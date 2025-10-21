@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { Dumbbell, LogOut, Users, UserPlus, Trash2, FileText } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface Aluno {
   id: string;
@@ -148,10 +149,13 @@ export default function Personal() {
               <p className="text-sm text-muted-foreground">{profile?.nome}</p>
             </div>
           </div>
-          <Button variant="outline" onClick={signOut}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Sair
-          </Button>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Button variant="outline" onClick={signOut}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Sair
+            </Button>
+          </div>
         </div>
       </header>
 

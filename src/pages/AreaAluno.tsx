@@ -9,6 +9,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { Dumbbell, LogOut, Download, Eye } from 'lucide-react';
 import { DocumentViewer } from '@/components/DocumentViewer';
 import { format } from 'date-fns';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { CalendarioSemanal } from '@/components/CalendarioSemanal';
+import { WhatsAppButton } from '@/components/WhatsAppButton';
 
 interface Material {
   id: string;
@@ -72,6 +75,10 @@ export default function AreaAluno() {
       case 'inicio':
         return (
           <div className="space-y-6 animate-fade-in">
+            {profile?.personal_id && (
+              <CalendarioSemanal profileId={user!.id} personalId={profile.personal_id} />
+            )}
+            
             <Card>
               <CardHeader>
                 <CardTitle className="text-2xl">Bem-vindo(a), {profile?.nome}! 🎉</CardTitle>
@@ -384,10 +391,19 @@ export default function AreaAluno() {
                   <p className="text-sm text-muted-foreground">{profile?.nome}</p>
                 </div>
               </div>
-              <Button variant="outline" onClick={signOut}>
-                <LogOut className="mr-2 h-4 w-4" />
-                Sair
-              </Button>
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
+                {profile?.personal_id && (
+                  <WhatsAppButton 
+                    telefone={profile.telefone || ''}
+                    nome="Personal"
+                  />
+                )}
+                <Button variant="outline" onClick={signOut}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sair
+                </Button>
+              </div>
             </div>
           </header>
 

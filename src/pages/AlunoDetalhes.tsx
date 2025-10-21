@@ -15,6 +15,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { ArrowLeft, Upload, Eye, Trash2, Download } from 'lucide-react';
 import { DocumentViewer } from '@/components/DocumentViewer';
 import { format } from 'date-fns';
+import { CalendarioSemanal } from '@/components/CalendarioSemanal';
+import { WhatsAppButton } from '@/components/WhatsAppButton';
 
 interface Material {
   id: string;
@@ -206,18 +208,27 @@ export default function AlunoDetalhes() {
             <CardTitle>Informações do Aluno</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
+            <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-bold">{aluno.nome}</h2>
                 <Badge>Aluno</Badge>
               </div>
               <p className="text-muted-foreground">{aluno.email}</p>
               {aluno.telefone && (
-                <p className="text-muted-foreground">{aluno.telefone}</p>
+                <>
+                  <p className="text-muted-foreground">{aluno.telefone}</p>
+                  <WhatsAppButton telefone={aluno.telefone} nome={aluno.nome} />
+                </>
               )}
             </div>
           </CardContent>
         </Card>
+
+        {user && (
+          <div className="mb-8">
+            <CalendarioSemanal profileId={id!} personalId={user.id} />
+          </div>
+        )}
 
         <Card>
           <CardHeader>

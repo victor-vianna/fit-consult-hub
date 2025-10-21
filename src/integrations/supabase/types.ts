@@ -103,6 +103,57 @@ export type Database = {
           },
         ]
       }
+      treinos_semanais: {
+        Row: {
+          concluido: boolean
+          created_at: string
+          dia_semana: number
+          id: string
+          observacoes: string | null
+          personal_id: string
+          profile_id: string
+          semana: string
+          updated_at: string
+        }
+        Insert: {
+          concluido?: boolean
+          created_at?: string
+          dia_semana: number
+          id?: string
+          observacoes?: string | null
+          personal_id: string
+          profile_id: string
+          semana: string
+          updated_at?: string
+        }
+        Update: {
+          concluido?: boolean
+          created_at?: string
+          dia_semana?: number
+          id?: string
+          observacoes?: string | null
+          personal_id?: string
+          profile_id?: string
+          semana?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "treinos_semanais_personal_id_fkey"
+            columns: ["personal_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "treinos_semanais_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null

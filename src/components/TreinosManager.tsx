@@ -21,6 +21,7 @@ interface TreinoDia {
   dia: number;
   treinoId: string | null;
   exercicios: Exercicio[];
+  descricao: string | null;
 }
 
 interface TreinosManagerProps {
@@ -44,9 +45,11 @@ export function TreinosManager({ profileId, personalId, readOnly = false }: Trei
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editDescricaoOpen, setEditDescricaoOpen] = useState(false);
   const [selectedDia, setSelectedDia] = useState<number | null>(null);
   const [novoExercicio, setNovoExercicio] = useState({ nome: '', link_video: '' });
   const [exercicioEditando, setExercicioEditando] = useState<Exercicio | null>(null);
+  const [descricaoEditando, setDescricaoEditando] = useState('');
 
   useEffect(() => {
     carregarTreinos();
@@ -87,6 +90,7 @@ export function TreinosManager({ profileId, personalId, readOnly = false }: Trei
               dia,
               treinoId: treino.id,
               exercicios: exercicios || [],
+              descricao: treino.descricao,
             };
           }
 
@@ -94,6 +98,7 @@ export function TreinosManager({ profileId, personalId, readOnly = false }: Trei
             dia,
             treinoId: null,
             exercicios: [],
+            descricao: null,
           };
         })
       );
@@ -202,6 +207,29 @@ export function TreinosManager({ profileId, personalId, readOnly = false }: Trei
     }
   };
 
+  const handleEditarDescricao = async () => {
+    if (selectedDia === null) return;
+
+    try {
+      const treinoId = await criarTreinoSeNecessario(selectedDia);
+      
+      const { error } = await supabase
+        .from('treinos_semanais')
+        .update({ descricao: descricaoEditando || null })
+        .eq('id', treinoId);
+
+      if (error) throw error;
+
+      toast.success('Grupo muscular atualizado');
+      setEditDescricaoOpen(false);
+      setDescricaoEditando('');
+      carregarTreinos();
+    } catch (error) {
+      console.error('Erro ao editar descrição:', error);
+      toast.error('Erro ao editar descrição');
+    }
+  };
+
   if (loading) {
     return <div className="text-center py-8">Carregando treinos...</div>;
   }
@@ -216,34 +244,50 @@ export function TreinosManager({ profileId, personalId, readOnly = false }: Trei
         {treinos.map((treino) => (
           <Collapsible key={treino.dia} defaultOpen={treino.exercicios.length > 0}>
             <Card>
-              <CollapsibleTrigger className="w-full">
-                <CardHeader className="cursor-pointer hover:bg-accent/50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+              <CardHeader>
+                <div className="flex items-center justify-between gap-4">
+                  <CollapsibleTrigger className="flex items-center gap-2 flex-1 text-left">
+                    <ChevronDown className="h-4 w-4 transition-transform shrink-0 data-[state=open]:rotate-180" />
+                    <div className="flex-1">
                       <CardTitle className="text-lg">{diasSemana[treino.dia - 1]}</CardTitle>
+                      {treino.descricao && (
+                        <CardDescription className="text-sm mt-1">{treino.descricao}</CardDescription>
+                      )}
                       {treino.exercicios.length > 0 && (
-                        <span className="text-sm text-muted-foreground">
-                          ({treino.exercicios.length} {treino.exercicios.length === 1 ? 'exercício' : 'exercícios'})
+                        <span className="text-xs text-muted-foreground mt-1 block">
+                          {treino.exercicios.length} {treino.exercicios.length === 1 ? 'exercício' : 'exercícios'}
                         </span>
                       )}
                     </div>
-                    {!readOnly && (
+                  </CollapsibleTrigger>
+                  {!readOnly && (
+                    <div className="flex gap-2 shrink-0">
                       <Button
                         size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedDia(treino.dia);
+                          setDescricaoEditando(treino.descricao || '');
+                          setEditDescricaoOpen(true);
+                        }}
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        Grupo
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => {
                           setSelectedDia(treino.dia);
                           setDialogOpen(true);
                         }}
                       >
                         <Plus className="h-4 w-4 mr-2" />
-                        Adicionar Exercício
+                        Exercício
                       </Button>
-                    )}
-                  </div>
-                </CardHeader>
-              </CollapsibleTrigger>
+                    </div>
+                  )}
+                </div>
+              </CardHeader>
 
               <CollapsibleContent>
                 <CardContent className="pt-0">
@@ -371,6 +415,35 @@ export function TreinosManager({ profileId, personalId, readOnly = false }: Trei
               Cancelar
             </Button>
             <Button onClick={handleEditarExercicio}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para editar descrição/grupo muscular */}
+      <Dialog open={editDescricaoOpen} onOpenChange={setEditDescricaoOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Grupo Muscular</DialogTitle>
+            <DialogDescription>
+              Defina o grupo muscular para {selectedDia !== null && diasSemana[selectedDia - 1]}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="descricao">Grupo Muscular</Label>
+              <Input
+                id="descricao"
+                value={descricaoEditando}
+                onChange={(e) => setDescricaoEditando(e.target.value)}
+                placeholder="Ex: Peito e Ombro, Pernas Completo, Costas..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDescricaoOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleEditarDescricao}>Salvar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

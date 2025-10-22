@@ -145,6 +145,7 @@ export type Database = {
         Row: {
           concluido: boolean
           created_at: string
+          descricao: string | null
           dia_semana: number
           id: string
           observacoes: string | null
@@ -156,6 +157,7 @@ export type Database = {
         Insert: {
           concluido?: boolean
           created_at?: string
+          descricao?: string | null
           dia_semana: number
           id?: string
           observacoes?: string | null
@@ -167,6 +169,7 @@ export type Database = {
         Update: {
           concluido?: boolean
           created_at?: string
+          descricao?: string | null
           dia_semana?: number
           id?: string
           observacoes?: string | null

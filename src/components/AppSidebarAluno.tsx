@@ -1,4 +1,4 @@
-import { Home, BookOpen, FileText, ListChecks } from 'lucide-react';
+import { Home, BookOpen, FileText, ListChecks, Dumbbell } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -15,6 +15,7 @@ const items = [
   { title: 'Início', icon: Home, value: 'inicio' },
   { title: 'Consultoria', icon: BookOpen, value: 'consultoria' },
   { title: 'Diretrizes', icon: ListChecks, value: 'diretrizes' },
+  { title: 'Treinos', icon: Dumbbell, value: 'treinos' },
   { title: 'Materiais', icon: FileText, value: 'materiais' },
 ];
 

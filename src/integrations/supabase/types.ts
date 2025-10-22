@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      exercicios: {
+        Row: {
+          created_at: string
+          id: string
+          link_video: string | null
+          nome: string
+          ordem: number
+          treino_semanal_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          link_video?: string | null
+          nome: string
+          ordem?: number
+          treino_semanal_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          link_video?: string | null
+          nome?: string
+          ordem?: number
+          treino_semanal_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercicios_treino_semanal_id_fkey"
+            columns: ["treino_semanal_id"]
+            isOneToOne: false
+            referencedRelation: "treinos_semanais"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       materiais: {
         Row: {
           arquivo_nome: string
@@ -187,14 +225,8 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_admin: {
-        Args: { _user_id: string }
-        Returns: boolean
-      }
-      is_personal: {
-        Args: { _user_id: string }
-        Returns: boolean
-      }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_personal: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       user_role: "admin" | "personal" | "aluno"

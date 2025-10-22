@@ -17,6 +17,7 @@ import { DocumentViewer } from '@/components/DocumentViewer';
 import { format } from 'date-fns';
 import { CalendarioSemanal } from '@/components/CalendarioSemanal';
 import { WhatsAppButton } from '@/components/WhatsAppButton';
+import { TreinosManager } from '@/components/TreinosManager';
 
 interface Material {
   id: string;
@@ -229,6 +230,10 @@ export default function AlunoDetalhes() {
             <CalendarioSemanal profileId={id!} personalId={user.id} />
           </div>
         )}
+
+        <div className="mb-8">
+          <TreinosManager profileId={id!} personalId={user.id} readOnly={false} />
+        </div>
 
         <Card>
           <CardHeader>

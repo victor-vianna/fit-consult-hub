@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CalendarioSemanal } from '@/components/CalendarioSemanal';
 import { WhatsAppButton } from '@/components/WhatsAppButton';
+import { TreinosManager } from '@/components/TreinosManager';
 
 interface Material {
   id: string;
@@ -304,6 +305,19 @@ export default function AreaAluno() {
                 </ul>
               </CardContent>
             </Card>
+          </div>
+        );
+
+      case 'treinos':
+        return (
+          <div className="space-y-6 animate-fade-in">
+            {profile?.personal_id && (
+              <TreinosManager 
+                profileId={user!.id} 
+                personalId={profile.personal_id} 
+                readOnly={true}
+              />
+            )}
           </div>
         );
 

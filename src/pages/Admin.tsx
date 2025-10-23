@@ -29,6 +29,9 @@ export default function Admin() {
   const { toast } = useToast();
   const [personals, setPersonals] = useState<PersonalWithAlunos[]>([]);
   const [totalAlunos, setTotalAlunos] = useState(0);
+  const [totalPersonals, setTotalPersonals] = useState(0);
+  const [totalAdmins, setTotalAdmins] = useState(0);
+  const [totalUsuarios, setTotalUsuarios] = useState(0);
   const [loading, setLoading] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
 
@@ -38,6 +41,23 @@ export default function Admin() {
 
   const fetchData = async () => {
     try {
+      // Buscar contagens de roles
+      const { data: rolesData } = await supabase
+        .from('user_roles')
+        .select('role, user_id');
+
+      if (rolesData) {
+        const personalCount = rolesData.filter(r => r.role === 'personal').length;
+        const alunoCount = rolesData.filter(r => r.role === 'aluno').length;
+        const adminCount = rolesData.filter(r => r.role === 'admin').length;
+        const uniqueUsers = new Set(rolesData.map(r => r.user_id));
+        
+        setTotalPersonals(personalCount);
+        setTotalAlunos(alunoCount);
+        setTotalAdmins(adminCount);
+        setTotalUsuarios(uniqueUsers.size);
+      }
+
       // Buscar personals
       const { data: personalRoles } = await supabase
         .from('user_roles')
@@ -47,7 +67,6 @@ export default function Admin() {
       if (!personalRoles) return;
 
       const personalIds = personalRoles.map(r => r.user_id);
-
       const { data: personalProfiles } = await supabase
         .from('profiles')
         .select('*')
@@ -55,7 +74,6 @@ export default function Admin() {
 
       if (!personalProfiles) return;
 
-      // Buscar alunos de cada personal
       const personalsComAlunos = await Promise.all(
         personalProfiles.map(async (personal) => {
           const { data: alunos } = await supabase
@@ -71,7 +89,6 @@ export default function Admin() {
       );
 
       setPersonals(personalsComAlunos);
-      setTotalAlunos(personalsComAlunos.reduce((acc, p) => acc + p.alunos.length, 0));
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
     }
@@ -167,24 +184,34 @@ export default function Admin() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Personal Trainers</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{personals.length}</div>
+              <div className="text-2xl font-bold">{totalPersonals}</div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total de Alunos</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Alunos</CardTitle>
+              <UserPlus className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totalAlunos}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Administradores</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalAdmins}</div>
             </CardContent>
           </Card>
 
@@ -194,7 +221,7 @@ export default function Admin() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{personals.length + totalAlunos}</div>
+              <div className="text-2xl font-bold">{totalUsuarios}</div>
             </CardContent>
           </Card>
         </div>

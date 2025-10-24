@@ -6,13 +6,17 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebarAluno } from '@/components/AppSidebarAluno';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Dumbbell, LogOut, Download, Eye } from 'lucide-react';
+import { Dumbbell, LogOut, Download, Eye, BookOpen, ListChecks, FileText } from 'lucide-react';
 import { DocumentViewer } from '@/components/DocumentViewer';
 import { format } from 'date-fns';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CalendarioSemanal } from '@/components/CalendarioSemanal';
 import { WhatsAppButton } from '@/components/WhatsAppButton';
 import { TreinosManager } from '@/components/TreinosManager';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { MobileHeader } from '@/components/mobile/MobileHeader';
+import { BottomNavigation } from '@/components/mobile/BottomNavigation';
+import { ActionCard } from '@/components/mobile/ActionCard';
 
 interface Material {
   id: string;
@@ -26,6 +30,7 @@ interface Material {
 
 export default function AreaAluno() {
   const { user, signOut } = useAuth();
+  const isMobile = useIsMobile();
   const [profile, setProfile] = useState<any>(null);
   const [materiais, setMateriais] = useState<Material[]>([]);
   const [activeSection, setActiveSection] = useState('inicio');
@@ -71,7 +76,61 @@ export default function AreaAluno() {
     setViewerOpen(true);
   };
 
+  const renderMobileHome = () => {
+    return (
+      <div className="space-y-4 px-4 pb-24 animate-fade-in">
+        {profile?.personal_id && (
+          <CalendarioSemanal profileId={user!.id} personalId={profile.personal_id} />
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <ActionCard
+            title="Treinos"
+            icon={Dumbbell}
+            onClick={() => setActiveSection('treinos')}
+          />
+          <ActionCard
+            title="Materiais"
+            icon={FileText}
+            onClick={() => setActiveSection('materiais')}
+          />
+          <ActionCard
+            title="Consultoria"
+            icon={BookOpen}
+            onClick={() => setActiveSection('consultoria')}
+          />
+          <ActionCard
+            title="Diretrizes"
+            icon={ListChecks}
+            onClick={() => setActiveSection('diretrizes')}
+          />
+        </div>
+
+        <Card className="border-primary/50 bg-gradient-to-br from-primary/5 to-primary/10">
+          <CardHeader>
+            <CardTitle className="text-lg">Sua Jornada Começa Agora</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            <p className="mb-3">
+              Agora que você já conhece o funcionamento da minha consultoria, chegou o momento de dar 
+              o primeiro passo!
+            </p>
+            <p className="font-semibold">
+              Vamos juntos transformar sua rotina, superar desafios e conquistar os seus melhores 
+              resultados. Estou pronto para te acompanhar – vem comigo! 💪
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
   const renderContent = () => {
+    // Mobile: só renderiza home especial na seção 'inicio'
+    if (isMobile && activeSection === 'inicio') {
+      return renderMobileHome();
+    }
+
     switch (activeSection) {
       case 'inicio':
         return (
@@ -386,6 +445,39 @@ export default function AreaAluno() {
     }
   };
 
+  // Layout Mobile
+  if (isMobile) {
+    return (
+      <div className="min-h-screen flex flex-col w-full bg-background">
+        <MobileHeader userName={profile?.nome} />
+
+        <main className="flex-1 overflow-auto mobile-content-spacing">
+          <div className="container max-w-2xl mx-auto py-4">
+            {renderContent()}
+          </div>
+        </main>
+
+        <BottomNavigation
+          activeSection={activeSection}
+          onSectionChange={setActiveSection}
+          onSignOut={signOut}
+          personalWhatsApp={profile?.telefone}
+        />
+
+        {selectedFile && (
+          <DocumentViewer
+            open={viewerOpen}
+            onClose={() => setViewerOpen(false)}
+            fileUrl={selectedFile.url}
+            fileName={selectedFile.name}
+            fileType={selectedFile.type}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // Layout Desktop
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">

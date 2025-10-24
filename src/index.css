@@ -103,3 +103,24 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  /* Safe area utilities for mobile devices */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* Mobile spacing utilities */
+  .mobile-content-spacing {
+    @apply pb-20 md:pb-0;
+  }
+
+  /* Touch target minimum size */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+}

@@ -32,6 +32,7 @@ export default function AreaAluno() {
   const { user, signOut } = useAuth();
   const isMobile = useIsMobile();
   const [profile, setProfile] = useState<any>(null);
+  const [personalProfile, setPersonalProfile] = useState<any>(null);
   const [materiais, setMateriais] = useState<Material[]>([]);
   const [activeSection, setActiveSection] = useState('inicio');
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -54,6 +55,17 @@ export default function AreaAluno() {
         .single();
 
       setProfile(profileData);
+
+      // Buscar telefone do personal
+      if (profileData?.personal_id) {
+        const { data: personalData } = await supabase
+          .from('profiles')
+          .select('telefone')
+          .eq('id', profileData.personal_id)
+          .single();
+        
+        setPersonalProfile(personalData);
+      }
 
       const { data: materiaisData } = await supabase
         .from('materiais')
@@ -461,7 +473,7 @@ export default function AreaAluno() {
           activeSection={activeSection}
           onSectionChange={setActiveSection}
           onSignOut={signOut}
-          personalWhatsApp={profile?.telefone}
+          personalWhatsApp={personalProfile?.telefone}
         />
 
         {selectedFile && (
@@ -499,9 +511,9 @@ export default function AreaAluno() {
               </div>
               <div className="flex items-center gap-2">
                 <ThemeToggle />
-                {profile?.personal_id && (
+                {profile?.personal_id && personalProfile?.telefone && (
                   <WhatsAppButton 
-                    telefone={profile.telefone || ''}
+                    telefone={personalProfile.telefone}
                     nome="Personal"
                   />
                 )}

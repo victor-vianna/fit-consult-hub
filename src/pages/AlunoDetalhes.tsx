@@ -35,6 +35,7 @@ export default function AlunoDetalhes() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [aluno, setAluno] = useState<any>(null);
+  const [personalProfile, setPersonalProfile] = useState<any>(null);
   const [materiais, setMateriais] = useState<Material[]>([]);
   const [loading, setLoading] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
@@ -48,7 +49,7 @@ export default function AlunoDetalhes() {
   }, [id]);
 
   const fetchData = async () => {
-    if (!id) return;
+    if (!id || !user) return;
 
     try {
       // Buscar dados do aluno
@@ -59,6 +60,15 @@ export default function AlunoDetalhes() {
         .single();
 
       setAluno(alunoData);
+
+      // Buscar dados do personal (user atual)
+      const { data: personalData } = await supabase
+        .from('profiles')
+        .select('telefone')
+        .eq('id', user.id)
+        .single();
+
+      setPersonalProfile(personalData);
 
       // Buscar materiais
       const { data: materiaisData } = await supabase
@@ -216,10 +226,10 @@ export default function AlunoDetalhes() {
               </div>
               <p className="text-muted-foreground">{aluno.email}</p>
               {aluno.telefone && (
-                <>
-                  <p className="text-muted-foreground">{aluno.telefone}</p>
-                  <WhatsAppButton telefone={aluno.telefone} nome={aluno.nome} />
-                </>
+                <p className="text-muted-foreground">📱 {aluno.telefone}</p>
+              )}
+              {personalProfile?.telefone && (
+                <WhatsAppButton telefone={personalProfile.telefone} nome={aluno.nome} />
               )}
             </div>
           </CardContent>

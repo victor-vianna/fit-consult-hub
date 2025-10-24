@@ -1,6 +1,7 @@
 {
   "name": "FitConsult Hub",
   "short_name": "FitConsult",
+  "version": "2.0.0",
   "description": "Plataforma completa de consultoria fitness online",
   "start_url": "/",
   "display": "standalone",

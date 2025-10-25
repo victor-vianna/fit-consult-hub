@@ -61,14 +61,16 @@ export default function AlunoDetalhes() {
 
       setAluno(alunoData);
 
-      // Buscar dados do personal (user atual)
-      const { data: personalData } = await supabase
-        .from('profiles')
-        .select('telefone')
-        .eq('id', user.id)
-        .single();
+      // Buscar dados do personal vinculado ao aluno
+      if (alunoData?.personal_id) {
+        const { data: personalData } = await supabase
+          .from('profiles')
+          .select('telefone')
+          .eq('id', alunoData.personal_id)
+          .single();
 
-      setPersonalProfile(personalData);
+        setPersonalProfile(personalData);
+      }
 
       // Buscar materiais
       const { data: materiaisData } = await supabase

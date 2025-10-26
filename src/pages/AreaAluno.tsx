@@ -37,7 +37,6 @@ export default function AreaAluno() {
   const [activeSection, setActiveSection] = useState('inicio');
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
@@ -49,17 +48,11 @@ export default function AreaAluno() {
     if (!user) return;
 
     try {
-      setLoading(true);
-      const { data: profileData, error: profileError } = await supabase
+      const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single();
-
-      if (profileError) {
-        console.error('Erro ao carregar perfil:', profileError);
-        return;
-      }
 
       setProfile(profileData);
 
@@ -83,8 +76,6 @@ export default function AreaAluno() {
       setMateriais(materiaisData || []);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -465,18 +456,6 @@ export default function AreaAluno() {
         return null;
     }
   };
-
-  // Tela de loading
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Carregando...</p>
-        </div>
-      </div>
-    );
-  }
 
   // Layout Mobile
   if (isMobile) {

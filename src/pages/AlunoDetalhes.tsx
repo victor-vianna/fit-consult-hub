@@ -261,11 +261,8 @@ export default function AlunoDetalhes() {
               {aluno.telefone && (
                 <p className="text-muted-foreground">📱 {aluno.telefone}</p>
               )}
-              {personalProfile?.telefone && (
-                <WhatsAppButton
-                  telefone={personalProfile.telefone}
-                  nome={aluno.nome}
-                />
+              {aluno?.telefone && (
+                <WhatsAppButton telefone={aluno.telefone} nome={aluno.nome} />
               )}
             </div>
           </CardContent>

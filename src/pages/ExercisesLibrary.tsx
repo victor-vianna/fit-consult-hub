@@ -29,6 +29,9 @@ export default function ExercisesLibrary() {
   const [modalOpen, setModalOpen] = useState(false);
   const [userRole, setUserRole] = useState<string>("");
 
+  // ✅ NOVO: Estado para edição
+  const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [grupoFilter, setGrupoFilter] = useState<string>("todos");
   const [equipamentoFilter, setEquipamentoFilter] = useState<string>("todos");
@@ -95,6 +98,12 @@ export default function ExercisesLibrary() {
     setFilteredExercises(filtered);
   };
 
+  // ✅ NOVO: Handler para abrir modal de edição
+  const handleEdit = (exercise: Exercise) => {
+    setEditingExercise(exercise);
+    setModalOpen(true);
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja deletar este exercício?")) return;
 
@@ -110,6 +119,18 @@ export default function ExercisesLibrary() {
       console.error("Erro ao deletar exercício:", error);
       toast.error("Erro ao deletar exercício");
     }
+  };
+
+  // ✅ NOVO: Handler para fechar modal e limpar estado de edição
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setEditingExercise(null);
+  };
+
+  // ✅ NOVO: Handler para sucesso (criar ou editar)
+  const handleSuccess = () => {
+    fetchExercises();
+    handleCloseModal();
   };
 
   const clearFilters = () => {
@@ -140,10 +161,13 @@ export default function ExercisesLibrary() {
             {filteredExercises.length} exercício(s) encontrado(s)
           </p>
         </div>
-        {/*✅ Só mostra o botão para personal e admin */}
+        {/* Só mostra o botão para personal e admin */}
         {(userRole === "personal" || userRole === "admin") && (
           <Button
-            onClick={() => setModalOpen(true)}
+            onClick={() => {
+              setEditingExercise(null); // ✅ Garantir que está em modo criação
+              setModalOpen(true);
+            }}
             className="transition-all hover:scale-[1.02]"
           >
             <Plus className="w-4 h-4 mr-2" />
@@ -239,7 +263,7 @@ export default function ExercisesLibrary() {
 
       {/* Exercícios */}
       {filteredExercises.length === 0 ? (
-        <div className="text-center py-16 ">
+        <div className="text-center py-16">
           <p className="text-muted-foreground text-lg">
             Nenhum exercício encontrado
           </p>
@@ -254,6 +278,7 @@ export default function ExercisesLibrary() {
               key={exercise.id}
               exercise={exercise}
               showActions={exercise.created_by === user?.id}
+              onEdit={handleEdit} // ✅ NOVO: Passar handler de edição
               onDelete={handleDelete}
             />
           ))}
@@ -263,8 +288,9 @@ export default function ExercisesLibrary() {
       {/* Modal */}
       <ExerciseModal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onSuccess={fetchExercises}
+        onClose={handleCloseModal} // ✅ Usar novo handler
+        onSuccess={handleSuccess} // ✅ Usar novo handler
+        exercise={editingExercise} // ✅ NOVO: Passar exercício para edição
       />
     </div>
   );

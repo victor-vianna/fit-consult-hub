@@ -1,117 +1,158 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Exercise } from "@/types/exercise";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Youtube, Dumbbell, TrendingUp } from "lucide-react";
-import { Exercise } from "@/types/exercise";
+import {
+  Trash2,
+  Edit,
+  ExternalLink,
+  Dumbbell,
+  Image as ImageIcon,
+} from "lucide-react";
 
 interface ExerciseCardProps {
   exercise: Exercise;
-  onSelect?: (exercise: Exercise) => void;
-  onDelete?: (id: string) => void;
   showActions?: boolean;
+  onEdit?: (exercise: Exercise) => void;
+  onDelete?: (id: string) => void;
   selectable?: boolean;
+  onSelect?: (exercise: Exercise) => void;
 }
 
 export default function ExerciseCard({
   exercise,
-  onSelect,
-  onDelete,
   showActions = false,
+  onEdit,
+  onDelete,
   selectable = false,
+  onSelect,
 }: ExerciseCardProps) {
-  const thumbnailUrl = exercise.imagem_thumbnail
-    ? `${
-        import.meta.env.VITE_SUPABASE_URL
-      }/storage/v1/object/public/exercise-thumbnails/${
-        exercise.imagem_thumbnail
-      }`
-    : "https://via.placeholder.com/300x200?text=Sem+Imagem";
+  const handleClick = () => {
+    if (selectable && onSelect) {
+      onSelect(exercise);
+    }
+  };
+
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onEdit) {
+      onEdit(exercise);
+    }
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onDelete) {
+      onDelete(exercise.id);
+    }
+  };
 
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
-      <div className="relative h-48 overflow-hidden bg-gray-100">
-        <img
-          src={thumbnailUrl}
-          alt={exercise.nome}
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            e.currentTarget.src =
-              "https://via.placeholder.com/300x200?text=Erro+ao+Carregar";
-          }}
-        />
-        {exercise.is_global && (
-          <Badge className="absolute top-2 right-2 bg-blue-500">Global</Badge>
-        )}
-      </div>
+    <Card
+      className={`overflow-hidden transition-all hover:shadow-lg ${
+        selectable ? "cursor-pointer hover:border-primary" : ""
+      }`}
+      onClick={handleClick}
+    >
+      {/* ✅ Thumbnail */}
+      {exercise.imagem_thumbnail ? (
+        <div className="w-full h-40 overflow-hidden bg-muted">
+          <img
+            src={exercise.imagem_thumbnail}
+            alt={exercise.nome}
+            className="w-full h-full object-cover"
+          />
+        </div>
+      ) : (
+        <div className="w-full h-40 bg-muted flex items-center justify-center">
+          <ImageIcon className="w-12 h-12 text-muted-foreground/30" />
+        </div>
+      )}
 
-      <CardHeader>
-        <CardTitle className="text-lg">{exercise.nome}</CardTitle>
-        <div className="flex gap-2 flex-wrap">
-          <Badge variant="outline">{exercise.grupo_muscular}</Badge>
-          {exercise.equipamento && (
-            <Badge variant="secondary" className="flex items-center gap-1">
-              <Dumbbell className="w-3 h-3" />
-              {exercise.equipamento}
-            </Badge>
-          )}
-          {exercise.nivel_dificuldade && (
-            <Badge
-              variant="secondary"
-              className={`flex items-center gap-1 ${
-                exercise.nivel_dificuldade === "iniciante"
-                  ? "bg-green-100 text-green-800"
-                  : exercise.nivel_dificuldade === "intermediario"
-                  ? "bg-yellow-100 text-yellow-800"
-                  : "bg-red-100 text-red-800"
-              }`}
-            >
-              <TrendingUp className="w-3 h-3" />
-              {exercise.nivel_dificuldade}
-            </Badge>
-          )}
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1">
+            <CardTitle className="text-lg line-clamp-2">
+              {exercise.nome}
+            </CardTitle>
+            <CardDescription className="mt-1 capitalize">
+              {exercise.grupo_muscular?.replace("_", " ")}
+            </CardDescription>
+          </div>
+          <Dumbbell className="w-5 h-5 text-muted-foreground shrink-0" />
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-3">
         {exercise.descricao && (
-          <p className="text-sm text-gray-600 line-clamp-2">
+          <p className="text-sm text-muted-foreground line-clamp-2">
             {exercise.descricao}
           </p>
         )}
 
-        <div className="flex gap-2 flex-wrap">
-          {exercise.link_youtube && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.open(exercise.link_youtube, "_blank")}
-            >
-              <Youtube className="w-4 h-4 mr-1" />
-              Vídeo
-            </Button>
+        <div className="flex flex-wrap gap-2">
+          {exercise.equipamento && (
+            <Badge variant="secondary" className="text-xs">
+              {exercise.equipamento.replace("_", " ")}
+            </Badge>
           )}
-
-          {selectable && onSelect && (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => onSelect(exercise)}
+          {exercise.nivel_dificuldade && (
+            <Badge
+              variant={
+                exercise.nivel_dificuldade === "iniciante"
+                  ? "default"
+                  : exercise.nivel_dificuldade === "intermediario"
+                  ? "secondary"
+                  : "destructive"
+              }
+              className="text-xs capitalize"
             >
-              <Plus className="w-4 h-4 mr-1" />
-              Adicionar
-            </Button>
-          )}
-
-          {showActions && onDelete && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => onDelete(exercise.id)}
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
+              {exercise.nivel_dificuldade}
+            </Badge>
           )}
         </div>
+
+        {exercise.link_youtube && (
+          <a
+            href={exercise.link_youtube}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-sm text-primary hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            Ver demonstração
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        )}
+
+        {showActions && (
+          <div className="flex gap-2 pt-2 border-t">
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1"
+              onClick={handleEdit}
+            >
+              <Edit className="w-4 h-4 mr-1" />
+              Editar
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              className="flex-1"
+              onClick={handleDelete}
+            >
+              <Trash2 className="w-4 h-4 mr-1" />
+              Deletar
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

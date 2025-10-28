@@ -26,7 +26,14 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { Users, UserPlus, Trash2, FileText } from "lucide-react";
+import {
+  Users,
+  UserPlus,
+  Trash2,
+  FileText,
+  UserCheck,
+  UserX,
+} from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebarPersonal } from "@/components/AppSidebarPersonal";
@@ -36,6 +43,7 @@ interface Aluno {
   nome: string;
   email: string;
   telefone: string | null;
+  is_active: boolean;
 }
 
 export default function Personal() {
@@ -47,6 +55,10 @@ export default function Personal() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
+
+  // Calcular alunos ativos e inativos
+  const alunosAtivos = alunos.filter((a) => a.is_active).length;
+  const alunosInativos = alunos.filter((a) => !a.is_active).length;
 
   useEffect(() => {
     if (user) {
@@ -67,11 +79,12 @@ export default function Personal() {
 
       setProfile(profileData);
 
-      // Buscar alunos
+      // Buscar alunos (incluindo is_active)
       const { data: alunosData } = await supabase
         .from("profiles")
         .select("*")
-        .eq("personal_id", user.id);
+        .eq("personal_id", user.id)
+        .order("nome");
 
       setAlunos(alunosData || []);
 
@@ -179,7 +192,7 @@ export default function Personal() {
 
           <main className="flex-1 overflow-auto">
             <div className="container mx-auto px-4 py-8">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium">
@@ -197,10 +210,26 @@ export default function Personal() {
                     <CardTitle className="text-sm font-medium">
                       Alunos Ativos
                     </CardTitle>
-                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <UserCheck className="h-4 w-4 text-green-600" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{alunos.length}</div>
+                    <div className="text-2xl font-bold text-green-600">
+                      {alunosAtivos}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      Alunos Inativos
+                    </CardTitle>
+                    <UserX className="h-4 w-4 text-red-600" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-red-600">
+                      {alunosInativos}
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -280,9 +309,28 @@ export default function Personal() {
                     {alunos.map((aluno) => (
                       <Card
                         key={aluno.id}
-                        className="cursor-pointer hover:shadow-lg transition-shadow"
+                        className={`cursor-pointer hover:shadow-lg transition-all relative ${
+                          !aluno.is_active
+                            ? "border-red-500 border-2 opacity-75"
+                            : "border-green-500 border-2"
+                        }`}
                         onClick={() => navigate(`/aluno/${aluno.id}`)}
                       >
+                        {/* Badge de status no canto superior direito */}
+                        <div className="absolute top-2 right-2">
+                          {aluno.is_active ? (
+                            <Badge className="bg-green-600 hover:bg-green-700">
+                              <UserCheck className="h-3 w-3 mr-1" />
+                              Ativo
+                            </Badge>
+                          ) : (
+                            <Badge variant="destructive">
+                              <UserX className="h-3 w-3 mr-1" />
+                              Bloqueado
+                            </Badge>
+                          )}
+                        </div>
+
                         <CardContent className="pt-6">
                           <div className="space-y-2">
                             <div className="flex items-center gap-2">

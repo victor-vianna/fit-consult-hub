@@ -12,6 +12,7 @@ import AlunoDetalhes from "./pages/AlunoDetalhes";
 import AreaAluno from "./pages/AreaAluno";
 import NotFound from "./pages/NotFound";
 import ExercisesLibrary from "./pages/ExercisesLibrary";
+import AcessoSuspenso from "./pages/AcessoSuspenso";
 
 const queryClient = new QueryClient();
 
@@ -65,6 +66,8 @@ const App = () => (
             }
           />
           <Route path="*" element={<NotFound />} />
+
+          <Route path="/acesso-suspenso" element={<AcessoSuspenso />} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>

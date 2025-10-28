@@ -48,6 +48,38 @@ export const useAuth = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Adicione este useEffect no seu hook useAuth
+  useEffect(() => {
+    if (user && role === "aluno") {
+      // Listener para mudanças no perfil do aluno
+      const channel = supabase
+        .channel("profile-changes")
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "profiles",
+            filter: `id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log("Perfil atualizado:", payload);
+
+            // Se is_active mudou para false, redireciona
+            if (payload.new.is_active === false) {
+              console.log("Aluno foi bloqueado, redirecionando...");
+              window.location.href = "/acesso-suspenso";
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [user, role]);
+
   const fetchUserRole = async (userId: string) => {
     try {
       const { data, error } = await supabase

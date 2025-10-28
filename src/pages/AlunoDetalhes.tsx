@@ -34,12 +34,13 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowLeft, Upload, Eye, Trash2, Download } from "lucide-react";
+import { ArrowLeft, Upload, Eye, Trash2, AlertTriangle } from "lucide-react";
 import { DocumentViewer } from "@/components/DocumentViewer";
 import { format } from "date-fns";
 import { CalendarioSemanal } from "@/components/CalendarioSemanal";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { TreinosManager } from "@/components/TreinosManager";
+import { StudentActiveToggle } from "@/components/ui/StudantActiveToggle";
 
 interface Material {
   id: string;
@@ -51,12 +52,23 @@ interface Material {
   created_at: string;
 }
 
+interface Aluno {
+  id: string;
+  nome: string;
+  email: string;
+  telefone?: string;
+  personal_id?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export default function AlunoDetalhes() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [aluno, setAluno] = useState<any>(null);
+  const [aluno, setAluno] = useState<Aluno | null>(null);
   const [personalProfile, setPersonalProfile] = useState<any>(null);
   const [materiais, setMateriais] = useState<Material[]>([]);
   const [loading, setLoading] = useState(false);
@@ -82,10 +94,15 @@ export default function AlunoDetalhes() {
 
       if (alunoError) {
         console.error("Erro ao buscar aluno:", alunoError);
+        toast({
+          title: "Erro ao carregar aluno",
+          description: alunoError.message,
+          variant: "destructive",
+        });
         return;
       }
 
-      setAluno(alunoData);
+      setAluno(alunoData as Aluno);
 
       if (alunoData?.personal_id) {
         const { data: personalData, error: personalError } = await supabase
@@ -227,10 +244,19 @@ export default function AlunoDetalhes() {
     setViewerOpen(true);
   };
 
+  const handleActiveStatusChange = (newStatus: boolean) => {
+    if (aluno) {
+      setAluno({ ...aluno, is_active: newStatus });
+    }
+  };
+
   if (!aluno) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p>Carregando...</p>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Carregando...</p>
+        </div>
       </div>
     );
   }
@@ -249,13 +275,41 @@ export default function AlunoDetalhes() {
       <main className="container mx-auto px-4 py-8">
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle>Informações do Aluno</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Informações do Aluno</CardTitle>
+              <StudentActiveToggle
+                studentId={aluno.id}
+                studentName={aluno.nome}
+                isActive={aluno.is_active}
+                onChanged={handleActiveStatusChange}
+              />
+            </div>
           </CardHeader>
           <CardContent>
+            {/* Banner de aviso se aluno estiver bloqueado */}
+            {!aluno.is_active && (
+              <div className="mb-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-r-lg">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold text-yellow-900">
+                      ⚠️ Aluno com acesso bloqueado
+                    </p>
+                    <p className="text-sm text-yellow-800 mt-1">
+                      Este aluno não consegue acessar o sistema no momento. Ele
+                      verá uma tela de "Acesso Suspenso" ao tentar fazer login.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-bold">{aluno.nome}</h2>
-                <Badge>Aluno</Badge>
+                <Badge variant={aluno.is_active ? "default" : "destructive"}>
+                  {aluno.is_active ? "Ativo" : "Bloqueado"}
+                </Badge>
               </div>
               <p className="text-muted-foreground">{aluno.email}</p>
               {aluno.telefone && (

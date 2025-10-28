@@ -11,6 +11,7 @@ import Personal from "./pages/Personal";
 import AlunoDetalhes from "./pages/AlunoDetalhes";
 import AreaAluno from "./pages/AreaAluno";
 import NotFound from "./pages/NotFound";
+import ExercisesLibrary from "./pages/ExercisesLibrary";
 
 const queryClient = new QueryClient();
 
@@ -23,37 +24,45 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/auth" element={<Auth />} />
-          <Route 
-            path="/admin" 
+          <Route
+            path="/admin"
             element={
-              <AuthGuard allowedRoles={['admin']}>
+              <AuthGuard allowedRoles={["admin"]}>
                 <Admin />
               </AuthGuard>
-            } 
+            }
           />
-          <Route 
-            path="/" 
+          <Route
+            path="/"
             element={
-              <AuthGuard allowedRoles={['personal']}>
+              <AuthGuard allowedRoles={["personal"]}>
                 <Personal />
               </AuthGuard>
-            } 
+            }
           />
-          <Route 
-            path="/aluno/:id" 
+          <Route
+            path="/aluno/:id"
             element={
-              <AuthGuard allowedRoles={['personal']}>
+              <AuthGuard allowedRoles={["personal"]}>
                 <AlunoDetalhes />
               </AuthGuard>
-            } 
+            }
           />
-          <Route 
-            path="/aluno" 
+          <Route
+            path="/aluno"
             element={
-              <AuthGuard allowedRoles={['aluno']}>
+              <AuthGuard allowedRoles={["aluno"]}>
                 <AreaAluno />
               </AuthGuard>
-            } 
+            }
+          />
+          <Route
+            path="/exercicios"
+            element={
+              <AuthGuard allowedRoles={["personal", "admin", "aluno"]}>
+                <ExercisesLibrary />
+              </AuthGuard>
+            }
           />
           <Route path="*" element={<NotFound />} />
         </Routes>

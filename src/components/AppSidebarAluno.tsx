@@ -1,4 +1,12 @@
-import { Home, BookOpen, FileText, ListChecks, Dumbbell } from 'lucide-react';
+import {
+  Home,
+  BookOpen,
+  FileText,
+  ListChecks,
+  Dumbbell,
+  Library,
+} from "lucide-react";
+import { Link } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -9,14 +17,14 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from '@/components/ui/sidebar';
+} from "@/components/ui/sidebar";
 
 const items = [
-  { title: 'Início', icon: Home, value: 'inicio' },
-  { title: 'Consultoria', icon: BookOpen, value: 'consultoria' },
-  { title: 'Diretrizes', icon: ListChecks, value: 'diretrizes' },
-  { title: 'Treinos', icon: Dumbbell, value: 'treinos' },
-  { title: 'Materiais', icon: FileText, value: 'materiais' },
+  { title: "Início", icon: Home, value: "inicio" },
+  { title: "Consultoria", icon: BookOpen, value: "consultoria" },
+  { title: "Diretrizes", icon: ListChecks, value: "diretrizes" },
+  { title: "Treinos", icon: Dumbbell, value: "treinos" },
+  { title: "Materiais", icon: FileText, value: "materiais" },
 ];
 
 interface AppSidebarAlunoProps {
@@ -24,13 +32,17 @@ interface AppSidebarAlunoProps {
   onSectionChange: (section: string) => void;
 }
 
-export function AppSidebarAluno({ activeSection, onSectionChange }: AppSidebarAlunoProps) {
+export function AppSidebarAluno({
+  activeSection,
+  onSectionChange,
+}: AppSidebarAlunoProps) {
   const { state } = useSidebar();
-  const collapsed = state === 'collapsed';
+  const collapsed = state === "collapsed";
 
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
+        {/* Menu Principal */}
         <SidebarGroup>
           <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -46,6 +58,23 @@ export function AppSidebarAluno({ activeSection, onSectionChange }: AppSidebarAl
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Recursos Adicionais */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Recursos</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link to="/exercicios">
+                    <Library className="h-4 w-4" />
+                    {!collapsed && <span>Exercícios</span>}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

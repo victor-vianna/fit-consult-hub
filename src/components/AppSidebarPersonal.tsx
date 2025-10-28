@@ -34,9 +34,8 @@ export function AppSidebarPersonal() {
 
   const menuItems = [
     { title: "Início", icon: Home, path: "/" },
-    { title: "Alunos", icon: Users, path: "/" },
     { title: "Exercícios", icon: Library, path: "/exercicios" },
-    { title: "Financeiro", icon: Wallet, url: "/financeiro" },
+    { title: "Financeiro", icon: Wallet, path: "/financeiro" },
   ];
 
   return (

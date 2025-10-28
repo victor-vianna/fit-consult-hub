@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -45,13 +45,13 @@ export function useFinancialDashboard(personalId: string) {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (personalId) {
-      fetchFinancialData();
+  // ✅ SOLUÇÃO: Remover toast das dependências e usar useEffect separado
+  const fetchFinancialData = useCallback(async () => {
+    if (!personalId) {
+      setLoading(false);
+      return;
     }
-  }, [personalId]);
 
-  const fetchFinancialData = async () => {
     try {
       setLoading(true);
 
@@ -77,12 +77,17 @@ export function useFinancialDashboard(personalId: string) {
 
       // Buscar perfis dos alunos
       const studentIds = subscriptions?.map((s) => s.student_id) || [];
-      const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, nome, email")
-        .in("id", studentIds);
 
-      if (profilesError) throw profilesError;
+      let profiles = [];
+      if (studentIds.length > 0) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id, nome, email")
+          .in("id", studentIds);
+
+        if (profilesError) throw profilesError;
+        profiles = profilesData || [];
+      }
 
       // Calcular métricas
       const now = new Date();
@@ -210,17 +215,44 @@ export function useFinancialDashboard(personalId: string) {
 
       setMonthlyRevenue(monthlyRevenueData);
       setInadimplentesList(inadimplentesList);
+
+      return { success: true };
     } catch (error: any) {
       console.error("Erro ao buscar dados financeiros:", error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar os dados financeiros",
-        variant: "destructive",
-      });
+
+      // ✅ Retornar erro em vez de usar toast diretamente
+      return {
+        success: false,
+        error: "Não foi possível carregar os dados financeiros",
+      };
     } finally {
       setLoading(false);
     }
-  };
+  }, [personalId]); // ✅ APENAS personalId nas dependências
+
+  // ✅ useEffect principal - chama apenas uma vez quando personalId muda
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadData = async () => {
+      const result = await fetchFinancialData();
+
+      // ✅ Mostrar toast apenas se houver erro e componente ainda montado
+      if (isMounted && result && !result.success) {
+        toast({
+          title: "Erro",
+          description: result.error,
+          variant: "destructive",
+        });
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchFinancialData, toast]);
 
   return {
     metrics,

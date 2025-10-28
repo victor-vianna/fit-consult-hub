@@ -13,6 +13,7 @@ import AreaAluno from "./pages/AreaAluno";
 import NotFound from "./pages/NotFound";
 import ExercisesLibrary from "./pages/ExercisesLibrary";
 import AcessoSuspenso from "./pages/AcessoSuspenso";
+import Financeiro from "./pages/Financeiro";
 
 const queryClient = new QueryClient();
 
@@ -62,6 +63,14 @@ const App = () => (
             element={
               <AuthGuard allowedRoles={["personal", "admin", "aluno"]}>
                 <ExercisesLibrary />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/financeiro"
+            element={
+              <AuthGuard allowedRoles={["personal"]}>
+                <Financeiro />
               </AuthGuard>
             }
           />

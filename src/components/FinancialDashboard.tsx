@@ -26,11 +26,35 @@ import {
 } from "recharts";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useMemo, useEffect } from "react";
 
 export function FinancialDashboard() {
   const { user } = useAuth();
+
+  // ✅ Garantir que userId seja estável
+  const userId = useMemo(() => user?.id || "", [user?.id]);
+
+  // ✅ Só chamar o hook quando userId estiver disponível
   const { metrics, monthlyRevenue, inadimplentesList, loading } =
-    useFinancialDashboard(user?.id || "");
+    useFinancialDashboard(userId);
+
+  // ✅ Debug: verificar se há loop
+  useEffect(() => {
+    console.log("FinancialDashboard renderizado", { userId, loading });
+  }, [userId, loading]);
+
+  // ✅ Não renderizar se não houver userId
+  if (!userId) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <p className="text-muted-foreground">
+            Carregando informações do usuário...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -53,13 +77,12 @@ export function FinancialDashboard() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in p-2">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold">Dashboard Financeiro</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-muted-foreground">
           Visão geral das suas finanças e pagamentos
-        </p>
+        </h1>
       </div>
 
       {/* Cards de Métricas Principais */}

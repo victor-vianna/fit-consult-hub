@@ -37,6 +37,8 @@ import {
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebarPersonal } from "@/components/AppSidebarPersonal";
+import { PersonalSettingsDialog } from "@/components/PersonalSettingsDialog";
+import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 
 interface Aluno {
   id: string;
@@ -55,6 +57,9 @@ export default function Personal() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
+
+  // Hook de configurações personalizadas
+  const { settings: personalSettings } = usePersonalSettings(user?.id);
 
   // Calcular alunos ativos e inativos
   const alunosAtivos = alunos.filter((a) => a.is_active).length;
@@ -175,18 +180,54 @@ export default function Personal() {
         <AppSidebarPersonal />
 
         <div className="flex-1 flex flex-col">
-          <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+          <header
+            className="border-b backdrop-blur-sm sticky top-0 z-10"
+            style={{
+              backgroundColor: personalSettings?.theme_color
+                ? `${personalSettings.theme_color}10`
+                : "hsl(var(--card) / 0.5)",
+              borderColor: personalSettings?.theme_color
+                ? `${personalSettings.theme_color}30`
+                : "hsl(var(--border))",
+            }}
+          >
             <div className="flex items-center justify-between px-4 py-4">
               <div className="flex items-center gap-3">
                 <SidebarTrigger />
+
+                {/* Logo do Personal */}
+                {personalSettings?.logo_url && (
+                  <div className="relative">
+                    <img
+                      src={personalSettings.logo_url}
+                      alt="Logo"
+                      className="h-12 w-12 rounded-full object-cover border-2"
+                      style={{
+                        borderColor: personalSettings.theme_color || "#3b82f6",
+                      }}
+                    />
+                  </div>
+                )}
+
                 <div>
-                  <h1 className="text-xl font-bold">FitConsult</h1>
+                  <h1
+                    className="text-xl font-bold"
+                    style={{
+                      color: personalSettings?.theme_color || "inherit",
+                    }}
+                  >
+                    {personalSettings?.display_name || "FitConsult"}
+                  </h1>
                   <p className="text-sm text-muted-foreground">
                     {profile?.nome}
                   </p>
                 </div>
               </div>
-              <ThemeToggle />
+
+              <div className="flex items-center gap-2">
+                {user?.id && <PersonalSettingsDialog personalId={user.id} />}
+                <ThemeToggle />
+              </div>
             </div>
           </header>
 
@@ -252,7 +293,12 @@ export default function Personal() {
                     <CardTitle>Meus Alunos</CardTitle>
                     <Dialog open={openDialog} onOpenChange={setOpenDialog}>
                       <DialogTrigger asChild>
-                        <Button>
+                        <Button
+                          style={{
+                            backgroundColor:
+                              personalSettings?.theme_color || undefined,
+                          }}
+                        >
                           <UserPlus className="mr-2 h-4 w-4" />
                           Novo Aluno
                         </Button>
@@ -296,6 +342,10 @@ export default function Personal() {
                             type="submit"
                             className="w-full"
                             disabled={loading}
+                            style={{
+                              backgroundColor:
+                                personalSettings?.theme_color || undefined,
+                            }}
                           >
                             {loading ? "Cadastrando..." : "Cadastrar Aluno"}
                           </Button>

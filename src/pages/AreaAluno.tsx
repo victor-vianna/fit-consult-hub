@@ -21,7 +21,10 @@ import {
   BookOpen,
   ListChecks,
   FileText,
+  CreditCard,
+  Home,
 } from "lucide-react";
+import { StudentSubscriptionView } from "@/components/StudentSubscriptionView";
 import { DocumentViewer } from "@/components/DocumentViewer";
 import { format } from "date-fns";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -144,9 +147,9 @@ export default function AreaAluno() {
             onClick={() => setActiveSection("consultoria")}
           />
           <ActionCard
-            title="Diretrizes"
-            icon={ListChecks}
-            onClick={() => setActiveSection("diretrizes")}
+            title="Meu Plano"
+            icon={CreditCard}
+            onClick={() => setActiveSection("plano")}
           />
         </div>
 
@@ -666,6 +669,32 @@ export default function AreaAluno() {
                 </div>
               </CardContent>
             </Card>
+          </div>
+        );
+
+      case "plano":
+        return (
+          <div className="space-y-6 animate-fade-in">
+            <Card>
+              <CardHeader>
+                <CardTitle
+                  className="text-2xl"
+                  style={{
+                    color: personalSettings?.theme_color || undefined,
+                  }}
+                >
+                  Meu Plano
+                </CardTitle>
+                <CardDescription>
+                  Informações sobre sua assinatura e pagamentos
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <StudentSubscriptionView
+              studentId={user!.id}
+              personalId={profile?.personal_id}
+            />
           </div>
         );
 

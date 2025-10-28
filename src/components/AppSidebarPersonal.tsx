@@ -1,4 +1,4 @@
-import { Home, Users, Library, Settings, LogOut } from "lucide-react";
+import { Home, Users, Library, Settings, LogOut, Wallet } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Sidebar,
@@ -36,6 +36,7 @@ export function AppSidebarPersonal() {
     { title: "Início", icon: Home, path: "/" },
     { title: "Alunos", icon: Users, path: "/" },
     { title: "Exercícios", icon: Library, path: "/exercicios" },
+    { title: "Financeiro", icon: Wallet, url: "/financeiro" },
   ];
 
   return (

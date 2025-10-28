@@ -5,6 +5,7 @@ import {
   ListChecks,
   Dumbbell,
   Library,
+  CreditCard,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -26,6 +27,7 @@ const items = [
   { title: "Diretrizes", icon: ListChecks, value: "diretrizes" },
   { title: "Treinos", icon: Dumbbell, value: "treinos" },
   { title: "Materiais", icon: FileText, value: "materiais" },
+  { title: "Meu Plano", icon: CreditCard, value: "plano" },
 ];
 
 interface AppSidebarAlunoProps {

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -34,13 +35,24 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowLeft, Upload, Eye, Trash2, AlertTriangle } from "lucide-react";
+import {
+  ArrowLeft,
+  Upload,
+  Eye,
+  Trash2,
+  AlertTriangle,
+  User,
+  Dumbbell,
+  FileText,
+  CreditCard,
+} from "lucide-react";
 import { DocumentViewer } from "@/components/DocumentViewer";
 import { format } from "date-fns";
 import { CalendarioSemanal } from "@/components/CalendarioSemanal";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { TreinosManager } from "@/components/TreinosManager";
 import { StudentActiveToggle } from "@/components/ui/StudantActiveToggle";
+import { SubscriptionManager } from "@/components/SubscriptionManager";
 
 interface Material {
   id: string;
@@ -322,153 +334,201 @@ export default function AlunoDetalhes() {
           </CardContent>
         </Card>
 
-        {user && (
-          <div className="mb-8">
-            <CalendarioSemanal profileId={id!} personalId={user.id} />
-          </div>
-        )}
+        {/* Tabs para organizar conteúdo */}
+        <Tabs defaultValue="geral" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="geral">
+              <User className="h-4 w-4 mr-2" />
+              Geral
+            </TabsTrigger>
+            <TabsTrigger value="treinos">
+              <Dumbbell className="h-4 w-4 mr-2" />
+              Treinos
+            </TabsTrigger>
+            <TabsTrigger value="materiais">
+              <FileText className="h-4 w-4 mr-2" />
+              Materiais
+            </TabsTrigger>
+            <TabsTrigger value="financeiro">
+              <CreditCard className="h-4 w-4 mr-2" />
+              Financeiro
+            </TabsTrigger>
+          </TabsList>
 
-        <div className="mb-8">
-          <TreinosManager
-            profileId={id!}
-            personalId={user.id}
-            readOnly={false}
-          />
-        </div>
+          {/* Aba Geral */}
+          <TabsContent value="geral" className="space-y-6">
+            {user && <CalendarioSemanal profileId={id!} personalId={user.id} />}
+          </TabsContent>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Materiais</CardTitle>
-              <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Enviar Material
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Enviar Material</DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleEnviarMaterial} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="titulo">Título</Label>
-                      <Input id="titulo" name="titulo" required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="tipo">Tipo</Label>
-                      <Select name="tipo" required>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o tipo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="treino">Treino</SelectItem>
-                          <SelectItem value="dieta">Dieta</SelectItem>
-                          <SelectItem value="avaliacao">Avaliação</SelectItem>
-                          <SelectItem value="outro">Outro</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="descricao">Descrição</Label>
-                      <Textarea id="descricao" name="descricao" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="arquivo">Arquivo</Label>
-                      <Input
-                        id="arquivo"
-                        name="arquivo"
-                        type="file"
-                        accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
-                        required
-                      />
-                    </div>
-                    <Button type="submit" className="w-full" disabled={loading}>
-                      {loading ? "Enviando..." : "Enviar Material"}
-                    </Button>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {materiais.map((material) => (
-                <Card key={material.id}>
-                  <CardContent className="pt-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-semibold">{material.titulo}</h3>
-                          <Badge variant="secondary">{material.tipo}</Badge>
+          {/* Aba Treinos */}
+          <TabsContent value="treinos" className="space-y-6">
+            <TreinosManager
+              profileId={id!}
+              personalId={user!.id}
+              readOnly={false}
+            />
+          </TabsContent>
+
+          {/* Aba Materiais */}
+          <TabsContent value="materiais" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Materiais</CardTitle>
+                  <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Enviar Material
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Enviar Material</DialogTitle>
+                      </DialogHeader>
+                      <form
+                        onSubmit={handleEnviarMaterial}
+                        className="space-y-4"
+                      >
+                        <div className="space-y-2">
+                          <Label htmlFor="titulo">Título</Label>
+                          <Input id="titulo" name="titulo" required />
                         </div>
-                        {material.descricao && (
-                          <p className="text-sm text-muted-foreground mb-2">
-                            {material.descricao}
-                          </p>
-                        )}
-                        <p className="text-xs text-muted-foreground">
-                          📎 {material.arquivo_nome}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {format(
-                            new Date(material.created_at),
-                            "dd/MM/yyyy HH:mm"
-                          )}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="tipo">Tipo</Label>
+                          <Select name="tipo" required>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o tipo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="treino">Treino</SelectItem>
+                              <SelectItem value="dieta">Dieta</SelectItem>
+                              <SelectItem value="avaliacao">
+                                Avaliação
+                              </SelectItem>
+                              <SelectItem value="outro">Outro</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="descricao">Descrição</Label>
+                          <Textarea id="descricao" name="descricao" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="arquivo">Arquivo</Label>
+                          <Input
+                            id="arquivo"
+                            name="arquivo"
+                            type="file"
+                            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                            required
+                          />
+                        </div>
                         <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleVisualizarMaterial(material)}
+                          type="submit"
+                          className="w-full"
+                          disabled={loading}
                         >
-                          <Eye className="h-4 w-4" />
+                          {loading ? "Enviando..." : "Enviar Material"}
                         </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <Trash2 className="h-4 w-4 text-destructive" />
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {materiais.map((material) => (
+                    <Card key={material.id}>
+                      <CardContent className="pt-6">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h3 className="font-semibold">
+                                {material.titulo}
+                              </h3>
+                              <Badge variant="secondary">{material.tipo}</Badge>
+                            </div>
+                            {material.descricao && (
+                              <p className="text-sm text-muted-foreground mb-2">
+                                {material.descricao}
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              📎 {material.arquivo_nome}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {format(
+                                new Date(material.created_at),
+                                "dd/MM/yyyy HH:mm"
+                              )}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleVisualizarMaterial(material)}
+                            >
+                              <Eye className="h-4 w-4" />
                             </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>
-                                Confirmar exclusão
-                              </AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Tem certeza que deseja remover este material?
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() =>
-                                  handleRemoverMaterial(
-                                    material.id,
-                                    material.arquivo_url
-                                  )
-                                }
-                              >
-                                Remover
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              {materiais.length === 0 && (
-                <p className="text-center text-muted-foreground py-8">
-                  Nenhum material enviado ainda
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    Confirmar exclusão
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Tem certeza que deseja remover este
+                                    material?
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>
+                                    Cancelar
+                                  </AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() =>
+                                      handleRemoverMaterial(
+                                        material.id,
+                                        material.arquivo_url
+                                      )
+                                    }
+                                  >
+                                    Remover
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  {materiais.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">
+                      Nenhum material enviado ainda
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Aba Financeiro */}
+          <TabsContent value="financeiro" className="space-y-4">
+            <SubscriptionManager
+              studentId={id!}
+              personalId={user!.id}
+              studentName={aluno.nome}
+            />
+          </TabsContent>
+        </Tabs>
       </main>
 
       {selectedFile && (

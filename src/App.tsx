@@ -65,9 +65,8 @@ const App = () => (
               </AuthGuard>
             }
           />
-          <Route path="*" element={<NotFound />} />
-
           <Route path="/acesso-suspenso" element={<AcessoSuspenso />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>

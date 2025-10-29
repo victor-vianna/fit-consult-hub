@@ -18,7 +18,6 @@ import {
   LogOut,
   Download,
   Eye,
-  BookOpen,
   ListChecks,
   FileText,
   CreditCard,
@@ -142,11 +141,11 @@ export default function AreaAluno() {
             icon={FileText}
             onClick={() => setActiveSection("materiais")}
           />
-          <ActionCard
+          {/* <ActionCard
             title="Consultoria"
             icon={BookOpen}
             onClick={() => setActiveSection("consultoria")}
-          />
+          /> */}
           <ActionCard
             title="Meu Plano"
             icon={CreditCard}

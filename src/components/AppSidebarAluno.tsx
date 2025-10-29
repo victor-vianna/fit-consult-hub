@@ -23,8 +23,8 @@ import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 
 const items = [
   { title: "Início", icon: Home, value: "inicio" },
-  { title: "Consultoria", icon: BookOpen, value: "consultoria" },
-  { title: "Diretrizes", icon: ListChecks, value: "diretrizes" },
+  // { title: "Consultoria", icon: BookOpen, value: "consultoria" },
+  // { title: "Diretrizes", icon: ListChecks, value: "diretrizes" },
   { title: "Treinos", icon: Dumbbell, value: "treinos" },
   { title: "Materiais", icon: FileText, value: "materiais" },
   { title: "Biblioteca", icon: Library, value: "exercicios" },

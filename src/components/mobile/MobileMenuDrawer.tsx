@@ -7,6 +7,7 @@ import {
   Library,
   LogOut,
   KeyRound,
+  CreditCard,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -29,11 +30,12 @@ interface MobileMenuDrawerProps {
 
 const menuItems = [
   { title: "Início", icon: Home, value: "inicio" },
-  { title: "Consultoria", icon: BookOpen, value: "consultoria" },
-  { title: "Diretrizes", icon: ListChecks, value: "diretrizes" },
+  // { title: "Consultoria", icon: BookOpen, value: "consultoria" },
+  // { title: "Diretrizes", icon: ListChecks, value: "diretrizes" },
   { title: "Treinos", icon: Dumbbell, value: "treinos" },
   { title: "Biblioteca", icon: Library, value: "exercicios" },
   { title: "Materiais", icon: FileText, value: "materiais" },
+  { title: "Meu Plano", icon: CreditCard, value: "plano" },
 ];
 
 export function MobileMenuDrawer({

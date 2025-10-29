@@ -6,6 +6,7 @@ import {
   Dumbbell,
   Library,
   CreditCard,
+  Calendar,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -26,8 +27,9 @@ const items = [
   // { title: "Consultoria", icon: BookOpen, value: "consultoria" },
   // { title: "Diretrizes", icon: ListChecks, value: "diretrizes" },
   { title: "Treinos", icon: Dumbbell, value: "treinos" },
+  { title: "Histórico", icon: Calendar, value: "historico" },
   { title: "Materiais", icon: FileText, value: "materiais" },
-  { title: "Biblioteca", icon: Library, value: "exercicios" },
+  { title: "Biblioteca", icon: Library, value: "biblioteca" },
   { title: "Meu Plano", icon: CreditCard, value: "plano" },
 ];
 

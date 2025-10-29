@@ -45,6 +45,7 @@ import {
   Dumbbell,
   FileText,
   CreditCard,
+  Calendar,
 } from "lucide-react";
 import { DocumentViewer } from "@/components/DocumentViewer";
 import { format } from "date-fns";
@@ -53,6 +54,8 @@ import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { TreinosManager } from "@/components/TreinosManager";
 import { StudentActiveToggle } from "@/components/ui/StudantActiveToggle";
 import { SubscriptionManager } from "@/components/SubscriptionManager";
+import { CalendarioTreinosMensal } from "@/components/CalendarioTreinosMensal";
+import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 
 interface Material {
   id: string;
@@ -87,6 +90,9 @@ export default function AlunoDetalhes() {
   const [openDialog, setOpenDialog] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
+  const { settings: personalSettings } = usePersonalSettings(user?.id);
+  const [activeTab, setActiveTab] = useState("geral");
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (id && user) {
@@ -300,6 +306,11 @@ export default function AlunoDetalhes() {
     );
   }
 
+  // ✅ FUNÇÃO PARA SINCRONIZAR TREINOS
+  const handleTreinoAtualizado = () => {
+    setRefreshKey((prev) => prev + 1);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
@@ -362,8 +373,14 @@ export default function AlunoDetalhes() {
         </Card>
 
         {/* Tabs para organizar conteúdo */}
-        <Tabs defaultValue="geral" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="space-y-6"
+        >
+          <TabsList className="grid w-full grid-cols-5">
+            {" "}
+            {/* ✅ Mudei de grid-cols-4 para grid-cols-5 */}
             <TabsTrigger value="geral">
               <User className="h-4 w-4 mr-2" />
               Geral
@@ -371,6 +388,12 @@ export default function AlunoDetalhes() {
             <TabsTrigger value="treinos">
               <Dumbbell className="h-4 w-4 mr-2" />
               Treinos
+            </TabsTrigger>
+            <TabsTrigger value="historico">
+              {" "}
+              {/* ✅ NOVA ABA */}
+              <Calendar className="h-4 w-4 mr-2" />
+              Histórico
             </TabsTrigger>
             <TabsTrigger value="materiais">
               <FileText className="h-4 w-4 mr-2" />
@@ -384,7 +407,15 @@ export default function AlunoDetalhes() {
 
           {/* Aba Geral */}
           <TabsContent value="geral" className="space-y-6">
-            {user && <CalendarioSemanal profileId={id!} personalId={user.id} />}
+            {user && (
+              <CalendarioSemanal
+                profileId={id!}
+                personalId={user.id}
+                themeColor={personalSettings?.theme_color}
+                onVerHistoricoCompleto={() => setActiveTab("historico")}
+                onTreinoAtualizado={handleTreinoAtualizado}
+              />
+            )}
           </TabsContent>
 
           {/* Aba Treinos */}
@@ -396,6 +427,18 @@ export default function AlunoDetalhes() {
             />
           </TabsContent>
 
+          {/* ✅ NOVA ABA: Histórico */}
+          <TabsContent value="historico" className="space-y-6">
+            {user && (
+              <CalendarioTreinosMensal
+                profileId={id!}
+                personalId={user.id}
+                themeColor={personalSettings?.theme_color}
+                refreshKey={refreshKey}
+              />
+            )}
+          </TabsContent>
+
           {/* Aba Materiais */}
           <TabsContent value="materiais" className="space-y-6">
             <Card>
@@ -404,7 +447,12 @@ export default function AlunoDetalhes() {
                   <CardTitle>Materiais</CardTitle>
                   <Dialog open={openDialog} onOpenChange={setOpenDialog}>
                     <DialogTrigger asChild>
-                      <Button>
+                      <Button
+                        style={{
+                          backgroundColor:
+                            personalSettings?.theme_color || undefined,
+                        }}
+                      >
                         <Upload className="mr-2 h-4 w-4" />
                         Enviar Material
                       </Button>
@@ -455,6 +503,10 @@ export default function AlunoDetalhes() {
                           type="submit"
                           className="w-full"
                           disabled={loading}
+                          style={{
+                            backgroundColor:
+                              personalSettings?.theme_color || undefined,
+                          }}
                         >
                           {loading ? "Enviando..." : "Enviar Material"}
                         </Button>

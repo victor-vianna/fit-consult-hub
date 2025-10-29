@@ -1,17 +1,45 @@
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
-import { Dumbbell, LogOut, Users, UserPlus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ThemeToggle } from '@/components/ThemeToggle';
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  Dumbbell,
+  LogOut,
+  Users,
+  UserPlus,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface Profile {
   id: string;
@@ -43,15 +71,17 @@ export default function Admin() {
     try {
       // Buscar contagens de roles
       const { data: rolesData } = await supabase
-        .from('user_roles')
-        .select('role, user_id');
+        .from("user_roles")
+        .select("role, user_id");
 
       if (rolesData) {
-        const personalCount = rolesData.filter(r => r.role === 'personal').length;
-        const alunoCount = rolesData.filter(r => r.role === 'aluno').length;
-        const adminCount = rolesData.filter(r => r.role === 'admin').length;
-        const uniqueUsers = new Set(rolesData.map(r => r.user_id));
-        
+        const personalCount = rolesData.filter(
+          (r) => r.role === "personal"
+        ).length;
+        const alunoCount = rolesData.filter((r) => r.role === "aluno").length;
+        const adminCount = rolesData.filter((r) => r.role === "admin").length;
+        const uniqueUsers = new Set(rolesData.map((r) => r.user_id));
+
         setTotalPersonals(personalCount);
         setTotalAlunos(alunoCount);
         setTotalAdmins(adminCount);
@@ -60,37 +90,37 @@ export default function Admin() {
 
       // Buscar personals
       const { data: personalRoles } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'personal');
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "personal");
 
       if (!personalRoles) return;
 
-      const personalIds = personalRoles.map(r => r.user_id);
+      const personalIds = personalRoles.map((r) => r.user_id);
       const { data: personalProfiles } = await supabase
-        .from('profiles')
-        .select('*')
-        .in('id', personalIds);
+        .from("profiles")
+        .select("*")
+        .in("id", personalIds);
 
       if (!personalProfiles) return;
 
-      const personalsComAlunos = await Promise.all(
-        personalProfiles.map(async (personal) => {
-          const { data: alunos } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('personal_id', personal.id);
+      // ✅ CORREÇÃO: Buscar TODOS os alunos de uma vez (1 query ao invés de N)
+      const { data: todosAlunos } = await supabase
+        .from("profiles")
+        .select("*")
+        .in("personal_id", personalIds);
 
-          return {
-            ...personal,
-            alunos: alunos || [],
-          };
-        })
-      );
+      // ✅ Agrupar alunos por personal (em memória, sem queries)
+      const personalsComAlunos = personalProfiles.map((personal) => ({
+        ...personal,
+        alunos:
+          todosAlunos?.filter((aluno) => aluno.personal_id === personal.id) ||
+          [],
+      }));
 
       setPersonals(personalsComAlunos);
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
+      console.error("Erro ao carregar dados:", error);
     }
   };
 
@@ -100,31 +130,45 @@ export default function Admin() {
 
     const formData = new FormData(e.currentTarget);
     const dados = {
-      nome: formData.get('nome') as string,
-      email: formData.get('email') as string,
-      password: formData.get('password') as string,
-      telefone: formData.get('telefone') as string,
+      nome: formData.get("nome") as string,
+      email: formData.get("email") as string,
+      password: formData.get("password") as string,
+      telefone: formData.get("telefone") as string,
     };
 
     try {
-      const { data, error } = await supabase.functions.invoke('create-personal-user', {
-        body: dados,
-      });
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error("Sessão não encontrada. Faça login novamente.");
+      }
+
+      const { data, error } = await supabase.functions.invoke(
+        "create-personal-user",
+        {
+          body: dados,
+          headers: {
+            Authorization: `Bearer ${session.access_token}`, // ✅ Agora funciona
+          },
+        }
+      );
 
       if (error) throw error;
 
       toast({
-        title: 'Personal criado!',
-        description: 'Personal trainer cadastrado com sucesso',
+        title: "Personal criado!",
+        description: "Personal trainer cadastrado com sucesso",
       });
 
       setOpenDialog(false);
       fetchData();
     } catch (error: any) {
       toast({
-        title: 'Erro ao criar personal',
+        title: "Erro ao criar personal",
         description: error.message,
-        variant: 'destructive',
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -134,30 +178,27 @@ export default function Admin() {
   const handleDeletePersonal = async (personalId: string) => {
     try {
       // Deletar role
-      await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', personalId);
+      await supabase.from("user_roles").delete().eq("user_id", personalId);
 
       // Deletar profile (cascade deleta user)
       const { error } = await supabase
-        .from('profiles')
+        .from("profiles")
         .delete()
-        .eq('id', personalId);
+        .eq("id", personalId);
 
       if (error) throw error;
 
       toast({
-        title: 'Personal removido',
-        description: 'Personal trainer removido com sucesso',
+        title: "Personal removido",
+        description: "Personal trainer removido com sucesso",
       });
 
       fetchData();
     } catch (error: any) {
       toast({
-        title: 'Erro ao remover personal',
+        title: "Erro ao remover personal",
         description: error.message,
-        variant: 'destructive',
+        variant: "destructive",
       });
     }
   };
@@ -170,7 +211,9 @@ export default function Admin() {
             <Dumbbell className="h-8 w-8 text-primary" />
             <div>
               <h1 className="text-xl font-bold">FitConsult</h1>
-              <p className="text-sm text-muted-foreground">Painel do Administrador</p>
+              <p className="text-sm text-muted-foreground">
+                Painel do Administrador
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -187,7 +230,9 @@ export default function Admin() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Personal Trainers</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Personal Trainers
+              </CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -207,7 +252,9 @@ export default function Admin() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Administradores</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Administradores
+              </CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -217,7 +264,9 @@ export default function Admin() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total de Usuários</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Total de Usuários
+              </CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -252,14 +301,20 @@ export default function Admin() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="password">Senha</Label>
-                      <Input id="password" name="password" type="password" minLength={6} required />
+                      <Input
+                        id="password"
+                        name="password"
+                        type="password"
+                        minLength={6}
+                        required
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="telefone">Telefone</Label>
                       <Input id="telefone" name="telefone" type="tel" />
                     </div>
                     <Button type="submit" className="w-full" disabled={loading}>
-                      {loading ? 'Criando...' : 'Criar Personal'}
+                      {loading ? "Criando..." : "Criar Personal"}
                     </Button>
                   </form>
                 </DialogContent>
@@ -274,11 +329,17 @@ export default function Admin() {
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="font-semibold">{personal.nome}</h3>
                       <Badge variant="secondary">Personal</Badge>
-                      <Badge variant="outline">{personal.alunos.length} alunos</Badge>
+                      <Badge variant="outline">
+                        {personal.alunos.length} alunos
+                      </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground">{personal.email}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {personal.email}
+                    </p>
                     {personal.telefone && (
-                      <p className="text-sm text-muted-foreground">{personal.telefone}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {personal.telefone}
+                      </p>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
@@ -295,14 +356,19 @@ export default function Admin() {
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                          <AlertDialogTitle>
+                            Confirmar exclusão
+                          </AlertDialogTitle>
                           <AlertDialogDescription>
-                            Tem certeza que deseja remover este personal trainer?
+                            Tem certeza que deseja remover este personal
+                            trainer?
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeletePersonal(personal.id)}>
+                          <AlertDialogAction
+                            onClick={() => handleDeletePersonal(personal.id)}
+                          >
                             Remover
                           </AlertDialogAction>
                         </AlertDialogFooter>
@@ -313,16 +379,27 @@ export default function Admin() {
                 <CollapsibleContent className="mt-4 space-y-2">
                   {personal.alunos.length > 0 ? (
                     personal.alunos.map((aluno) => (
-                      <div key={aluno.id} className="pl-4 border-l-2 border-primary/20 py-2">
+                      <div
+                        key={aluno.id}
+                        className="pl-4 border-l-2 border-primary/20 py-2"
+                      >
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs">Aluno</Badge>
-                          <span className="font-medium text-sm">{aluno.nome}</span>
+                          <Badge variant="outline" className="text-xs">
+                            Aluno
+                          </Badge>
+                          <span className="font-medium text-sm">
+                            {aluno.nome}
+                          </span>
                         </div>
-                        <p className="text-xs text-muted-foreground">{aluno.email}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {aluno.email}
+                        </p>
                       </div>
                     ))
                   ) : (
-                    <p className="text-sm text-muted-foreground pl-4">Nenhum aluno cadastrado</p>
+                    <p className="text-sm text-muted-foreground pl-4">
+                      Nenhum aluno cadastrado
+                    </p>
                   )}
                 </CollapsibleContent>
               </Collapsible>

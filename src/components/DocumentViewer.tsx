@@ -1,6 +1,6 @@
-import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Download, X } from 'lucide-react';
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Download, X } from "lucide-react";
 
 interface DocumentViewerProps {
   open: boolean;
@@ -10,9 +10,17 @@ interface DocumentViewerProps {
   fileType: string;
 }
 
-export const DocumentViewer = ({ open, onClose, fileUrl, fileName, fileType }: DocumentViewerProps) => {
-  const isPdf = fileType === 'application/pdf' || fileName.endsWith('.pdf');
-  const isImage = fileType.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif)$/i.test(fileName);
+export const DocumentViewer = ({
+  open,
+  onClose,
+  fileUrl,
+  fileName,
+  fileType,
+}: DocumentViewerProps) => {
+  const isPdf = fileType === "application/pdf" || fileName.endsWith(".pdf");
+  const isImage =
+    fileType.startsWith("image/") ||
+    /\.(jpg|jpeg|png|webp|gif)$/i.test(fileName);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -35,6 +43,9 @@ export const DocumentViewer = ({ open, onClose, fileUrl, fileName, fileType }: D
           {isPdf ? (
             <iframe
               src={fileUrl}
+              sandbox="allow-scripts allow-same-origin" // ✅ Adicione
+              referrerPolicy="no-referrer"
+              style={{ width: "100%", height: "80vh", border: "none" }}
               className="w-full h-full border-0"
               title={fileName}
             />

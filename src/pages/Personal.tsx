@@ -119,10 +119,21 @@ export default function Personal() {
     };
 
     try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error("Sessão não encontrada. Faça login novamente.");
+      }
+
       const { data, error } = await supabase.functions.invoke(
         "create-aluno-user",
         {
           body: dados,
+          headers: {
+            Authorization: `Bearer ${session.access_token}`, // ✅ Agora funciona
+          },
         }
       );
 

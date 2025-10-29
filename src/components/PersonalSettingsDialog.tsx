@@ -12,6 +12,7 @@ import {
 import { Settings, Upload, X } from "lucide-react";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { toast } from "@/hooks/use-toast";
 
 interface Props {
   personalId: string;
@@ -40,6 +41,33 @@ export function PersonalSettingsDialog({ personalId }: Props) {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // ✅ VALIDAÇÃO DE TAMANHO (10MB)
+    const MAX_SIZE = 2 * 1024 * 1024; // 2MB em bytes
+    if (file.size > MAX_SIZE) {
+      toast({
+        title: "Erro",
+        description: "Arquivo muito grande. Máximo: 10MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // ✅ VALIDAÇÃO DE TIPO
+    const ALLOWED_TYPES = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/jpg",
+    ];
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      toast({
+        title: "Erro",
+        description: "Tipo de arquivo não permitido. Use PDF ou imagens.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setUploading(true);
     try {

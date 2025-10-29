@@ -2,9 +2,12 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
-const SUPABASE_URL = "https://jqpxlqggkstytgrkyhyb.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxcHhscWdna3N0eXRncmt5aHliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA4ODI2ODcsImV4cCI6MjA3NjQ1ODY4N30.TnjXdbtYQJ8w17FaHlbi1FHbTInxzQvFqg9HCa8saBI";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  throw new Error("❌ Faltam variáveis de ambiente do Supabase");
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
@@ -15,7 +18,7 @@ export const supabase = createClient<Database>(
   {
     auth: {
       storage: localStorage,
-      persistSession: false,
+      persistSession: true,
       autoRefreshToken: true,
     },
   }

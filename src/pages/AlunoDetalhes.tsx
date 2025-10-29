@@ -155,6 +155,33 @@ export default function AlunoDetalhes() {
     const formData = new FormData(e.currentTarget);
     const arquivo = formData.get("arquivo") as File;
 
+    // ✅ VALIDAÇÃO DE TAMANHO (10MB)
+    const MAX_SIZE = 10 * 1024 * 1024; // 10MB em bytes
+    if (arquivo.size > MAX_SIZE) {
+      toast({
+        title: "Erro",
+        description: "Arquivo muito grande. Máximo: 10MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // ✅ VALIDAÇÃO DE TIPO
+    const ALLOWED_TYPES = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/jpg",
+    ];
+    if (!ALLOWED_TYPES.includes(arquivo.type)) {
+      toast({
+        title: "Erro",
+        description: "Tipo de arquivo não permitido. Use PDF ou imagens.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!arquivo) {
       toast({
         title: "Arquivo obrigatório",

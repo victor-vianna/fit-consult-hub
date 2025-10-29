@@ -27,6 +27,7 @@ const items = [
   { title: "Diretrizes", icon: ListChecks, value: "diretrizes" },
   { title: "Treinos", icon: Dumbbell, value: "treinos" },
   { title: "Materiais", icon: FileText, value: "materiais" },
+  { title: "Biblioteca", icon: Library, value: "exercicios" },
   { title: "Meu Plano", icon: CreditCard, value: "plano" },
 ];
 
@@ -123,23 +124,6 @@ export function AppSidebarAluno({
                   </SidebarMenuItem>
                 );
               })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {/* Recursos Adicionais */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Recursos</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link to="/exercicios">
-                    <Library className="h-4 w-4" />
-                    {!collapsed && <span>Exercícios</span>}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

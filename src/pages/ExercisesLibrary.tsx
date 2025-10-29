@@ -20,13 +20,6 @@ import {
 import { Plus, Search, Filter, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
-import { AppSidebarPersonal } from "@/components/AppSidebarPersonal";
-import {
-  SidebarProvider,
-  SidebarInset,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function ExercisesLibrary() {
@@ -36,8 +29,6 @@ export default function ExercisesLibrary() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [userRole, setUserRole] = useState<string>("");
-
-  // ✅ NOVO: Estado para edição
   const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -106,7 +97,6 @@ export default function ExercisesLibrary() {
     setFilteredExercises(filtered);
   };
 
-  // ✅ NOVO: Handler para abrir modal de edição
   const handleEdit = (exercise: Exercise) => {
     setEditingExercise(exercise);
     setModalOpen(true);
@@ -129,13 +119,11 @@ export default function ExercisesLibrary() {
     }
   };
 
-  // ✅ NOVO: Handler para fechar modal e limpar estado de edição
   const handleCloseModal = () => {
     setModalOpen(false);
     setEditingExercise(null);
   };
 
-  // ✅ NOVO: Handler para sucesso (criar ou editar)
   const handleSuccess = () => {
     fetchExercises();
     handleCloseModal();
@@ -158,27 +146,15 @@ export default function ExercisesLibrary() {
   }
 
   return (
-    <SidebarProvider>
-      <AppSidebarPersonal />
-      <SidebarInset>
-        {/* Header */}
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <div className="flex flex-1 items-center justify-between">
-            <h1 className="text-xl font-semibold">Biblioteca de Exercícios</h1>
-            <ThemeToggle />
-          </div>
-        </header>
-
-        {/* Conteúdo */}
-        <div className="flex flex-1 flex-col gap-4 p-4">
+    <div className="min-h-screen bg-background">
+      {/* Conteúdo */}
+      <div className="container mx-auto px-4 py-6">
+        <div className="flex flex-col gap-6">
           {/* Header com contador e botão */}
           <div className="flex justify-between items-center">
             <p className="text-muted-foreground">
               {filteredExercises.length} exercício(s) encontrado(s)
             </p>
-            {/* Só mostra o botão para personal e admin */}
             {(userRole === "personal" || userRole === "admin") && (
               <Button
                 onClick={() => {
@@ -310,7 +286,7 @@ export default function ExercisesLibrary() {
             exercise={editingExercise}
           />
         </div>
-      </SidebarInset>
-    </SidebarProvider>
+      </div>
+    </div>
   );
 }

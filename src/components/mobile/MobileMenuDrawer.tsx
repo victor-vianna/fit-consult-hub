@@ -32,6 +32,7 @@ const menuItems = [
   { title: "Consultoria", icon: BookOpen, value: "consultoria" },
   { title: "Diretrizes", icon: ListChecks, value: "diretrizes" },
   { title: "Treinos", icon: Dumbbell, value: "treinos" },
+  { title: "Biblioteca", icon: Library, value: "exercicios" },
   { title: "Materiais", icon: FileText, value: "materiais" },
 ];
 

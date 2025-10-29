@@ -35,6 +35,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { BottomNavigation } from "@/components/mobile/BottomNavigation";
 import { ActionCard } from "@/components/mobile/ActionCard";
+import ExercisesLibrary from "./ExercisesLibrary";
 
 interface Material {
   id: string;
@@ -150,6 +151,11 @@ export default function AreaAluno() {
             title="Meu Plano"
             icon={CreditCard}
             onClick={() => setActiveSection("plano")}
+          />
+          <ActionCard
+            title="Exercícios"
+            icon={ListChecks}
+            onClick={() => setActiveSection("exercicios")}
           />
         </div>
 
@@ -695,6 +701,31 @@ export default function AreaAluno() {
               studentId={user!.id}
               personalId={profile?.personal_id}
             />
+          </div>
+        );
+
+      case "exercicios":
+        return (
+          <div className="animate-fade-in">
+            <Card>
+              <CardHeader>
+                <CardTitle
+                  className="text-2xl"
+                  style={{
+                    color: personalSettings?.theme_color || undefined,
+                  }}
+                >
+                  Biblioteca de Exercícios
+                </CardTitle>
+                <CardDescription>
+                  Explore todos os exercícios disponíveis com vídeos e
+                  instruções
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            {/* ✅ Importe e use o componente de exercícios aqui */}
+            <ExercisesLibrary />
           </div>
         );
 

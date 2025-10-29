@@ -33,7 +33,7 @@ const menuItems = [
   // { title: "Consultoria", icon: BookOpen, value: "consultoria" },
   // { title: "Diretrizes", icon: ListChecks, value: "diretrizes" },
   { title: "Treinos", icon: Dumbbell, value: "treinos" },
-  { title: "Biblioteca", icon: Library, value: "exercicios" },
+  { title: "Biblioteca", icon: Library, value: "Biblioteca" },
   { title: "Materiais", icon: FileText, value: "materiais" },
   { title: "Meu Plano", icon: CreditCard, value: "plano" },
 ];
@@ -80,9 +80,9 @@ export function MobileMenuDrawer({
           ))}
         </div>
 
-        <Separator className="my-4" />
+        {/* <Separator className="my-4" /> */}
 
-        {/* Recursos Adicionais */}
+        {/* Recursos Adicionais
         <div className="flex flex-col gap-2">
           <p className="text-xs font-semibold text-muted-foreground px-3 mb-1">
             RECURSOS
@@ -95,7 +95,7 @@ export function MobileMenuDrawer({
             <Library className="h-4 w-4 mr-2" />
             Exercícios
           </Button>
-        </div>
+        </div> */}
 
         <Separator className="my-4" />
 

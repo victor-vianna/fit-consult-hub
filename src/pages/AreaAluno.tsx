@@ -153,7 +153,7 @@ export default function AreaAluno() {
             onClick={() => setActiveSection("plano")}
           />
           <ActionCard
-            title="Exercícios"
+            title="Biblioteca"
             icon={ListChecks}
             onClick={() => setActiveSection("exercicios")}
           />

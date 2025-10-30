@@ -23,6 +23,7 @@ import {
   CreditCard,
   Home,
   Calendar,
+  Library,
 } from "lucide-react";
 import { StudentSubscriptionView } from "@/components/StudentSubscriptionView";
 import { DocumentViewer } from "@/components/DocumentViewer";
@@ -163,7 +164,7 @@ export default function AreaAluno() {
           />
           <ActionCard
             title="Biblioteca"
-            icon={ListChecks}
+            icon={Library}
             onClick={() => setActiveSection("biblioteca")}
           />
         </div>

@@ -30,12 +30,12 @@ interface MobileMenuDrawerProps {
 
 const menuItems = [
   { title: "Início", icon: Home, value: "inicio" },
-  // { title: "Consultoria", icon: BookOpen, value: "consultoria" },
-  // { title: "Diretrizes", icon: ListChecks, value: "diretrizes" },
   { title: "Treinos", icon: Dumbbell, value: "treinos" },
   { title: "Biblioteca", icon: Library, value: "Biblioteca" },
   { title: "Materiais", icon: FileText, value: "materiais" },
   { title: "Meu Plano", icon: CreditCard, value: "plano" },
+  // { title: "Consultoria", icon: BookOpen, value: "consultoria" },
+  // { title: "Diretrizes", icon: ListChecks, value: "diretrizes" },
 ];
 
 export function MobileMenuDrawer({

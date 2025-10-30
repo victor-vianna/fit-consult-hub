@@ -31,7 +31,7 @@ interface MobileMenuDrawerProps {
 const menuItems = [
   { title: "Início", icon: Home, value: "inicio" },
   { title: "Treinos", icon: Dumbbell, value: "treinos" },
-  { title: "Biblioteca", icon: Library, value: "Biblioteca" },
+  { title: "Biblioteca", icon: Library, value: "biblioteca" },
   { title: "Materiais", icon: FileText, value: "materiais" },
   { title: "Meu Plano", icon: CreditCard, value: "plano" },
   // { title: "Consultoria", icon: BookOpen, value: "consultoria" },

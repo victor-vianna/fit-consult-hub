@@ -33,12 +33,16 @@ import {
   FileText,
   UserCheck,
   UserX,
+  LogOut,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebarPersonal } from "@/components/AppSidebarPersonal";
 import { PersonalSettingsDialog } from "@/components/PersonalSettingsDialog";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
+import { MobileHeaderPersonal } from "@/components/mobile/MobileHeaderPersonal";
+import { BottomNavigationPersonal } from "@/components/mobile/BottomNavigationPersonal";
+import { MobileMenuDrawerPersonal } from "@/components/mobile/MobileMenuDrawerPersonal";
 
 interface Aluno {
   id: string;
@@ -57,13 +61,23 @@ export default function Personal() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
-  // Hook de configurações personalizadas
   const { settings: personalSettings } = usePersonalSettings(user?.id);
 
-  // Calcular alunos ativos e inativos
   const alunosAtivos = alunos.filter((a) => a.is_active).length;
   const alunosInativos = alunos.filter((a) => !a.is_active).length;
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -75,7 +89,6 @@ export default function Personal() {
     if (!user) return;
 
     try {
-      // Buscar perfil do personal
       const { data: profileData } = await supabase
         .from("profiles")
         .select("*")
@@ -84,7 +97,6 @@ export default function Personal() {
 
       setProfile(profileData);
 
-      // Buscar alunos (incluindo is_active)
       const { data: alunosData } = await supabase
         .from("profiles")
         .select("*")
@@ -93,7 +105,6 @@ export default function Personal() {
 
       setAlunos(alunosData || []);
 
-      // Buscar total de materiais
       const { count } = await supabase
         .from("materiais")
         .select("*", { count: "exact", head: true })
@@ -132,7 +143,7 @@ export default function Personal() {
         {
           body: dados,
           headers: {
-            Authorization: `Bearer ${session.access_token}`, // ✅ Agora funciona
+            Authorization: `Bearer ${session.access_token}`,
           },
         }
       );
@@ -159,10 +170,8 @@ export default function Personal() {
 
   const handleDeleteAluno = async (alunoId: string) => {
     try {
-      // Deletar role
       await supabase.from("user_roles").delete().eq("user_id", alunoId);
 
-      // Deletar profile
       const { error } = await supabase
         .from("profiles")
         .delete()
@@ -185,6 +194,240 @@ export default function Personal() {
     }
   };
 
+  // Versão Mobile
+  if (isMobile) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background">
+        <MobileHeaderPersonal
+          onMenuClick={() => setMenuOpen(true)}
+          personalId={user?.id}
+          personalSettings={personalSettings}
+          profileName={profile?.nome}
+        />
+
+        <main className="flex-1 overflow-auto pb-20 px-4 pt-4">
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xs font-medium">
+                    Total Alunos
+                  </CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold">{alunos.length}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xs font-medium">Ativos</CardTitle>
+                  <UserCheck className="h-4 w-4 text-green-600" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold text-green-600">
+                  {alunosAtivos}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xs font-medium">
+                    Inativos
+                  </CardTitle>
+                  <UserX className="h-4 w-4 text-red-600" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold text-red-600">
+                  {alunosInativos}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xs font-medium">
+                    Materiais
+                  </CardTitle>
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold">{totalMateriais}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Meus Alunos</CardTitle>
+                <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+                  <DialogTrigger asChild>
+                    <Button
+                      size="sm"
+                      style={{
+                        backgroundColor:
+                          personalSettings?.theme_color || undefined,
+                      }}
+                    >
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Novo
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Cadastrar Aluno</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleCreateAluno} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="nome">Nome</Label>
+                        <Input id="nome" name="nome" required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input id="email" name="email" type="email" required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="password">Senha</Label>
+                        <Input
+                          id="password"
+                          name="password"
+                          type="password"
+                          minLength={6}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="telefone">Telefone</Label>
+                        <Input id="telefone" name="telefone" type="tel" />
+                      </div>
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={loading}
+                        style={{
+                          backgroundColor:
+                            personalSettings?.theme_color || undefined,
+                        }}
+                      >
+                        {loading ? "Cadastrando..." : "Cadastrar Aluno"}
+                      </Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {alunos.map((aluno) => (
+                  <Card
+                    key={aluno.id}
+                    className={`cursor-pointer hover:shadow-md transition-all relative ${
+                      !aluno.is_active
+                        ? "border-red-500 border-2 opacity-75"
+                        : "border-green-500 border-2"
+                    }`}
+                    onClick={() => navigate(`/aluno/${aluno.id}`)}
+                  >
+                    <div className="absolute top-2 right-2">
+                      {aluno.is_active ? (
+                        <Badge className="bg-green-600 text-xs">
+                          <UserCheck className="h-3 w-3 mr-1" />
+                          Ativo
+                        </Badge>
+                      ) : (
+                        <Badge variant="destructive" className="text-xs">
+                          <UserX className="h-3 w-3 mr-1" />
+                          Bloqueado
+                        </Badge>
+                      )}
+                    </div>
+
+                    <CardContent className="pt-4">
+                      <div className="space-y-1">
+                        <h3 className="font-semibold text-sm">{aluno.nome}</h3>
+                        <p className="text-xs text-muted-foreground">
+                          {aluno.email}
+                        </p>
+                        {aluno.telefone && (
+                          <p className="text-xs text-muted-foreground">
+                            {aluno.telefone}
+                          </p>
+                        )}
+                        <div
+                          className="pt-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full"
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive mr-2" />
+                                Remover
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  Confirmar exclusão
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Tem certeza que deseja remover este aluno?
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteAluno(aluno.id)}
+                                >
+                                  Remover
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              {alunos.length === 0 && (
+                <p className="text-center text-muted-foreground py-8 text-sm">
+                  Nenhum aluno cadastrado
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </main>
+
+        <BottomNavigationPersonal
+          onMenuClick={() => setMenuOpen(true)}
+          themeColor={personalSettings?.theme_color}
+        />
+
+        <MobileMenuDrawerPersonal
+          open={menuOpen}
+          onOpenChange={setMenuOpen}
+          personalSettings={personalSettings}
+          onSignOut={signOut}
+        />
+      </div>
+    );
+  }
+
+  // Versão Desktop
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background">
@@ -206,7 +449,6 @@ export default function Personal() {
               <div className="flex items-center gap-3">
                 <SidebarTrigger />
 
-                {/* Logo do Personal */}
                 {personalSettings?.logo_url && (
                   <div className="relative">
                     <img
@@ -238,6 +480,10 @@ export default function Personal() {
               <div className="flex items-center gap-2">
                 {user?.id && <PersonalSettingsDialog personalId={user.id} />}
                 <ThemeToggle />
+                <Button variant="outline" onClick={signOut}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sair
+                </Button>
               </div>
             </div>
           </header>
@@ -377,7 +623,6 @@ export default function Personal() {
                         }`}
                         onClick={() => navigate(`/aluno/${aluno.id}`)}
                       >
-                        {/* Badge de status no canto superior direito */}
                         <div className="absolute top-2 right-2">
                           {aluno.is_active ? (
                             <Badge className="bg-green-600 hover:bg-green-700">

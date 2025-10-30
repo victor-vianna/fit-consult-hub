@@ -46,6 +46,9 @@ import {
   FileText,
   CreditCard,
   Calendar,
+  Mail,
+  Phone,
+  Download,
 } from "lucide-react";
 import { DocumentViewer } from "@/components/DocumentViewer";
 import { format } from "date-fns";
@@ -93,6 +96,16 @@ export default function AlunoDetalhes() {
   const { settings: personalSettings } = usePersonalSettings(user?.id);
   const [activeTab, setActiveTab] = useState("geral");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   useEffect(() => {
     if (id && user) {
@@ -161,18 +174,17 @@ export default function AlunoDetalhes() {
     const formData = new FormData(e.currentTarget);
     const arquivo = formData.get("arquivo") as File;
 
-    // ✅ VALIDAÇÃO DE TAMANHO (10MB)
-    const MAX_SIZE = 10 * 1024 * 1024; // 10MB em bytes
+    const MAX_SIZE = 10 * 1024 * 1024;
     if (arquivo.size > MAX_SIZE) {
       toast({
         title: "Erro",
         description: "Arquivo muito grande. Máximo: 10MB",
         variant: "destructive",
       });
+      setLoading(false);
       return;
     }
 
-    // ✅ VALIDAÇÃO DE TIPO
     const ALLOWED_TYPES = [
       "application/pdf",
       "image/jpeg",
@@ -185,6 +197,7 @@ export default function AlunoDetalhes() {
         description: "Tipo de arquivo não permitido. Use PDF ou imagens.",
         variant: "destructive",
       });
+      setLoading(false);
       return;
     }
 
@@ -199,7 +212,6 @@ export default function AlunoDetalhes() {
     }
 
     try {
-      // Upload do arquivo
       const fileExt = arquivo.name.split(".").pop();
       const fileName = `${user.id}/${id}/${Date.now()}.${fileExt}`;
 
@@ -209,12 +221,10 @@ export default function AlunoDetalhes() {
 
       if (uploadError) throw uploadError;
 
-      // Obter URL pública
       const { data: urlData } = supabase.storage
         .from("materiais")
         .getPublicUrl(fileName);
 
-      // Salvar no banco
       const { error: dbError } = await supabase.from("materiais").insert({
         profile_id: id,
         personal_id: user.id,
@@ -250,14 +260,11 @@ export default function AlunoDetalhes() {
     arquivoUrl: string
   ) => {
     try {
-      // Extrair path do arquivo da URL
       const urlParts = arquivoUrl.split("/materiais/");
       const filePath = urlParts[1];
 
-      // Deletar do storage
       await supabase.storage.from("materiais").remove([filePath]);
 
-      // Deletar do banco
       const { error } = await supabase
         .from("materiais")
         .delete()
@@ -295,115 +302,257 @@ export default function AlunoDetalhes() {
     }
   };
 
+  const handleTreinoAtualizado = () => {
+    setRefreshKey((prev) => prev + 1);
+  };
+
+  const getTipoIcon = (tipo: string) => {
+    switch (tipo) {
+      case "treino":
+        return "🏋️";
+      case "dieta":
+        return "🥗";
+      case "avaliacao":
+        return "📊";
+      default:
+        return "📄";
+    }
+  };
+
+  const getTipoColor = (tipo: string) => {
+    switch (tipo) {
+      case "treino":
+        return "bg-blue-100 text-blue-800 border-blue-200";
+      case "dieta":
+        return "bg-green-100 text-green-800 border-green-200";
+      case "avaliacao":
+        return "bg-purple-100 text-purple-800 border-purple-200";
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200";
+    }
+  };
+
   if (!aluno) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Carregando...</p>
+          <div
+            className="animate-spin rounded-full h-16 w-16 border-4 border-t-transparent mx-auto"
+            style={{
+              borderColor: personalSettings?.theme_color
+                ? `${personalSettings.theme_color}40`
+                : undefined,
+              borderTopColor: "transparent",
+            }}
+          ></div>
+          <p className="mt-4 text-muted-foreground font-medium">
+            Carregando informações do aluno...
+          </p>
         </div>
       </div>
     );
   }
 
-  // ✅ FUNÇÃO PARA SINCRONIZAR TREINOS
-  const handleTreinoAtualizado = () => {
-    setRefreshKey((prev) => prev + 1);
-  };
-
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
-          <Button variant="ghost" onClick={() => navigate("/")}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Voltar
-          </Button>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      {/* Header Premium */}
+      <header
+        className="border-b bg-card/80 backdrop-blur-xl sticky top-0 z-50 shadow-sm"
+        style={{
+          borderColor: personalSettings?.theme_color
+            ? `${personalSettings.theme_color}20`
+            : undefined,
+        }}
+      >
+        <div className={`${isMobile ? "px-4" : "container mx-auto px-6"} py-4`}>
+          <div className="flex items-center justify-between">
+            <Button
+              variant="ghost"
+              onClick={() => navigate("/")}
+              className="hover:bg-accent/50"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              {isMobile ? "Voltar" : "Voltar ao Dashboard"}
+            </Button>
+
+            {!isMobile && (
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant={aluno.is_active ? "default" : "destructive"}
+                  className="text-xs"
+                >
+                  {aluno.is_active ? "✓ Ativo" : "✕ Bloqueado"}
+                </Badge>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
-        <Card className="mb-8">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Informações do Aluno</CardTitle>
-              <StudentActiveToggle
-                studentId={aluno.id}
-                studentName={aluno.nome}
-                isActive={aluno.is_active}
-                onChanged={handleActiveStatusChange}
-              />
+      <main
+        className={`${isMobile ? "px-4 py-6" : "container mx-auto px-6 py-8"}`}
+      >
+        {/* Card de Perfil do Aluno - Premium */}
+        <Card className="mb-8 overflow-hidden border-2 shadow-lg">
+          <div
+            className="h-2"
+            style={{
+              background: personalSettings?.theme_color
+                ? `linear-gradient(90deg, ${personalSettings.theme_color}, ${personalSettings.theme_color}80)`
+                : "linear-gradient(90deg, hsl(var(--primary)), hsl(var(--primary) / 0.8))",
+            }}
+          />
+          <CardHeader className="pb-4">
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+              <div className="flex items-start gap-4">
+                {/* Avatar */}
+                <div
+                  className="w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center text-2xl md:text-3xl font-bold text-white shadow-lg"
+                  style={{
+                    background: personalSettings?.theme_color
+                      ? `linear-gradient(135deg, ${personalSettings.theme_color}, ${personalSettings.theme_color}cc)`
+                      : "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.8))",
+                  }}
+                >
+                  {aluno.nome.charAt(0).toUpperCase()}
+                </div>
+
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+                      {aluno.nome}
+                    </h1>
+                    {isMobile && (
+                      <Badge
+                        variant={aluno.is_active ? "default" : "destructive"}
+                        className="text-xs"
+                      >
+                        {aluno.is_active ? "Ativo" : "Bloqueado"}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="space-y-1 text-sm md:text-base">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Mail className="h-4 w-4" />
+                      <span>{aluno.email}</span>
+                    </div>
+                    {aluno.telefone && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Phone className="h-4 w-4" />
+                        <span>{aluno.telefone}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <StudentActiveToggle
+                  studentId={aluno.id}
+                  studentName={aluno.nome}
+                  isActive={aluno.is_active}
+                  onChanged={handleActiveStatusChange}
+                />
+                {aluno?.telefone && (
+                  <WhatsAppButton telefone={aluno.telefone} nome={aluno.nome} />
+                )}
+              </div>
             </div>
           </CardHeader>
-          <CardContent>
-            {/* Banner de aviso se aluno estiver bloqueado */}
-            {!aluno.is_active && (
-              <div className="mb-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-r-lg">
+
+          {/* Banner de Aviso */}
+          {!aluno.is_active && (
+            <div className="mx-6 mb-6">
+              <div className="p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border-l-4 border-yellow-500 rounded-r-xl shadow-sm">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="font-semibold text-yellow-900">
-                      ⚠️ Aluno com acesso bloqueado
+                      ⚠️ Acesso Bloqueado
                     </p>
                     <p className="text-sm text-yellow-800 mt-1">
-                      Este aluno não consegue acessar o sistema no momento. Ele
-                      verá uma tela de "Acesso Suspenso" ao tentar fazer login.
+                      Este aluno não pode acessar o sistema. Ele verá uma tela
+                      de "Acesso Suspenso" ao tentar fazer login.
                     </p>
                   </div>
                 </div>
               </div>
-            )}
-
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold">{aluno.nome}</h2>
-                <Badge variant={aluno.is_active ? "default" : "destructive"}>
-                  {aluno.is_active ? "Ativo" : "Bloqueado"}
-                </Badge>
-              </div>
-              <p className="text-muted-foreground">{aluno.email}</p>
-              {aluno.telefone && (
-                <p className="text-muted-foreground">📱 {aluno.telefone}</p>
-              )}
-              {aluno?.telefone && (
-                <WhatsAppButton telefone={aluno.telefone} nome={aluno.nome} />
-              )}
             </div>
-          </CardContent>
+          )}
         </Card>
 
-        {/* Tabs para organizar conteúdo */}
+        {/* Tabs Premium */}
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="grid w-full grid-cols-5">
-            {" "}
-            {/* ✅ Mudei de grid-cols-4 para grid-cols-5 */}
-            <TabsTrigger value="geral">
-              <User className="h-4 w-4 mr-2" />
-              Geral
-            </TabsTrigger>
-            <TabsTrigger value="treinos">
-              <Dumbbell className="h-4 w-4 mr-2" />
-              Treinos
-            </TabsTrigger>
-            <TabsTrigger value="historico">
-              {" "}
-              {/* ✅ NOVA ABA */}
-              <Calendar className="h-4 w-4 mr-2" />
-              Histórico
-            </TabsTrigger>
-            <TabsTrigger value="materiais">
-              <FileText className="h-4 w-4 mr-2" />
-              Materiais
-            </TabsTrigger>
-            <TabsTrigger value="financeiro">
-              <CreditCard className="h-4 w-4 mr-2" />
-              Financeiro
-            </TabsTrigger>
-          </TabsList>
+          <div
+            className={`${isMobile ? "overflow-x-auto scrollbar-hide" : ""}`}
+          >
+            <TabsList
+              className={`${
+                isMobile
+                  ? "inline-flex w-auto min-w-full gap-2"
+                  : "grid grid-cols-5 w-full"
+              } bg-muted/50 p-1 h-auto`}
+            >
+              <TabsTrigger
+                value="geral"
+                className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
+                  isMobile ? "flex-shrink-0 px-6 py-3" : "py-3"
+                }`}
+              >
+                <User className={`${isMobile ? "h-5 w-5" : "h-4 w-4 mr-2"}`} />
+                {!isMobile && "Geral"}
+              </TabsTrigger>
+              <TabsTrigger
+                value="treinos"
+                className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
+                  isMobile ? "flex-shrink-0 px-6 py-3" : "py-3"
+                }`}
+              >
+                <Dumbbell
+                  className={`${isMobile ? "h-5 w-5" : "h-4 w-4 mr-2"}`}
+                />
+                {!isMobile && "Treinos"}
+              </TabsTrigger>
+              <TabsTrigger
+                value="historico"
+                className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
+                  isMobile ? "flex-shrink-0 px-6 py-3" : "py-3"
+                }`}
+              >
+                <Calendar
+                  className={`${isMobile ? "h-5 w-5" : "h-4 w-4 mr-2"}`}
+                />
+                {!isMobile && "Histórico"}
+              </TabsTrigger>
+              <TabsTrigger
+                value="materiais"
+                className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
+                  isMobile ? "flex-shrink-0 px-6 py-3" : "py-3"
+                }`}
+              >
+                <FileText
+                  className={`${isMobile ? "h-5 w-5" : "h-4 w-4 mr-2"}`}
+                />
+                {!isMobile && "Materiais"}
+              </TabsTrigger>
+              <TabsTrigger
+                value="financeiro"
+                className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
+                  isMobile ? "flex-shrink-0 px-6 py-3" : "py-3"
+                }`}
+              >
+                <CreditCard
+                  className={`${isMobile ? "h-5 w-5" : "h-4 w-4 mr-2"}`}
+                />
+                {!isMobile && "Financeiro"}
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Aba Geral */}
           <TabsContent value="geral" className="space-y-6">
@@ -427,7 +576,7 @@ export default function AlunoDetalhes() {
             />
           </TabsContent>
 
-          {/* ✅ NOVA ABA: Histórico */}
+          {/* Aba Histórico */}
           <TabsContent value="historico" className="space-y-6">
             {user && (
               <CalendarioTreinosMensal
@@ -439,55 +588,80 @@ export default function AlunoDetalhes() {
             )}
           </TabsContent>
 
-          {/* Aba Materiais */}
+          {/* Aba Materiais - Design Premium */}
           <TabsContent value="materiais" className="space-y-6">
-            <Card>
-              <CardHeader>
+            <Card className="border-2 shadow-md">
+              <CardHeader className="bg-gradient-to-r from-card to-muted/20">
                 <div className="flex items-center justify-between">
-                  <CardTitle>Materiais</CardTitle>
+                  <div>
+                    <CardTitle className="text-xl">
+                      Materiais do Aluno
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {materiais.length}{" "}
+                      {materiais.length === 1 ? "material" : "materiais"}{" "}
+                      enviado{materiais.length === 1 ? "" : "s"}
+                    </p>
+                  </div>
                   <Dialog open={openDialog} onOpenChange={setOpenDialog}>
                     <DialogTrigger asChild>
                       <Button
+                        size={isMobile ? "sm" : "default"}
+                        className="shadow-md"
                         style={{
                           backgroundColor:
                             personalSettings?.theme_color || undefined,
                         }}
                       >
                         <Upload className="mr-2 h-4 w-4" />
-                        Enviar Material
+                        {isMobile ? "Enviar" : "Enviar Material"}
                       </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="max-w-lg">
                       <DialogHeader>
-                        <DialogTitle>Enviar Material</DialogTitle>
+                        <DialogTitle className="text-xl">
+                          Enviar Novo Material
+                        </DialogTitle>
                       </DialogHeader>
                       <form
                         onSubmit={handleEnviarMaterial}
                         className="space-y-4"
                       >
                         <div className="space-y-2">
-                          <Label htmlFor="titulo">Título</Label>
-                          <Input id="titulo" name="titulo" required />
+                          <Label htmlFor="titulo">Título do Material</Label>
+                          <Input
+                            id="titulo"
+                            name="titulo"
+                            placeholder="Ex: Treino de Hipertrofia"
+                            required
+                          />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="tipo">Tipo</Label>
+                          <Label htmlFor="tipo">Categoria</Label>
                           <Select name="tipo" required>
                             <SelectTrigger>
-                              <SelectValue placeholder="Selecione o tipo" />
+                              <SelectValue placeholder="Selecione a categoria" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="treino">Treino</SelectItem>
-                              <SelectItem value="dieta">Dieta</SelectItem>
+                              <SelectItem value="treino">🏋️ Treino</SelectItem>
+                              <SelectItem value="dieta">🥗 Dieta</SelectItem>
                               <SelectItem value="avaliacao">
-                                Avaliação
+                                📊 Avaliação
                               </SelectItem>
-                              <SelectItem value="outro">Outro</SelectItem>
+                              <SelectItem value="outro">📄 Outro</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="descricao">Descrição</Label>
-                          <Textarea id="descricao" name="descricao" />
+                          <Label htmlFor="descricao">
+                            Descrição (Opcional)
+                          </Label>
+                          <Textarea
+                            id="descricao"
+                            name="descricao"
+                            placeholder="Adicione detalhes sobre este material..."
+                            rows={3}
+                          />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="arquivo">Arquivo</Label>
@@ -495,9 +669,13 @@ export default function AlunoDetalhes() {
                             id="arquivo"
                             name="arquivo"
                             type="file"
-                            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                            accept=".pdf,.jpg,.jpeg,.png"
                             required
+                            className="cursor-pointer"
                           />
+                          <p className="text-xs text-muted-foreground">
+                            PDF ou imagens (máx. 10MB)
+                          </p>
                         </div>
                         <Button
                           type="submit"
@@ -508,93 +686,179 @@ export default function AlunoDetalhes() {
                               personalSettings?.theme_color || undefined,
                           }}
                         >
-                          {loading ? "Enviando..." : "Enviar Material"}
+                          {loading ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+                              Enviando...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="mr-2 h-4 w-4" />
+                              Enviar Material
+                            </>
+                          )}
                         </Button>
                       </form>
                     </DialogContent>
                   </Dialog>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {materiais.map((material) => (
-                    <Card key={material.id}>
-                      <CardContent className="pt-6">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <h3 className="font-semibold">
-                                {material.titulo}
-                              </h3>
-                              <Badge variant="secondary">{material.tipo}</Badge>
+              <CardContent className="pt-6">
+                {materiais.length > 0 ? (
+                  <div className="grid gap-4">
+                    {materiais.map((material) => (
+                      <Card
+                        key={material.id}
+                        className="overflow-hidden hover:shadow-lg transition-all duration-300 border-2"
+                      >
+                        <div
+                          className="h-1"
+                          style={{
+                            backgroundColor:
+                              personalSettings?.theme_color ||
+                              "hsl(var(--primary))",
+                          }}
+                        />
+                        <CardContent className="p-4 md:p-6">
+                          <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                            <div className="flex-1 space-y-3">
+                              <div className="flex items-start gap-3">
+                                <div className="text-3xl">
+                                  {getTipoIcon(material.tipo)}
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                                    <h3 className="font-semibold text-lg">
+                                      {material.titulo}
+                                    </h3>
+                                    <Badge
+                                      className={`${getTipoColor(
+                                        material.tipo
+                                      )} border text-xs`}
+                                    >
+                                      {material.tipo.charAt(0).toUpperCase() +
+                                        material.tipo.slice(1)}
+                                    </Badge>
+                                  </div>
+                                  {material.descricao && (
+                                    <p className="text-sm text-muted-foreground mb-3 leading-relaxed">
+                                      {material.descricao}
+                                    </p>
+                                  )}
+                                  <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                                    <span className="flex items-center gap-1">
+                                      📎 {material.arquivo_nome}
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      📅{" "}
+                                      {format(
+                                        new Date(material.created_at),
+                                        "dd/MM/yyyy"
+                                      )}
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      🕐{" "}
+                                      {format(
+                                        new Date(material.created_at),
+                                        "HH:mm"
+                                      )}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
-                            {material.descricao && (
-                              <p className="text-sm text-muted-foreground mb-2">
-                                {material.descricao}
-                              </p>
-                            )}
-                            <p className="text-xs text-muted-foreground">
-                              📎 {material.arquivo_nome}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {format(
-                                new Date(material.created_at),
-                                "dd/MM/yyyy HH:mm"
-                              )}
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleVisualizarMaterial(material)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="outline" size="sm">
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>
-                                    Confirmar exclusão
-                                  </AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Tem certeza que deseja remover este
-                                    material?
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>
-                                    Cancelar
-                                  </AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() =>
-                                      handleRemoverMaterial(
-                                        material.id,
-                                        material.arquivo_url
-                                      )
-                                    }
+                            <div className="flex md:flex-col gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  handleVisualizarMaterial(material)
+                                }
+                                className="flex-1 md:flex-none"
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                {isMobile ? "Ver" : "Visualizar"}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  window.open(material.arquivo_url, "_blank")
+                                }
+                                className="flex-1 md:flex-none"
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                {isMobile ? "Baixar" : "Download"}
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1 md:flex-none border-red-200 hover:bg-red-50"
                                   >
-                                    Remover
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                      Confirmar Exclusão
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Tem certeza que deseja remover o material
+                                      "{material.titulo}"? Esta ação não pode
+                                      ser desfeita.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>
+                                      Cancelar
+                                    </AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() =>
+                                        handleRemoverMaterial(
+                                          material.id,
+                                          material.arquivo_url
+                                        )
+                                      }
+                                      className="bg-destructive hover:bg-destructive/90"
+                                    >
+                                      Remover
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                  {materiais.length === 0 && (
-                    <p className="text-center text-muted-foreground py-8">
-                      Nenhum material enviado ainda
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-16">
+                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-muted mb-4">
+                      <FileText className="h-10 w-10 text-muted-foreground" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2">
+                      Nenhum material enviado
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
+                      Comece enviando materiais de treino, dieta ou avaliações
+                      para este aluno.
                     </p>
-                  )}
-                </div>
+                    <Button
+                      onClick={() => setOpenDialog(true)}
+                      style={{
+                        backgroundColor:
+                          personalSettings?.theme_color || undefined,
+                      }}
+                    >
+                      <Upload className="mr-2 h-4 w-4" />
+                      Enviar Primeiro Material
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

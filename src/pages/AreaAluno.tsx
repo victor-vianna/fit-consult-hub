@@ -37,6 +37,7 @@ import { BottomNavigation } from "@/components/mobile/BottomNavigation";
 import { ActionCard } from "@/components/mobile/ActionCard";
 import ExercisesLibrary from "./ExercisesLibrary";
 import { CalendarioTreinosMensal } from "@/components/CalendarioTreinosMensal";
+import Biblioteca from "./Biblioteca";
 
 interface Material {
   id: string;
@@ -163,7 +164,7 @@ export default function AreaAluno() {
           <ActionCard
             title="Biblioteca"
             icon={ListChecks}
-            onClick={() => setActiveSection("exercicios")}
+            onClick={() => setActiveSection("biblioteca")}
           />
         </div>
 
@@ -727,7 +728,7 @@ export default function AreaAluno() {
           </div>
         );
 
-      case "exercicios":
+      case "biblioteca":
         return (
           <div className="animate-fade-in">
             <Card>

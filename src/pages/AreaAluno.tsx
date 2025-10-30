@@ -129,6 +129,8 @@ export default function AreaAluno() {
           <CalendarioSemanal
             profileId={user!.id}
             personalId={profile.personal_id}
+            themeColor={personalSettings?.theme_color}
+            onVerHistoricoCompleto={() => setActiveSection("historico")}
           />
         )}
 

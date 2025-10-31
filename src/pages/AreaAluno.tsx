@@ -39,6 +39,7 @@ import { ActionCard } from "@/components/mobile/ActionCard";
 import ExercisesLibrary from "./ExercisesLibrary";
 import { CalendarioTreinosMensal } from "@/components/CalendarioTreinosMensal";
 import Biblioteca from "./Biblioteca";
+import { AppLayout } from "@/components/AppLayout";
 
 interface Material {
   id: string;
@@ -779,21 +780,120 @@ export default function AreaAluno() {
   // Layout Mobile
   if (isMobile) {
     return (
-      <div className="min-h-screen flex flex-col w-full bg-background">
-        <MobileHeader userName={profile?.nome} />
+      <AppLayout>
+        <div className="min-h-screen flex flex-col w-full bg-background">
+          <MobileHeader userName={profile?.nome} />
 
-        <main className="flex-1 overflow-auto mobile-content-spacing">
-          <div className="container max-w-2xl mx-auto py-4">
-            {renderContent()}
+          <main className="flex-1 overflow-auto mobile-content-spacing">
+            <div className="container max-w-2xl mx-auto py-4">
+              {renderContent()}
+            </div>
+          </main>
+
+          <BottomNavigation
+            activeSection={activeSection}
+            onSectionChange={setActiveSection}
+            onSignOut={signOut}
+            personalWhatsApp={personalProfile?.telefone}
+          />
+
+          {selectedFile && (
+            <DocumentViewer
+              open={viewerOpen}
+              onClose={() => setViewerOpen(false)}
+              fileUrl={selectedFile.url}
+              fileName={selectedFile.name}
+              fileType={selectedFile.type}
+            />
+          )}
+        </div>
+      </AppLayout>
+    );
+  }
+
+  // Layout Desktop
+  return (
+    <AppLayout>
+      <SidebarProvider>
+        <div className="min-h-screen flex w-full">
+          <AppSidebarAluno
+            activeSection={activeSection}
+            onSectionChange={setActiveSection}
+            personalId={profile?.personal_id}
+          />
+
+          <div className="flex-1 flex flex-col">
+            <header
+              className="border-b backdrop-blur-sm sticky top-0 z-10"
+              style={{
+                backgroundColor: personalSettings?.theme_color
+                  ? `${personalSettings.theme_color}10`
+                  : "hsl(var(--card) / 0.5)",
+                borderColor: personalSettings?.theme_color
+                  ? `${personalSettings.theme_color}30`
+                  : "hsl(var(--border))",
+              }}
+            >
+              <div className="flex items-center justify-between px-4 py-4">
+                <div className="flex items-center gap-3">
+                  <SidebarTrigger />
+
+                  {/* Logo do Personal */}
+                  {personalSettings?.logo_url ? (
+                    <img
+                      src={personalSettings.logo_url}
+                      alt="Logo"
+                      className="h-12 w-12 rounded-full object-cover border-2"
+                      style={{
+                        borderColor: personalSettings.theme_color || "#3b82f6",
+                      }}
+                    />
+                  ) : (
+                    <Dumbbell
+                      className="h-8 w-8"
+                      style={{
+                        color: personalSettings?.theme_color || undefined,
+                      }}
+                    />
+                  )}
+
+                  <div>
+                    <h1
+                      className="text-xl font-bold"
+                      style={{
+                        color: personalSettings?.theme_color || "inherit",
+                      }}
+                    >
+                      {personalSettings?.display_name || "FitConsult"}
+                    </h1>
+                    <p className="text-sm text-muted-foreground">
+                      {profile?.nome}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <ThemeToggle />
+                  {profile?.personal_id && personalProfile?.telefone && (
+                    <WhatsAppButton
+                      telefone={personalProfile.telefone}
+                      nome="Personal"
+                    />
+                  )}
+                  <Button variant="outline" onClick={signOut}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sair
+                  </Button>
+                </div>
+              </div>
+            </header>
+
+            <main className="flex-1 p-6 overflow-auto">
+              <div className="container max-w-4xl mx-auto">
+                {renderContent()}
+              </div>
+            </main>
           </div>
-        </main>
-
-        <BottomNavigation
-          activeSection={activeSection}
-          onSectionChange={setActiveSection}
-          onSignOut={signOut}
-          personalWhatsApp={personalProfile?.telefone}
-        />
+        </div>
 
         {selectedFile && (
           <DocumentViewer
@@ -804,100 +904,7 @@ export default function AreaAluno() {
             fileType={selectedFile.type}
           />
         )}
-      </div>
-    );
-  }
-
-  // Layout Desktop
-  return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full">
-        <AppSidebarAluno
-          activeSection={activeSection}
-          onSectionChange={setActiveSection}
-          personalId={profile?.personal_id}
-        />
-
-        <div className="flex-1 flex flex-col">
-          <header
-            className="border-b backdrop-blur-sm sticky top-0 z-10"
-            style={{
-              backgroundColor: personalSettings?.theme_color
-                ? `${personalSettings.theme_color}10`
-                : "hsl(var(--card) / 0.5)",
-              borderColor: personalSettings?.theme_color
-                ? `${personalSettings.theme_color}30`
-                : "hsl(var(--border))",
-            }}
-          >
-            <div className="flex items-center justify-between px-4 py-4">
-              <div className="flex items-center gap-3">
-                <SidebarTrigger />
-
-                {/* Logo do Personal */}
-                {personalSettings?.logo_url ? (
-                  <img
-                    src={personalSettings.logo_url}
-                    alt="Logo"
-                    className="h-12 w-12 rounded-full object-cover border-2"
-                    style={{
-                      borderColor: personalSettings.theme_color || "#3b82f6",
-                    }}
-                  />
-                ) : (
-                  <Dumbbell
-                    className="h-8 w-8"
-                    style={{
-                      color: personalSettings?.theme_color || undefined,
-                    }}
-                  />
-                )}
-
-                <div>
-                  <h1
-                    className="text-xl font-bold"
-                    style={{
-                      color: personalSettings?.theme_color || "inherit",
-                    }}
-                  >
-                    {personalSettings?.display_name || "FitConsult"}
-                  </h1>
-                  <p className="text-sm text-muted-foreground">
-                    {profile?.nome}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <ThemeToggle />
-                {profile?.personal_id && personalProfile?.telefone && (
-                  <WhatsAppButton
-                    telefone={personalProfile.telefone}
-                    nome="Personal"
-                  />
-                )}
-                <Button variant="outline" onClick={signOut}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Sair
-                </Button>
-              </div>
-            </div>
-          </header>
-
-          <main className="flex-1 p-6 overflow-auto">
-            <div className="container max-w-4xl mx-auto">{renderContent()}</div>
-          </main>
-        </div>
-      </div>
-
-      {selectedFile && (
-        <DocumentViewer
-          open={viewerOpen}
-          onClose={() => setViewerOpen(false)}
-          fileUrl={selectedFile.url}
-          fileName={selectedFile.name}
-          fileType={selectedFile.type}
-        />
-      )}
-    </SidebarProvider>
+      </SidebarProvider>
+    </AppLayout>
   );
 }

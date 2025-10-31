@@ -15,8 +15,17 @@ import ExercisesLibrary from "./pages/ExercisesLibrary";
 import AcessoSuspenso from "./pages/AcessoSuspenso";
 import Financeiro from "./pages/Financeiro";
 import Biblioteca from "./pages/Biblioteca";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // Dados ficam "frescos" por 5 minutos
+      refetchOnWindowFocus: false, // Não recarregar ao focar janela
+      retry: 1, // Tentar 1 vez em caso de erro
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -80,6 +89,8 @@ const App = () => (
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
+    {/* ✅ Devtools para debug (apenas em dev) */}
+    <ReactQueryDevtools initialIsOpen={false} />
   </QueryClientProvider>
 );
 

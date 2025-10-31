@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+// components/TreinosManager.tsx
+import { useState } from "react";
+import { useTreinos } from "@/hooks/useTreinos";
 import {
   Card,
   CardContent,
@@ -18,45 +19,50 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import {
-  Plus,
-  Trash2,
-  Edit,
-  ExternalLink,
-  GripVertical,
-  Library,
-} from "lucide-react";
-import { toast } from "sonner";
+import { Plus, Edit, ChevronDown, Loader2 } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ChevronDown } from "lucide-react";
-
-// ✅ NOVO: imports para integração com a biblioteca
+import { ExercicioDialog } from "@/components/ExercicioDialog";
+import { SortableExercicioCard } from "@/components/SortableExercicioCard";
 import ExercisePicker from "@/components/exercises/ExercisePicker";
 import type { Exercise } from "@/types/exercise";
-
-interface Exercicio {
-  id: string;
-  nome: string;
-  link_video: string | null;
-  ordem: number;
-}
-
-interface TreinoDia {
-  dia: number;
-  treinoId: string | null;
-  exercicios: Exercicio[];
-  descricao: string | null;
-}
+import type { Exercicio as TreinoExercicio, TreinoDia } from "@/types/treino";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { WorkoutTimer } from "./WorkoutTimer";
 
 interface TreinosManagerProps {
   profileId: string;
   personalId: string;
   readOnly?: boolean;
 }
+
+type DialogExercicio = {
+  id?: string;
+  nome: string;
+  link_video: string;
+  series: number;
+  repeticoes: string;
+  descanso: number;
+  carga: string;
+  observacoes: string;
+};
 
 const diasSemana = [
   "Segunda-feira",
@@ -73,215 +79,133 @@ export function TreinosManager({
   personalId,
   readOnly = false,
 }: TreinosManagerProps) {
-  const [treinos, setTreinos] = useState<TreinoDia[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const {
+    treinos,
+    loading,
+    adicionarExercicio,
+    editarExercicio,
+    removerExercicio,
+    reordenarExercicios,
+    editarDescricao,
+    marcarExercicioConcluido,
+    isAdicionando,
+    isEditando,
+    isRemovendo,
+    isReordenando,
+  } = useTreinos({ profileId, personalId });
+
+  const [exercicioDialogOpen, setExercicioDialogOpen] = useState(false);
   const [editDescricaoOpen, setEditDescricaoOpen] = useState(false);
-  const [selectedDia, setSelectedDia] = useState<number | null>(null);
-  const [novoExercicio, setNovoExercicio] = useState({
-    nome: "",
-    link_video: "",
-  });
-  const [exercicioEditando, setExercicioEditando] = useState<Exercicio | null>(
-    null
-  );
-  const [descricaoEditando, setDescricaoEditando] = useState("");
-
-  // ✅ NOVO: controlar abertura do ExercisePicker
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [selectedDia, setSelectedDia] = useState<number | null>(null);
+  const [exercicioEditando, setExercicioEditando] =
+    useState<DialogExercicio | null>(null);
+  const [descricaoEditando, setDescricaoEditando] = useState("");
+  const [exercicioTemp, setExercicioTemp] =
+    useState<Partial<DialogExercicio> | null>(null);
 
-  useEffect(() => {
-    carregarTreinos();
-  }, [profileId]);
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 5 },
+    }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
-  const carregarTreinos = async () => {
-    try {
-      setLoading(true);
-      const hoje = new Date();
-      const inicioDaSemana = new Date(hoje);
-      inicioDaSemana.setDate(hoje.getDate() - hoje.getDay() + 1);
+  const handleDragEnd = (event: DragEndEvent, dia: number) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
 
-      const { data: treinosSemanais, error: treinosError } = await supabase
-        .from("treinos_semanais")
-        .select("*")
-        .eq("profile_id", profileId)
-        .eq("personal_id", personalId)
-        .gte("semana", inicioDaSemana.toISOString().split("T")[0])
-        .order("dia_semana");
-
-      if (treinosError) throw treinosError;
-
-      const treinosComExercicios: TreinoDia[] = await Promise.all(
-        Array.from({ length: 7 }, async (_, i) => {
-          const dia = i + 1;
-          const treino = treinosSemanais?.find((t) => t.dia_semana === dia);
-
-          if (treino) {
-            const { data: exercicios, error: exerciciosError } = await supabase
-              .from("exercicios")
-              .select("*")
-              .eq("treino_semanal_id", treino.id)
-              .order("ordem");
-
-            if (exerciciosError) throw exerciciosError;
-
-            return {
-              dia,
-              treinoId: treino.id,
-              exercicios: exercicios || [],
-              descricao: treino.descricao,
-            };
-          }
-
-          return {
-            dia,
-            treinoId: null,
-            exercicios: [],
-            descricao: null,
-          };
-        })
-      );
-
-      setTreinos(treinosComExercicios);
-    } catch (error) {
-      console.error("Erro ao carregar treinos:", error);
-      toast.error("Erro ao carregar treinos");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const criarTreinoSeNecessario = async (dia: number): Promise<string> => {
     const treino = treinos.find((t) => t.dia === dia);
-    if (treino?.treinoId) return treino.treinoId;
+    if (!treino) return;
 
-    const hoje = new Date();
-    const inicioDaSemana = new Date(hoje);
-    inicioDaSemana.setDate(hoje.getDate() - hoje.getDay() + 1);
+    const oldIndex = treino.exercicios.findIndex((ex) => ex.id === active.id);
+    const newIndex = treino.exercicios.findIndex((ex) => ex.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
 
-    const { data, error } = await supabase
-      .from("treinos_semanais")
-      .insert({
-        profile_id: profileId,
-        personal_id: personalId,
-        semana: inicioDaSemana.toISOString().split("T")[0],
-        dia_semana: dia,
-        concluido: false,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data.id;
+    const newOrder = arrayMove(treino.exercicios, oldIndex, newIndex);
+    reordenarExercicios(dia, newOrder).catch((e) =>
+      console.error("Erro ao reordenar exercícios:", e)
+    );
   };
 
-  const handleAdicionarExercicio = async () => {
-    if (!novoExercicio.nome.trim() || selectedDia === null) {
-      toast.error("Preencha o nome do exercício");
-      return;
-    }
-
-    try {
-      const treinoId = await criarTreinoSeNecessario(selectedDia);
-      const treino = treinos.find((t) => t.dia === selectedDia);
-      const proximaOrdem = treino ? treino.exercicios.length : 0;
-
-      const { error } = await supabase.from("exercicios").insert({
-        treino_semanal_id: treinoId,
-        nome: novoExercicio.nome,
-        link_video: novoExercicio.link_video || null,
-        ordem: proximaOrdem,
-      });
-
-      if (error) throw error;
-
-      toast.success("Exercício adicionado com sucesso");
-      setDialogOpen(false);
-      setNovoExercicio({ nome: "", link_video: "" });
-      carregarTreinos();
-    } catch (error) {
-      console.error("Erro ao adicionar exercício:", error);
-      toast.error("Erro ao adicionar exercício");
-    }
-  };
-
-  const handleEditarExercicio = async () => {
-    if (!exercicioEditando || !exercicioEditando.nome.trim()) {
-      toast.error("Preencha o nome do exercício");
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from("exercicios")
-        .update({
-          nome: exercicioEditando.nome,
-          link_video: exercicioEditando.link_video || null,
-        })
-        .eq("id", exercicioEditando.id);
-
-      if (error) throw error;
-
-      toast.success("Exercício atualizado com sucesso");
-      setEditDialogOpen(false);
-      setExercicioEditando(null);
-      carregarTreinos();
-    } catch (error) {
-      console.error("Erro ao editar exercício:", error);
-      toast.error("Erro ao editar exercício");
-    }
-  };
-
-  const handleRemoverExercicio = async (exercicioId: string) => {
-    try {
-      const { error } = await supabase
-        .from("exercicios")
-        .delete()
-        .eq("id", exercicioId);
-
-      if (error) throw error;
-
-      toast.success("Exercício removido com sucesso");
-      carregarTreinos();
-    } catch (error) {
-      console.error("Erro ao remover exercício:", error);
-      toast.error("Erro ao remover exercício");
-    }
-  };
-
-  const handleEditarDescricao = async () => {
-    if (selectedDia === null) return;
-
-    try {
-      const treinoId = await criarTreinoSeNecessario(selectedDia);
-
-      const { error } = await supabase
-        .from("treinos_semanais")
-        .update({ descricao: descricaoEditando || null })
-        .eq("id", treinoId);
-
-      if (error) throw error;
-
-      toast.success("Grupo muscular atualizado");
-      setEditDescricaoOpen(false);
-      setDescricaoEditando("");
-      carregarTreinos();
-    } catch (error) {
-      console.error("Erro ao editar descrição:", error);
-      toast.error("Erro ao editar descrição");
-    }
-  };
-
-  // ✅ NOVO: quando escolher um exercício da biblioteca
   const handleExerciseSelect = (exercise: Exercise) => {
-    setNovoExercicio({
+    setExercicioTemp({
       nome: exercise.nome,
-      link_video: exercise.link_youtube || "",
+      link_video: exercise.link_youtube ?? "",
+      series: 3,
+      repeticoes: "12",
+      descanso: 60,
+      carga: "",
+      observacoes: "",
     });
     setPickerOpen(false);
-    // Mantemos o Dialog de "Adicionar Exercício" aberto para o usuário confirmar
-    toast.success(`"${exercise.nome}" selecionado da biblioteca`);
+    setExercicioDialogOpen(true);
+  };
+
+  const dialogToPayload = (
+    d: Omit<DialogExercicio, "id">
+  ): Partial<TreinoExercicio> => {
+    const cargaTrim = d.carga?.trim();
+    if (!cargaTrim) {
+      return {
+        nome: d.nome,
+        link_video: d.link_video ? d.link_video : null,
+        series: d.series,
+        repeticoes: d.repeticoes,
+        descanso: d.descanso,
+        carga: null,
+        observacoes: d.observacoes ? d.observacoes : null,
+      };
+    }
+    const parsed = Number(cargaTrim);
+    return {
+      nome: d.nome,
+      link_video: d.link_video ? d.link_video : null,
+      series: d.series,
+      repeticoes: d.repeticoes,
+      descanso: d.descanso,
+      carga: Number.isNaN(parsed) ? null : parsed,
+      observacoes: d.observacoes ? d.observacoes : null,
+    };
+  };
+
+  const treinoExToDialog = (ex: TreinoExercicio): DialogExercicio => ({
+    id: ex.id,
+    nome: ex.nome,
+    link_video: ex.link_video ?? "",
+    series: ex.series ?? 3,
+    repeticoes: ex.repeticoes ?? "12",
+    descanso: ex.descanso ?? 60,
+    carga: ex.carga != null ? String(ex.carga) : "",
+    observacoes: ex.observacoes ?? "",
+  });
+
+  const handleSaveExercicio = async (dados: Omit<DialogExercicio, "id">) => {
+    try {
+      const payload = dialogToPayload(dados);
+      if (exercicioEditando?.id) {
+        await editarExercicio(exercicioEditando.id, payload);
+        setExercicioEditando(null);
+      } else if (selectedDia !== null) {
+        await adicionarExercicio(selectedDia, payload);
+      }
+      setExercicioDialogOpen(false);
+      setExercicioTemp(null);
+    } catch (err) {
+      console.error("Erro ao salvar exercício:", err);
+    }
+  };
+
+  const handleSaveDescricao = async () => {
+    if (selectedDia !== null) {
+      try {
+        await editarDescricao(selectedDia, descricaoEditando || null);
+        setEditDescricaoOpen(false);
+      } catch (err) {
+        console.error("Erro ao salvar descrição:", err);
+      }
+    }
   };
 
   if (loading) {
@@ -295,16 +219,16 @@ export function TreinosManager({
       </div>
 
       <div className="grid gap-4">
-        {treinos.map((treino) => (
+        {treinos.map((treino: TreinoDia) => (
           <Collapsible
             key={treino.dia}
             defaultOpen={treino.exercicios.length > 0}
           >
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between gap-4">
-                  <CollapsibleTrigger className="flex items-center gap-2 flex-1 text-left">
-                    <ChevronDown className="h-4 w-4 transition-transform shrink-0 data-[state=open]:rotate-180" />
+                <div className="flex items-center justify-between gap-4 w-full">
+                  <CollapsibleTrigger className="flex items-center gap-2 flex-1 text-left group">
+                    <ChevronDown className="h-4 w-4 transition-transform shrink-0 group-data-[state=open]:rotate-180" />
                     <div className="flex-1">
                       <CardTitle className="text-lg">
                         {diasSemana[treino.dia - 1]}
@@ -324,98 +248,131 @@ export function TreinosManager({
                       )}
                     </div>
                   </CollapsibleTrigger>
-                  {!readOnly && (
-                    <div className="flex gap-2 shrink-0">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedDia(treino.dia);
-                          setDescricaoEditando(treino.descricao || "");
-                          setEditDescricaoOpen(true);
-                        }}
-                      >
-                        <Edit className="h-4 w-4 mr-2" />
-                        Grupo
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setSelectedDia(treino.dia);
-                          setDialogOpen(true);
-                        }}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Exercício
-                      </Button>
-                    </div>
-                  )}
+
+                  <div className="flex items-center gap-3">
+                    {treino.treinoId && (
+                      <div className="mr-2">
+                        <WorkoutTimer
+                          treinoId={treino.treinoId}
+                          profileId={profileId}
+                          personalId={personalId}
+                        />
+                      </div>
+                    )}
+
+                    {!readOnly && (
+                      <div className="flex gap-2 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedDia(treino.dia);
+                            setDescricaoEditando(treino.descricao ?? "");
+                            setEditDescricaoOpen(true);
+                          }}
+                          disabled={isEditando}
+                        >
+                          {isEditando ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Edit className="h-4 w-4 mr-2" />
+                          )}
+                          Grupo
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setSelectedDia(treino.dia);
+                            setExercicioTemp(null);
+                            setExercicioEditando(null);
+                            setExercicioDialogOpen(true);
+                          }}
+                          disabled={isAdicionando}
+                        >
+                          {isAdicionando ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Plus className="h-4 w-4 mr-2" />
+                          )}
+                          Exercício
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
 
               <CollapsibleContent>
                 <CardContent className="pt-0">
                   {treino.exercicios.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-4">
+                    <p className="text-muted-foreground text-center py-8">
                       Nenhum exercício cadastrado para este dia
                     </p>
                   ) : (
-                    <div className="space-y-2">
-                      {treino.exercicios.map((exercicio, index) => (
-                        <div
-                          key={exercicio.id}
-                          className="flex items-center gap-2 p-3 border rounded-lg bg-card hover:bg-accent/50 transition-colors"
-                        >
-                          {!readOnly && (
-                            <GripVertical className="h-4 w-4 text-muted-foreground" />
-                          )}
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-sm text-muted-foreground">
-                                #{index + 1}
-                              </span>
-                              <span className="font-medium">
-                                {exercicio.nome}
-                              </span>
-                            </div>
-                            {exercicio.link_video && (
-                              <a
-                                href={exercicio.link_video}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-primary hover:underline flex items-center gap-1 mt-1"
-                              >
-                                Ver demonstração
-                                <ExternalLink className="h-3 w-3" />
-                              </a>
-                            )}
-                          </div>
-                          {!readOnly && (
-                            <div className="flex gap-2">
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() => {
-                                  setExercicioEditando(exercicio);
-                                  setEditDialogOpen(true);
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={(event) => handleDragEnd(event, treino.dia)}
+                    >
+                      <SortableContext
+                        items={treino.exercicios.map((ex) => ex.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className="space-y-3">
+                          {treino.exercicios.map((exercicio, index) => {
+                            const cardEx = {
+                              id: exercicio.id,
+                              nome: exercicio.nome,
+                              link_video: exercicio.link_video ?? null,
+                              ordem: exercicio.ordem,
+                              series: exercicio.series,
+                              repeticoes: exercicio.repeticoes,
+                              descanso: exercicio.descanso,
+                              carga:
+                                exercicio.carga != null
+                                  ? String(exercicio.carga)
+                                  : undefined,
+                              observacoes: exercicio.observacoes ?? undefined,
+                              concluido: !!exercicio.concluido,
+                            };
+
+                            return (
+                              <SortableExercicioCard
+                                key={exercicio.id}
+                                exercicio={cardEx}
+                                index={index}
+                                readOnly={readOnly}
+                                onEdit={() => {
+                                  setSelectedDia(treino.dia);
+                                  setExercicioEditando(
+                                    treinoExToDialog(exercicio)
+                                  );
+                                  setExercicioDialogOpen(true);
                                 }}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() =>
-                                  handleRemoverExercicio(exercicio.id)
-                                }
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          )}
+                                onDelete={(id) => {
+                                  removerExercicio(id).catch((e) =>
+                                    console.error(
+                                      "Erro ao remover exercício:",
+                                      e
+                                    )
+                                  );
+                                }}
+                                onToggleConcluido={(id, concluido) => {
+                                  marcarExercicioConcluido(id, concluido).catch(
+                                    (e) =>
+                                      console.error(
+                                        "Erro ao marcar concluído:",
+                                        e
+                                      )
+                                  );
+                                }}
+                                /* não passa isRemovendo/isReordenando — evite mismatch se filhos não aceitam */
+                              />
+                            );
+                          })}
                         </div>
-                      ))}
-                    </div>
+                      </SortableContext>
+                    </DndContext>
                   )}
                 </CardContent>
               </CollapsibleContent>
@@ -424,117 +381,25 @@ export function TreinosManager({
         ))}
       </div>
 
-      {/* Dialog para adicionar exercício */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Adicionar Exercício</DialogTitle>
-            <DialogDescription>
-              Adicione um novo exercício para{" "}
-              {selectedDia !== null && diasSemana[selectedDia - 1]}
-            </DialogDescription>
-          </DialogHeader>
+      <ExercicioDialog
+        open={exercicioDialogOpen}
+        onOpenChange={(open) => {
+          setExercicioDialogOpen(open);
+          if (!open) {
+            setExercicioEditando(null);
+            setExercicioTemp(null);
+          }
+        }}
+        exercicio={
+          (exercicioEditando ??
+            (exercicioTemp as DialogExercicio) ??
+            null) as any
+        }
+        onSave={handleSaveExercicio}
+        diaNome={selectedDia !== null ? diasSemana[selectedDia - 1] : undefined}
+        /* não passar isSaving aqui para não quebrar tipagem dos filhos */
+      />
 
-          {/* ✅ Botão Buscar na Biblioteca */}
-          <div className="mb-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={() => setPickerOpen(true)}
-            >
-              <Library className="h-4 w-4 mr-2" />
-              Buscar na Biblioteca de Exercícios
-            </Button>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="nome">Nome do Exercício *</Label>
-              <Input
-                id="nome"
-                value={novoExercicio.nome}
-                onChange={(e) =>
-                  setNovoExercicio({ ...novoExercicio, nome: e.target.value })
-                }
-                placeholder="Ex: Supino Reto"
-              />
-            </div>
-            <div>
-              <Label htmlFor="link">Link do Vídeo (opcional)</Label>
-              <Input
-                id="link"
-                value={novoExercicio.link_video}
-                onChange={(e) =>
-                  setNovoExercicio({
-                    ...novoExercicio,
-                    link_video: e.target.value,
-                  })
-                }
-                placeholder="https://youtube.com/..."
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleAdicionarExercicio}>Adicionar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog para editar exercício */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar Exercício</DialogTitle>
-            <DialogDescription>
-              Edite as informações do exercício
-            </DialogDescription>
-          </DialogHeader>
-          {exercicioEditando && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="edit-nome">Nome do Exercício *</Label>
-                <Input
-                  id="edit-nome"
-                  value={exercicioEditando.nome}
-                  onChange={(e) =>
-                    setExercicioEditando({
-                      ...exercicioEditando,
-                      nome: e.target.value,
-                    })
-                  }
-                  placeholder="Ex: Supino Reto"
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-link">Link do Vídeo (opcional)</Label>
-                <Input
-                  id="edit-link"
-                  value={exercicioEditando.link_video || ""}
-                  onChange={(e) =>
-                    setExercicioEditando({
-                      ...exercicioEditando,
-                      link_video: e.target.value,
-                    })
-                  }
-                  placeholder="https://youtube.com/..."
-                />
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleEditarExercicio}>Salvar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog para editar descrição/grupo muscular */}
       <Dialog open={editDescricaoOpen} onOpenChange={setEditDescricaoOpen}>
         <DialogContent>
           <DialogHeader>
@@ -559,15 +424,20 @@ export function TreinosManager({
             <Button
               variant="outline"
               onClick={() => setEditDescricaoOpen(false)}
+              disabled={isEditando}
             >
               Cancelar
             </Button>
-            <Button onClick={handleEditarDescricao}>Salvar</Button>
+            <Button onClick={handleSaveDescricao} disabled={isEditando}>
+              {isEditando ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Salvar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ✅ ExercisePicker Modal */}
       <ExercisePicker
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
@@ -576,3 +446,5 @@ export function TreinosManager({
     </div>
   );
 }
+
+export default TreinosManager;

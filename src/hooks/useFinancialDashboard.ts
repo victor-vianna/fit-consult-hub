@@ -167,7 +167,10 @@ export function useFinancialDashboard(personalId: string) {
             nome: profile?.nome || "Desconhecido",
             email: profile?.email || "",
             valor: sub.valor,
-            status_pagamento: sub.status_pagamento,
+            status_pagamento: sub.status_pagamento as
+              | "pago"
+              | "pendente"
+              | "atrasado",
             data_expiracao: sub.data_expiracao,
             diasAtraso: diasAtraso > 0 ? diasAtraso : 0,
           };

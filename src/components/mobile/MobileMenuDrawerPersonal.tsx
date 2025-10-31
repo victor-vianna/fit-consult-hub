@@ -68,14 +68,6 @@ export function MobileMenuDrawerPersonal({
         onOpenChange(false);
       },
     },
-    {
-      icon: CreditCard,
-      label: "Assinaturas",
-      onClick: () => {
-        navigate("/subscription-manager");
-        onOpenChange(false);
-      },
-    },
   ];
 
   return (

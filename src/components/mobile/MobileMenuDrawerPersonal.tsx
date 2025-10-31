@@ -53,18 +53,18 @@ export function MobileMenuDrawerPersonal({
       },
     },
     {
-      icon: Library,
-      label: "Biblioteca",
-      onClick: () => {
-        navigate("/biblioteca");
-        onOpenChange(false);
-      },
-    },
-    {
       icon: DollarSign,
       label: "Financeiro",
       onClick: () => {
         navigate("/financeiro");
+        onOpenChange(false);
+      },
+    },
+    {
+      icon: Library,
+      label: "Biblioteca",
+      onClick: () => {
+        navigate("/biblioteca");
         onOpenChange(false);
       },
     },

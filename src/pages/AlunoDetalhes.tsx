@@ -338,12 +338,14 @@ export default function AlunoDetalhes() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted">
         <div className="text-center">
           <div
-            className="animate-spin rounded-full h-16 w-16 border-4 border-t-transparent mx-auto"
+            className="animate-spin rounded-full h-16 w-16 border-4 mx-auto" // Removi border-t-transparent daqui
             style={{
               borderColor: personalSettings?.theme_color
-                ? `${personalSettings.theme_color}40`
-                : undefined,
-              borderTopColor: "transparent",
+                ? `${personalSettings.theme_color}40` // Cor base da borda (com 40% de opacidade)
+                : "rgba(0, 0, 0, 0.1)", // Cor padrão se não houver theme_color
+              borderTopColor: personalSettings?.theme_color
+                ? personalSettings.theme_color // Cor da parte "giratória" do spinner
+                : "#000000", // Cor padrão se não houver theme_color
             }}
           ></div>
           <p className="mt-4 text-muted-foreground font-medium">

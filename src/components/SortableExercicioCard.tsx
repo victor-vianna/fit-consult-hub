@@ -22,7 +22,9 @@ interface SortableExercicioCardProps {
   readOnly?: boolean;
   onEdit?: (exercicio: Exercicio) => void;
   onDelete?: (id: string) => void;
-  onToggleConcluido?: (id: string, concluido: boolean) => void;
+  onToggleConcluido?: (id: string, concluido: boolean) => Promise<any> | void;
+  // ✅ Nova prop para atualização otimista
+  onOptimisticToggle?: (id: string, concluido: boolean) => void;
 }
 
 export function SortableExercicioCard({
@@ -32,35 +34,28 @@ export function SortableExercicioCard({
   onEdit,
   onDelete,
   onToggleConcluido,
+  onOptimisticToggle, // ✅ Recebe a prop
 }: SortableExercicioCardProps) {
-  // ✅ Hook que torna o item arrastável
   const {
-    attributes, // Atributos de acessibilidade
-    listeners, // Event listeners para drag (onMouseDown, onTouchStart, etc)
-    setNodeRef, // Ref para o elemento DOM
-    transform, // Transformação CSS durante o drag
-    transition, // Transição CSS suave
-    isDragging, // Boolean se está sendo arrastado
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
   } = useSortable({
-    id: exercicio.id, // ID único do item
+    id: exercicio.id,
   });
 
-  // ✅ Estilo que aplica a transformação durante o drag
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    // Reduzir opacidade enquanto arrasta
     opacity: isDragging ? 0.5 : 1,
-    // Aumentar z-index para ficar acima dos outros
     zIndex: isDragging ? 1000 : "auto",
   };
 
   return (
     <div ref={setNodeRef} style={style}>
-      {/* 
-        ✅ Passamos os listeners para o ExercicioCard
-        Ele aplicará no ícone de GripVertical
-      */}
       <ExercicioCard
         exercicio={exercicio}
         index={index}
@@ -68,6 +63,7 @@ export function SortableExercicioCard({
         onEdit={onEdit}
         onDelete={onDelete}
         onToggleConcluido={onToggleConcluido}
+        onOptimisticToggle={onOptimisticToggle} // ✅ Encaminha para o card
         dragListeners={listeners}
         dragAttributes={attributes}
       />

@@ -149,19 +149,43 @@ export default function Personal() {
         }
       );
 
-      if (error) throw error;
+      if (error) {
+        // Trata erros específicos
+        if (
+          error.message?.includes("Email já cadastrado") ||
+          error.message?.includes("already been registered")
+        ) {
+          throw new Error(
+            "Este email já está cadastrado. Use um email diferente."
+          );
+        }
+        throw error;
+      }
+
+      // Verifica se há erro na resposta
+      if (data?.error) {
+        if (data.error.includes("Email já cadastrado")) {
+          throw new Error(
+            "Este email já está cadastrado. Use um email diferente."
+          );
+        }
+        throw new Error(data.error);
+      }
 
       toast({
-        title: "Aluno criado!",
+        title: "✅ Aluno criado!",
         description: "Aluno cadastrado com sucesso",
       });
 
       setOpenDialog(false);
+      e.currentTarget.reset(); // Limpa o formulário
       fetchData();
     } catch (error: any) {
+      console.error("Erro ao criar aluno:", error);
+
       toast({
-        title: "Erro ao criar aluno",
-        description: error.message,
+        title: "❌ Erro ao criar aluno",
+        description: error.message || "Ocorreu um erro ao criar o aluno",
         variant: "destructive",
       });
     } finally {

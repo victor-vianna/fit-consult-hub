@@ -10,12 +10,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { exercicioSchema } from "@/lib/schemas/exercicioSchema";
 import type { Exercicio, TreinoDia } from "@/types/treino";
+import { useExerciseGroups } from "@/hooks/useExerciseGroups";
 
 interface UseTreinosProps {
   profileId: string;
   personalId: string;
 }
 
+// Utilitário: retorna início da semana (segunda-feira)
 const getWeekStart = (date = new Date()) => {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
@@ -30,7 +32,7 @@ const buildQueryKey = (
   semana: string
 ): QueryKey => ["treinos", profileId, personalId, semana];
 
-const cargaFromDb = (c: string | null | undefined): number | null =>
+const cargaFromDb = (c: string | number | null | undefined): number | null =>
   c == null ? null : Number(c);
 
 const cargaForInsert = (c?: number | null): string | null =>
@@ -44,12 +46,14 @@ const buildInitialTreinos = (): TreinoDia[] =>
     dia: i + 1,
     treinoId: null,
     exercicios: [],
+    grupos: [],
     descricao: null,
     concluido: false,
   }));
 
 export function useTreinos({ profileId, personalId }: UseTreinosProps) {
   const queryClient = useQueryClient();
+  const { obterGruposDoTreino } = useExerciseGroups();
   const semana = getWeekStart();
 
   const {
@@ -64,7 +68,6 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
       const inicioDaSemana = new Date(hoje);
       inicioDaSemana.setDate(hoje.getDate() - hoje.getDay() + 1);
 
-      // 🔥 FIX: Buscar TODOS os treinos deste aluno com este personal nesta semana
       const { data: treinosSemanais, error: treinosError } = await supabase
         .from("treinos_semanais")
         .select("*")
@@ -78,74 +81,95 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
         throw treinosError;
       }
 
-      console.log("✅ Treinos encontrados:", treinosSemanais);
-
-      const treinosComExercicios: TreinoDia[] = await Promise.all(
+      const treinosCompletos: TreinoDia[] = await Promise.all(
         Array.from({ length: 7 }, async (_, i) => {
           const dia = i + 1;
-          const treino: any = treinosSemanais?.find(
+          const treino = treinosSemanais?.find(
             (t: any) => t.dia_semana === dia
           );
 
-          if (treino) {
-            const { data: exercicios, error: exerciciosError } = await supabase
-              .from("exercicios")
-              .select("*")
-              .eq("treino_semanal_id", treino.id)
-              .order("ordem");
-
-            if (exerciciosError) {
-              console.error("❌ Erro ao buscar exercícios:", exerciciosError);
-              throw exerciciosError;
-            }
-
-            console.log(`✅ Exercícios dia ${dia}:`, exercicios);
-
-            const exerciciosTipados: Exercicio[] = (exercicios || []).map(
-              (ex: any) => ({
-                id: ex.id,
-                treino_semanal_id: ex.treino_semanal_id,
-                nome: ex.nome,
-                link_video: ex.link_video,
-                ordem: ex.ordem,
-                series: ex.series ?? 3,
-                repeticoes: ex.repeticoes ?? "12",
-                descanso: ex.descanso ?? 60,
-                carga: cargaFromDb(ex.carga),
-                observacoes: ex.observacoes ?? null,
-                concluido: ex.concluido ?? false,
-                created_at: ex.created_at,
-                updated_at: ex.updated_at,
-              })
-            );
-
+          if (!treino) {
             return {
               dia,
-              treinoId: treino.id,
-              exercicios: exerciciosTipados,
-              descricao: treino.descricao,
-              concluido: treino.concluido,
+              treinoId: null,
+              exercicios: [],
+              grupos: [],
+              descricao: null,
+              concluido: false,
             };
           }
 
+          const { data: exercicios, error: exerciciosError } = await supabase
+            .from("exercicios")
+            .select("*")
+            .eq("treino_semanal_id", treino.id)
+            .order("ordem");
+
+          if (exerciciosError) {
+            console.error("❌ Erro ao buscar exercícios:", exerciciosError);
+            throw exerciciosError;
+          }
+
+          // Mapear cada registro do banco para o tipo Exercicio com conversões corretas
+          const exerciciosTipados: Exercicio[] = (exercicios || []).map(
+            (ex: any) => {
+              const mapped: Exercicio = {
+                id: String(ex.id),
+                treino_semanal_id:
+                  ex.treino_semanal_id != null
+                    ? String(ex.treino_semanal_id)
+                    : null,
+                nome: String(ex.nome ?? ""),
+                link_video: ex.link_video ?? null,
+                ordem:
+                  typeof ex.ordem === "number"
+                    ? ex.ordem
+                    : Number(ex.ordem ?? 0),
+                ordem_no_grupo:
+                  ex.ordem_no_grupo != null ? Number(ex.ordem_no_grupo) : null, // ← adicionado
+                series: ex.series != null ? Number(ex.series) : 3,
+                repeticoes: ex.repeticoes ?? "12",
+                descanso: ex.descanso != null ? Number(ex.descanso) : 60,
+                descanso_entre_grupos:
+                  ex.descanso_entre_grupos != null
+                    ? Number(ex.descanso_entre_grupos)
+                    : null,
+                carga: cargaFromDb(ex.carga),
+                observacoes: ex.observacoes ?? null,
+                concluido: Boolean(ex.concluido),
+                grupo_id: ex.grupo_id ?? null,
+                tipo_agrupamento: ex.tipo_agrupamento ?? null, // ← adicionado
+                created_at: ex.created_at ?? null,
+                updated_at: ex.updated_at ?? null,
+                deleted_at: ex.deleted_at ?? null,
+              };
+              return mapped;
+            }
+          );
+
+          // Buscar grupos associados ao treino (hook de grupos)
+          const grupos = await obterGruposDoTreino(treino.id);
+
           return {
             dia,
-            treinoId: null,
-            exercicios: [],
-            descricao: null,
-            concluido: false,
+            treinoId: treino.id,
+            exercicios: exerciciosTipados,
+            grupos,
+            descricao: treino.descricao ?? null,
+            concluido: Boolean(treino.concluido),
           };
         })
       );
 
-      return treinosComExercicios;
+      return treinosCompletos;
     },
-    staleTime: 1000 * 60 * 2, // 🔥 FIX: Reduzido para 2 minutos
+    staleTime: 1000 * 60 * 2,
     enabled: !!profileId && !!personalId,
-    refetchOnWindowFocus: true, // 🔥 FIX: Recarregar ao voltar para aba
-    refetchOnMount: true, // 🔥 FIX: Recarregar ao montar
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 
+  // Criação automática de treino semanal
   const criarTreinoSeNecessario = useCallback(
     async (dia: number): Promise<string> => {
       const treino = treinos.find((t) => t.dia === dia);
@@ -154,8 +178,6 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
       const hoje = new Date();
       const inicioDaSemana = new Date(hoje);
       inicioDaSemana.setDate(hoje.getDate() - hoje.getDay() + 1);
-
-      console.log("📝 Criando treino semanal para dia:", dia);
 
       const { data, error } = await supabase
         .from("treinos_semanais")
@@ -169,19 +191,13 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
         .select()
         .single();
 
-      if (error) {
-        console.error("❌ Erro ao criar treino:", error);
-        throw error;
-      }
-
-      console.log("✅ Treino criado:", data);
+      if (error) throw error;
       return data.id;
     },
     [personalId, profileId, treinos]
   );
 
   // ---------- Mutations ----------
-
   const adicionarExercicioMutation = useMutation({
     mutationFn: async ({
       dia,
@@ -190,8 +206,6 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
       dia: number;
       exercicio: Partial<Exercicio>;
     }) => {
-      console.log("📝 Adicionando exercício:", { dia, exercicio });
-
       const validated = exercicioSchema.parse(exercicio);
       const cargaDb = cargaForInsert((exercicio as Partial<Exercicio>).carga);
 
@@ -216,31 +230,55 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
         .select()
         .single();
 
-      if (error) {
-        console.error("❌ Erro ao inserir exercício:", error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log("✅ Exercício inserido:", data);
-
+      // Converter o objeto retornado do DB para o tipo Exercicio
       const inserted: Exercicio = {
-        ...(data as any),
+        id: String((data as any).id),
+        treino_semanal_id:
+          (data as any).treino_semanal_id != null
+            ? String((data as any).treino_semanal_id)
+            : null,
+        nome: String((data as any).nome ?? ""),
+        link_video: (data as any).link_video ?? null,
+        ordem:
+          typeof (data as any).ordem === "number"
+            ? (data as any).ordem
+            : Number((data as any).ordem ?? 0),
+        ordem_no_grupo:
+          (data as any).ordem_no_grupo != null
+            ? Number((data as any).ordem_no_grupo)
+            : null, // ← adicionado
+        series: (data as any).series != null ? Number((data as any).series) : 3,
+        repeticoes: (data as any).repeticoes ?? "12",
+        descanso:
+          (data as any).descanso != null ? Number((data as any).descanso) : 60,
+        descanso_entre_grupos:
+          (data as any).descanso_entre_grupos != null
+            ? Number((data as any).descanso_entre_grupos)
+            : null,
         carga: cargaFromDb((data as any).carga),
+        observacoes: (data as any).observacoes ?? null,
+        concluido: Boolean((data as any).concluido),
+        grupo_id: (data as any).grupo_id ?? null,
+        tipo_agrupamento: (data as any).tipo_agrupamento ?? null, // ← adicionado
+        created_at: (data as any).created_at ?? null,
+        updated_at: (data as any).updated_at ?? null,
+        deleted_at: (data as any).deleted_at ?? null,
       };
+
       return { dia, exercicio: inserted };
     },
     onSuccess: async () => {
-      // 🔥 FIX: Invalidar cache de forma mais agressiva
       await queryClient.invalidateQueries({
         queryKey: buildQueryKey(profileId, personalId, semana),
       });
-      // 🔥 FIX: Forçar refetch imediato
       await refetch();
       toast.success("Exercício adicionado com sucesso");
     },
     onError: (err) => {
       toast.error("Erro ao adicionar exercício");
-      console.error("❌ Mutation error:", err);
+      console.error(err);
     },
   });
 
@@ -373,7 +411,6 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
       return { exercicioId, concluido };
     },
     onMutate: async ({ exercicioId, concluido }) => {
-      // Optimistic update
       await queryClient.cancelQueries({
         queryKey: buildQueryKey(profileId, personalId, semana),
       });

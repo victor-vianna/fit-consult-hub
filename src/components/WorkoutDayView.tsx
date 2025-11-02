@@ -1,4 +1,5 @@
 // components/WorkoutDayView.tsx
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -8,16 +9,24 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dumbbell, Calendar, CheckCircle2 } from "lucide-react";
+import {
+  Dumbbell,
+  Calendar,
+  CheckCircle2,
+  Loader2,
+  Link as LinkIcon,
+} from "lucide-react";
 import { SortableExercicioCard } from "@/components/SortableExercicioCard";
+import { GroupedExerciseCard } from "./GroupedExerciseCard";
 import { WorkoutTimer } from "./WorkoutTimer";
+import { useExerciseGroups } from "@/hooks/useExerciseGroups";
 import type { TreinoDia } from "@/types/treino";
-import { useState } from "react";
 
 interface WorkoutDayViewProps {
   treinos: TreinoDia[];
   profileId: string;
   personalId: string;
+  groupsByTreino?: Record<string, any[]>;
   onToggleConcluido: (
     id: string,
     concluido: boolean
@@ -25,6 +34,10 @@ interface WorkoutDayViewProps {
     exercicioId: string;
     concluido: boolean;
   }>;
+  onToggleGrupoConcluido?: (
+    grupoId: string,
+    concluido: boolean
+  ) => Promise<void>;
 }
 
 const diasSemana = [
@@ -42,8 +55,20 @@ export function WorkoutDayView({
   profileId,
   personalId,
   onToggleConcluido,
+  onToggleGrupoConcluido,
 }: WorkoutDayViewProps) {
   const [treinos, setTreinos] = useState<TreinoDia[]>(initialTreinos);
+  const { obterGruposDoTreino } = useExerciseGroups();
+  const [groupsByTreino, setGroupsByTreino] = useState<Record<string, any[]>>(
+    {}
+  );
+  const [loadingGroups, setLoadingGroups] = useState(false);
+  const [localGroups, setLocalGroups] = useState(groupsByTreino);
+
+  const getTreinoId = (treino: TreinoDia): string | null => {
+    const rawId = (treino as any).treinoId ?? (treino as any).id;
+    return rawId ? String(rawId) : null;
+  };
 
   const calcularProgresso = (treino: TreinoDia) => {
     if (treino.exercicios.length === 0) return 0;
@@ -63,16 +88,141 @@ export function WorkoutDayView({
     }
   };
 
-  // ✅ Atualização otimista do exercício no estado local
   const handleOptimisticToggle = (id: string, concluido: boolean) => {
-    setTreinos((prev) =>
-      prev.map((treino) => ({
-        ...treino,
-        exercicios: treino.exercicios.map((ex) =>
-          ex.id === id ? { ...ex, concluido } : ex
-        ),
-      }))
-    );
+    setLocalGroups((prev) => {
+      const updated = { ...prev };
+
+      for (const treinoId in updated) {
+        updated[treinoId] = updated[treinoId].map((grupo) => {
+          const newExercicios = grupo.exercicios.map((ex) =>
+            ex.id === id ? { ...ex, concluido } : ex
+          );
+
+          const changed = newExercicios.some(
+            (ex, i) => ex.concluido !== grupo.exercicios[i]?.concluido
+          );
+
+          return changed ? { ...grupo, exercicios: newExercicios } : grupo;
+        });
+      }
+
+      return { ...updated };
+    });
+  };
+
+  // ✅ Toggle completo de grupo (marca/desmarca todos os exercícios)
+  const handleToggleGrupo = async (grupoId: string, concluido: boolean) => {
+    setLocalGroups((prev) => {
+      const updated = { ...prev };
+      for (const treinoId in updated) {
+        updated[treinoId] = updated[treinoId].map((grupo) =>
+          grupo.grupo_id === grupoId
+            ? {
+                ...grupo,
+                exercicios: grupo.exercicios.map((ex) => ({
+                  ...ex,
+                  concluido,
+                })),
+              }
+            : grupo
+        );
+      }
+      return { ...updated };
+    });
+
+    if (onToggleGrupoConcluido) {
+      await onToggleGrupoConcluido(grupoId, concluido);
+    }
+  };
+
+  // ✅ Toggle individual (marca apenas um exercício)
+  const handleToggleExercicio = async (id: string, concluido: boolean) => {
+    handleOptimisticToggle(id, concluido);
+    await onToggleConcluido(id, concluido);
+  };
+
+  // Carregar grupos ao montar ou atualizar treinos
+  useEffect(() => {
+    let mounted = true;
+
+    const loadGroups = async () => {
+      if (!treinos || treinos.length === 0) {
+        if (mounted) {
+          setGroupsByTreino({});
+          setLoadingGroups(false);
+        }
+        return;
+      }
+
+      setLoadingGroups(true);
+      const mapping: Record<string, any[]> = {};
+
+      for (const treino of treinos) {
+        if (!mounted) break;
+        const treinoId = getTreinoId(treino);
+
+        console.log("🔍 Carregando grupos do treino:", {
+          dia: treino.dia,
+          treinoId,
+          exercicios: treino.exercicios.length,
+        });
+
+        if (!treinoId) {
+          mapping[String(treino.dia)] = [];
+          continue;
+        }
+        try {
+          const grupos = await obterGruposDoTreino(treinoId);
+          mapping[treinoId] = Array.isArray(grupos) ? grupos : [];
+
+          console.log("✅ Grupos carregados:", {
+            treinoId,
+            totalGrupos: grupos.length,
+            grupos,
+            primeiroGrupo: grupos[0],
+          });
+        } catch (err) {
+          console.warn(`[WorkoutDayView] Erro ao carregar grupos:`, err);
+          mapping[treinoId] = [];
+        }
+      }
+
+      if (mounted) {
+        console.log("✅ Todos os grupos carregados:", mapping);
+        setGroupsByTreino(mapping);
+        setLoadingGroups(false);
+      }
+    };
+
+    loadGroups();
+    return () => {
+      mounted = false;
+    };
+  }, [treinos, obterGruposDoTreino]);
+
+  useEffect(() => {
+    setLocalGroups(groupsByTreino);
+  }, [groupsByTreino]);
+
+  // ✅ Exemplo de handler completo para toggle de grupo
+  const handleToggleGrupoConcluido = (grupoId: string, concluido: boolean) => {
+    setGroupsByTreino((prev) => {
+      const newGroups = { ...prev };
+      for (const treinoId in newGroups) {
+        newGroups[treinoId] = newGroups[treinoId].map((grupo) =>
+          grupo.grupo_id === grupoId
+            ? {
+                ...grupo,
+                exercicios: grupo.exercicios.map((ex) => ({
+                  ...ex,
+                  concluido,
+                })),
+              }
+            : grupo
+        );
+      }
+      return newGroups;
+    });
   };
 
   return (
@@ -94,7 +244,7 @@ export function WorkoutDayView({
         </div>
       </div>
 
-      {/* Navegação por Abas */}
+      {/* Tabs */}
       <Tabs defaultValue={String(primeiroDiaComExercicios)} className="w-full">
         <TabsList className="grid w-full grid-cols-7 h-auto p-1 bg-card/50 backdrop-blur-sm border shadow-lg rounded-xl">
           {diasSemana.map((dia, index) => {
@@ -132,15 +282,14 @@ export function WorkoutDayView({
           })}
         </TabsList>
 
-        {/* Conteúdo de Cada Dia */}
+        {/* Conteúdo de cada dia */}
         {treinos.map((treino) => {
           const diaInfo = diasSemana[treino.dia - 1];
           const temExercicios = treino.exercicios.length > 0;
           const progresso = calcularProgresso(treino);
-          const concluidos = treino.exercicios.filter(
-            (e) => e.concluido
-          ).length;
-          const total = treino.exercicios.length;
+
+          const treinoId = getTreinoId(treino);
+          const grupos = treinoId ? groupsByTreino[treinoId] ?? [] : [];
 
           return (
             <TabsContent
@@ -158,7 +307,7 @@ export function WorkoutDayView({
                 />
               )}
 
-              {/* Card do Dia */}
+              {/* Card do dia */}
               <Card className="border-primary/30 shadow-2xl bg-card/50 backdrop-blur-sm overflow-hidden">
                 <CardHeader className="bg-gradient-to-br from-primary/10 via-primary/5 to-background border-b">
                   <div className="space-y-3 sm:space-y-4">
@@ -175,56 +324,7 @@ export function WorkoutDayView({
                       </CardDescription>
                     )}
 
-                    {/* Barra de Progresso */}
-                    {temExercicios && (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-xs sm:text-sm">
-                          <span className="font-semibold text-muted-foreground">
-                            Progresso do treino
-                          </span>
-                          <span className="font-bold text-primary">
-                            {concluidos}/{total} exercícios
-                          </span>
-                        </div>
-
-                        <div className="relative w-full h-3 sm:h-4 bg-muted rounded-full overflow-hidden shadow-inner">
-                          <div
-                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-primary to-primary/80 transition-all duration-500 ease-out shadow-lg"
-                            style={{ width: `${progresso}%` }}
-                          >
-                            {progresso > 15 && (
-                              <div className="absolute inset-0 flex items-center justify-end pr-2">
-                                <span className="text-[10px] sm:text-xs font-bold text-primary-foreground drop-shadow">
-                                  {progresso}%
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 pt-1">
-                          <div className="flex gap-1 flex-wrap">
-                            {treino.exercicios.slice(0, 10).map((ex) => (
-                              <div
-                                key={ex.id}
-                                className={`w-2 h-2 rounded-full transition-all ${
-                                  ex.concluido
-                                    ? "bg-green-500 scale-110"
-                                    : "bg-muted-foreground/20"
-                                }`}
-                                title={ex.nome}
-                              />
-                            ))}
-                            {treino.exercicios.length > 10 && (
-                              <span className="text-xs text-muted-foreground ml-1">
-                                +{treino.exercicios.length - 10}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
+                    {/* Badges */}
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge
                         variant="outline"
@@ -234,6 +334,17 @@ export function WorkoutDayView({
                         {treino.exercicios.length} exercício
                         {treino.exercicios.length !== 1 ? "s" : ""}
                       </Badge>
+
+                      {grupos.length > 0 && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs sm:text-sm bg-blue-50 border-blue-200"
+                        >
+                          <LinkIcon className="h-3 w-3 mr-1" />
+                          {grupos.length} grupo
+                          {grupos.length !== 1 ? "s" : ""}
+                        </Badge>
+                      )}
 
                       {progresso > 0 && progresso < 100 && (
                         <Badge
@@ -257,6 +368,7 @@ export function WorkoutDayView({
                   </div>
                 </CardHeader>
 
+                {/* Conteúdo do Card */}
                 <CardContent className="p-4 sm:p-6">
                   {!temExercicios ? (
                     <div className="flex flex-col items-center justify-center py-16 sm:py-20 text-center space-y-4">
@@ -275,35 +387,42 @@ export function WorkoutDayView({
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-2 sm:space-y-3">
-                      {treino.exercicios.map((exercicio, index) => {
-                        const cardEx = {
-                          id: exercicio.id,
-                          nome: exercicio.nome,
-                          link_video: exercicio.link_video ?? null,
-                          ordem: exercicio.ordem,
-                          series: exercicio.series,
-                          repeticoes: exercicio.repeticoes,
-                          descanso: exercicio.descanso,
-                          carga:
-                            exercicio.carga != null
-                              ? String(exercicio.carga)
-                              : undefined,
-                          observacoes: exercicio.observacoes ?? undefined,
-                          concluido: !!exercicio.concluido,
-                        };
+                    <div className="space-y-3 sm:space-y-4">
+                      {/* ✅ GRUPOS DE EXERCÍCIOS */}
+                      {grupos.length > 0 &&
+                        grupos.map((grupo, idx) => (
+                          <GroupedExerciseCard
+                            key={grupo.grupo_id || grupo.id || idx}
+                            grupo={grupo}
+                            index={idx}
+                            readOnly={false}
+                            onToggleGrupoConcluido={handleToggleGrupoConcluido}
+                            onToggleConcluido={handleOptimisticToggle}
+                            onOptimisticToggle={handleOptimisticToggle}
+                          />
+                        ))}
 
-                        return (
+                      {/* ✅ EXERCÍCIOS ISOLADOS */}
+                      {treino.exercicios
+                        .filter((ex) => !ex.grupo_id)
+                        .map((exercicio, index) => (
                           <SortableExercicioCard
                             key={exercicio.id}
-                            exercicio={cardEx}
+                            exercicio={exercicio}
                             index={index}
                             readOnly={false}
                             onToggleConcluido={handleToggleConcluido}
-                            onOptimisticToggle={handleOptimisticToggle} // ✅ Adicionado
+                            onOptimisticToggle={handleOptimisticToggle}
                           />
-                        );
-                      })}
+                        ))}
+
+                      {/* Loader */}
+                      {loadingGroups && (
+                        <div className="flex items-center justify-center py-4 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          <span className="text-xs">Carregando grupos...</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </CardContent>

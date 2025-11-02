@@ -23,7 +23,6 @@ interface SortableExercicioCardProps {
   onEdit?: (exercicio: Exercicio) => void;
   onDelete?: (id: string) => void;
   onToggleConcluido?: (id: string, concluido: boolean) => Promise<any> | void;
-  // ✅ Nova prop para atualização otimista
   onOptimisticToggle?: (id: string, concluido: boolean) => void;
 }
 
@@ -34,7 +33,7 @@ export function SortableExercicioCard({
   onEdit,
   onDelete,
   onToggleConcluido,
-  onOptimisticToggle, // ✅ Recebe a prop
+  onOptimisticToggle,
 }: SortableExercicioCardProps) {
   const {
     attributes,
@@ -45,6 +44,7 @@ export function SortableExercicioCard({
     isDragging,
   } = useSortable({
     id: exercicio.id,
+    disabled: readOnly, // ✅ Desabilita drag quando readOnly
   });
 
   const style = {
@@ -63,9 +63,9 @@ export function SortableExercicioCard({
         onEdit={onEdit}
         onDelete={onDelete}
         onToggleConcluido={onToggleConcluido}
-        onOptimisticToggle={onOptimisticToggle} // ✅ Encaminha para o card
-        dragListeners={listeners}
-        dragAttributes={attributes}
+        onOptimisticToggle={onOptimisticToggle}
+        dragListeners={readOnly ? undefined : listeners} // ✅ Remove listeners quando readOnly
+        dragAttributes={readOnly ? undefined : attributes} // ✅ Remove attributes quando readOnly
       />
     </div>
   );

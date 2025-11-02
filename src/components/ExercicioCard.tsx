@@ -1,6 +1,6 @@
 // components/ExercicioCard.tsx
 import { useState, useEffect, useRef } from "react";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,10 @@ import {
   Clock,
   Repeat,
   Weight,
+  CheckCircle2,
+  Circle,
+  Play,
+  Dumbbell,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -79,224 +83,178 @@ export function ExercicioCard({
     }
   }, [exercicio.concluido, exercicio.id, isUpdating]);
 
-  const handleToggle = async (checked: boolean | "indeterminate") => {
-    if (
-      readOnly ||
-      !onToggleConcluido ||
-      isUpdating ||
-      checked === "indeterminate"
-    ) {
-      return;
-    }
-
-    const newValue = checked as boolean;
-
-    // Marca que houve interação do usuário
-    hasUserInteracted.current = true;
-
-    console.log("🔄 Toggle iniciado:", {
-      exercicioId: exercicio.id,
-      exercicioNome: exercicio.nome,
-      de: localConcluido,
-      para: newValue,
-    });
-
-    // Atualização otimista local imediata
-    setLocalConcluido(newValue);
-    setIsUpdating(true);
-
-    // Notifica o pai otimisticamente (se fornecido) para atualizar barra de progresso
-    try {
-      onOptimisticToggle?.(exercicio.id, newValue);
-    } catch (err) {
-      console.warn("onOptimisticToggle lançou erro:", err);
-    }
+  const handleToggle = async (novoValor: boolean) => {
+    setLocalConcluido(novoValor);
+    onOptimisticToggle?.(exercicio.id, novoValor);
 
     try {
-      // Chama o handler de persistência (pai pode retornar Promise)
-      const maybePromise = onToggleConcluido(exercicio.id, newValue);
-      if (maybePromise && typeof (maybePromise as any).then === "function") {
-        const result = await maybePromise;
-        console.log("✅ Toggle bem-sucedido:", result);
-      } else {
-        console.log("✅ Toggle (sync) chamado com sucesso");
-      }
-      // mantém o estado local como newValue — caso o pai confirme, acima o prop vai estar igual
-      setLocalConcluido(newValue);
+      await onToggleConcluido?.(exercicio.id, novoValor);
     } catch (error) {
-      console.error("❌ Erro ao toggle:", error);
-      // Reverte localmente em caso de erro
-      setLocalConcluido(!newValue);
-      // Notifica o pai para reverter também (opcional: pai pode checar)
-      try {
-        onOptimisticToggle?.(exercicio.id, !newValue);
-      } catch (_) {}
-    } finally {
-      setIsUpdating(false);
+      console.error("Erro ao atualizar exercício:", error);
+      setLocalConcluido(!novoValor);
     }
   };
 
   return (
     <Card
       className={cn(
-        "overflow-hidden p-3 sm:p-4 transition-all border",
+        "overflow-hidden transition-all border",
         localConcluido
           ? "bg-green-50 dark:bg-green-950/20 border-green-300 dark:border-green-900"
           : "hover:shadow-md border-border",
         isUpdating && "opacity-60"
       )}
     >
-      <div className="flex items-start gap-2 sm:gap-3">
-        {!readOnly && (
-          <div
-            {...dragListeners}
-            {...dragAttributes}
-            className="cursor-grab active:cursor-grabbing pt-1 hidden sm:block"
-            title="Arrastar exercício"
-          >
-            <GripVertical className="h-5 w-5 text-muted-foreground" />
-          </div>
-        )}
-
-        <Badge
-          variant={localConcluido ? "default" : "outline"}
-          className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center p-0 text-xs sm:text-sm"
-        >
-          {index + 1}
-        </Badge>
-
-        <div className="flex-1 space-y-2 sm:space-y-3 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <h4
-              className={cn(
-                "font-semibold text-sm sm:text-base leading-tight flex-1",
-                localConcluido && "line-through text-muted-foreground"
-              )}
-            >
-              {exercicio.nome}
-            </h4>
-
-            {exercicio.link_video && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 w-7 sm:h-8 sm:w-8 p-0 flex-shrink-0"
-                asChild
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          {/* Número do exercício */}
+          {!readOnly && (
+            <div className="flex flex-col items-center gap-1 pt-1">
+              <div
+                {...dragListeners}
+                {...dragAttributes}
+                className="cursor-grab active:cursor-grabbing"
               >
-                <a
-                  href={exercicio.link_video}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Ver demonstração"
-                >
-                  <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4" />
-                </a>
-              </Button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 text-xs sm:text-sm">
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <Repeat className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-              <div className="min-w-0">
-                <p className="text-[10px] sm:text-xs text-muted-foreground">
-                  Séries
-                </p>
-                <p className="font-medium truncate">{exercicio.series}x</p>
+                <GripVertical className="h-4 w-4 text-muted-foreground" />
               </div>
-            </div>
-
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <Repeat className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground rotate-90 flex-shrink-0" />
-              <div className="min-w-0">
-                <p className="text-[10px] sm:text-xs text-muted-foreground">
-                  Reps
-                </p>
-                <p className="font-medium truncate">{exercicio.repeticoes}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-              <div className="min-w-0">
-                <p className="text-[10px] sm:text-xs text-muted-foreground">
-                  Descanso
-                </p>
-                <p className="font-medium truncate">{exercicio.descanso}s</p>
-              </div>
-            </div>
-
-            {exercicio.carga && (
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <Weight className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-[10px] sm:text-xs text-muted-foreground">
-                    Carga
-                  </p>
-                  <p className="font-medium truncate">{exercicio.carga}</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {exercicio.observacoes && (
-            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-md p-2 sm:p-3">
-              <p className="text-xs sm:text-sm text-blue-900 dark:text-blue-100">
-                <span className="font-medium">💡 Dica:</span>{" "}
-                {exercicio.observacoes}
-              </p>
+              <Badge variant="outline" className="text-xs">
+                {index + 1}
+              </Badge>
             </div>
           )}
 
-          {!readOnly && onToggleConcluido && (
-            <div className="flex items-center gap-2 pt-2 border-t">
-              <Checkbox
-                id={`concluido-${exercicio.id}`}
-                checked={localConcluido}
-                disabled={isUpdating}
-                onCheckedChange={handleToggle}
-              />
-              <Label
-                htmlFor={`concluido-${exercicio.id}`}
-                className="text-xs sm:text-sm cursor-pointer select-none"
-              >
-                {isUpdating
-                  ? "⏳ Salvando..."
-                  : localConcluido
-                  ? "✅ Concluído"
-                  : "Marcar como concluído"}
-              </Label>
+          {readOnly && (
+            <Badge variant="outline" className="text-xs flex-shrink-0">
+              {index + 1}
+            </Badge>
+          )}
+
+          {/* Conteúdo do exercício */}
+          <div className="flex-1">
+            <div
+              className={cn(
+                "flex items-start gap-3 p-3 rounded-lg border transition-all",
+                localConcluido
+                  ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
+                  : "bg-muted/30 border-border hover:bg-muted/50"
+              )}
+            >
+              {/* Checkbox (só para aluno/readOnly) */}
+              {onToggleConcluido && (
+                <button
+                  onClick={() => handleToggle(!localConcluido)}
+                  className={cn(
+                    "mt-1 shrink-0 z-10 transition-all duration-300 ease-in-out",
+                    localConcluido
+                      ? "scale-110 text-green-500"
+                      : "hover:scale-110 text-muted-foreground hover:text-primary"
+                  )}
+                  disabled={isUpdating}
+                >
+                  {localConcluido ? (
+                    <CheckCircle2 className="h-5 w-5 transition-transform duration-300 ease-in-out" />
+                  ) : (
+                    <Circle className="h-5 w-5 transition-transform duration-300 ease-in-out" />
+                  )}
+                </button>
+              )}
+
+              {/* Número circular */}
+              <div className="flex flex-col items-center mt-1">
+                <div
+                  className={cn(
+                    "h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all",
+                    localConcluido
+                      ? "bg-green-600 text-white border-green-700"
+                      : "bg-background text-primary border-primary/30"
+                  )}
+                >
+                  1
+                </div>
+              </div>
+
+              {/* Informações do exercício */}
+              <div className="flex-1 space-y-1">
+                <p
+                  className={cn(
+                    "font-semibold text-sm",
+                    localConcluido && "line-through text-muted-foreground"
+                  )}
+                >
+                  {exercicio.nome}
+                </p>
+
+                {exercicio.link_video && (
+                  <a
+                    href={exercicio.link_video}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Play className="h-3 w-3" />
+                    Ver demonstração
+                  </a>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1 font-medium">
+                    <Dumbbell className="h-3 w-3" />
+                    {exercicio.series}x{exercicio.repeticoes}
+                  </span>
+
+                  {exercicio.carga && (
+                    <span className="font-mono font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">
+                      {exercicio.carga}kg
+                    </span>
+                  )}
+
+                  {exercicio.descanso > 0 && (
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {exercicio.descanso}s
+                    </span>
+                  )}
+                </div>
+
+                {exercicio.observacoes && (
+                  <p className="text-xs text-muted-foreground italic">
+                    {exercicio.observacoes}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Ações (só para personal) */}
+          {!readOnly && (onEdit || onDelete) && (
+            <div className="flex flex-col gap-1 flex-shrink-0">
+              {onEdit && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 sm:h-8 sm:w-8"
+                  onClick={() => onEdit(exercicio)}
+                  title="Editar exercício"
+                >
+                  <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                </Button>
+              )}
+              {onDelete && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 sm:h-8 sm:w-8 text-destructive hover:text-destructive"
+                  onClick={() => onDelete(exercicio.id)}
+                  title="Excluir exercício"
+                >
+                  <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                </Button>
+              )}
             </div>
           )}
         </div>
-
-        {!readOnly && (onEdit || onDelete) && (
-          <div className="flex flex-col gap-1 flex-shrink-0">
-            {onEdit && (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7 sm:h-8 sm:w-8"
-                onClick={() => onEdit(exercicio)}
-                title="Editar exercício"
-              >
-                <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
-              </Button>
-            )}
-            {onDelete && (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7 sm:h-8 sm:w-8 text-destructive hover:text-destructive"
-                onClick={() => onDelete(exercicio.id)}
-                title="Excluir exercício"
-              >
-                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
+      </CardContent>
     </Card>
   );
 }

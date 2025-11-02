@@ -48,10 +48,9 @@ export const useAuth = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Adicione este useEffect no seu hook useAuth
+  // Listener para mudanças no perfil do aluno
   useEffect(() => {
     if (user && role === "aluno") {
-      // Listener para mudanças no perfil do aluno
       const channel = supabase
         .channel("profile-changes")
         .on(
@@ -99,50 +98,31 @@ export const useAuth = () => {
   };
 
   const signOut = async () => {
+    console.log("🔵 Iniciando logout...");
+
     try {
-      console.log("🔵 Iniciando logout...");
+      // Limpar token manualmente do localStorage
+      const keys = Object.keys(localStorage);
+      keys.forEach((key) => {
+        if (key.includes("supabase") || key.includes("sb-")) {
+          localStorage.removeItem(key);
+        }
+      });
 
-      // ✅ 1. Obter sessão atual antes de tentar deslogar
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      console.log("✅ Tokens locais removidos");
 
-      if (!session) {
-        console.warn(
-          "⚠️ Nenhuma sessão ativa encontrada. Encerrando localmente..."
-        );
-        setUser(null);
-        setSession(null);
-        setRole(null);
-        navigate("/auth", { replace: true });
-        return;
-      }
-
-      // ✅ 2. Fazer logout real no Supabase (sem scope: 'global')
-      const { error } = await supabase.auth.signOut();
-
-      if (error) {
-        console.error("🔴 Erro no signOut:", error.message);
-        toast.error("Erro ao sair da conta.");
-      } else {
-        console.log("✅ Logout concluído");
-        toast.success("Logout realizado com sucesso!");
-      }
-
-      // ✅ 3. Limpar estado local e redirecionar
+      // Limpar estado
       setUser(null);
       setSession(null);
       setRole(null);
+      setLoading(false);
+
+      // Redirecionar
       navigate("/auth", { replace: true });
-    } catch (error: any) {
-      console.error("🔴 Erro inesperado ao fazer logout:", error.message);
-      setUser(null);
-      setSession(null);
-      setRole(null);
-      navigate("/auth", { replace: true });
-      toast.error(
-        "Erro ao fazer logout, mas você foi desconectado localmente."
-      );
+      toast.success("Logout realizado com sucesso!");
+    } catch (error) {
+      console.error("Erro no logout:", error);
+      toast.error("Erro ao fazer logout");
     }
   };
 

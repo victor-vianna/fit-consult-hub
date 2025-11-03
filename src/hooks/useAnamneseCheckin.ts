@@ -8,6 +8,7 @@ interface AnamneseCheckinStatus {
   podeAcessarTreinos: boolean;
   loading: boolean;
   error: string | null;
+  refresh: () => void;
 }
 
 export function useAnamneseCheckin(
@@ -20,18 +21,19 @@ export function useAnamneseCheckin(
     podeAcessarTreinos: false,
     loading: true,
     error: null,
+    refresh: () => {},
   });
 
-  useEffect(() => {
+  const verificarStatus = async () => {
     if (!profileId || !personalId) {
-      setStatus((prev) => ({ ...prev, loading: false }));
+      setStatus((prev) => ({
+        ...prev,
+        loading: false,
+        podeAcessarTreinos: true,
+      }));
       return;
     }
 
-    verificarStatus();
-  }, [profileId, personalId]);
-
-  const verificarStatus = async () => {
     try {
       setStatus((prev) => ({ ...prev, loading: true, error: null }));
 
@@ -97,6 +99,7 @@ export function useAnamneseCheckin(
         podeAcessarTreinos,
         loading: false,
         error: null,
+        refresh: verificarStatus,
       });
     } catch (error: any) {
       console.error("Erro ao verificar status:", error);
@@ -104,9 +107,14 @@ export function useAnamneseCheckin(
         ...prev,
         loading: false,
         error: error.message,
+        refresh: verificarStatus,
       }));
     }
   };
 
-  return status;
+  useEffect(() => {
+    verificarStatus();
+  }, [profileId, personalId]);
+
+  return { ...status, refresh: verificarStatus };
 }

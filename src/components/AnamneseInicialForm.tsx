@@ -8,7 +8,6 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { ClipboardList, CheckCircle2, AlertCircle } from "lucide-react";
-import { format } from "date-fns";
 
 interface Props {
   profileId: string;
@@ -72,11 +71,44 @@ export function AnamneseInicialForm({
   const [step, setStep] = useState(1);
   const totalSteps = 6;
 
+  // form values controlados
+  const [formValues, setFormValues] = useState<Record<string, any>>({});
+
+  // --- Effects (fora de qualquer função) ---
   useEffect(() => {
+    // checar existencia na montagem / quando ids mudarem
     checkExistingAnamnese();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, personalId]);
 
-  const checkExistingAnamnese = async () => {
+  useEffect(() => {
+    if (existingAnamnese) {
+      setFormValues({ ...existingAnamnese });
+    }
+  }, [existingAnamnese]);
+
+  // --- Helpers / handlers ---
+  const nextStep = () => {
+    if (validateStep(step)) {
+      setStep((s) => Math.min(s + 1, totalSteps));
+    }
+  };
+
+  const prevStep = () => setStep((s) => Math.max(s - 1, 1));
+
+  // Bloqueia Enter em inputs (não textarea) e avança para a próxima etapa
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (e.key === "Enter") {
+      const target = e.target as HTMLElement | null;
+      if (target.tagName !== "TEXTAREA" && target.tagName !== "BUTTON") {
+        e.preventDefault();
+        nextStep(); // opcional: avançar ao pressionar Enter
+      }
+    }
+  };
+
+  async function checkExistingAnamnese() {
+    if (!profileId || !personalId) return;
     try {
       const { data, error } = await supabase
         .from("anamnese_inicial")
@@ -85,7 +117,16 @@ export function AnamneseInicialForm({
         .eq("personal_id", personalId)
         .single();
 
-      if (error && error.code !== "PGRST116") throw error;
+      if (error) {
+        if (error?.code === "PGRST116") {
+          // nenhum registro exato: trate como "não existe"
+          setExistingAnamnese(null);
+        } else {
+          console.error(error);
+        }
+      } else {
+        setExistingAnamnese(data);
+      }
 
       if (data) {
         setExistingAnamnese(data);
@@ -93,71 +134,103 @@ export function AnamneseInicialForm({
     } catch (error: any) {
       console.error("Erro ao verificar anamnese:", error);
     }
+  }
+
+  const handleChange = (e: any) => {
+    const { name, value, type } = e.target;
+    setFormValues((prev) => ({
+      ...prev,
+      [name]:
+        type === "number"
+          ? value === "" || value === null
+            ? null
+            : Number(value)
+          : value,
+    }));
+  };
+
+  const handleRadioChange = (name: string, value: string) => {
+    setFormValues((prev) => ({
+      ...prev,
+      [name]: value === "sim",
+    }));
+  };
+
+  const normalizeForSave = (obj: Record<string, any>) => {
+    const normalized: Record<string, any> = {};
+    Object.entries(obj).forEach(([k, v]) => {
+      normalized[k] = v === "" ? null : v;
+    });
+    return normalized;
+  };
+
+  // Validação dos campos obrigatórios de cada etapa
+  const validateStep = (stepNumber: number): boolean => {
+    switch (stepNumber) {
+      case 1:
+        // Etapa 1: apenas 'objetivos' é obrigatório
+        if (!formValues.objetivos || formValues.objetivos.trim() === "") {
+          toast({
+            title: "Campo obrigatório",
+            description:
+              "Por favor, preencha seus objetivos antes de continuar.",
+            variant: "destructive",
+          });
+          return false;
+        }
+        return true;
+
+      case 2:
+      case 3:
+      case 4:
+      case 5:
+        // Etapas 2-5: não há campos obrigatórios específicos
+        return true;
+
+      case 6:
+        // Etapa 6: não há campos obrigatórios específicos
+        return true;
+
+      default:
+        return true;
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    // proteção: não salvar se não estivermos na última etapa
+    if (step < totalSteps) {
+      toast({
+        title: "Atenção",
+        description: "Complete todas as etapas antes de finalizar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Valida a última etapa também
+    if (!validateStep(step)) {
+      return;
+    }
+
     setLoading(true);
 
-    const formData = new FormData(e.currentTarget);
-
-    const anamneseData: any = {
-      profile_id: profileId,
-      personal_id: personalId,
-      data_nascimento: formData.get("data_nascimento") || null,
-      profissao: formData.get("profissao") || null,
-      objetivos: formData.get("objetivos") as string,
-      rotina: formData.get("rotina") || null,
-      experiencia_online: formData.get("experiencia_online") || null,
-      acompanhamento_nutricional:
-        formData.get("acompanhamento_nutricional") || null,
-      nutri_nome: formData.get("nutri_nome") || null,
-      refeicoes_dia: formData.get("refeicoes_dia")
-        ? Number(formData.get("refeicoes_dia"))
-        : null,
-      rotina_alimentar: formData.get("rotina_alimentar") || null,
-      consumo_agua: formData.get("consumo_agua") || null,
-      horas_sono: formData.get("horas_sono") || null,
-      qualidade_sono: formData.get("qualidade_sono") || null,
-      suplementos: formData.get("suplementos") || null,
-      cirurgias: formData.get("cirurgias") || null,
-      dores_lesoes: formData.get("dores_lesoes") || null,
-      fuma: formData.get("fuma") || null,
-      bebe: formData.get("bebe") || null,
-      restricao_medica: formData.get("restricao_medica") || null,
-      medicamentos: formData.get("medicamentos") || null,
-      alergia: formData.get("alergia") || null,
-      problema_coracao: formData.get("problema_coracao") || null,
-      diabetes: formData.get("diabetes") || null,
-      problema_respiratorio: formData.get("problema_respiratorio") || null,
-      pressao_arterial: formData.get("pressao_arterial") || null,
-      peso_atual: formData.get("peso_atual")
-        ? Number(formData.get("peso_atual"))
-        : null,
-      altura: formData.get("altura") ? Number(formData.get("altura")) : null,
-      peso_desejado: formData.get("peso_desejado")
-        ? Number(formData.get("peso_desejado"))
-        : null,
-      crianca_obesa: formData.get("crianca_obesa") === "sim",
-      exercicio_atual: formData.get("exercicio_atual") || null,
-      frequencia_exercicio: formData.get("frequencia_exercicio") || null,
-      compromisso_treinos: formData.get("compromisso_treinos")
-        ? Number(formData.get("compromisso_treinos"))
-        : null,
-      tempo_disponivel: formData.get("tempo_disponivel") || null,
-      local_treino: formData.get("local_treino") || null,
-      materiais_disponiveis: formData.get("materiais_disponiveis") || null,
-      preferencia_exercicio: formData.get("preferencia_exercicio") || null,
-      exercicios_gosta: formData.get("exercicios_gosta") || null,
-      exercicios_odeia: formData.get("exercicios_odeia") || null,
-      observacoes_extras: formData.get("observacoes_extras") || null,
-    };
-
     try {
+      const anamneseData: AnamneseData & {
+        profile_id: string;
+        personal_id: string;
+      } = {
+        ...(normalizeForSave(formValues) as AnamneseData),
+        objetivos: (formValues.objetivos ?? "") as string,
+        profile_id: profileId,
+        personal_id: personalId,
+      };
+
       if (existingAnamnese) {
         const { error } = await supabase
           .from("anamnese_inicial")
-          .update(anamneseData)
+          .update(anamneseData as any)
           .eq("profile_id", profileId)
           .eq("personal_id", personalId);
 
@@ -166,7 +239,7 @@ export function AnamneseInicialForm({
       } else {
         const { error } = await supabase
           .from("anamnese_inicial")
-          .insert(anamneseData);
+          .insert(anamneseData as any);
 
         if (error) throw error;
         toast({
@@ -180,7 +253,7 @@ export function AnamneseInicialForm({
       console.error("Erro ao salvar anamnese:", error);
       toast({
         title: "Erro ao salvar anamnese",
-        description: error.message,
+        description: error?.message || String(error),
         variant: "destructive",
       });
     } finally {
@@ -215,7 +288,8 @@ export function AnamneseInicialForm({
                   id="data_nascimento"
                   name="data_nascimento"
                   type="date"
-                  defaultValue={existingAnamnese?.data_nascimento}
+                  value={formValues.data_nascimento ?? ""}
+                  onChange={handleChange}
                 />
               </div>
               <div>
@@ -224,7 +298,8 @@ export function AnamneseInicialForm({
                   id="profissao"
                   name="profissao"
                   placeholder="Ex: Advogado, Professor..."
-                  defaultValue={existingAnamnese?.profissao}
+                  value={formValues.profissao ?? ""}
+                  onChange={handleChange}
                 />
               </div>
             </div>
@@ -239,7 +314,8 @@ export function AnamneseInicialForm({
                 placeholder="Ex: Ganhar massa muscular, perder gordura, melhorar condicionamento físico..."
                 rows={3}
                 required
-                defaultValue={existingAnamnese?.objetivos}
+                value={formValues.objetivos ?? ""}
+                onChange={handleChange}
               />
             </div>
 
@@ -252,7 +328,8 @@ export function AnamneseInicialForm({
                 name="rotina"
                 placeholder="Descreva sua rotina diária..."
                 rows={3}
-                defaultValue={existingAnamnese?.rotina}
+                value={formValues.rotina ?? ""}
+                onChange={handleChange}
               />
             </div>
 
@@ -266,7 +343,8 @@ export function AnamneseInicialForm({
                 name="experiencia_online"
                 placeholder="Sim/Não e como foi..."
                 rows={3}
-                defaultValue={existingAnamnese?.experiencia_online}
+                value={formValues.experiencia_online ?? ""}
+                onChange={handleChange}
               />
             </div>
           </div>
@@ -298,7 +376,8 @@ export function AnamneseInicialForm({
                 id="acompanhamento_nutricional"
                 name="acompanhamento_nutricional"
                 placeholder="Ex: Sim, com a nutricionista Maria Silva"
-                defaultValue={existingAnamnese?.acompanhamento_nutricional}
+                value={formValues.acompanhamento_nutricional ?? ""}
+                onChange={handleChange}
               />
             </div>
 
@@ -314,7 +393,13 @@ export function AnamneseInicialForm({
                   min="1"
                   max="10"
                   placeholder="Ex: 4"
-                  defaultValue={existingAnamnese?.refeicoes_dia}
+                  value={
+                    formValues.refeicoes_dia !== undefined &&
+                    formValues.refeicoes_dia !== null
+                      ? formValues.refeicoes_dia
+                      : ""
+                  }
+                  onChange={handleChange}
                 />
               </div>
               <div>
@@ -325,7 +410,8 @@ export function AnamneseInicialForm({
                   id="consumo_agua"
                   name="consumo_agua"
                   placeholder="Ex: 2 litros de água"
-                  defaultValue={existingAnamnese?.consumo_agua}
+                  value={formValues.consumo_agua ?? ""}
+                  onChange={handleChange}
                 />
               </div>
             </div>
@@ -340,7 +426,8 @@ export function AnamneseInicialForm({
                 name="rotina_alimentar"
                 placeholder="Ex: Café da manhã às 7h - pão integral com ovo..."
                 rows={4}
-                defaultValue={existingAnamnese?.rotina_alimentar}
+                value={formValues.rotina_alimentar ?? ""}
+                onChange={handleChange}
               />
             </div>
 
@@ -353,7 +440,8 @@ export function AnamneseInicialForm({
                   id="horas_sono"
                   name="horas_sono"
                   placeholder="Ex: 7 horas"
-                  defaultValue={existingAnamnese?.horas_sono}
+                  value={formValues.horas_sono ?? ""}
+                  onChange={handleChange}
                 />
               </div>
               <div>
@@ -364,7 +452,8 @@ export function AnamneseInicialForm({
                   id="qualidade_sono"
                   name="qualidade_sono"
                   placeholder="Ex: Boa, Ruim, Acordo durante a noite..."
-                  defaultValue={existingAnamnese?.qualidade_sono}
+                  value={formValues.qualidade_sono ?? ""}
+                  onChange={handleChange}
                 />
               </div>
             </div>
@@ -375,7 +464,8 @@ export function AnamneseInicialForm({
                 id="suplementos"
                 name="suplementos"
                 placeholder="Ex: Whey Protein, Creatina..."
-                defaultValue={existingAnamnese?.suplementos}
+                value={formValues.suplementos ?? ""}
+                onChange={handleChange}
               />
             </div>
           </div>
@@ -406,7 +496,8 @@ export function AnamneseInicialForm({
                 name="cirurgias"
                 placeholder="Descreva quais cirurgias e quando..."
                 rows={2}
-                defaultValue={existingAnamnese?.cirurgias}
+                value={formValues.cirurgias ?? ""}
+                onChange={handleChange}
               />
             </div>
 
@@ -419,7 +510,8 @@ export function AnamneseInicialForm({
                 name="dores_lesoes"
                 placeholder="Descreva dores crônicas, lesões antigas ou atuais..."
                 rows={2}
-                defaultValue={existingAnamnese?.dores_lesoes}
+                value={formValues.dores_lesoes ?? ""}
+                onChange={handleChange}
               />
             </div>
 
@@ -430,7 +522,8 @@ export function AnamneseInicialForm({
                   id="fuma"
                   name="fuma"
                   placeholder="Ex: Não / Sim, 10 cigarros por dia"
-                  defaultValue={existingAnamnese?.fuma}
+                  value={formValues.fuma ?? ""}
+                  onChange={handleChange}
                 />
               </div>
               <div>
@@ -441,7 +534,8 @@ export function AnamneseInicialForm({
                   id="bebe"
                   name="bebe"
                   placeholder="Ex: Socialmente / Finais de semana"
-                  defaultValue={existingAnamnese?.bebe}
+                  value={formValues.bebe ?? ""}
+                  onChange={handleChange}
                 />
               </div>
             </div>
@@ -453,7 +547,8 @@ export function AnamneseInicialForm({
                 name="restricao_medica"
                 placeholder="Alguma restrição médica para atividade física?"
                 rows={2}
-                defaultValue={existingAnamnese?.restricao_medica}
+                value={formValues.restricao_medica ?? ""}
+                onChange={handleChange}
               />
             </div>
 
@@ -466,7 +561,8 @@ export function AnamneseInicialForm({
                 name="medicamentos"
                 placeholder="Liste os medicamentos de uso contínuo..."
                 rows={2}
-                defaultValue={existingAnamnese?.medicamentos}
+                value={formValues.medicamentos ?? ""}
+                onChange={handleChange}
               />
             </div>
           </div>
@@ -495,7 +591,8 @@ export function AnamneseInicialForm({
                 id="alergia"
                 name="alergia"
                 placeholder="Ex: Não / Sim, alergia a..."
-                defaultValue={existingAnamnese?.alergia}
+                value={formValues.alergia ?? ""}
+                onChange={handleChange}
               />
             </div>
 
@@ -507,7 +604,8 @@ export function AnamneseInicialForm({
                 id="problema_coracao"
                 name="problema_coracao"
                 placeholder="Ex: Não / Sim, especifique..."
-                defaultValue={existingAnamnese?.problema_coracao}
+                value={formValues.problema_coracao ?? ""}
+                onChange={handleChange}
               />
             </div>
 
@@ -517,7 +615,8 @@ export function AnamneseInicialForm({
                 id="diabetes"
                 name="diabetes"
                 placeholder="Ex: Não / Sim, tipo 1 ou 2"
-                defaultValue={existingAnamnese?.diabetes}
+                value={formValues.diabetes ?? ""}
+                onChange={handleChange}
               />
             </div>
 
@@ -529,7 +628,8 @@ export function AnamneseInicialForm({
                 id="problema_respiratorio"
                 name="problema_respiratorio"
                 placeholder="Ex: Asma, bronquite..."
-                defaultValue={existingAnamnese?.problema_respiratorio}
+                value={formValues.problema_respiratorio ?? ""}
+                onChange={handleChange}
               />
             </div>
 
@@ -541,7 +641,8 @@ export function AnamneseInicialForm({
                 id="pressao_arterial"
                 name="pressao_arterial"
                 placeholder="Ex: Normal / Alta / Baixa"
-                defaultValue={existingAnamnese?.pressao_arterial}
+                value={formValues.pressao_arterial ?? ""}
+                onChange={handleChange}
               />
             </div>
           </div>
@@ -567,38 +668,51 @@ export function AnamneseInicialForm({
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="peso_atual">⚖️ Qual seu peso atual? (kg)</Label>
+                <Label htmlFor="peso_atual">⚖️ Peso atual (kg)</Label>
                 <Input
                   id="peso_atual"
                   name="peso_atual"
                   type="number"
                   step="0.1"
-                  placeholder="Ex: 75.5"
-                  defaultValue={existingAnamnese?.peso_atual}
+                  value={
+                    formValues.peso_atual !== undefined &&
+                    formValues.peso_atual !== null
+                      ? formValues.peso_atual
+                      : ""
+                  }
+                  onChange={handleChange}
                 />
               </div>
               <div>
-                <Label htmlFor="altura">📏 Qual sua altura? (m)</Label>
+                <Label htmlFor="altura">📏 Altura (m)</Label>
                 <Input
                   id="altura"
                   name="altura"
                   type="number"
                   step="0.01"
-                  placeholder="Ex: 1.75"
-                  defaultValue={existingAnamnese?.altura}
+                  value={
+                    formValues.altura !== undefined &&
+                    formValues.altura !== null
+                      ? formValues.altura
+                      : ""
+                  }
+                  onChange={handleChange}
                 />
               </div>
               <div>
-                <Label htmlFor="peso_desejado">
-                  🤔 Quanto gostaria de pesar? (kg)
-                </Label>
+                <Label htmlFor="peso_desejado">🏆 Peso desejado (kg)</Label>
                 <Input
                   id="peso_desejado"
                   name="peso_desejado"
                   type="number"
                   step="0.1"
-                  placeholder="Ex: 70"
-                  defaultValue={existingAnamnese?.peso_desejado}
+                  value={
+                    formValues.peso_desejado !== undefined &&
+                    formValues.peso_desejado !== null
+                      ? formValues.peso_desejado
+                      : ""
+                  }
+                  onChange={handleChange}
                 />
               </div>
             </div>
@@ -606,8 +720,10 @@ export function AnamneseInicialForm({
             <div>
               <Label>🍔 Foi uma criança obesa?</Label>
               <RadioGroup
-                name="crianca_obesa"
-                defaultValue={existingAnamnese?.crianca_obesa ? "sim" : "nao"}
+                value={formValues.crianca_obesa ? "sim" : "nao"}
+                onValueChange={(value) =>
+                  handleRadioChange("crianca_obesa", value)
+                }
               >
                 <div className="flex items-center space-x-4 mt-2">
                   <div className="flex items-center space-x-2">
@@ -642,12 +758,13 @@ export function AnamneseInicialForm({
                 name="exercicio_atual"
                 placeholder="Ex: Sim, caminhada 3x por semana / Não, sedentário..."
                 rows={2}
-                defaultValue={existingAnamnese?.exercicio_atual}
+                value={formValues.exercicio_atual ?? ""}
+                onChange={handleChange}
               />
             </div>
 
             <div>
-              <Label htmlFor="frequencia_exercicio">
+              <Label htmlFor="compromisso_treinos">
                 📅 Se compromete a fazer quantos treinos por semana?
               </Label>
               <Input
@@ -657,7 +774,13 @@ export function AnamneseInicialForm({
                 min="1"
                 max="7"
                 placeholder="Ex: 4"
-                defaultValue={existingAnamnese?.compromisso_treinos}
+                value={
+                  formValues.compromisso_treinos !== undefined &&
+                  formValues.compromisso_treinos !== null
+                    ? formValues.compromisso_treinos
+                    : ""
+                }
+                onChange={handleChange}
               />
             </div>
           </div>
@@ -689,7 +812,8 @@ export function AnamneseInicialForm({
                 id="tempo_disponivel"
                 name="tempo_disponivel"
                 placeholder="Ex: 1 hora por dia / 45 minutos, 2x ao dia"
-                defaultValue={existingAnamnese?.tempo_disponivel}
+                value={formValues.tempo_disponivel ?? ""}
+                onChange={handleChange}
               />
             </div>
 
@@ -701,7 +825,8 @@ export function AnamneseInicialForm({
                 id="local_treino"
                 name="local_treino"
                 placeholder="Ex: Academia, Casa, Parque..."
-                defaultValue={existingAnamnese?.local_treino}
+                value={formValues.local_treino ?? ""}
+                onChange={handleChange}
               />
             </div>
 
@@ -714,7 +839,8 @@ export function AnamneseInicialForm({
                 name="materiais_disponiveis"
                 placeholder="Ex: Halteres, faixas elásticas, esteira..."
                 rows={2}
-                defaultValue={existingAnamnese?.materiais_disponiveis}
+                value={formValues.materiais_disponiveis ?? ""}
+                onChange={handleChange}
               />
             </div>
 
@@ -727,7 +853,8 @@ export function AnamneseInicialForm({
                 id="preferencia_exercicio"
                 name="preferencia_exercicio"
                 placeholder="Ex: Musculação e aeróbicos"
-                defaultValue={existingAnamnese?.preferencia_exercicio}
+                value={formValues.preferencia_exercicio ?? ""}
+                onChange={handleChange}
               />
             </div>
 
@@ -740,7 +867,8 @@ export function AnamneseInicialForm({
                 name="exercicios_gosta"
                 placeholder="Ex: Agachamento, corrida, bicicleta..."
                 rows={2}
-                defaultValue={existingAnamnese?.exercicios_gosta}
+                value={formValues.exercicios_gosta ?? ""}
+                onChange={handleChange}
               />
             </div>
 
@@ -753,7 +881,8 @@ export function AnamneseInicialForm({
                 name="exercicios_odeia"
                 placeholder="Ex: Burpee, corrida, flexão..."
                 rows={2}
-                defaultValue={existingAnamnese?.exercicios_odeia}
+                value={formValues.exercicios_odeia ?? ""}
+                onChange={handleChange}
               />
             </div>
 
@@ -767,7 +896,8 @@ export function AnamneseInicialForm({
                 name="observacoes_extras"
                 placeholder="Qualquer informação adicional que considere importante..."
                 rows={3}
-                defaultValue={existingAnamnese?.observacoes_extras}
+                value={formValues.observacoes_extras ?? ""}
+                onChange={handleChange}
               />
             </div>
           </div>
@@ -802,39 +932,58 @@ export function AnamneseInicialForm({
       </CardHeader>
 
       <CardContent className="pt-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form
+          onSubmit={handleSubmit}
+          onKeyDown={handleKeyDown}
+          className="space-y-6"
+        >
           {renderStep()}
 
           <div className="flex justify-between items-center pt-6">
             {step > 1 ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setStep((prev) => prev - 1)}
-              >
-                Voltar
+              <Button type="button" variant="outline" onClick={prevStep}>
+                ← Voltar
               </Button>
             ) : (
               <div />
             )}
 
-            {step < totalSteps ? (
+            {step < totalSteps && (
               <Button
                 type="button"
-                onClick={() => setStep((prev) => prev + 1)}
+                onClick={nextStep}
                 style={{ backgroundColor: themeColor || "hsl(var(--primary))" }}
               >
-                Próximo
+                Próximo →
               </Button>
-            ) : (
+            )}
+
+            {step === totalSteps && (
               <Button
                 type="submit"
                 disabled={loading}
                 style={{ backgroundColor: themeColor || "hsl(var(--primary))" }}
               >
-                {loading ? "Salvando..." : "Concluir"}
+                {loading ? "Salvando..." : "✅ Concluir"}
               </Button>
             )}
+          </div>
+
+          {/* Indicador de progresso */}
+          <div className="flex justify-center items-center gap-2 pt-4">
+            {Array.from({ length: totalSteps }).map((_, index) => (
+              <div
+                key={index}
+                className={`h-2 rounded-full transition-all ${
+                  index + 1 === step ? "w-8" : "w-2"
+                } ${index + 1 <= step ? "bg-primary" : "bg-muted"}`}
+                style={
+                  index + 1 <= step
+                    ? { backgroundColor: themeColor || "hsl(var(--primary))" }
+                    : {}
+                }
+              />
+            ))}
           </div>
         </form>
       </CardContent>

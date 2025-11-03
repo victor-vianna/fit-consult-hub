@@ -1,11 +1,23 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getWeek, getYear } from "date-fns";
+
+// Função auxiliar para calcular semana do ano
+function getWeekNumber(date: Date): number {
+  const d = new Date(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+  );
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
 
 interface AnamneseCheckinStatus {
   anamnesePreenchida: boolean;
   checkinSemanalFeito: boolean;
   podeAcessarTreinos: boolean;
+  mostrarModalAnamnese: boolean;
+  mostrarModalCheckin: boolean;
   loading: boolean;
   error: string | null;
   refresh: () => void;
@@ -19,6 +31,8 @@ export function useAnamneseCheckin(
     anamnesePreenchida: false,
     checkinSemanalFeito: false,
     podeAcessarTreinos: false,
+    mostrarModalAnamnese: false,
+    mostrarModalCheckin: false,
     loading: true,
     error: null,
     refresh: () => {},
@@ -30,6 +44,7 @@ export function useAnamneseCheckin(
         ...prev,
         loading: false,
         podeAcessarTreinos: true,
+        refresh: verificarStatus,
       }));
       return;
     }
@@ -51,9 +66,24 @@ export function useAnamneseCheckin(
 
       const anamnesePreenchida = !!anamnese;
 
+      // Se não tem anamnese, já retorna bloqueado
+      if (!anamnesePreenchida) {
+        setStatus({
+          anamnesePreenchida: false,
+          checkinSemanalFeito: false,
+          podeAcessarTreinos: false,
+          mostrarModalAnamnese: true,
+          mostrarModalCheckin: false,
+          loading: false,
+          error: null,
+          refresh: verificarStatus,
+        });
+        return;
+      }
+
       // Verificar check-in semanal
-      const ano = getYear(new Date());
-      const semana = getWeek(new Date());
+      const ano = new Date().getFullYear();
+      const semana = getWeekNumber(new Date());
 
       const { data: checkin, error: checkinError } = await supabase
         .from("checkins_semanais")
@@ -82,21 +112,19 @@ export function useAnamneseCheckin(
 
       // Determinar se pode acessar treinos
       let podeAcessarTreinos = true;
+      let mostrarModalCheckin = false;
 
-      if (!anamnesePreenchida) {
+      if (checkinObrigatorio && bloquearTreinos && !checkinSemanalFeito) {
         podeAcessarTreinos = false;
-      } else if (
-        checkinObrigatorio &&
-        bloquearTreinos &&
-        !checkinSemanalFeito
-      ) {
-        podeAcessarTreinos = false;
+        mostrarModalCheckin = true;
       }
 
       setStatus({
         anamnesePreenchida,
         checkinSemanalFeito,
         podeAcessarTreinos,
+        mostrarModalAnamnese: false,
+        mostrarModalCheckin,
         loading: false,
         error: null,
         refresh: verificarStatus,

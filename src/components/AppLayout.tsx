@@ -1,37 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAnamneseCheckin } from "@/hooks/useAnamneseCheckin";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
+import { CheckinObrigatorioModal } from "@/components/CheckinObrigatorioModal";
 import { NotificacoesDropdown } from "@/components/NotificacoesDropdown";
 import { AnamneseObrigatoriaModal } from "./AnamneseObrigatorioModal";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, profile } = useAuth();
-  const [showAnamneseModal, setShowAnamneseModal] = useState(false);
 
-  // Buscar configurações do personal
   const { settings: personalSettings } = usePersonalSettings(
     profile?.personal_id
   );
 
-  // Verificar status da anamnese
-  const { anamnesePreenchida, loading, refresh } = useAnamneseCheckin(
-    user?.id,
-    profile?.personal_id
-  );
-
-  useEffect(() => {
-    // Só mostra o modal se:
-    // 1. Não está carregando
-    // 2. O usuário é um aluno (tem personal_id)
-    // 3. A anamnese não foi preenchida
-    if (!loading && profile?.personal_id && !anamnesePreenchida) {
-      setShowAnamneseModal(true);
-    }
-  }, [loading, anamnesePreenchida, profile]);
+  const { mostrarModalAnamnese, mostrarModalCheckin, loading, refresh } =
+    useAnamneseCheckin(user?.id, profile?.personal_id);
 
   const handleAnamneseComplete = () => {
-    setShowAnamneseModal(false);
+    refresh(); // Atualiza o status e verifica se precisa do check-in
+  };
+
+  const handleCheckinComplete = () => {
     refresh(); // Atualiza o status
   };
 
@@ -45,14 +34,25 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Conteúdo principal */}
       <main className="flex-1 overflow-auto">{children}</main>
 
-      {/* Modal obrigatório de anamnese */}
-      {profile?.personal_id && (
+      {/* Modal obrigatório de anamnese - Primeira prioridade */}
+      {!loading && profile?.personal_id && mostrarModalAnamnese && (
         <AnamneseObrigatoriaModal
           profileId={user!.id}
           personalId={profile.personal_id}
           themeColor={personalSettings?.theme_color}
-          open={showAnamneseModal}
+          open={mostrarModalAnamnese}
           onComplete={handleAnamneseComplete}
+        />
+      )}
+
+      {/* Modal obrigatório de check-in semanal - Segunda prioridade */}
+      {!loading && profile?.personal_id && mostrarModalCheckin && (
+        <CheckinObrigatorioModal
+          profileId={user!.id}
+          personalId={profile.personal_id}
+          themeColor={personalSettings?.theme_color}
+          open={mostrarModalCheckin}
+          onComplete={handleCheckinComplete}
         />
       )}
     </div>

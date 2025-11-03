@@ -49,6 +49,7 @@ import {
   Mail,
   Phone,
   Download,
+  Activity,
 } from "lucide-react";
 import { DocumentViewer } from "@/components/DocumentViewer";
 import { format } from "date-fns";
@@ -60,6 +61,7 @@ import { SubscriptionManager } from "@/components/SubscriptionManager";
 import { CalendarioTreinosMensal } from "@/components/CalendarioTreinosMensal";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { AppLayout } from "@/components/AppLayout";
+import { AvaliacaoFisicaManager } from "@/components/AvaliacaoFisicaManager";
 
 interface Material {
   id: string;
@@ -506,7 +508,7 @@ export default function AlunoDetalhes() {
                 className={`${
                   isMobile
                     ? "inline-flex w-auto min-w-full gap-2"
-                    : "grid grid-cols-5 w-full"
+                    : "grid grid-cols-6 w-full"
                 } bg-muted/50 p-1 h-auto`}
               >
                 <TabsTrigger
@@ -552,6 +554,17 @@ export default function AlunoDetalhes() {
                     className={`${isMobile ? "h-5 w-5" : "h-4 w-4 mr-2"}`}
                   />
                   {!isMobile && "Materiais"}
+                </TabsTrigger>
+                <TabsTrigger
+                  value="avaliacao"
+                  className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
+                    isMobile ? "flex-shrink-0 px-6 py-3" : "py-3"
+                  }`}
+                >
+                  <Activity
+                    className={`${isMobile ? "h-5 w-5" : "h-4 w-4 mr-2"}`}
+                  />
+                  {!isMobile && "Avaliação"}
                 </TabsTrigger>
                 <TabsTrigger
                   value="financeiro"
@@ -876,6 +889,16 @@ export default function AlunoDetalhes() {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+            {/* Aba Avaliação Física */}
+            <TabsContent value="avaliacao" className="space-y-6">
+              {user && (
+                <AvaliacaoFisicaManager
+                  profileId={id!}
+                  personalId={user.id}
+                  themeColor={personalSettings?.theme_color}
+                />
+              )}
             </TabsContent>
 
             {/* Aba Financeiro */}

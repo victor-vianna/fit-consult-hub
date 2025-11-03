@@ -177,8 +177,8 @@ export default function Personal() {
         description: "Aluno cadastrado com sucesso",
       });
 
-      setOpenDialog(false);
       e.currentTarget.reset(); // Limpa o formulário
+      setOpenDialog(false);
       fetchData();
     } catch (error: any) {
       console.error("Erro ao criar aluno:", error);

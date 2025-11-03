@@ -802,24 +802,41 @@ export function AnamneseInicialForm({
       </CardHeader>
 
       <CardContent className="pt-6">
-        {/* Progress Bar */}
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium">Progresso</span>
-            <span className="text-sm text-muted-foreground">
-              Etapa {step} de {totalSteps}
-            </span>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {renderStep()}
+
+          <div className="flex justify-between items-center pt-6">
+            {step > 1 ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep((prev) => prev - 1)}
+              >
+                Voltar
+              </Button>
+            ) : (
+              <div />
+            )}
+
+            {step < totalSteps ? (
+              <Button
+                type="button"
+                onClick={() => setStep((prev) => prev + 1)}
+                style={{ backgroundColor: themeColor || "hsl(var(--primary))" }}
+              >
+                Próximo
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                disabled={loading}
+                style={{ backgroundColor: themeColor || "hsl(var(--primary))" }}
+              >
+                {loading ? "Salvando..." : "Concluir"}
+              </Button>
+            )}
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div
-              className="h-2 rounded-full transition-all duration-300"
-              style={{
-                width: `${(step / totalSteps) * 100}%`,
-                backgroundColor: themeColor || "hsl(var(--primary))",
-              }}
-            />
-          </div>
-        </div>
+        </form>
       </CardContent>
     </Card>
   );

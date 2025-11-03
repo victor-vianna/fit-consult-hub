@@ -51,6 +51,7 @@ import {
   Download,
   Activity,
   ClipboardList,
+  ClipboardCheck,
 } from "lucide-react";
 import { DocumentViewer } from "@/components/DocumentViewer";
 import { format } from "date-fns";
@@ -64,6 +65,7 @@ import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { AppLayout } from "@/components/AppLayout";
 import { AvaliacaoFisicaManager } from "@/components/AvaliacaoFisicaManager";
 import { AnamneseVisualizacao } from "@/components/AnamneseVisualizacao";
+import { CheckinsDashboard } from "@/components/CheckinsDashboard";
 
 interface Material {
   id: string;
@@ -510,7 +512,7 @@ export default function AlunoDetalhes() {
                 className={`${
                   isMobile
                     ? "inline-flex w-auto min-w-full gap-2"
-                    : "grid grid-cols-7 w-full"
+                    : "grid grid-cols-8 w-full"
                 } bg-muted/50 p-1 h-auto`}
               >
                 <TabsTrigger
@@ -578,6 +580,17 @@ export default function AlunoDetalhes() {
                     className={`${isMobile ? "h-5 w-5" : "h-4 w-4 mr-2"}`}
                   />
                   {!isMobile && "Anamnese"}
+                </TabsTrigger>
+                <TabsTrigger
+                  value="checkins"
+                  className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
+                    isMobile ? "flex-shrink-0 px-6 py-3" : "py-3"
+                  }`}
+                >
+                  <ClipboardCheck
+                    className={`${isMobile ? "h-5 w-5" : "h-4 w-4 mr-2"}`}
+                  />
+                  {!isMobile && "Check-ins"}
                 </TabsTrigger>
                 <TabsTrigger
                   value="financeiro"
@@ -917,6 +930,17 @@ export default function AlunoDetalhes() {
             <TabsContent value="anamnese" className="space-y-6">
               {user && aluno && (
                 <AnamneseVisualizacao
+                  profileId={id!}
+                  personalId={user.id}
+                  themeColor={personalSettings?.theme_color}
+                  studentName={aluno.nome}
+                />
+              )}
+            </TabsContent>
+            {/* Aba Check-ins */}
+            <TabsContent value="checkins" className="space-y-6">
+              {user && aluno && (
+                <CheckinsDashboard
                   profileId={id!}
                   personalId={user.id}
                   themeColor={personalSettings?.theme_color}

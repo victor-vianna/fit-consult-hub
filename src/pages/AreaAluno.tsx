@@ -36,10 +36,10 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { BottomNavigation } from "@/components/mobile/BottomNavigation";
 import { ActionCard } from "@/components/mobile/ActionCard";
-import ExercisesLibrary from "./ExercisesLibrary";
 import { CalendarioTreinosMensal } from "@/components/CalendarioTreinosMensal";
 import Biblioteca from "./Biblioteca";
 import { AppLayout } from "@/components/AppLayout";
+import ExercisesLibrary from "@/components/ExercisesLibrary";
 
 interface Material {
   id: string;

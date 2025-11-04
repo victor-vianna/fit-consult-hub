@@ -2,8 +2,8 @@ import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAnamneseCheckin } from "@/hooks/useAnamneseCheckin";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
-import { CheckinObrigatorioModal } from "@/components/CheckinObrigatorioModal";
 import { NotificacoesDropdown } from "@/components/NotificacoesDropdown";
+import { CheckinObrigatorioModal } from "@/components/CheckinObrigatorioModal";
 import { AnamneseObrigatoriaModal } from "./AnamneseObrigatorioModal";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -17,12 +17,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     useAnamneseCheckin(user?.id, profile?.personal_id);
 
   const handleAnamneseComplete = () => {
-    refresh(); // Atualiza o status e verifica se precisa do check-in
+    refresh();
   };
 
   const handleCheckinComplete = () => {
-    refresh(); // Atualiza o status
+    refresh();
   };
+
+  // Renderiza os modais apenas se:
+  // 1. Não está loading
+  // 2. Há usuário e profile
+  // 3. O profile tem personal_id (é aluno)
+  const shouldRenderModals = !loading && user && profile?.personal_id;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -34,10 +40,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Conteúdo principal */}
       <main className="flex-1 overflow-auto">{children}</main>
 
-      {/* Modal obrigatório de anamnese - Primeira prioridade */}
-      {!loading && profile?.personal_id && mostrarModalAnamnese && (
+      {/* Modal obrigatório de anamnese - tem prioridade sobre o de check-in */}
+      {shouldRenderModals && mostrarModalAnamnese && (
         <AnamneseObrigatoriaModal
-          profileId={user!.id}
+          profileId={user.id}
           personalId={profile.personal_id}
           themeColor={personalSettings?.theme_color}
           open={mostrarModalAnamnese}
@@ -45,10 +51,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      {/* Modal obrigatório de check-in semanal - Segunda prioridade */}
-      {!loading && profile?.personal_id && mostrarModalCheckin && (
+      {/* Modal obrigatório de check-in semanal - só mostra se anamnese não estiver aberta */}
+      {shouldRenderModals && !mostrarModalAnamnese && mostrarModalCheckin && (
         <CheckinObrigatorioModal
-          profileId={user!.id}
+          profileId={user.id}
           personalId={profile.personal_id}
           themeColor={personalSettings?.theme_color}
           open={mostrarModalCheckin}

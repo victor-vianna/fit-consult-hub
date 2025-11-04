@@ -115,7 +115,7 @@ export function AnamneseInicialForm({
         .select("*")
         .eq("profile_id", profileId)
         .eq("personal_id", personalId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         if (error?.code === "PGRST116") {

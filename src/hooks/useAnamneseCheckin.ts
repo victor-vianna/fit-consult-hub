@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-// Função auxiliar para calcular semana do ano
 function getWeekNumber(date: Date): number {
   const d = new Date(
     Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
@@ -30,7 +29,7 @@ export function useAnamneseCheckin(
   const [status, setStatus] = useState<AnamneseCheckinStatus>({
     anamnesePreenchida: false,
     checkinSemanalFeito: false,
-    podeAcessarTreinos: false,
+    podeAcessarTreinos: true, // Padrão true para não bloquear durante loading
     mostrarModalAnamnese: false,
     mostrarModalCheckin: false,
     loading: true,
@@ -39,11 +38,14 @@ export function useAnamneseCheckin(
   });
 
   const verificarStatus = async () => {
+    // Se não tem profileId ou personalId, não faz nada
     if (!profileId || !personalId) {
       setStatus((prev) => ({
         ...prev,
         loading: false,
         podeAcessarTreinos: true,
+        mostrarModalAnamnese: false,
+        mostrarModalCheckin: false,
         refresh: verificarStatus,
       }));
       return;
@@ -58,9 +60,10 @@ export function useAnamneseCheckin(
         .select("id")
         .eq("profile_id", profileId)
         .eq("personal_id", personalId)
-        .single();
+        .maybeSingle(); // Usa maybeSingle ao invés de single
 
-      if (anamneseError && anamneseError.code !== "PGRST116") {
+      if (anamneseError) {
+        console.error("Erro ao verificar anamnese:", anamneseError);
         throw anamneseError;
       }
 
@@ -92,21 +95,23 @@ export function useAnamneseCheckin(
         .eq("personal_id", personalId)
         .eq("ano", ano)
         .eq("numero_semana", semana)
-        .single();
+        .maybeSingle(); // Usa maybeSingle ao invés de single
 
-      if (checkinError && checkinError.code !== "PGRST116") {
+      if (checkinError) {
+        console.error("Erro ao verificar check-in:", checkinError);
         throw checkinError;
       }
 
       const checkinSemanalFeito = !!checkin;
 
       // Verificar configuração do personal
-      const { data: config } = await supabase
+      const { data: config, error: configError } = await supabase
         .from("configuracao_checkins")
         .select("checkin_obrigatorio, bloquear_treinos")
         .eq("personal_id", personalId)
-        .single();
+        .maybeSingle();
 
+      // Se não tiver configuração ou erro, assume padrões
       const checkinObrigatorio = config?.checkin_obrigatorio ?? true;
       const bloquearTreinos = config?.bloquear_treinos ?? true;
 
@@ -135,6 +140,9 @@ export function useAnamneseCheckin(
         ...prev,
         loading: false,
         error: error.message,
+        podeAcessarTreinos: true, // Em caso de erro, não bloqueia
+        mostrarModalAnamnese: false,
+        mostrarModalCheckin: false,
         refresh: verificarStatus,
       }));
     }

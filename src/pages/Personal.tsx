@@ -232,220 +232,42 @@ export default function Personal() {
             profileName={profile?.nome}
           />
 
+          {/* ✅ Versão Mobile do bloco "Meus Alunos" */}
           <main className="flex-1 overflow-auto pb-20 px-4 pt-4">
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-xs font-medium">
-                      Total Alunos
-                    </CardTitle>
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xl font-bold">{alunos.length}</div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-xs font-medium">
-                      Ativos
-                    </CardTitle>
-                    <UserCheck className="h-4 w-4 text-green-600" />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xl font-bold text-green-600">
-                    {alunosAtivos}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-xs font-medium">
-                      Inativos
-                    </CardTitle>
-                    <UserX className="h-4 w-4 text-red-600" />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xl font-bold text-red-600">
-                    {alunosInativos}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-xs font-medium">
-                      Materiais
-                    </CardTitle>
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xl font-bold">{totalMateriais}</div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
+            <Card className="shadow-sm">
+              <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">Meus Alunos</CardTitle>
-                  <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-                    <DialogTrigger asChild>
-                      <Button
-                        size="sm"
-                        style={{
-                          backgroundColor:
-                            personalSettings?.theme_color || undefined,
-                        }}
-                      >
-                        <UserPlus className="mr-2 h-4 w-4" />
-                        Novo
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Cadastrar Aluno</DialogTitle>
-                      </DialogHeader>
-                      <form onSubmit={handleCreateAluno} className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="nome">Nome</Label>
-                          <Input id="nome" name="nome" required />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="email">Email</Label>
-                          <Input
-                            id="email"
-                            name="email"
-                            type="email"
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="password">Senha</Label>
-                          <Input
-                            id="password"
-                            name="password"
-                            type="password"
-                            minLength={6}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="telefone">Telefone</Label>
-                          <Input id="telefone" name="telefone" type="tel" />
-                        </div>
-                        <Button
-                          type="submit"
-                          className="w-full"
-                          disabled={loading}
-                          style={{
-                            backgroundColor:
-                              personalSettings?.theme_color || undefined,
-                          }}
-                        >
-                          {loading ? "Cadastrando..." : "Cadastrar Aluno"}
-                        </Button>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
+                  <CardTitle className="text-base font-semibold">
+                    Meus Alunos
+                  </CardTitle>
+                  <Button
+                    size="sm"
+                    onClick={() => navigate("/alunos")}
+                    className="text-xs"
+                    style={{
+                      backgroundColor:
+                        personalSettings?.theme_color || undefined,
+                    }}
+                  >
+                    <Users className="mr-1 h-4 w-4" />
+                    Ver Todos
+                  </Button>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {alunos.map((aluno) => (
-                    <Card
-                      key={aluno.id}
-                      className={`cursor-pointer hover:shadow-md transition-all relative ${
-                        !aluno.is_active
-                          ? "border-red-500 border-2 opacity-75"
-                          : "border-green-500 border-2"
-                      }`}
-                      onClick={() => navigate(`/aluno/${aluno.id}`)}
-                    >
-                      <div className="absolute top-2 right-2">
-                        {aluno.is_active ? (
-                          <Badge className="bg-green-600 text-xs">
-                            <UserCheck className="h-3 w-3 mr-1" />
-                            Ativo
-                          </Badge>
-                        ) : (
-                          <Badge variant="destructive" className="text-xs">
-                            <UserX className="h-3 w-3 mr-1" />
-                            Bloqueado
-                          </Badge>
-                        )}
-                      </div>
 
-                      <CardContent className="pt-4">
-                        <div className="space-y-1">
-                          <h3 className="font-semibold text-sm">
-                            {aluno.nome}
-                          </h3>
-                          <p className="text-xs text-muted-foreground">
-                            {aluno.email}
-                          </p>
-                          {aluno.telefone && (
-                            <p className="text-xs text-muted-foreground">
-                              {aluno.telefone}
-                            </p>
-                          )}
-                          <div
-                            className="pt-2"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="w-full"
-                                >
-                                  <Trash2 className="h-4 w-4 text-destructive mr-2" />
-                                  Remover
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>
-                                    Confirmar exclusão
-                                  </AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Tem certeza que deseja remover este aluno?
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>
-                                    Cancelar
-                                  </AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleDeleteAluno(aluno.id)}
-                                  >
-                                    Remover
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-                {alunos.length === 0 && (
-                  <p className="text-center text-muted-foreground py-8 text-sm">
-                    Nenhum aluno cadastrado
-                  </p>
-                )}
+              <CardContent className="text-center pt-4 pb-6">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Gerencie todos os seus alunos em um só lugar
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => navigate("/alunos")}
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  Acessar Gerenciador
+                </Button>
               </CardContent>
             </Card>
           </main>
@@ -531,218 +353,34 @@ export default function Personal() {
 
             <main className="flex-1 overflow-auto">
               <div className="container mx-auto px-4 py-8">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Total de Alunos
-                      </CardTitle>
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{alunos.length}</div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Alunos Ativos
-                      </CardTitle>
-                      <UserCheck className="h-4 w-4 text-green-600" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold text-green-600">
-                        {alunosAtivos}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Alunos Inativos
-                      </CardTitle>
-                      <UserX className="h-4 w-4 text-red-600" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold text-red-600">
-                        {alunosInativos}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Materiais Enviados
-                      </CardTitle>
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{totalMateriais}</div>
-                    </CardContent>
-                  </Card>
-                </div>
-
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>Meus Alunos</CardTitle>
-                      <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-                        <DialogTrigger asChild>
-                          <Button
-                            style={{
-                              backgroundColor:
-                                personalSettings?.theme_color || undefined,
-                            }}
-                          >
-                            <UserPlus className="mr-2 h-4 w-4" />
-                            Novo Aluno
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Cadastrar Aluno</DialogTitle>
-                          </DialogHeader>
-                          <form
-                            onSubmit={handleCreateAluno}
-                            className="space-y-4"
-                          >
-                            <div className="space-y-2">
-                              <Label htmlFor="nome">Nome</Label>
-                              <Input id="nome" name="nome" required />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="email">Email</Label>
-                              <Input
-                                id="email"
-                                name="email"
-                                type="email"
-                                required
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="password">Senha</Label>
-                              <Input
-                                id="password"
-                                name="password"
-                                type="password"
-                                minLength={6}
-                                required
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="telefone">Telefone</Label>
-                              <Input id="telefone" name="telefone" type="tel" />
-                            </div>
-                            <Button
-                              type="submit"
-                              className="w-full"
-                              disabled={loading}
-                              style={{
-                                backgroundColor:
-                                  personalSettings?.theme_color || undefined,
-                              }}
-                            >
-                              {loading ? "Cadastrando..." : "Cadastrar Aluno"}
-                            </Button>
-                          </form>
-                        </DialogContent>
-                      </Dialog>
+                      <Button
+                        onClick={() => navigate("/alunos")}
+                        style={{
+                          backgroundColor:
+                            personalSettings?.theme_color || undefined,
+                        }}
+                      >
+                        <Users className="mr-2 h-4 w-4" />
+                        Ver Todos os Alunos
+                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {alunos.map((aluno) => (
-                        <Card
-                          key={aluno.id}
-                          className={`cursor-pointer hover:shadow-lg transition-all relative ${
-                            !aluno.is_active
-                              ? "border-red-500 border-2 opacity-75"
-                              : "border-green-500 border-2"
-                          }`}
-                          onClick={() => navigate(`/aluno/${aluno.id}`)}
-                        >
-                          <div className="absolute top-2 right-2">
-                            {aluno.is_active ? (
-                              <Badge className="bg-green-600 hover:bg-green-700">
-                                <UserCheck className="h-3 w-3 mr-1" />
-                                Ativo
-                              </Badge>
-                            ) : (
-                              <Badge variant="destructive">
-                                <UserX className="h-3 w-3 mr-1" />
-                                Bloqueado
-                              </Badge>
-                            )}
-                          </div>
-
-                          <CardContent className="pt-6">
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2">
-                                <h3 className="font-semibold">{aluno.nome}</h3>
-                                <Badge variant="secondary" className="text-xs">
-                                  Aluno
-                                </Badge>
-                              </div>
-                              <p className="text-sm text-muted-foreground">
-                                {aluno.email}
-                              </p>
-                              {aluno.telefone && (
-                                <p className="text-sm text-muted-foreground">
-                                  {aluno.telefone}
-                                </p>
-                              )}
-                              <div
-                                className="pt-2 flex gap-2"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="flex-1"
-                                    >
-                                      <Trash2 className="h-4 w-4 text-destructive" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>
-                                        Confirmar exclusão
-                                      </AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Tem certeza que deseja remover este
-                                        aluno?
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>
-                                        Cancelar
-                                      </AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() =>
-                                          handleDeleteAluno(aluno.id)
-                                        }
-                                      >
-                                        Remover
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                    {alunos.length === 0 && (
-                      <p className="text-center text-muted-foreground py-8">
-                        Nenhum aluno cadastrado
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground mb-4">
+                        Gerencie todos os seus alunos em um só lugar
                       </p>
-                    )}
+                      <Button
+                        variant="outline"
+                        onClick={() => navigate("/alunos")}
+                      >
+                        Acessar Gerenciador de Alunos
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </div>

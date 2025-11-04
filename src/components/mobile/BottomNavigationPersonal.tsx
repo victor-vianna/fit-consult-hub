@@ -1,6 +1,14 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Home, Users, FileText, DollarSign, Menu, Library } from "lucide-react";
+import {
+  Home,
+  Users,
+  FileText,
+  DollarSign,
+  Menu,
+  Library,
+  UserIcon,
+} from "lucide-react";
 
 interface BottomNavigationPersonalProps {
   onMenuClick: () => void;
@@ -21,6 +29,11 @@ export function BottomNavigationPersonal({
       icon: Home,
       label: "Início",
       path: "/",
+    },
+    {
+      icon: UserIcon,
+      label: "Alunos",
+      path: "/alunos",
     },
     {
       icon: Library,

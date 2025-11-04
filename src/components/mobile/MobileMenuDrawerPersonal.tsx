@@ -18,6 +18,7 @@ import {
   CreditCard,
   MessageSquare,
   Library,
+  UserIcon,
 } from "lucide-react";
 
 interface MobileMenuDrawerPersonalProps {
@@ -53,10 +54,10 @@ export function MobileMenuDrawerPersonal({
       },
     },
     {
-      icon: DollarSign,
-      label: "Financeiro",
+      icon: UserIcon,
+      label: "Alunos",
       onClick: () => {
-        navigate("/financeiro");
+        navigate("/alunos");
         onOpenChange(false);
       },
     },
@@ -65,6 +66,14 @@ export function MobileMenuDrawerPersonal({
       label: "Biblioteca",
       onClick: () => {
         navigate("/biblioteca");
+        onOpenChange(false);
+      },
+    },
+    {
+      icon: DollarSign,
+      label: "Financeiro",
+      onClick: () => {
+        navigate("/financeiro");
         onOpenChange(false);
       },
     },

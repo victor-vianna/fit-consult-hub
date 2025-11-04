@@ -11,11 +11,11 @@ import Personal from "./pages/Personal";
 import AlunoDetalhes from "./pages/AlunoDetalhes";
 import AreaAluno from "./pages/AreaAluno";
 import NotFound from "./pages/NotFound";
-import ExercisesLibrary from "./pages/ExercisesLibrary";
 import AcessoSuspenso from "./pages/AcessoSuspenso";
 import Financeiro from "./pages/Financeiro";
 import Biblioteca from "./pages/Biblioteca";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import AlunosManager from "./pages/Alunos";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -81,6 +81,14 @@ const App = () => (
             element={
               <AuthGuard allowedRoles={["personal"]}>
                 <Financeiro />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/alunos"
+            element={
+              <AuthGuard allowedRoles={["personal"]}>
+                <AlunosManager />
               </AuthGuard>
             }
           />

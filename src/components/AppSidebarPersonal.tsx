@@ -9,6 +9,7 @@ import {
   Calendar,
   CreditCard,
   MessageSquare,
+  UsersIcon,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -30,8 +31,9 @@ import { useAuth } from "@/hooks/useAuth";
 
 const menuItems = [
   { title: "Dashboard", icon: Home, path: "/" },
-  { title: "Financeiro", icon: Wallet, path: "/financeiro" },
+  { title: "Alunos", icon: UsersIcon, path: "/alunos" },
   { title: "Biblioteca", icon: Library, path: "/biblioteca" },
+  { title: "Financeiro", icon: Wallet, path: "/financeiro" },
 ];
 
 export function AppSidebarPersonal() {

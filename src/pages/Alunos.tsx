@@ -4,12 +4,12 @@ import {
   SidebarInset,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { FinancialDashboard } from "@/components/FinancialDashboard";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { AppLayout } from "@/components/AppLayout";
+import AlunosManager from "@/components/AlunosManager";
 
-export default function Financeiro() {
+export default function Alunos() {
   return (
     <AppLayout>
       <SidebarProvider>
@@ -20,14 +20,14 @@ export default function Financeiro() {
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 h-4" />
             <div className="flex flex-1 items-center justify-between">
-              <h1 className="text-xl font-semibold">Dashboard Financeiro</h1>
+              <h1 className="text-xl font-semibold">Área dos Meus Alunos</h1>
               <ThemeToggle />
             </div>
           </header>
 
           {/* Conteúdo principal */}
           <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-            <FinancialDashboard />
+            <AlunosManager />
           </div>
         </SidebarInset>
       </SidebarProvider>

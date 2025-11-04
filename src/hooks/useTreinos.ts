@@ -32,13 +32,13 @@ const buildQueryKey = (
   semana: string
 ): QueryKey => ["treinos", profileId, personalId, semana];
 
-const cargaFromDb = (c: string | number | null | undefined): number | null =>
-  c == null ? null : Number(c);
-
-const cargaForInsert = (c?: number | null): string | null =>
+const cargaFromDb = (c: string | number | null | undefined): string | null =>
   c == null ? null : String(c);
 
-const cargaForUpdate = (c?: number | null): string | null | undefined =>
+const cargaForInsert = (c?: string | null): string | null =>
+  c == null ? null : String(c);
+
+const cargaForUpdate = (c?: string | null): string | null | undefined =>
   c === undefined ? undefined : c === null ? null : String(c);
 
 const buildInitialTreinos = (): TreinoDia[] =>

@@ -25,12 +25,7 @@ export const exercicioSchema = z.object({
 
   // NOVO: carga (peso). Pode ser número (ex: 20, 20.5), opcional e nullable.
   // Ajuste min/max conforme sua regra de negócio (aqui limitei a 0..1000).
-  carga: z
-    .number()
-    .nonnegative()
-    .max(1000, "Carga inválida")
-    .optional()
-    .nullable(),
+  carga: z.string().min(1).max(100).optional().nullable(),
 });
 
 export const treinoDescricaoSchema = z.object({

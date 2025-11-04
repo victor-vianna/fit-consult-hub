@@ -119,9 +119,10 @@ export default function Personal() {
 
   const handleCreateAluno = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const form = e.currentTarget;
     setLoading(true);
 
-    const formData = new FormData(e.currentTarget);
+    const formData = new FormData(form);
     const dados = {
       nome: formData.get("nome") as string,
       email: formData.get("email") as string,
@@ -177,7 +178,7 @@ export default function Personal() {
         description: "Aluno cadastrado com sucesso",
       });
 
-      e.currentTarget.reset(); // Limpa o formulário
+      form.reset(); // Limpa o formulário
       setOpenDialog(false);
       fetchData();
     } catch (error: any) {

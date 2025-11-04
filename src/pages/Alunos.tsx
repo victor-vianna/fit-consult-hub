@@ -20,7 +20,7 @@ export default function Alunos() {
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 h-4" />
             <div className="flex flex-1 items-center justify-between">
-              <h1 className="text-xl font-semibold">Área dos Meus Alunos</h1>
+              <h1 className="text-xl font-semibold">Área Meus Alunos</h1>
               <ThemeToggle />
             </div>
           </header>

@@ -29,6 +29,7 @@ import {
   CheckCircle2,
   Circle,
   Link as LinkIcon,
+  Blocks,
 } from "lucide-react";
 import {
   Collapsible,
@@ -42,8 +43,11 @@ import { SortableExercicioCard } from "@/components/SortableExercicioCard";
 import { WorkoutTimer } from "./WorkoutTimer";
 import { WorkoutDayView } from "./WorkoutDayView";
 import ExercisePicker from "@/components/exercises/ExercisePicker";
+import { WorkoutBlockDialog } from "./WorkoutBlockDialog";
+import { WorkoutBlockCard } from "./WorkoutBlockCard";
 import type { Exercise } from "@/types/exercise";
 import type { Exercicio as TreinoExercicio, TreinoDia } from "@/types/treino";
+import type { BlocoTreino } from "@/types/workoutBlocks";
 
 import {
   DndContext,
@@ -65,6 +69,7 @@ import {
   GrupoExerciciosInput,
   useExerciseGroups,
 } from "@/hooks/useExerciseGroups";
+import { useWorkoutBlocks } from "@/hooks/useWorkoutBlocks";
 import { GroupedExerciseCard } from "./GroupedExerciseCard";
 import { ExerciseGroupDialog } from "./ExerciseGroupDialog";
 
@@ -115,6 +120,15 @@ export function TreinosManager({
   // Hook de agrupamentos
   const { criarGrupo, obterGruposDoTreino, deletarGrupo } = useExerciseGroups();
 
+  // 🆕 Hook de blocos
+  const {
+    criarBloco,
+    obterBlocos,
+    deletarBloco,
+    marcarConcluido: marcarBlocoConcluido,
+    atualizarBloco,
+  } = useWorkoutBlocks();
+
   const [exercicioDialogOpen, setExercicioDialogOpen] = useState(false);
   const [editDescricaoOpen, setEditDescricaoOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -140,6 +154,14 @@ export function TreinosManager({
 
   // Estado para controlar carregamento de grupos
   const [loadingGroups, setLoadingGroups] = useState(false);
+
+  // 🆕 Estados para blocos
+  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+  const [blocoEditando, setBlocoEditando] = useState<BlocoTreino | null>(null);
+  const [blocosByTreino, setBlocosByTreino] = useState<
+    Record<string, BlocoTreino[]>
+  >({});
+  const [loadingBlocks, setLoadingBlocks] = useState(false);
 
   const isAluno = user?.id === profileId;
   const isPersonal = user?.id === personalId;
@@ -218,7 +240,48 @@ export function TreinosManager({
       mounted = false;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [treinos, obterGruposDoTreino]);
+  }, [treinos]);
+
+  // 🆕 Carregar blocos quando treinos mudarem
+  useEffect(() => {
+    let mounted = true;
+
+    const loadBlocks = async () => {
+      if (!treinos || treinos.length === 0) {
+        if (mounted) setBlocosByTreino({});
+        return;
+      }
+
+      setLoadingBlocks(true);
+
+      const mapping: Record<string, BlocoTreino[]> = {};
+
+      for (const treino of treinos) {
+        if (!mounted) break;
+        const treinoId = getTreinoId(treino);
+        if (!treinoId) continue;
+
+        try {
+          const blocos = await obterBlocos(treinoId);
+          mapping[treinoId] = blocos ?? [];
+        } catch (err) {
+          console.warn("[TreinosManager] Erro ao carregar blocos:", err);
+          mapping[treinoId] = [];
+        }
+      }
+
+      if (mounted) {
+        setBlocosByTreino(mapping);
+        setLoadingBlocks(false);
+      }
+    };
+
+    loadBlocks();
+
+    return () => {
+      mounted = false;
+    };
+  }, [treinos]);
 
   const handleDragEnd = async (event: DragEndEvent, dia: number) => {
     const { active, over } = event;
@@ -474,6 +537,71 @@ export function TreinosManager({
     }
   };
 
+  // 🆕 Função para salvar bloco
+  const handleSaveBlock = async (blocoData: Partial<BlocoTreino>) => {
+    if (selectedDia === null) return;
+
+    try {
+      setLoadingStates((prev) => ({ ...prev, adicionando: true }));
+
+      const treino = treinos.find((t) => t.dia === selectedDia);
+      if (!treino) return;
+
+      const treinoId = getTreinoId(treino);
+      if (!treinoId) return;
+
+      if (blocoEditando) {
+        // Editar
+        await atualizarBloco(blocoEditando.id, blocoData);
+      } else {
+        // Criar
+        await criarBloco(treinoId, blocoData);
+      }
+
+      // Recarregar blocos
+      const blocos = await obterBlocos(treinoId);
+      setBlocosByTreino((prev) => ({ ...prev, [treinoId]: blocos }));
+
+      setBlockDialogOpen(false);
+      setBlocoEditando(null);
+    } catch (error) {
+      console.error("[TreinosManager] Erro ao salvar bloco:", error);
+    } finally {
+      setLoadingStates((prev) => ({ ...prev, adicionando: false }));
+    }
+  };
+
+  // 🆕 Função para deletar bloco
+  const handleDeleteBlock = async (treinoId: string, blocoId: string) => {
+    if (!blocoId) {
+      console.warn("[TreinosManager] blocoId inválido para deletar");
+      return;
+    }
+
+    try {
+      setLoadingStates((prev) => ({ ...prev, removendo: true }));
+      await deletarBloco(blocoId);
+
+      // Recarregar blocos
+      try {
+        const updated = await obterBlocos(treinoId);
+        setBlocosByTreino((prev) => ({
+          ...prev,
+          [treinoId]: Array.isArray(updated) ? updated : [],
+        }));
+      } catch (err) {
+        console.warn(
+          "[TreinosManager] Erro ao recarregar blocos após delete:",
+          err
+        );
+      }
+    } catch (err) {
+      console.error("[TreinosManager] Erro ao deletar bloco:", err);
+    } finally {
+      setLoadingStates((prev) => ({ ...prev, removendo: false }));
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-16 space-y-4">
@@ -491,8 +619,10 @@ export function TreinosManager({
         profileId={profileId}
         personalId={personalId}
         groupsByTreino={groupsByTreino}
+        blocosByTreino={blocosByTreino}
         onToggleConcluido={marcarExercicioConcluido}
         onToggleGrupoConcluido={handleToggleGrupoConcluido}
+        onToggleBlocoConcluido={marcarBlocoConcluido}
       />
     );
   }
@@ -529,16 +659,30 @@ export function TreinosManager({
           const treinoId = getTreinoId(treino);
           const grupos = treinoId ? groupsByTreino[treinoId] ?? [] : [];
 
+          // 🆕 Obter blocos do cache
+          const blocos = treinoId ? blocosByTreino[treinoId] ?? [] : [];
+          const temBlocos = blocos.length > 0;
+
+          // 🆕 Separar blocos por tipo
+          const blocosInicio = blocos.filter((b) => b.posicao === "inicio");
+          const blocosMeio = blocos.filter((b) => b.posicao === "meio");
+          const blocosFim = blocos.filter((b) => b.posicao === "fim");
+
+          // Exercícios não agrupados
+          const exerciciosIsolados = treino.exercicios.filter(
+            (ex) => !ex.grupo_id
+          );
+
           return (
             <Collapsible
               key={treino.dia}
-              defaultOpen={temExercicios}
+              defaultOpen={temExercicios || temBlocos}
               className="group"
             >
               <Card
                 className={cn(
                   "transition-all duration-200 hover:shadow-md",
-                  temExercicios && "border-primary/20"
+                  (temExercicios || temBlocos) && "border-primary/20"
                 )}
               >
                 <CardHeader className="pb-3">
@@ -548,7 +692,9 @@ export function TreinosManager({
 
                       <div className="flex items-center gap-3 flex-1">
                         <Badge
-                          variant={temExercicios ? "default" : "outline"}
+                          variant={
+                            temExercicios || temBlocos ? "default" : "outline"
+                          }
                           className="font-mono text-xs px-2 py-1"
                         >
                           {diaInfo.abrev}
@@ -567,19 +713,29 @@ export function TreinosManager({
                           )}
 
                           <div className="flex items-center gap-3 mt-2">
-                            {temExercicios && (
+                            {(temExercicios || temBlocos) && (
                               <>
-                                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                  <Dumbbell className="h-3 w-3" />
-                                  {treino.exercicios.length} exercício
-                                  {treino.exercicios.length !== 1 ? "s" : ""}
-                                </span>
+                                {temExercicios && (
+                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <Dumbbell className="h-3 w-3" />
+                                    {treino.exercicios.length} exercício
+                                    {treino.exercicios.length !== 1 ? "s" : ""}
+                                  </span>
+                                )}
 
                                 {grupos.length > 0 && (
                                   <span className="text-xs text-blue-600 flex items-center gap-1">
                                     <LinkIcon className="h-3 w-3" />
                                     {grupos.length} grupo
                                     {grupos.length !== 1 ? "s" : ""}
+                                  </span>
+                                )}
+
+                                {blocos.length > 0 && (
+                                  <span className="text-xs text-purple-600 flex items-center gap-1">
+                                    <Blocks className="h-3 w-3" />
+                                    {blocos.length} bloco
+                                    {blocos.length !== 1 ? "s" : ""}
                                   </span>
                                 )}
 
@@ -592,10 +748,10 @@ export function TreinosManager({
                               </>
                             )}
 
-                            {!temExercicios && (
+                            {!temExercicios && !temBlocos && (
                               <span className="text-xs text-muted-foreground flex items-center gap-1">
                                 <Circle className="h-3 w-3" />
-                                Sem exercícios
+                                Sem conteúdo
                               </span>
                             )}
                           </div>
@@ -604,7 +760,7 @@ export function TreinosManager({
                     </CollapsibleTrigger>
 
                     {/* Actions - APENAS PARA PERSONAL */}
-                    {!readOnly && (
+                    {!readOnly && isPersonal && (
                       <div className="flex gap-2">
                         <Button
                           size="sm"
@@ -642,6 +798,21 @@ export function TreinosManager({
                           <span className="hidden sm:inline">Agrupar</span>
                         </Button>
 
+                        {/* 🆕 BOTÃO ADICIONAR BLOCO */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedDia(treino.dia);
+                            setBlocoEditando(null);
+                            setBlockDialogOpen(true);
+                          }}
+                        >
+                          <Blocks className="h-4 w-4 mr-1" />
+                          <span className="hidden sm:inline">Bloco</span>
+                        </Button>
+
                         <Button
                           size="sm"
                           onClick={(e) => {
@@ -671,113 +842,234 @@ export function TreinosManager({
 
                 <CollapsibleContent>
                   <CardContent className="pt-0">
-                    {!temExercicios && grupos.length === 0 ? (
+                    {!temExercicios && !temBlocos && grupos.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
                         <div className="p-3 bg-muted rounded-full">
                           <Dumbbell className="h-6 w-6 text-muted-foreground" />
                         </div>
                         <div>
                           <p className="text-sm font-medium text-muted-foreground">
-                            Nenhum exercício cadastrado
+                            Nenhum conteúdo cadastrado
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Adicione exercícios para o aluno
+                            Adicione exercícios, grupos ou blocos para o aluno
                           </p>
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-3">
-                        {/* Renderizar GRUPOS primeiro */}
-                        {grupos.length > 0 &&
-                          grupos.map((grupo: any, idx: number) => (
-                            <GroupedExerciseCard
-                              key={grupo.grupo_id ?? `grupo-${idx}`}
-                              grupo={grupo}
-                              index={idx}
-                              readOnly={readOnly}
-                              onEdit={
-                                isPersonal
-                                  ? () => {
-                                      console.log(
-                                        "[TreinosManager] Editar grupo:",
-                                        grupo.grupo_id
-                                      );
-                                      // TODO: implementar edição de grupo
-                                    }
-                                  : undefined
-                              }
-                              onDelete={
-                                isPersonal
-                                  ? () => {
-                                      if (treinoId && grupo.grupo_id) {
-                                        handleDeleteGroup(
-                                          treinoId,
+                      <div className="space-y-4">
+                        {/* 🎬 BLOCOS DO INÍCIO */}
+                        {blocosInicio.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Separator className="flex-1" />
+                              <span>Início do Treino</span>
+                              <Separator className="flex-1" />
+                            </div>
+                            {blocosInicio.map((bloco, idx) => {
+                              const treinoId = getTreinoId(treino);
+                              return (
+                                <WorkoutBlockCard
+                                  key={bloco.id}
+                                  bloco={bloco}
+                                  index={idx}
+                                  readOnly={readOnly}
+                                  onEdit={
+                                    isPersonal
+                                      ? () => {
+                                          setBlocoEditando(bloco);
+                                          setSelectedDia(treino.dia);
+                                          setBlockDialogOpen(true);
+                                        }
+                                      : undefined
+                                  }
+                                  onDelete={
+                                    isPersonal && treinoId
+                                      ? () =>
+                                          handleDeleteBlock(treinoId, bloco.id)
+                                      : undefined
+                                  }
+                                  onToggleConcluido={
+                                    isAluno ? marcarBlocoConcluido : undefined
+                                  }
+                                />
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* 💪 GRUPOS + EXERCÍCIOS (do meio) */}
+                        <div className="space-y-3">
+                          {/* Grupos agrupados */}
+                          {grupos.length > 0 &&
+                            grupos.map((grupo: any, idx: number) => (
+                              <GroupedExerciseCard
+                                key={grupo.grupo_id ?? `grupo-${idx}`}
+                                grupo={grupo}
+                                index={idx}
+                                readOnly={readOnly}
+                                onEdit={
+                                  isPersonal
+                                    ? () => {
+                                        console.log(
+                                          "[TreinosManager] Editar grupo:",
                                           grupo.grupo_id
                                         );
+                                        // TODO: implementar edição de grupo
                                       }
-                                    }
-                                  : undefined
-                              }
-                            />
-                          ))}
-
-                        {/* Exercícios isolados com DnD */}
-                        {treino.exercicios.filter((ex) => !ex.grupo_id).length >
-                          0 && (
-                          <DndContext
-                            sensors={sensors}
-                            collisionDetection={closestCenter}
-                            onDragEnd={(event) =>
-                              handleDragEnd(event, treino.dia)
-                            }
-                          >
-                            <SortableContext
-                              items={treino.exercicios
-                                .filter((ex) => !ex.grupo_id)
-                                .map((ex) => ex.id)}
-                              strategy={verticalListSortingStrategy}
-                            >
-                              <div className="space-y-2">
-                                {treino.exercicios
-                                  .filter((ex) => !ex.grupo_id)
-                                  .map((exercicio, index) => {
-                                    const cardEx = {
-                                      id: exercicio.id,
-                                      nome: exercicio.nome,
-                                      link_video: exercicio.link_video ?? null,
-                                      ordem: exercicio.ordem,
-                                      series: exercicio.series,
-                                      repeticoes: exercicio.repeticoes,
-                                      descanso: exercicio.descanso,
-                                      carga:
-                                        exercicio.carga != null
-                                          ? String(exercicio.carga)
-                                          : undefined,
-                                      observacoes:
-                                        exercicio.observacoes ?? undefined,
-                                      concluido: !!exercicio.concluido,
-                                    };
-
-                                    return (
-                                      <SortableExercicioCard
-                                        key={exercicio.id}
-                                        exercicio={cardEx}
-                                        index={index}
-                                        readOnly={readOnly}
-                                        onEdit={() => {
-                                          setSelectedDia(treino.dia);
-                                          setExercicioEditando(
-                                            treinoExToDialog(exercicio)
+                                    : undefined
+                                }
+                                onDelete={
+                                  isPersonal
+                                    ? () => {
+                                        if (treinoId && grupo.grupo_id) {
+                                          handleDeleteGroup(
+                                            treinoId,
+                                            grupo.grupo_id
                                           );
-                                          setExercicioDialogOpen(true);
-                                        }}
-                                        onDelete={handleRemover}
-                                      />
-                                    );
-                                  })}
-                              </div>
-                            </SortableContext>
-                          </DndContext>
+                                        }
+                                      }
+                                    : undefined
+                                }
+                              />
+                            ))}
+
+                          {/* Exercícios isolados com DnD */}
+                          {exerciciosIsolados.length > 0 && (
+                            <DndContext
+                              sensors={sensors}
+                              collisionDetection={closestCenter}
+                              onDragEnd={(event) =>
+                                handleDragEnd(event, treino.dia)
+                              }
+                            >
+                              <SortableContext
+                                items={exerciciosIsolados.map((ex) => ex.id)}
+                                strategy={verticalListSortingStrategy}
+                              >
+                                <div className="space-y-2">
+                                  {exerciciosIsolados.map(
+                                    (exercicio, index) => {
+                                      const cardEx = {
+                                        id: exercicio.id,
+                                        nome: exercicio.nome,
+                                        link_video:
+                                          exercicio.link_video ?? null,
+                                        ordem: exercicio.ordem,
+                                        series: exercicio.series,
+                                        repeticoes: exercicio.repeticoes,
+                                        descanso: exercicio.descanso,
+                                        carga:
+                                          exercicio.carga != null
+                                            ? String(exercicio.carga)
+                                            : undefined,
+                                        observacoes:
+                                          exercicio.observacoes ?? undefined,
+                                        concluido: !!exercicio.concluido,
+                                      };
+
+                                      return (
+                                        <SortableExercicioCard
+                                          key={exercicio.id}
+                                          exercicio={cardEx}
+                                          index={index}
+                                          readOnly={readOnly}
+                                          onEdit={() => {
+                                            setSelectedDia(treino.dia);
+                                            setExercicioEditando(
+                                              treinoExToDialog(exercicio)
+                                            );
+                                            setExercicioDialogOpen(true);
+                                          }}
+                                          onDelete={handleRemover}
+                                        />
+                                      );
+                                    }
+                                  )}
+                                </div>
+                              </SortableContext>
+                            </DndContext>
+                          )}
+                        </div>
+
+                        {/* 🧘 BLOCOS DO MEIO */}
+                        {blocosMeio.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Separator className="flex-1" />
+                              <span>Complementar</span>
+                              <Separator className="flex-1" />
+                            </div>
+                            {blocosMeio.map((bloco, idx) => {
+                              const treinoId = getTreinoId(treino);
+                              return (
+                                <WorkoutBlockCard
+                                  key={bloco.id}
+                                  bloco={bloco}
+                                  index={idx}
+                                  readOnly={readOnly}
+                                  onEdit={
+                                    isPersonal
+                                      ? () => {
+                                          setBlocoEditando(bloco);
+                                          setSelectedDia(treino.dia);
+                                          setBlockDialogOpen(true);
+                                        }
+                                      : undefined
+                                  }
+                                  onDelete={
+                                    isPersonal && treinoId
+                                      ? () =>
+                                          handleDeleteBlock(treinoId, bloco.id)
+                                      : undefined
+                                  }
+                                  onToggleConcluido={
+                                    isAluno ? marcarBlocoConcluido : undefined
+                                  }
+                                />
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* 🏁 BLOCOS DO FIM */}
+                        {blocosFim.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Separator className="flex-1" />
+                              <span>Finalização</span>
+                              <Separator className="flex-1" />
+                            </div>
+                            {blocosFim.map((bloco, idx) => {
+                              const treinoId = getTreinoId(treino);
+                              return (
+                                <WorkoutBlockCard
+                                  key={bloco.id}
+                                  bloco={bloco}
+                                  index={idx}
+                                  readOnly={readOnly}
+                                  onEdit={
+                                    isPersonal
+                                      ? () => {
+                                          setBlocoEditando(bloco);
+                                          setSelectedDia(treino.dia);
+                                          setBlockDialogOpen(true);
+                                        }
+                                      : undefined
+                                  }
+                                  onDelete={
+                                    isPersonal && treinoId
+                                      ? () =>
+                                          handleDeleteBlock(treinoId, bloco.id)
+                                      : undefined
+                                  }
+                                  onToggleConcluido={
+                                    isAluno ? marcarBlocoConcluido : undefined
+                                  }
+                                />
+                              );
+                            })}
+                          </div>
                         )}
 
                         {/* Indicador de carregamento de grupos */}
@@ -786,6 +1078,16 @@ export function TreinosManager({
                             <Loader2 className="h-4 w-4 animate-spin mr-2" />
                             <span className="text-xs">
                               Carregando grupos...
+                            </span>
+                          </div>
+                        )}
+
+                        {/* 🆕 Indicador de carregamento de blocos */}
+                        {loadingBlocks && blocos.length === 0 && (
+                          <div className="flex items-center justify-center py-4 text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            <span className="text-xs">
+                              Carregando blocos...
                             </span>
                           </div>
                         )}
@@ -869,6 +1171,20 @@ export function TreinosManager({
           open={groupDialogOpen}
           onOpenChange={setGroupDialogOpen}
           onSave={handleSaveGroup}
+          diaNome={
+            selectedDia !== null ? diasSemana[selectedDia - 1].nome : undefined
+          }
+        />
+
+        {/* 🆕 DIALOG DE BLOCOS */}
+        <WorkoutBlockDialog
+          open={blockDialogOpen}
+          onOpenChange={(open) => {
+            setBlockDialogOpen(open);
+            if (!open) setBlocoEditando(null);
+          }}
+          onSave={handleSaveBlock}
+          blocoEditando={blocoEditando}
           diaNome={
             selectedDia !== null ? diasSemana[selectedDia - 1].nome : undefined
           }

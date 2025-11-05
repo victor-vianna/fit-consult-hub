@@ -21,12 +21,15 @@ import { GroupedExerciseCard } from "./GroupedExerciseCard";
 import { WorkoutTimer } from "./WorkoutTimer";
 import { useExerciseGroups } from "@/hooks/useExerciseGroups";
 import type { TreinoDia } from "@/types/treino";
+import { BlocoTreino } from "@/types/workoutBlocks";
+import { WorkoutBlockCard } from "./WorkoutBlockCard";
 
 interface WorkoutDayViewProps {
   treinos: TreinoDia[];
   profileId: string;
   personalId: string;
   groupsByTreino?: Record<string, any[]>;
+  blocosByTreino?: Record<string, BlocoTreino[]>;
   onToggleConcluido: (
     id: string,
     concluido: boolean
@@ -38,6 +41,10 @@ interface WorkoutDayViewProps {
     grupoId: string,
     concluido: boolean
   ) => Promise<void>;
+  onToggleBlocoConcluido?: (
+    blocoId: string,
+    concluido: boolean
+  ) => Promise<void> | void;
 }
 
 const diasSemana = [
@@ -56,14 +63,24 @@ export function WorkoutDayView({
   personalId,
   onToggleConcluido,
   onToggleGrupoConcluido,
+  onToggleBlocoConcluido,
+  groupsByTreino: groupsByTreinoProp,
+  blocosByTreino: blocosByTreinoProp,
 }: WorkoutDayViewProps) {
   const [treinos, setTreinos] = useState<TreinoDia[]>(initialTreinos);
   const { obterGruposDoTreino } = useExerciseGroups();
   const [groupsByTreino, setGroupsByTreino] = useState<Record<string, any[]>>(
-    {}
+    groupsByTreinoProp ?? {}
   );
   const [loadingGroups, setLoadingGroups] = useState(false);
-  const [localGroups, setLocalGroups] = useState(groupsByTreino);
+  const [localGroups, setLocalGroups] = useState<Record<string, any[]>>(
+    groupsByTreinoProp ?? {}
+  );
+
+  const [blocosByTreino, setBlocosByTreino] = useState<
+    Record<string, BlocoTreino[]>
+  >(blocosByTreinoProp ?? {});
+  const [loadingBlocks, setLoadingBlocks] = useState(false);
 
   const getTreinoId = (treino: TreinoDia): string | null => {
     const rawId = (treino as any).treinoId ?? (treino as any).id;
@@ -141,6 +158,26 @@ export function WorkoutDayView({
     await onToggleConcluido(id, concluido);
   };
 
+  // Toggle blocos - otimistic update e chamada da prop
+  const handleOptimisticToggleBloco = (blocoId: string, concluido: boolean) => {
+    setBlocosByTreino((prev) => {
+      const updated = { ...prev };
+      for (const treinoId in updated) {
+        updated[treinoId] = updated[treinoId].map((bloco) =>
+          bloco.id === blocoId ? { ...bloco, concluido } : bloco
+        );
+      }
+      return updated;
+    });
+  };
+
+  const handleToggleBloco = async (blocoId: string, concluido: boolean) => {
+    handleOptimisticToggleBloco(blocoId, concluido);
+    if (onToggleBlocoConcluido) {
+      await onToggleBlocoConcluido(blocoId, concluido);
+    }
+  };
+
   // Carregar grupos ao montar ou atualizar treinos
   useEffect(() => {
     let mounted = true;
@@ -199,6 +236,17 @@ export function WorkoutDayView({
       mounted = false;
     };
   }, [treinos, obterGruposDoTreino]);
+
+  // Sincronizar blocos quando parent passar blocosByTreino
+  useEffect(() => {
+    if (blocosByTreinoProp && Object.keys(blocosByTreinoProp).length > 0) {
+      setBlocosByTreino(blocosByTreinoProp);
+      setLoadingBlocks(false);
+    } else {
+      // Se parent não passou, mantemos o estado vazio (ou outra lógica de carregamento pode ser adicionada)
+      setBlocosByTreino(blocosByTreinoProp ?? {});
+    }
+  }, [blocosByTreinoProp]);
 
   useEffect(() => {
     setLocalGroups(groupsByTreino);
@@ -290,6 +338,11 @@ export function WorkoutDayView({
 
           const treinoId = getTreinoId(treino);
           const grupos = treinoId ? groupsByTreino[treinoId] ?? [] : [];
+          const blocos = treinoId ? blocosByTreino[treinoId] ?? [] : [];
+
+          const blocosInicio = blocos.filter((b) => b.posicao === "inicio");
+          const blocosMeio = blocos.filter((b) => b.posicao === "meio");
+          const blocosFim = blocos.filter((b) => b.posicao === "fim");
 
           return (
             <TabsContent
@@ -388,6 +441,26 @@ export function WorkoutDayView({
                     </div>
                   ) : (
                     <div className="space-y-3 sm:space-y-4">
+                      {/* 🎬 BLOCOS DO INÍCIO */}
+                      {blocosInicio.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="font-semibold text-sm">
+                              Blocos - Início
+                            </span>
+                          </div>
+                          {blocosInicio.map((bloco, idx) => (
+                            <WorkoutBlockCard
+                              key={bloco.id}
+                              bloco={bloco}
+                              index={idx}
+                              readOnly={false}
+                              onToggleConcluido={handleToggleBloco}
+                            />
+                          ))}
+                        </div>
+                      )}
+
                       {/* ✅ GRUPOS DE EXERCÍCIOS */}
                       {grupos.length > 0 &&
                         grupos.map((grupo, idx) => (
@@ -416,11 +489,58 @@ export function WorkoutDayView({
                           />
                         ))}
 
+                      {/* 🧘 BLOCOS DO MEIO */}
+                      {blocosMeio.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="font-semibold text-sm">
+                              Blocos - Complementar
+                            </span>
+                          </div>
+                          {blocosMeio.map((bloco, idx) => (
+                            <WorkoutBlockCard
+                              key={bloco.id}
+                              bloco={bloco}
+                              index={idx}
+                              readOnly={false}
+                              onToggleConcluido={handleToggleBloco}
+                            />
+                          ))}
+                        </div>
+                      )}
+
+                      {/* 🏁 BLOCOS DO FIM */}
+                      {blocosFim.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="font-semibold text-sm">
+                              Blocos - Finalização
+                            </span>
+                          </div>
+                          {blocosFim.map((bloco, idx) => (
+                            <WorkoutBlockCard
+                              key={bloco.id}
+                              bloco={bloco}
+                              index={idx}
+                              readOnly={false}
+                              onToggleConcluido={handleToggleBloco}
+                            />
+                          ))}
+                        </div>
+                      )}
+
                       {/* Loader */}
                       {loadingGroups && (
                         <div className="flex items-center justify-center py-4 text-muted-foreground">
                           <Loader2 className="h-4 w-4 animate-spin mr-2" />
                           <span className="text-xs">Carregando grupos...</span>
+                        </div>
+                      )}
+
+                      {loadingBlocks && (
+                        <div className="flex items-center justify-center py-4 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          <span className="text-xs">Carregando blocos...</span>
                         </div>
                       )}
                     </div>

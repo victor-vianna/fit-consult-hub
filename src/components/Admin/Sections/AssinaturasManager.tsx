@@ -32,11 +32,14 @@ interface Assinatura {
     preco: number;
   };
   status: string;
-  dataInicio: string;
-  dataFim?: string;
+  data_inicio: string;
+  data_fim?: string;
+  data_cancelamento?: string;
   trial: boolean;
+  trial_fim?: string;
   valor_mensal: number;
-  proximoPagamento?: string;
+  forma_pagamento?: string;
+  motivo_cancelamento?: string;
 }
 
 export default function AssinaturasManager() {
@@ -79,11 +82,14 @@ export default function AssinaturasManager() {
             preco: a.plano?.preco_mensal || a.valor_mensal || 0,
           },
           status: a.status,
-          dataInicio: a.data_inicio,
-          dataFim: a.data_fim,
+          data_inicio: a.data_inicio,
+          data_fim: a.data_fim,
+          data_cancelamento: a.data_cancelamento,
           trial: a.trial || false,
+          trial_fim: a.trial_fim,
           valor_mensal: a.valor_mensal || 0,
-          proximoPagamento: a.proximo_pagamento,
+          forma_pagamento: a.forma_pagamento,
+          motivo_cancelamento: a.motivo_cancelamento,
         })) || [];
 
       setAssinaturas(assinaturasFormatadas);
@@ -370,19 +376,32 @@ export default function AssinaturasManager() {
                           </p>
                           <p className="font-medium">
                             {format(
-                              new Date(assinatura.dataInicio),
+                              new Date(assinatura.data_inicio),
                               "dd/MM/yyyy"
                             )}
                           </p>
                         </div>
-                        {assinatura.proximoPagamento && (
+                        {assinatura.data_fim && (
                           <div>
                             <p className="text-muted-foreground text-xs mb-1">
-                              Próximo Pagamento
+                              Data Fim
                             </p>
                             <p className="font-medium">
                               {format(
-                                new Date(assinatura.proximoPagamento),
+                                new Date(assinatura.data_fim),
+                                "dd/MM/yyyy"
+                              )}
+                            </p>
+                          </div>
+                        )}
+                        {assinatura.trial && assinatura.trial_fim && (
+                          <div>
+                            <p className="text-muted-foreground text-xs mb-1">
+                              Fim do Trial
+                            </p>
+                            <p className="font-medium">
+                              {format(
+                                new Date(assinatura.trial_fim),
                                 "dd/MM/yyyy"
                               )}
                             </p>

@@ -29,8 +29,6 @@ interface Personal {
   nome: string;
   email: string;
   telefone?: string;
-  cidade?: string;
-  estado?: string;
   created_at: string;
   assinatura?: {
     id: string;
@@ -90,8 +88,8 @@ export default function PersonalsManager() {
 
       // Buscar alunos de cada personal
       const { data: alunosData } = await supabase
-        .from("alunos")
-        .select("personal_id, ativo")
+        .from("profiles")
+        .select("personal_id, is_active")
         .in("personal_id", personalIds);
 
       // Montar estrutura completa
@@ -109,8 +107,6 @@ export default function PersonalsManager() {
             nome: profile.nome || "Sem nome",
             email: profile.email || "Sem email",
             telefone: profile.telefone,
-            cidade: profile.cidade,
-            estado: profile.estado,
             created_at: profile.created_at,
             assinatura: assinatura
               ? {
@@ -124,7 +120,7 @@ export default function PersonalsManager() {
             estatisticas: {
               totalAlunos: alunosDoPersonal?.length || 0,
               alunosAtivos:
-                alunosDoPersonal?.filter((a) => a.ativo).length || 0,
+                alunosDoPersonal?.filter((a) => a.is_active).length || 0,
               receitaGerada: 0, // Calcular se necessário
             },
           };
@@ -351,16 +347,7 @@ export default function PersonalsManager() {
                           <span>{personal.telefone}</span>
                         </div>
                       )}
-                      {(personal.cidade || personal.estado) && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <MapPin className="h-4 w-4" />
-                          <span>
-                            {personal.cidade}
-                            {personal.cidade && personal.estado && ", "}
-                            {personal.estado}
-                          </span>
-                        </div>
-                      )}
+
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Calendar className="h-4 w-4" />
                         <span>

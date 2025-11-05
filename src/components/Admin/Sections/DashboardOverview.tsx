@@ -71,6 +71,28 @@ function getMonthName(monthIndex: number): string {
   return months[monthIndex];
 }
 
+function getStatusColor(status: string) {
+  switch (status) {
+    case "ativa":
+      return "bg-green-100 text-green-800 border-green-200";
+    case "trial":
+      return "bg-blue-100 text-blue-800 border-blue-200";
+    default:
+      return "bg-gray-100 text-gray-800 border-gray-200";
+  }
+}
+
+function getStatusIcon(status: string) {
+  switch (status) {
+    case "ativa":
+      return <CheckCircle2 className="h-3 w-3" />;
+    case "trial":
+      return <Activity className="h-3 w-3" />;
+    default:
+      return null;
+  }
+}
+
 export default function DashboardOverview() {
   const { toast } = useToast();
   const [metrics, setMetrics] = useState<Metrics>({
@@ -249,28 +271,6 @@ export default function DashboardOverview() {
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "ativa":
-        return "bg-green-100 text-green-800 border-green-200";
-      case "trial":
-        return "bg-blue-100 text-blue-800 border-blue-200";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "ativa":
-        return <CheckCircle2 className="h-3 w-3" />;
-      case "trial":
-        return <Activity className="h-3 w-3" />;
-      default:
-        return null;
     }
   };
 
@@ -561,7 +561,7 @@ export default function DashboardOverview() {
                       <h4 className="font-semibold">
                         {assinatura.personal.nome}
                       </h4>
-                      <Badge className={getStatusConfig(assinatura.status)}>
+                      <Badge className={getStatusColor(assinatura.status)}>
                         {getStatusIcon(assinatura.status)}
                         <span className="ml-1">
                           {assinatura.status.toUpperCase()}

@@ -25,9 +25,8 @@ interface Plano {
   nome: string;
   descricao: string;
   preco_mensal: number;
-  preco_anual?: number;
   max_alunos: number;
-  recursos: string[];
+  features: string[];
   ativo: boolean;
   created_at: string;
   assinaturas_count: number;
@@ -63,7 +62,9 @@ export default function PlanosManager() {
       const planosComContagem: Plano[] =
         planosData?.map((plano) => ({
           ...plano,
-          recursos: plano.recursos || [],
+          features: Array.isArray(plano.features)
+            ? plano.features.map(String)
+            : [],
           assinaturas_count:
             assinaturasData?.filter((a) => a.plano_id === plano.id).length || 0,
         })) || [];
@@ -87,9 +88,8 @@ export default function PlanosManager() {
       nome: "",
       descricao: "",
       preco_mensal: 0,
-      preco_anual: 0,
       max_alunos: 10,
-      recursos: [],
+      features: [],
       ativo: true,
       created_at: new Date().toISOString(),
       assinaturas_count: 0,
@@ -114,9 +114,8 @@ export default function PlanosManager() {
             nome: editingPlano.nome,
             descricao: editingPlano.descricao,
             preco_mensal: editingPlano.preco_mensal,
-            preco_anual: editingPlano.preco_anual,
             max_alunos: editingPlano.max_alunos,
-            recursos: editingPlano.recursos,
+            features: editingPlano.features,
             ativo: editingPlano.ativo,
           })
           .eq("id", editingPlano.id);
@@ -133,9 +132,8 @@ export default function PlanosManager() {
           nome: editingPlano.nome,
           descricao: editingPlano.descricao,
           preco_mensal: editingPlano.preco_mensal,
-          preco_anual: editingPlano.preco_anual,
           max_alunos: editingPlano.max_alunos,
-          recursos: editingPlano.recursos,
+          features: editingPlano.features,
           ativo: editingPlano.ativo,
         });
 
@@ -294,50 +292,35 @@ export default function PlanosManager() {
             </div>
 
             <div>
-              <label className="text-sm font-medium">Preço Anual (R$)</label>
+              <label className="text-sm font-medium">Máximo de Alunos</label>
               <Input
                 type="number"
-                value={editingPlano.preco_anual || ""}
+                value={editingPlano.max_alunos}
                 onChange={(e) =>
                   setEditingPlano({
                     ...editingPlano,
-                    preco_anual: parseFloat(e.target.value),
+                    max_alunos: parseInt(e.target.value),
                   })
                 }
-                placeholder="0.00"
+                placeholder="10"
               />
             </div>
           </div>
 
           <div>
-            <label className="text-sm font-medium">Máximo de Alunos</label>
-            <Input
-              type="number"
-              value={editingPlano.max_alunos}
-              onChange={(e) =>
-                setEditingPlano({
-                  ...editingPlano,
-                  max_alunos: parseInt(e.target.value),
-                })
-              }
-              placeholder="10"
-            />
-          </div>
-
-          <div>
             <label className="text-sm font-medium">
-              Recursos (um por linha)
+              Features (uma por linha)
             </label>
             <textarea
               className="w-full min-h-[100px] p-2 border rounded-md"
-              value={editingPlano.recursos.join("\n")}
+              value={editingPlano.features.join("\n")}
               onChange={(e) =>
                 setEditingPlano({
                   ...editingPlano,
-                  recursos: e.target.value.split("\n").filter((r) => r.trim()),
+                  features: e.target.value.split("\n").filter((r) => r.trim()),
                 })
               }
-              placeholder="Recursos incluídos no plano"
+              placeholder="Features incluídas no plano"
             />
           </div>
 
@@ -458,11 +441,6 @@ export default function PlanosManager() {
                       {formatCurrency(plano.preco_mensal)}
                     </div>
                     <p className="text-sm text-muted-foreground">por mês</p>
-                    {plano.preco_anual && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        ou {formatCurrency(plano.preco_anual)}/ano
-                      </p>
-                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -480,25 +458,25 @@ export default function PlanosManager() {
                     </div>
                   </div>
 
-                  {plano.recursos.length > 0 && (
+                  {plano.features.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-sm font-semibold">Recursos:</p>
+                      <p className="text-sm font-semibold">Features:</p>
                       <ul className="space-y-1">
-                        {plano.recursos.slice(0, 3).map((recurso, idx) => (
+                        {plano.features.slice(0, 3).map((feature, idx) => (
                           <li
                             key={idx}
                             className="flex items-start gap-2 text-sm"
                           >
                             <Check className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                             <span className="text-muted-foreground">
-                              {recurso}
+                              {feature}
                             </span>
                           </li>
                         ))}
                       </ul>
-                      {plano.recursos.length > 3 && (
+                      {plano.features.length > 3 && (
                         <p className="text-xs text-muted-foreground">
-                          +{plano.recursos.length - 3} recursos
+                          +{plano.features.length - 3} features
                         </p>
                       )}
                     </div>

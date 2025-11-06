@@ -24,6 +24,8 @@ export const useAuth = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    let initialized = false;
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
@@ -31,20 +33,26 @@ export const useAuth = () => {
       setSession(session);
       setUser(session?.user ?? null);
 
-      if (session?.user) {
+      // Ignora o evento INITIAL_SESSION para evitar loops
+      if (event === "INITIAL_SESSION") return;
+
+      if (session?.user && !initialized) {
+        initialized = true;
         initializeUserData(session.user.id);
-      } else {
+      } else if (!session?.user) {
         setRole(null);
         setProfile(null);
         setLoading(false);
       }
     });
 
+    // Carregar sessão inicial apenas uma vez
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
 
-      if (session?.user) {
+      if (session?.user && !initialized) {
+        initialized = true;
         initializeUserData(session.user.id);
       } else {
         setLoading(false);

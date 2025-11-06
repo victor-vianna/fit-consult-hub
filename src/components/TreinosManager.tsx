@@ -72,6 +72,7 @@ import {
 import { useWorkoutBlocks } from "@/hooks/useWorkoutBlocks";
 import { GroupedExerciseCard } from "./GroupedExerciseCard";
 import { ExerciseGroupDialog } from "./ExerciseGroupDialog";
+import { toast } from "sonner";
 
 interface TreinosManagerProps {
   profileId: string;
@@ -150,8 +151,12 @@ export function TreinosManager({
   const [blocoEditando, setBlocoEditando] = useState<BlocoTreino | null>(null);
 
   // Cache local (opcional - remover se usar apenas dados de treinos)
-  const [groupsByTreino, setGroupsByTreino] = useState<Record<string, any[]>>({});
-  const [blocosByTreino, setBlocosByTreino] = useState<Record<string, BlocoTreino[]>>({});
+  const [groupsByTreino, setGroupsByTreino] = useState<Record<string, any[]>>(
+    {}
+  );
+  const [blocosByTreino, setBlocosByTreino] = useState<
+    Record<string, BlocoTreino[]>
+  >({});
 
   const isAluno = user?.id === profileId;
   const isPersonal = user?.id === personalId;
@@ -165,6 +170,80 @@ export function TreinosManager({
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  // ✅ Carrega grupos e blocos de forma segura (sem loop infinito)
+  useEffect(() => {
+    if (!treinos || treinos.length === 0) return;
+
+    let isSubscribed = true;
+    let carregouTreinos = false; // flag para evitar reexecuções desnecessárias
+
+    const carregarDadosAdicionais = async () => {
+      // Evita reexecução se já carregou para esses mesmos treinos
+      if (carregouTreinos) return;
+      carregouTreinos = true;
+
+      try {
+        const novosGrupos: Record<string, any[]> = {};
+        const novosBlocos: Record<string, BlocoTreino[]> = {};
+
+        // 🚀 Buscar todos os grupos e blocos de forma paralela
+        await Promise.all(
+          treinos.map(async (treino) => {
+            const treinoId = getTreinoId(treino);
+            if (!treinoId) return;
+
+            try {
+              // Grupos
+              if (treino.grupos && Array.isArray(treino.grupos)) {
+                novosGrupos[treinoId] = treino.grupos;
+              } else {
+                const grupos = await obterGruposDoTreino(treinoId);
+                novosGrupos[treinoId] = Array.isArray(grupos) ? grupos : [];
+              }
+
+              // Blocos
+              if (treino.blocos && Array.isArray(treino.blocos)) {
+                novosBlocos[treinoId] = treino.blocos;
+              } else {
+                const blocos = await obterBlocos(treinoId);
+                novosBlocos[treinoId] = Array.isArray(blocos) ? blocos : [];
+              }
+            } catch (err) {
+              console.warn(
+                `[TreinosManager] Erro ao carregar treino ${treinoId}:`,
+                err
+              );
+            }
+          })
+        );
+
+        // ⚙️ Atualiza apenas se o componente ainda estiver montado
+        if (isSubscribed) {
+          setGroupsByTreino((prev) => {
+            const iguais = JSON.stringify(prev) === JSON.stringify(novosGrupos);
+            return iguais ? prev : novosGrupos;
+          });
+
+          setBlocosByTreino((prev) => {
+            const iguais = JSON.stringify(prev) === JSON.stringify(novosBlocos);
+            return iguais ? prev : novosBlocos;
+          });
+        }
+      } catch (error) {
+        console.error("[TreinosManager] Erro geral no carregamento:", error);
+      }
+    };
+
+    carregarDadosAdicionais();
+
+    return () => {
+      isSubscribed = false;
+    };
+
+    // 🚫 Não inclua funções externas nas dependências
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [treinos]);
 
   // 🔧 HELPER: Obter ID do treino de forma consistente
   const getTreinoId = (treino: TreinoDia): string | null => {
@@ -296,6 +375,24 @@ export function TreinosManager({
     return Math.round((concluidos / treino.exercicios.length) * 100);
   };
 
+  // 🔧 Esta função conta TODOS os exercícios (isolados + em grupos)
+  const calcularTotalExercicios = (
+    treino: TreinoDia,
+    grupos: any[]
+  ): number => {
+    // Exercícios isolados (não estão em nenhum grupo)
+    const exerciciosIsolados = treino.exercicios.filter(
+      (ex) => !ex.grupo_id
+    ).length;
+
+    // Exercícios dentro de grupos
+    const exerciciosEmGrupos = grupos.reduce((total, grupo) => {
+      return total + (grupo.exercicios?.length || 0);
+    }, 0);
+
+    return exerciciosIsolados + exerciciosEmGrupos;
+  };
+
   // 🔧 Função para salvar grupo
   const handleSaveGroup = async (grupoData: GrupoExerciciosInput) => {
     if (selectedDia === null) return;
@@ -309,24 +406,37 @@ export function TreinosManager({
           "[TreinosManager] Treino não encontrado para o dia:",
           selectedDia
         );
+        toast.error("Treino não encontrado");
         return;
       }
 
       const treinoId = getTreinoId(treino);
       if (!treinoId) {
         console.warn("[TreinosManager] Nenhum treinoId encontrado:", treino);
+        toast.error("ID do treino não encontrado");
         return;
       }
 
+      console.log("[TreinosManager] Criando grupo para treino:", treinoId);
+
+      // Criar grupo
       await criarGrupo(treinoId, grupoData);
 
-      // Recarregar grupos deste treino
+      // 🔧 FIX: Aguardar um pouco para o backend processar
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      // Recarregar grupos
       try {
         const updated = await obterGruposDoTreino(treinoId);
         setGroupsByTreino((prev) => ({
           ...prev,
           [treinoId]: Array.isArray(updated) ? updated : [],
         }));
+
+        console.log(
+          "[TreinosManager] Grupos atualizados:",
+          updated?.length ?? 0
+        );
       } catch (err) {
         console.warn(
           "[TreinosManager] Erro ao recarregar grupos após criação:",
@@ -346,12 +456,19 @@ export function TreinosManager({
   const handleDeleteGroup = async (treinoId: string, grupoId: string) => {
     if (!grupoId) {
       console.warn("[TreinosManager] grupoId inválido para deletar");
+      toast.error("ID do grupo inválido");
       return;
     }
 
     try {
       setLoadingStates((prev) => ({ ...prev, removendo: true }));
+
+      console.log("[TreinosManager] Deletando grupo:", grupoId);
+
       await deletarGrupo(grupoId);
+
+      // 🔧 FIX: Aguardar um pouco para o backend processar
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
       // Recarregar grupos
       try {
@@ -360,6 +477,11 @@ export function TreinosManager({
           ...prev,
           [treinoId]: Array.isArray(updated) ? updated : [],
         }));
+
+        console.log(
+          "[TreinosManager] Grupos atualizados após delete:",
+          updated?.length ?? 0
+        );
       } catch (err) {
         console.warn(
           "[TreinosManager] Erro ao recarregar grupos após delete:",
@@ -434,22 +556,44 @@ export function TreinosManager({
       setLoadingStates((prev) => ({ ...prev, adicionando: true }));
 
       const treino = treinos.find((t) => t.dia === selectedDia);
-      if (!treino) return;
+      if (!treino) {
+        toast.error("Treino não encontrado");
+        return;
+      }
 
       const treinoId = getTreinoId(treino);
-      if (!treinoId) return;
+      if (!treinoId) {
+        toast.error("ID do treino não encontrado");
+        return;
+      }
 
+      console.log("[TreinosManager] Salvando bloco para treino:", treinoId);
+
+      // Criar ou editar
       if (blocoEditando) {
-        // Editar
         await atualizarBloco(blocoEditando.id, blocoData);
       } else {
-        // Criar
         await criarBloco(treinoId, blocoData);
       }
 
+      // 🔧 FIX: Aguardar um pouco para o backend processar
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
       // Recarregar blocos
-      const blocos = await obterBlocos(treinoId);
-      setBlocosByTreino((prev) => ({ ...prev, [treinoId]: blocos }));
+      try {
+        const blocos = await obterBlocos(treinoId);
+        setBlocosByTreino((prev) => ({
+          ...prev,
+          [treinoId]: blocos,
+        }));
+
+        console.log(
+          "[TreinosManager] Blocos atualizados:",
+          blocos?.length ?? 0
+        );
+      } catch (err) {
+        console.warn("[TreinosManager] Erro ao recarregar blocos:", err);
+      }
 
       setBlockDialogOpen(false);
       setBlocoEditando(null);
@@ -464,12 +608,19 @@ export function TreinosManager({
   const handleDeleteBlock = async (treinoId: string, blocoId: string) => {
     if (!blocoId) {
       console.warn("[TreinosManager] blocoId inválido para deletar");
+      toast.error("ID do bloco inválido");
       return;
     }
 
     try {
       setLoadingStates((prev) => ({ ...prev, removendo: true }));
+
+      console.log("[TreinosManager] Deletando bloco:", blocoId);
+
       await deletarBloco(blocoId);
+
+      // 🔧 FIX: Aguardar um pouco para o backend processar
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
       // Recarregar blocos
       try {
@@ -478,6 +629,11 @@ export function TreinosManager({
           ...prev,
           [treinoId]: Array.isArray(updated) ? updated : [],
         }));
+
+        console.log(
+          "[TreinosManager] Blocos atualizados após delete:",
+          updated?.length ?? 0
+        );
       } catch (err) {
         console.warn(
           "[TreinosManager] Erro ao recarregar blocos após delete:",
@@ -546,8 +702,10 @@ export function TreinosManager({
 
           // 🔧 Obter grupos e blocos do cache ou diretamente do treino
           const treinoId = getTreinoId(treino);
-          const grupos = treino.grupos ?? (treinoId ? groupsByTreino[treinoId] ?? [] : []);
-          const blocos = treino.blocos ?? (treinoId ? blocosByTreino[treinoId] ?? [] : []);
+          const grupos =
+            treino.grupos ?? (treinoId ? groupsByTreino[treinoId] ?? [] : []);
+          const blocos =
+            treino.blocos ?? (treinoId ? blocosByTreino[treinoId] ?? [] : []);
           const temBlocos = blocos.length > 0;
 
           // 🆕 Separar blocos por tipo
@@ -605,8 +763,17 @@ export function TreinosManager({
                                 {temExercicios && (
                                   <span className="text-xs text-muted-foreground flex items-center gap-1">
                                     <Dumbbell className="h-3 w-3" />
-                                    {treino.exercicios.length} exercício
-                                    {treino.exercicios.length !== 1 ? "s" : ""}
+                                    {(() => {
+                                      const treinoId = getTreinoId(treino);
+                                      const grupos = treinoId
+                                        ? groupsByTreino[treinoId] ?? []
+                                        : [];
+                                      const totalExercicios =
+                                        calcularTotalExercicios(treino, grupos);
+                                      return `${totalExercicios} exercício${
+                                        totalExercicios !== 1 ? "s" : ""
+                                      }`;
+                                    })()}
                                   </span>
                                 )}
 

@@ -66,7 +66,7 @@ export async function checkStudentIsActive(userId: string): Promise<boolean> {
   const { data, error } = await supabase
     .from("profiles")
     .select("is_active")
-    .eq("user_id", userId)
+    .eq("id", userId)
     .single();
 
   if (error) return false;

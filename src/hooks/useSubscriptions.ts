@@ -51,7 +51,7 @@ export function useSubscriptions(studentId?: string) {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setSubscriptions(data || []);
+      setSubscriptions((data || []) as Subscription[]);
     } catch (error: any) {
       console.error("Erro ao buscar assinaturas:", error);
       toast({

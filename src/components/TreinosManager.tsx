@@ -144,24 +144,14 @@ export function TreinosManager({
     removendo: false,
   });
 
-  // Estado para abrir dialog de agrupamento
+  // 🆕 Estado para abrir dialog de agrupamento e blocos
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
-
-  // Cache local de grupos por treinoId
-  const [groupsByTreino, setGroupsByTreino] = useState<Record<string, any[]>>(
-    {}
-  );
-
-  // Estado para controlar carregamento de grupos
-  const [loadingGroups, setLoadingGroups] = useState(false);
-
-  // 🆕 Estados para blocos
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [blocoEditando, setBlocoEditando] = useState<BlocoTreino | null>(null);
-  const [blocosByTreino, setBlocosByTreino] = useState<
-    Record<string, BlocoTreino[]>
-  >({});
-  const [loadingBlocks, setLoadingBlocks] = useState(false);
+
+  // Cache local (opcional - remover se usar apenas dados de treinos)
+  const [groupsByTreino, setGroupsByTreino] = useState<Record<string, any[]>>({});
+  const [blocosByTreino, setBlocosByTreino] = useState<Record<string, BlocoTreino[]>>({});
 
   const isAluno = user?.id === profileId;
   const isPersonal = user?.id === personalId;
@@ -181,107 +171,6 @@ export function TreinosManager({
     const rawId = (treino as any).treinoId ?? (treino as any).id;
     return rawId ? String(rawId) : null;
   };
-
-  // 🔧 Carregar grupos quando treinos mudarem
-  useEffect(() => {
-    let mounted = true;
-    let timeoutId: NodeJS.Timeout;
-
-    const loadGroups = async () => {
-      if (!treinos || treinos.length === 0) {
-        if (mounted) {
-          setGroupsByTreino({});
-          setLoadingGroups(false);
-        }
-        return;
-      }
-
-      // Evitar múltiplas cargas simultâneas
-      setLoadingGroups(true);
-
-      // Pequeno debounce para evitar chamadas rápidas demais
-      timeoutId = setTimeout(async () => {
-        if (!mounted) return;
-
-        const mapping: Record<string, any[]> = {};
-
-        // Processar sequencialmente para evitar sobrecarga
-        for (const treino of treinos) {
-          if (!mounted) break;
-
-          const treinoId = getTreinoId(treino);
-          if (!treinoId) {
-            mapping[String(treino.dia)] = [];
-            continue;
-          }
-
-          try {
-            const grupos = await obterGruposDoTreino(treinoId);
-            mapping[treinoId] = Array.isArray(grupos) ? grupos : [];
-          } catch (err) {
-            console.warn(
-              `[TreinosManager] Erro ao carregar grupos para treino ${treinoId}:`,
-              err
-            );
-            mapping[treinoId] = [];
-          }
-        }
-
-        if (mounted) {
-          setGroupsByTreino(mapping);
-          setLoadingGroups(false);
-        }
-      }, 100); // Debounce de 100ms
-    };
-
-    loadGroups();
-
-    return () => {
-      mounted = false;
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [treinos]);
-
-  // 🆕 Carregar blocos quando treinos mudarem
-  useEffect(() => {
-    let mounted = true;
-
-    const loadBlocks = async () => {
-      if (!treinos || treinos.length === 0) {
-        if (mounted) setBlocosByTreino({});
-        return;
-      }
-
-      setLoadingBlocks(true);
-
-      const mapping: Record<string, BlocoTreino[]> = {};
-
-      for (const treino of treinos) {
-        if (!mounted) break;
-        const treinoId = getTreinoId(treino);
-        if (!treinoId) continue;
-
-        try {
-          const blocos = await obterBlocos(treinoId);
-          mapping[treinoId] = blocos ?? [];
-        } catch (err) {
-          console.warn("[TreinosManager] Erro ao carregar blocos:", err);
-          mapping[treinoId] = [];
-        }
-      }
-
-      if (mounted) {
-        setBlocosByTreino(mapping);
-        setLoadingBlocks(false);
-      }
-    };
-
-    loadBlocks();
-
-    return () => {
-      mounted = false;
-    };
-  }, [treinos]);
 
   const handleDragEnd = async (event: DragEndEvent, dia: number) => {
     const { active, over } = event;
@@ -655,12 +544,10 @@ export function TreinosManager({
           const diaInfo = diasSemana[treino.dia - 1];
           const temExercicios = treino.exercicios.length > 0;
 
-          // 🔧 Obter grupos do cache
+          // 🔧 Obter grupos e blocos do cache ou diretamente do treino
           const treinoId = getTreinoId(treino);
-          const grupos = treinoId ? groupsByTreino[treinoId] ?? [] : [];
-
-          // 🆕 Obter blocos do cache
-          const blocos = treinoId ? blocosByTreino[treinoId] ?? [] : [];
+          const grupos = treino.grupos ?? (treinoId ? groupsByTreino[treinoId] ?? [] : []);
+          const blocos = treino.blocos ?? (treinoId ? blocosByTreino[treinoId] ?? [] : []);
           const temBlocos = blocos.length > 0;
 
           // 🆕 Separar blocos por tipo
@@ -1069,26 +956,6 @@ export function TreinosManager({
                                 />
                               );
                             })}
-                          </div>
-                        )}
-
-                        {/* Indicador de carregamento de grupos */}
-                        {loadingGroups && grupos.length === 0 && (
-                          <div className="flex items-center justify-center py-4 text-muted-foreground">
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                            <span className="text-xs">
-                              Carregando grupos...
-                            </span>
-                          </div>
-                        )}
-
-                        {/* 🆕 Indicador de carregamento de blocos */}
-                        {loadingBlocks && blocos.length === 0 && (
-                          <div className="flex items-center justify-center py-4 text-muted-foreground">
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                            <span className="text-xs">
-                              Carregando blocos...
-                            </span>
                           </div>
                         )}
                       </div>

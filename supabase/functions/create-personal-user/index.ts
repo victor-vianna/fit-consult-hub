@@ -37,10 +37,10 @@ Deno.serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const {
       data: { user },
-      error: authError,
+      error: authCheckError,
     } = await supabaseAdmin.auth.getUser(token);
 
-    if (authError || !user) {
+    if (authCheckError || !user) {
       return new Response(JSON.stringify({ error: "Token inválido" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
     }
 
     // ✅ SÓ ADMIN PODE CRIAR PERSONAL
-    const { data: isAdmin, error: roleError } = await supabaseAdmin.rpc(
+    const { data: isAdmin, error: adminCheckError } = await supabaseAdmin.rpc(
       "check_user_has_role",
       {
         _user_id: user.id,
@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
       }
     );
 
-    if (roleError || !isAdmin) {
+    if (adminCheckError || !isAdmin) {
       return new Response(
         JSON.stringify({ error: "Apenas admins podem criar personals" }),
         {
@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
     console.log("Criando personal:", { email, nome });
 
     // Criar usuário no auth
-    const { data: authData, error: authError } =
+    const { data: authData, error: createAuthError } =
       await supabaseAdmin.auth.admin.createUser({
         email,
         password,
@@ -79,9 +79,9 @@ Deno.serve(async (req) => {
         user_metadata: { nome },
       });
 
-    if (authError) {
-      console.error("Erro ao criar usuário:", authError);
-      throw authError;
+    if (createAuthError || !authData.user) {
+      console.error("Erro ao criar usuário:", createAuthError);
+      throw createAuthError || new Error("Usuário não criado");
     }
 
     console.log("Usuário criado:", authData.user.id);
@@ -110,13 +110,13 @@ Deno.serve(async (req) => {
     }
 
     // Adicionar role 'personal'
-    const { error: roleError } = await supabaseAdmin
+    const { error: createRoleError } = await supabaseAdmin
       .from("user_roles")
       .insert({ user_id: authData.user.id, role: "personal" });
 
-    if (roleError) {
-      console.error("Erro ao adicionar role personal:", roleError);
-      throw roleError;
+    if (createRoleError) {
+      console.error("Erro ao adicionar role personal:", createRoleError);
+      throw createRoleError;
     }
 
     console.log("Personal criado com sucesso");

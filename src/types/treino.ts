@@ -25,7 +25,8 @@ export interface TreinoDia {
   dia: number;
   treinoId: string | null;
   exercicios: Exercicio[];
-  grupos?: any[]; // substitua `any` por um tipo mais preciso quando disponível
+  grupos?: any[];
+  blocos?: any[];
   descricao: string | null;
   concluido: boolean;
 }

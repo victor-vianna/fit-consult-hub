@@ -147,14 +147,24 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
             }
           );
 
-          // Buscar grupos associados ao treino (hook de grupos)
+          // Buscar grupos e blocos associados ao treino
           const grupos = await obterGruposDoTreino(treino.id);
+          
+          // Buscar blocos do treino
+          const { data: blocos } = await supabase
+            .from("blocos_treino")
+            .select("*")
+            .eq("treino_semanal_id", treino.id)
+            .is("deleted_at", null)
+            .order("posicao", { ascending: true })
+            .order("ordem", { ascending: true });
 
           return {
             dia,
             treinoId: treino.id,
             exercicios: exerciciosTipados,
             grupos,
+            blocos: blocos ?? [],
             descricao: treino.descricao ?? null,
             concluido: Boolean(treino.concluido),
           };

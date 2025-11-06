@@ -24,22 +24,22 @@ export function useWorkoutBlocks() {
           .from("blocos_treino")
           .insert({
             treino_semanal_id: treinoSemanalId,
-            tipo: bloco.tipo,
+            tipo: bloco.tipo as any,
             posicao: bloco.posicao ?? "meio",
             ordem: proximaOrdem,
             nome: bloco.nome,
             descricao: bloco.descricao,
             duracao_estimada_minutos: bloco.duracao_estimada_minutos,
             obrigatorio: bloco.obrigatorio ?? false,
-            config_cardio: bloco.config_cardio,
-            config_alongamento: bloco.config_alongamento,
-            config_aquecimento: bloco.config_aquecimento,
+            config_cardio: bloco.config_cardio as any,
+            config_alongamento: bloco.config_alongamento as any,
+            config_aquecimento: bloco.config_aquecimento as any,
           })
           .select()
           .single();
 
         if (error) throw error;
-        return data;
+        return data as any as BlocoTreino;
       } catch (error) {
         console.error("[useWorkoutBlocks] Erro ao criar:", error);
         throw error;
@@ -59,7 +59,7 @@ export function useWorkoutBlocks() {
         .order("ordem", { ascending: true });
 
       if (error) throw error;
-      return data as BlocoTreino[];
+      return (data ?? []) as any as BlocoTreino[];
     } catch (error) {
       console.error("[useWorkoutBlocks] Erro ao obter:", error);
       throw error;
@@ -71,7 +71,7 @@ export function useWorkoutBlocks() {
       try {
         const { error } = await supabase
           .from("blocos_treino")
-          .update(updates)
+          .update(updates as any)
           .eq("id", blocoId);
 
         if (error) throw error;

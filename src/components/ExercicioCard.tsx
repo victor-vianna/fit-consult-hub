@@ -78,16 +78,10 @@ export function ExercicioCard({
   // marca que o usuário interagiu (p/ evitar sobrescrever durante a interação ativa)
   const hasUserInteracted = useRef(false);
 
-  // Sincroniza o estado local com a prop do pai quando NÃO estamos atualizando.
-  // Isso permite que, após a resposta do servidor (pai atualiza o prop),
-  // o componente reflita o estado final.
+  // ✅ Apenas sincronizar quando prop mudar externamente
   useEffect(() => {
-    if (!isUpdating) {
-      setLocalConcluido(exercicio.concluido);
-      // se o pai confirmou uma mudança, resetamos a flag de interação
-      hasUserInteracted.current = false;
-    }
-  }, [exercicio.concluido, exercicio.id, isUpdating]);
+    setLocalConcluido(exercicio.concluido);
+  }, [exercicio.id]); // Remove exercicio.concluido da dependência
 
   const { abrirExercicioNaBiblioteca } = useExerciseLibrary();
 
@@ -102,14 +96,14 @@ export function ExercicioCard({
 
     try {
       await onToggleConcluido?.(exercicio.id, novoValor);
-      
+
       if (novoValor) {
         toast.success(`✓ ${exercicio.nome} concluído!`, {
           duration: 2000,
         });
       } else {
         toast.info(`↻ ${exercicio.nome} desmarcado`, {
-          duration: 1500
+          duration: 1500,
         });
       }
     } catch (error) {
@@ -125,7 +119,7 @@ export function ExercicioCard({
         .from("exercicios")
         .update({ peso_executado: peso })
         .eq("id", exercicioId);
-      
+
       if (error) throw error;
     } catch (error) {
       console.error("Erro ao atualizar peso:", error);

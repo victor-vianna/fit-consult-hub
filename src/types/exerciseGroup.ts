@@ -15,8 +15,8 @@ export interface ExercicioAgrupado {
   series: number;
   repeticoes: string;
   descanso: number;
-  // Alinhado ao schema: carga é varchar no DB -> string | null
-  carga?: string | null;
+  carga?: string | null; // Peso RECOMENDADO pelo personal
+  peso_executado?: string | null; // Peso que o aluno realmente executou
   observacoes?: string | null;
   concluido?: boolean;
   ordem: number;

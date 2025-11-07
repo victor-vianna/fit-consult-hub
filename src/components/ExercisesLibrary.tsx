@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Exercise,
@@ -24,6 +25,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function ExercisesLibrary() {
   const { user } = useAuth();
+  const location = useLocation();
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [filteredExercises, setFilteredExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,6 +37,13 @@ export default function ExercisesLibrary() {
   const [grupoFilter, setGrupoFilter] = useState<string>("todos");
   const [equipamentoFilter, setEquipamentoFilter] = useState<string>("todos");
   const [nivelFilter, setNivelFilter] = useState<string>("todos");
+
+  // Aplicar filtro inicial se vier de navegação
+  useEffect(() => {
+    if (location.state?.searchTerm) {
+      setSearchTerm(location.state.searchTerm);
+    }
+  }, [location.state]);
 
   useEffect(() => {
     if (user) {

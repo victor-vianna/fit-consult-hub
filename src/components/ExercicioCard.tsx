@@ -16,9 +16,14 @@ import {
   Circle,
   Play,
   Dumbbell,
+  BookOpen,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { InlinePesoInput } from "@/components/InlinePesoInput";
+import { useExerciseLibrary } from "@/hooks/useExerciseLibrary";
 
 interface Exercicio {
   id: string;
@@ -29,6 +34,7 @@ interface Exercicio {
   repeticoes: string;
   descanso: number;
   carga?: string;
+  peso_executado?: string | null;
   observacoes?: string;
   concluido: boolean;
 }
@@ -83,15 +89,47 @@ export function ExercicioCard({
     }
   }, [exercicio.concluido, exercicio.id, isUpdating]);
 
+  const { abrirExercicioNaBiblioteca } = useExerciseLibrary();
+
   const handleToggle = async (novoValor: boolean) => {
+    // Haptic feedback para mobile
+    if ("vibrate" in navigator) {
+      navigator.vibrate(10);
+    }
+
     setLocalConcluido(novoValor);
     onOptimisticToggle?.(exercicio.id, novoValor);
 
     try {
       await onToggleConcluido?.(exercicio.id, novoValor);
+      
+      if (novoValor) {
+        toast.success(`✓ ${exercicio.nome} concluído!`, {
+          duration: 2000,
+        });
+      } else {
+        toast.info(`↻ ${exercicio.nome} desmarcado`, {
+          duration: 1500
+        });
+      }
     } catch (error) {
       console.error("Erro ao atualizar exercício:", error);
       setLocalConcluido(!novoValor);
+      toast.error("Erro ao atualizar exercício");
+    }
+  };
+
+  const handleSavePeso = async (exercicioId: string, peso: string) => {
+    try {
+      const { error } = await supabase
+        .from("exercicios")
+        .update({ peso_executado: peso })
+        .eq("id", exercicioId);
+      
+      if (error) throw error;
+    } catch (error) {
+      console.error("Erro ao atualizar peso:", error);
+      throw error;
     }
   };
 
@@ -145,6 +183,7 @@ export function ExercicioCard({
                   onClick={() => handleToggle(!localConcluido)}
                   className={cn(
                     "mt-1 shrink-0 z-10 transition-all duration-300 ease-in-out",
+                    "min-w-[44px] min-h-[44px] flex items-center justify-center",
                     localConcluido
                       ? "scale-110 text-green-500"
                       : "hover:scale-110 text-muted-foreground hover:text-primary"
@@ -184,18 +223,30 @@ export function ExercicioCard({
                   {exercicio.nome}
                 </p>
 
-                {exercicio.link_video && (
-                  <a
-                    href={exercicio.link_video}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-1"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Play className="h-3 w-3" />
-                    Ver demonstração
-                  </a>
-                )}
+                <div className="flex flex-wrap items-center gap-3">
+                  {exercicio.link_video && (
+                    <a
+                      href={exercicio.link_video}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Play className="h-3 w-3" />
+                      Ver demonstração
+                    </a>
+                  )}
+
+                  {onToggleConcluido && (
+                    <button
+                      onClick={() => abrirExercicioNaBiblioteca(exercicio.nome)}
+                      className="text-xs text-purple-600 hover:underline flex items-center gap-1"
+                    >
+                      <BookOpen className="h-3 w-3" />
+                      Ver na biblioteca
+                    </button>
+                  )}
+                </div>
 
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1 font-medium">
@@ -203,11 +254,19 @@ export function ExercicioCard({
                     {exercicio.series}x{exercicio.repeticoes}
                   </span>
 
-                  {exercicio.carga && (
+                  {exercicio.carga && onToggleConcluido ? (
+                    <InlinePesoInput
+                      exercicioId={exercicio.id}
+                      pesoRecomendado={exercicio.carga}
+                      pesoExecutado={exercicio.peso_executado || null}
+                      onSave={handleSavePeso}
+                      disabled={isUpdating}
+                    />
+                  ) : exercicio.carga ? (
                     <span className="font-mono font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">
                       {exercicio.carga}kg
                     </span>
-                  )}
+                  ) : null}
 
                   {exercicio.descanso > 0 && (
                     <span className="flex items-center gap-1">

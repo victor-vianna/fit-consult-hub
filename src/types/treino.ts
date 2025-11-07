@@ -10,15 +10,16 @@ export interface Exercicio {
   series: number | null;
   repeticoes: string | null;
   descanso: number | null;
-  descanso_entre_grupos: number | null; // <- adicionado
-  carga: string | null; // frontend trabalha com número; mapeie do DB no hook
+  descanso_entre_grupos: number | null;
+  carga: string | null; // Peso RECOMENDADO pelo personal
+  peso_executado: string | null; // Peso que o aluno realmente executou
   observacoes: string | null;
   concluido: boolean;
   grupo_id: string | null;
   tipo_agrupamento: string | null;
   created_at: string | null;
   updated_at: string | null;
-  deleted_at: string | null; // <- adicionado
+  deleted_at: string | null;
 }
 
 export interface TreinoDia {

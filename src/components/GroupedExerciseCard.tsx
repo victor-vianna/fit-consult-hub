@@ -15,8 +15,13 @@ import {
   GripVertical,
   Repeat,
   ArrowDown,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { InlinePesoInput } from "@/components/InlinePesoInput";
+import { useExerciseLibrary } from "@/hooks/useExerciseLibrary";
 
 // ✅ Tipos de agrupamento suportados
 const TIPOS_AGRUPAMENTO = {
@@ -38,6 +43,7 @@ interface ExercicioAgrupado {
   repeticoes?: string;
   descanso?: number;
   carga?: string | number | null;
+  peso_executado?: string | null;
   observacoes?: string | null;
   concluido?: boolean;
   ordem_no_grupo?: number | null;
@@ -98,12 +104,19 @@ export function GroupedExerciseCard({
   const algumConcluido = localExercicios.some((e) => e.concluido);
   const nenhumConcluido = !algumConcluido;
 
+  const { abrirExercicioNaBiblioteca } = useExerciseLibrary();
+
   // ✅ Handler para toggle de exercício individual
   const handleToggleExercicio = async (
     exercicioId: string,
     concluido: boolean
   ) => {
     if (!onToggleConcluido) return;
+
+    // Haptic feedback
+    if ("vibrate" in navigator) {
+      navigator.vibrate(10);
+    }
 
     // Update otimista
     setLocalExercicios((prev) =>
@@ -112,8 +125,22 @@ export function GroupedExerciseCard({
 
     try {
       await onToggleConcluido(exercicioId, concluido);
+      
+      const exercicio = localExercicios.find(e => e.id === exercicioId);
+      if (exercicio) {
+        if (concluido) {
+          toast.success(`✓ ${exercicio.nome} concluído!`, {
+            duration: 2000,
+          });
+        } else {
+          toast.info(`↻ ${exercicio.nome} desmarcado`, {
+            duration: 1500
+          });
+        }
+      }
     } catch (error) {
       console.error("[GroupedExerciseCard] Erro ao marcar exercício:", error);
+      toast.error("Erro ao atualizar exercício");
       // Reverter em caso de erro
       setLocalExercicios((prev) =>
         prev.map((e) =>
@@ -133,6 +160,11 @@ export function GroupedExerciseCard({
       return;
     }
 
+    // Haptic feedback
+    if ("vibrate" in navigator) {
+      navigator.vibrate(10);
+    }
+
     const novoStatus = !todosConcluidos;
 
     // Update otimista
@@ -142,10 +174,35 @@ export function GroupedExerciseCard({
 
     try {
       await onToggleGrupoConcluido(grupo.grupo_id, novoStatus);
+      
+      if (novoStatus) {
+        toast.success(`✓ Grupo ${tipoConfig.label} concluído!`, {
+          duration: 2000,
+        });
+      } else {
+        toast.info(`↻ Grupo ${tipoConfig.label} desmarcado`, {
+          duration: 1500
+        });
+      }
     } catch (error) {
       console.error("[GroupedExerciseCard] Erro ao marcar grupo:", error);
+      toast.error("Erro ao atualizar grupo");
       // Reverter em caso de erro
       setLocalExercicios(grupo.exercicios || []);
+    }
+  };
+
+  const handleSavePeso = async (exercicioId: string, peso: string) => {
+    try {
+      const { error } = await supabase
+        .from("exercicios")
+        .update({ peso_executado: peso })
+        .eq("id", exercicioId);
+      
+      if (error) throw error;
+    } catch (error) {
+      console.error("Erro ao atualizar peso:", error);
+      throw error;
     }
   };
 
@@ -330,19 +387,31 @@ export function GroupedExerciseCard({
                             {exercicio.nome}
                           </p>
 
-                          {/* Link do vídeo */}
-                          {exercicio.link_video && (
-                            <a
-                              href={exercicio.link_video}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-blue-600 hover:underline flex items-center gap-1"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <Play className="h-3 w-3" />
-                              Ver demonstração
-                            </a>
-                          )}
+                          {/* Links de vídeo e biblioteca */}
+                          <div className="flex flex-wrap items-center gap-3">
+                            {exercicio.link_video && (
+                              <a
+                                href={exercicio.link_video}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Play className="h-3 w-3" />
+                                Ver demonstração
+                              </a>
+                            )}
+
+                            {!readOnly && (
+                              <button
+                                onClick={() => abrirExercicioNaBiblioteca(exercicio.nome)}
+                                className="text-xs text-purple-600 hover:underline flex items-center gap-1"
+                              >
+                                <BookOpen className="h-3 w-3" />
+                                Ver na biblioteca
+                              </button>
+                            )}
+                          </div>
 
                           {/* Informações de treino */}
                           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -352,11 +421,19 @@ export function GroupedExerciseCard({
                               {exercicio.repeticoes || "12"}
                             </span>
 
-                            {cargaFormatada && (
+                            {cargaFormatada && !readOnly ? (
+                              <InlinePesoInput
+                                exercicioId={exercicio.id}
+                                pesoRecomendado={cargaFormatada}
+                                pesoExecutado={exercicio.peso_executado || null}
+                                onSave={handleSavePeso}
+                                disabled={false}
+                              />
+                            ) : cargaFormatada ? (
                               <span className="font-mono font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">
                                 {cargaFormatada}kg
                               </span>
-                            )}
+                            ) : null}
 
                             {exercicio.descanso != null &&
                               exercicio.descanso > 0 && (

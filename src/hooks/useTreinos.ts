@@ -150,6 +150,7 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
                     ? Number(ex.descanso_entre_grupos)
                     : null,
                 carga: cargaFromDb(ex.carga),
+                peso_executado: ex.peso_executado ?? null,
                 observacoes: ex.observacoes ?? null,
                 concluido: Boolean(ex.concluido),
                 grupo_id: ex.grupo_id ?? null,
@@ -310,6 +311,7 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
             ? Number((data as any).descanso_entre_grupos)
             : null,
         carga: cargaFromDb((data as any).carga),
+        peso_executado: (data as any).peso_executado ?? null,
         observacoes: (data as any).observacoes ?? null,
         concluido: Boolean((data as any).concluido),
         grupo_id: (data as any).grupo_id ?? null,

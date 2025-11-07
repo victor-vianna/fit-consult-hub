@@ -14,6 +14,7 @@ import {
   Heart,
   Gauge,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   BlocoTreino,
   TIPOS_BLOCO,
@@ -46,6 +47,34 @@ export function WorkoutBlockCard({
   const tipoChave = bloco.tipo as TipoBloco;
   const tipoInfo = TIPOS_BLOCO[tipoChave] ?? TIPOS_BLOCO.outro;
 
+  const handleToggleBloco = async () => {
+    if (!onToggleConcluido) return;
+    
+    // Haptic feedback
+    if ("vibrate" in navigator) {
+      navigator.vibrate(10);
+    }
+
+    const novoStatus = !bloco.concluido;
+    
+    try {
+      await onToggleConcluido(bloco.id, novoStatus);
+      
+      if (novoStatus) {
+        toast.success(`✓ ${bloco.nome} concluído!`, {
+          duration: 2000,
+        });
+      } else {
+        toast.info(`↻ ${bloco.nome} desmarcado`, {
+          duration: 1500
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao marcar bloco:", error);
+      toast.error("Erro ao atualizar bloco");
+    }
+  };
+
   const corClasses: Record<string, string> = {
     red: "border-red-500/50 bg-red-50/50 dark:bg-red-950/20",
     blue: "border-blue-500/50 bg-blue-50/50 dark:bg-blue-950/20",
@@ -77,8 +106,8 @@ export function WorkoutBlockCard({
 
               {readOnly && onToggleConcluido ? (
                 <button
-                  onClick={() => onToggleConcluido(bloco.id, !bloco.concluido)}
-                  className="shrink-0"
+                  onClick={handleToggleBloco}
+                  className="shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   {bloco.concluido ? (
                     <CheckCircle2 className="h-5 w-5 text-green-600" />

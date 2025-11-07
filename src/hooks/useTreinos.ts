@@ -51,6 +51,16 @@ const buildInitialTreinos = (): TreinoDia[] =>
     concluido: false,
   }));
 
+// ✅ Validar e normalizar dia da semana (1-7)
+const validarDiaSemana = (dia: number): number => {
+  const diaValido = Math.floor(dia);
+  if (diaValido < 1 || diaValido > 7 || !Number.isFinite(diaValido)) {
+    console.error(`[useTreinos] Dia inválido recebido: ${dia}`);
+    throw new Error(`Dia da semana inválido: ${dia}. Deve ser entre 1 e 7.`);
+  }
+  return diaValido;
+};
+
 export function useTreinos({ profileId, personalId }: UseTreinosProps) {
   const queryClient = useQueryClient();
   const { obterGruposDoTreino } = useExerciseGroups({
@@ -107,6 +117,7 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
             .from("exercicios")
             .select("*")
             .eq("treino_semanal_id", treino.id)
+            .is("deleted_at", null)
             .order("ordem");
 
           if (exerciciosError) {
@@ -130,7 +141,7 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
                     ? ex.ordem
                     : Number(ex.ordem ?? 0),
                 ordem_no_grupo:
-                  ex.ordem_no_grupo != null ? Number(ex.ordem_no_grupo) : null, // ← adicionado
+                  ex.ordem_no_grupo != null ? Number(ex.ordem_no_grupo) : null,
                 series: ex.series != null ? Number(ex.series) : 3,
                 repeticoes: ex.repeticoes ?? "12",
                 descanso: ex.descanso != null ? Number(ex.descanso) : 60,
@@ -142,7 +153,7 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
                 observacoes: ex.observacoes ?? null,
                 concluido: Boolean(ex.concluido),
                 grupo_id: ex.grupo_id ?? null,
-                tipo_agrupamento: ex.tipo_agrupamento ?? null, // ← adicionado
+                tipo_agrupamento: ex.tipo_agrupamento ?? null,
                 created_at: ex.created_at ?? null,
                 updated_at: ex.updated_at ?? null,
                 deleted_at: ex.deleted_at ?? null,
@@ -151,7 +162,7 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
             }
           );
 
-          // Buscar grupos e blocos associados ao treino
+          // Buscar grupos associados ao treino
           const grupos = await obterGruposDoTreino(treino.id);
 
           // Buscar blocos do treino
@@ -183,15 +194,26 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
     refetchOnMount: true,
   });
 
-  // Criação automática de treino semanal
+  // ✅ Criação automática de treino semanal com validação
   const criarTreinoSeNecessario = useCallback(
     async (dia: number): Promise<string> => {
-      const treino = treinos.find((t) => t.dia === dia);
-      if (treino?.treinoId) return treino.treinoId as string;
+      // Validar dia antes de usar
+      const diaValido = validarDiaSemana(dia);
+
+      const treino = treinos.find((t) => t.dia === diaValido);
+      if (treino?.treinoId) {
+        console.log(
+          `[useTreinos] Treino já existe para dia ${diaValido}:`,
+          treino.treinoId
+        );
+        return treino.treinoId as string;
+      }
 
       const hoje = new Date();
       const inicioDaSemana = new Date(hoje);
       inicioDaSemana.setDate(hoje.getDate() - hoje.getDay() + 1);
+
+      console.log(`[useTreinos] Criando treino semanal para dia ${diaValido}`);
 
       const { data, error } = await supabase
         .from("treinos_semanais")
@@ -199,13 +221,21 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
           profile_id: profileId,
           personal_id: personalId,
           semana: inicioDaSemana.toISOString().split("T")[0],
-          dia_semana: dia,
+          dia_semana: diaValido, // ✅ Usar dia validado
           concluido: false,
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error(
+          `[useTreinos] Erro ao criar treino para dia ${diaValido}:`,
+          error
+        );
+        throw error;
+      }
+
+      console.log(`[useTreinos] Treino criado com sucesso:`, data.id);
       return data.id;
     },
     [personalId, profileId, treinos]
@@ -220,11 +250,19 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
       dia: number;
       exercicio: Partial<Exercicio>;
     }) => {
+      console.log(
+        `[useTreinos] Adicionando exercício para dia ${dia}:`,
+        exercicio.nome
+      );
+
+      // ✅ Validar dia antes de processar
+      const diaValido = validarDiaSemana(dia);
+
       const validated = exercicioSchema.parse(exercicio);
       const cargaDb = cargaForInsert((exercicio as Partial<Exercicio>).carga);
 
-      const treinoId = await criarTreinoSeNecessario(dia);
-      const treino = treinos.find((t) => t.dia === dia);
+      const treinoId = await criarTreinoSeNecessario(diaValido);
+      const treino = treinos.find((t) => t.dia === diaValido);
       const proximaOrdem = treino ? treino.exercicios.length : 0;
 
       const { data, error } = await supabase
@@ -262,7 +300,7 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
         ordem_no_grupo:
           (data as any).ordem_no_grupo != null
             ? Number((data as any).ordem_no_grupo)
-            : null, // ← adicionado
+            : null,
         series: (data as any).series != null ? Number((data as any).series) : 3,
         repeticoes: (data as any).repeticoes ?? "12",
         descanso:
@@ -275,13 +313,14 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
         observacoes: (data as any).observacoes ?? null,
         concluido: Boolean((data as any).concluido),
         grupo_id: (data as any).grupo_id ?? null,
-        tipo_agrupamento: (data as any).tipo_agrupamento ?? null, // ← adicionado
+        tipo_agrupamento: (data as any).tipo_agrupamento ?? null,
         created_at: (data as any).created_at ?? null,
         updated_at: (data as any).updated_at ?? null,
         deleted_at: (data as any).deleted_at ?? null,
       };
 
-      return { dia, exercicio: inserted };
+      console.log(`[useTreinos] Exercício adicionado:`, inserted.id);
+      return { dia: diaValido, exercicio: inserted };
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
@@ -290,9 +329,13 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
       await refetch();
       toast.success("Exercício adicionado com sucesso");
     },
-    onError: (err) => {
-      toast.error("Erro ao adicionar exercício");
-      console.error(err);
+    onError: (err: any) => {
+      console.error("[useTreinos] Erro ao adicionar exercício:", err);
+      if (err.code === "23514") {
+        toast.error("Erro: Dia da semana inválido");
+      } else {
+        toast.error("Erro ao adicionar exercício");
+      }
     },
   });
 
@@ -328,7 +371,7 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
     },
     onError: (err) => {
       toast.error("Erro ao atualizar exercício");
-      console.error("editarExercicio error:", err);
+      console.error("[useTreinos] editarExercicio error:", err);
     },
   });
 
@@ -350,7 +393,7 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
     },
     onError: (err) => {
       toast.error("Erro ao remover exercício");
-      console.error("removerExercicio error:", err);
+      console.error("[useTreinos] removerExercicio error:", err);
     },
   });
 
@@ -362,12 +405,14 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
       dia: number;
       exerciciosOrdenados: Exercicio[];
     }) => {
+      const diaValido = validarDiaSemana(dia);
+
       await Promise.all(
         exerciciosOrdenados.map((ex, index) =>
           supabase.from("exercicios").update({ ordem: index }).eq("id", ex.id)
         )
       );
-      return { dia, exerciciosOrdenados };
+      return { dia: diaValido, exerciciosOrdenados };
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
@@ -377,7 +422,7 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
     },
     onError: (err) => {
       toast.error("Erro ao atualizar ordem");
-      console.error("reordenarExercicios error:", err);
+      console.error("[useTreinos] reordenarExercicios error:", err);
     },
   });
 
@@ -389,13 +434,15 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
       dia: number;
       descricao: string | null;
     }) => {
-      const treinoId = await criarTreinoSeNecessario(dia);
+      const diaValido = validarDiaSemana(dia);
+      const treinoId = await criarTreinoSeNecessario(diaValido);
+
       const { error } = await supabase
         .from("treinos_semanais")
         .update({ descricao: descricao || null })
         .eq("id", treinoId);
       if (error) throw error;
-      return { dia, descricao };
+      return { dia: diaValido, descricao };
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
@@ -405,7 +452,7 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
     },
     onError: (err) => {
       toast.error("Erro ao atualizar grupo muscular");
-      console.error("editarDescricao error:", err);
+      console.error("[useTreinos] editarDescricao error:", err);
     },
   });
 

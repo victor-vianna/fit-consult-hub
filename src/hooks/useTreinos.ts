@@ -53,7 +53,11 @@ const buildInitialTreinos = (): TreinoDia[] =>
 
 export function useTreinos({ profileId, personalId }: UseTreinosProps) {
   const queryClient = useQueryClient();
-  const { obterGruposDoTreino } = useExerciseGroups();
+  const { obterGruposDoTreino } = useExerciseGroups({
+    profileId,
+    personalId,
+    enabled: true,
+  });
   const semana = getWeekStart();
 
   const {
@@ -149,7 +153,7 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
 
           // Buscar grupos e blocos associados ao treino
           const grupos = await obterGruposDoTreino(treino.id);
-          
+
           // Buscar blocos do treino
           const { data: blocos } = await supabase
             .from("blocos_treino")

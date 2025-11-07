@@ -119,16 +119,36 @@ export function TreinosManager({
   } = useTreinos({ profileId, personalId });
 
   // Hook de agrupamentos
-  const { criarGrupo, obterGruposDoTreino, deletarGrupo } = useExerciseGroups();
+  const {
+    gruposPorTreino,
+    loading: loadingGrupos,
+    obterGruposDoTreino,
+    criarGrupo,
+    deletarGrupo,
+    isCriando: isCriandoGrupo,
+    isDeletando: isDeletandoGrupo,
+  } = useExerciseGroups({
+    profileId,
+    personalId,
+    enabled: true,
+  });
 
   // 🆕 Hook de blocos
   const {
-    criarBloco,
+    blocosPorTreino,
+    loading: loadingBlocos,
     obterBlocos,
+    criarBloco,
+    atualizarBloco,
     deletarBloco,
     marcarConcluido: marcarBlocoConcluido,
-    atualizarBloco,
-  } = useWorkoutBlocks();
+    isCriando: isCriandoBloco,
+    isDeletando: isDeletandoBloco,
+  } = useWorkoutBlocks({
+    profileId,
+    personalId,
+    enabled: true,
+  });
 
   const [exercicioDialogOpen, setExercicioDialogOpen] = useState(false);
   const [editDescricaoOpen, setEditDescricaoOpen] = useState(false);
@@ -150,14 +170,6 @@ export function TreinosManager({
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [blocoEditando, setBlocoEditando] = useState<BlocoTreino | null>(null);
 
-  // Cache local (opcional - remover se usar apenas dados de treinos)
-  const [groupsByTreino, setGroupsByTreino] = useState<Record<string, any[]>>(
-    {}
-  );
-  const [blocosByTreino, setBlocosByTreino] = useState<
-    Record<string, BlocoTreino[]>
-  >({});
-
   const isAluno = user?.id === profileId;
   const isPersonal = user?.id === personalId;
 
@@ -170,80 +182,6 @@ export function TreinosManager({
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
-
-  // ✅ Carrega grupos e blocos de forma segura (sem loop infinito)
-  useEffect(() => {
-    if (!treinos || treinos.length === 0) return;
-
-    let isSubscribed = true;
-    let carregouTreinos = false; // flag para evitar reexecuções desnecessárias
-
-    const carregarDadosAdicionais = async () => {
-      // Evita reexecução se já carregou para esses mesmos treinos
-      if (carregouTreinos) return;
-      carregouTreinos = true;
-
-      try {
-        const novosGrupos: Record<string, any[]> = {};
-        const novosBlocos: Record<string, BlocoTreino[]> = {};
-
-        // 🚀 Buscar todos os grupos e blocos de forma paralela
-        await Promise.all(
-          treinos.map(async (treino) => {
-            const treinoId = getTreinoId(treino);
-            if (!treinoId) return;
-
-            try {
-              // Grupos
-              if (treino.grupos && Array.isArray(treino.grupos)) {
-                novosGrupos[treinoId] = treino.grupos;
-              } else {
-                const grupos = await obterGruposDoTreino(treinoId);
-                novosGrupos[treinoId] = Array.isArray(grupos) ? grupos : [];
-              }
-
-              // Blocos
-              if (treino.blocos && Array.isArray(treino.blocos)) {
-                novosBlocos[treinoId] = treino.blocos;
-              } else {
-                const blocos = await obterBlocos(treinoId);
-                novosBlocos[treinoId] = Array.isArray(blocos) ? blocos : [];
-              }
-            } catch (err) {
-              console.warn(
-                `[TreinosManager] Erro ao carregar treino ${treinoId}:`,
-                err
-              );
-            }
-          })
-        );
-
-        // ⚙️ Atualiza apenas se o componente ainda estiver montado
-        if (isSubscribed) {
-          setGroupsByTreino((prev) => {
-            const iguais = JSON.stringify(prev) === JSON.stringify(novosGrupos);
-            return iguais ? prev : novosGrupos;
-          });
-
-          setBlocosByTreino((prev) => {
-            const iguais = JSON.stringify(prev) === JSON.stringify(novosBlocos);
-            return iguais ? prev : novosBlocos;
-          });
-        }
-      } catch (error) {
-        console.error("[TreinosManager] Erro geral no carregamento:", error);
-      }
-    };
-
-    carregarDadosAdicionais();
-
-    return () => {
-      isSubscribed = false;
-    };
-
-    // 🚫 Não inclua funções externas nas dependências
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [treinos]);
 
   // 🔧 HELPER: Obter ID do treino de forma consistente
   const getTreinoId = (treino: TreinoDia): string | null => {
@@ -376,10 +314,10 @@ export function TreinosManager({
   };
 
   // 🔧 Esta função conta TODOS os exercícios (isolados + em grupos)
-  const calcularTotalExercicios = (
-    treino: TreinoDia,
-    grupos: any[]
-  ): number => {
+  const calcularTotalExercicios = (treino: TreinoDia): number => {
+    const treinoId = getTreinoId(treino);
+    const grupos = treinoId ? obterGruposDoTreino(treinoId) : [];
+
     // Exercícios isolados (não estão em nenhum grupo)
     const exerciciosIsolados = treino.exercicios.filter(
       (ex) => !ex.grupo_id
@@ -402,60 +340,33 @@ export function TreinosManager({
 
       const treino = treinos.find((t) => t.dia === selectedDia);
       if (!treino) {
-        console.warn(
-          "[TreinosManager] Treino não encontrado para o dia:",
-          selectedDia
-        );
         toast.error("Treino não encontrado");
         return;
       }
 
       const treinoId = getTreinoId(treino);
       if (!treinoId) {
-        console.warn("[TreinosManager] Nenhum treinoId encontrado:", treino);
         toast.error("ID do treino não encontrado");
         return;
       }
 
       console.log("[TreinosManager] Criando grupo para treino:", treinoId);
 
-      // Criar grupo
+      // 🚀 React Query automaticamente atualiza o cache e a UI
       await criarGrupo(treinoId, grupoData);
-
-      // 🔧 FIX: Aguardar um pouco para o backend processar
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      // Recarregar grupos
-      try {
-        const updated = await obterGruposDoTreino(treinoId);
-        setGroupsByTreino((prev) => ({
-          ...prev,
-          [treinoId]: Array.isArray(updated) ? updated : [],
-        }));
-
-        console.log(
-          "[TreinosManager] Grupos atualizados:",
-          updated?.length ?? 0
-        );
-      } catch (err) {
-        console.warn(
-          "[TreinosManager] Erro ao recarregar grupos após criação:",
-          err
-        );
-      }
 
       setGroupDialogOpen(false);
     } catch (error) {
       console.error("[TreinosManager] Erro ao criar grupo:", error);
+      // Toast já é exibido pelo hook
     } finally {
       setLoadingStates((prev) => ({ ...prev, adicionando: false }));
     }
   };
 
   // 🔧 Função para deletar grupo
-  const handleDeleteGroup = async (treinoId: string, grupoId: string) => {
+  const handleDeleteGroup = async (grupoId: string) => {
     if (!grupoId) {
-      console.warn("[TreinosManager] grupoId inválido para deletar");
       toast.error("ID do grupo inválido");
       return;
     }
@@ -465,41 +376,21 @@ export function TreinosManager({
 
       console.log("[TreinosManager] Deletando grupo:", grupoId);
 
+      // 🚀 React Query automaticamente atualiza o cache e a UI
       await deletarGrupo(grupoId);
-
-      // 🔧 FIX: Aguardar um pouco para o backend processar
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      // Recarregar grupos
-      try {
-        const updated = await obterGruposDoTreino(treinoId);
-        setGroupsByTreino((prev) => ({
-          ...prev,
-          [treinoId]: Array.isArray(updated) ? updated : [],
-        }));
-
-        console.log(
-          "[TreinosManager] Grupos atualizados após delete:",
-          updated?.length ?? 0
-        );
-      } catch (err) {
-        console.warn(
-          "[TreinosManager] Erro ao recarregar grupos após delete:",
-          err
-        );
-      }
     } catch (err) {
       console.error("[TreinosManager] Erro ao deletar grupo:", err);
+      // Toast já é exibido pelo hook
     } finally {
       setLoadingStates((prev) => ({ ...prev, removendo: false }));
     }
   };
 
-  // 1. Adicionar função para marcar grupo completo (adicionar após handleDeleteGroup):
+  // 1. Adicionar função para marcar grupo completo:
   const handleToggleGrupoConcluido = async (
     grupoId: string,
     concluido: boolean
-  ) => {
+  ): Promise<void> => {
     if (!grupoId) {
       console.warn("[TreinosManager] grupoId inválido para toggle");
       return;
@@ -508,8 +399,8 @@ export function TreinosManager({
     try {
       setLoadingStates((prev) => ({ ...prev, editando: true }));
 
-      // Encontrar o grupo e marcar todos os exercícios
-      const grupoAtual = Object.values(groupsByTreino)
+      // ✅ Encontrar o grupo usando gruposPorTreino do React Query
+      const grupoAtual = Object.values(gruposPorTreino)
         .flat()
         .find((g: any) => g.grupo_id === grupoId);
 
@@ -525,24 +416,13 @@ export function TreinosManager({
 
       await Promise.all(promises);
 
-      // Recarregar grupos para atualizar UI
-      const treinoId = grupoAtual.treino_id;
-      if (treinoId) {
-        try {
-          const updated = await obterGruposDoTreino(String(treinoId));
-          setGroupsByTreino((prev) => ({
-            ...prev,
-            [String(treinoId)]: Array.isArray(updated) ? updated : [],
-          }));
-        } catch (err) {
-          console.warn(
-            "[TreinosManager] Erro ao recarregar grupos após toggle:",
-            err
-          );
-        }
-      }
+      // ✅ React Query invalida automaticamente, não precisa recarregar manualmente
+      toast.success(
+        concluido ? "Grupo marcado como concluído" : "Grupo desmarcado"
+      );
     } catch (err) {
       console.error("[TreinosManager] Erro ao marcar grupo completo:", err);
+      toast.error("Erro ao atualizar grupo");
     } finally {
       setLoadingStates((prev) => ({ ...prev, editando: false }));
     }
@@ -569,45 +449,26 @@ export function TreinosManager({
 
       console.log("[TreinosManager] Salvando bloco para treino:", treinoId);
 
-      // Criar ou editar
+      // 🚀 React Query automaticamente atualiza o cache e a UI
       if (blocoEditando) {
         await atualizarBloco(blocoEditando.id, blocoData);
       } else {
         await criarBloco(treinoId, blocoData);
       }
 
-      // 🔧 FIX: Aguardar um pouco para o backend processar
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      // Recarregar blocos
-      try {
-        const blocos = await obterBlocos(treinoId);
-        setBlocosByTreino((prev) => ({
-          ...prev,
-          [treinoId]: blocos,
-        }));
-
-        console.log(
-          "[TreinosManager] Blocos atualizados:",
-          blocos?.length ?? 0
-        );
-      } catch (err) {
-        console.warn("[TreinosManager] Erro ao recarregar blocos:", err);
-      }
-
       setBlockDialogOpen(false);
       setBlocoEditando(null);
     } catch (error) {
       console.error("[TreinosManager] Erro ao salvar bloco:", error);
+      // Toast já é exibido pelo hook
     } finally {
       setLoadingStates((prev) => ({ ...prev, adicionando: false }));
     }
   };
 
   // 🆕 Função para deletar bloco
-  const handleDeleteBlock = async (treinoId: string, blocoId: string) => {
+  const handleDeleteBlock = async (blocoId: string) => {
     if (!blocoId) {
-      console.warn("[TreinosManager] blocoId inválido para deletar");
       toast.error("ID do bloco inválido");
       return;
     }
@@ -617,37 +478,17 @@ export function TreinosManager({
 
       console.log("[TreinosManager] Deletando bloco:", blocoId);
 
+      // 🚀 React Query automaticamente atualiza o cache e a UI
       await deletarBloco(blocoId);
-
-      // 🔧 FIX: Aguardar um pouco para o backend processar
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      // Recarregar blocos
-      try {
-        const updated = await obterBlocos(treinoId);
-        setBlocosByTreino((prev) => ({
-          ...prev,
-          [treinoId]: Array.isArray(updated) ? updated : [],
-        }));
-
-        console.log(
-          "[TreinosManager] Blocos atualizados após delete:",
-          updated?.length ?? 0
-        );
-      } catch (err) {
-        console.warn(
-          "[TreinosManager] Erro ao recarregar blocos após delete:",
-          err
-        );
-      }
     } catch (err) {
       console.error("[TreinosManager] Erro ao deletar bloco:", err);
+      // Toast já é exibido pelo hook
     } finally {
       setLoadingStates((prev) => ({ ...prev, removendo: false }));
     }
   };
 
-  if (loading) {
+  if (loading || loadingGrupos || loadingBlocos) {
     return (
       <div className="flex flex-col items-center justify-center py-16 space-y-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -663,8 +504,8 @@ export function TreinosManager({
         treinos={treinos}
         profileId={profileId}
         personalId={personalId}
-        groupsByTreino={groupsByTreino}
-        blocosByTreino={blocosByTreino}
+        gruposPorTreino={gruposPorTreino} // ✅ Usar do hook
+        blocosPorTreino={blocosPorTreino} // ✅ Usar do hook
         onToggleConcluido={marcarExercicioConcluido}
         onToggleGrupoConcluido={handleToggleGrupoConcluido}
         onToggleBlocoConcluido={marcarBlocoConcluido}
@@ -702,10 +543,8 @@ export function TreinosManager({
 
           // 🔧 Obter grupos e blocos do cache ou diretamente do treino
           const treinoId = getTreinoId(treino);
-          const grupos =
-            treino.grupos ?? (treinoId ? groupsByTreino[treinoId] ?? [] : []);
-          const blocos =
-            treino.blocos ?? (treinoId ? blocosByTreino[treinoId] ?? [] : []);
+          const grupos = treinoId ? obterGruposDoTreino(treinoId) : [];
+          const blocos = treinoId ? obterBlocos(treinoId) : [];
           const temBlocos = blocos.length > 0;
 
           // 🆕 Separar blocos por tipo
@@ -764,12 +603,8 @@ export function TreinosManager({
                                   <span className="text-xs text-muted-foreground flex items-center gap-1">
                                     <Dumbbell className="h-3 w-3" />
                                     {(() => {
-                                      const treinoId = getTreinoId(treino);
-                                      const grupos = treinoId
-                                        ? groupsByTreino[treinoId] ?? []
-                                        : [];
                                       const totalExercicios =
-                                        calcularTotalExercicios(treino, grupos);
+                                        calcularTotalExercicios(treino); // ✅ 1 parâmetro
                                       return `${totalExercicios} exercício${
                                         totalExercicios !== 1 ? "s" : ""
                                       }`;
@@ -846,8 +681,11 @@ export function TreinosManager({
                             setSelectedDia(treino.dia);
                             setGroupDialogOpen(true);
                           }}
-                          disabled={loadingStates.adicionando}
+                          disabled={isCriandoGrupo || loadingStates.adicionando}
                         >
+                          {(isCriandoGrupo || loadingStates.adicionando) && (
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          )}
                           <LinkIcon className="h-4 w-4 mr-1" />
                           <span className="hidden sm:inline">Agrupar</span>
                         </Button>
@@ -862,7 +700,11 @@ export function TreinosManager({
                             setBlocoEditando(null);
                             setBlockDialogOpen(true);
                           }}
+                          disabled={isCriandoBloco || loadingStates.adicionando}
                         >
+                          {(isCriandoBloco || loadingStates.adicionando) && (
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          )}
                           <Blocks className="h-4 w-4 mr-1" />
                           <span className="hidden sm:inline">Bloco</span>
                         </Button>
@@ -938,13 +780,18 @@ export function TreinosManager({
                                       : undefined
                                   }
                                   onDelete={
-                                    isPersonal && treinoId
-                                      ? () =>
-                                          handleDeleteBlock(treinoId, bloco.id)
+                                    isPersonal
+                                      ? () => handleDeleteBlock(bloco.id)
                                       : undefined
                                   }
                                   onToggleConcluido={
-                                    isAluno ? marcarBlocoConcluido : undefined
+                                    isAluno
+                                      ? (blocoId, concluido) =>
+                                          marcarBlocoConcluido(
+                                            blocoId,
+                                            concluido
+                                          )
+                                      : undefined
                                   }
                                 />
                               );
@@ -976,11 +823,8 @@ export function TreinosManager({
                                 onDelete={
                                   isPersonal
                                     ? () => {
-                                        if (treinoId && grupo.grupo_id) {
-                                          handleDeleteGroup(
-                                            treinoId,
-                                            grupo.grupo_id
-                                          );
+                                        if (grupo.grupo_id) {
+                                          handleDeleteGroup(grupo.grupo_id);
                                         }
                                       }
                                     : undefined
@@ -1072,13 +916,18 @@ export function TreinosManager({
                                       : undefined
                                   }
                                   onDelete={
-                                    isPersonal && treinoId
-                                      ? () =>
-                                          handleDeleteBlock(treinoId, bloco.id)
+                                    isPersonal
+                                      ? () => handleDeleteBlock(bloco.id)
                                       : undefined
                                   }
                                   onToggleConcluido={
-                                    isAluno ? marcarBlocoConcluido : undefined
+                                    isAluno
+                                      ? (blocoId, concluido) =>
+                                          marcarBlocoConcluido(
+                                            blocoId,
+                                            concluido
+                                          )
+                                      : undefined
                                   }
                                 />
                               );
@@ -1112,13 +961,18 @@ export function TreinosManager({
                                       : undefined
                                   }
                                   onDelete={
-                                    isPersonal && treinoId
-                                      ? () =>
-                                          handleDeleteBlock(treinoId, bloco.id)
+                                    isPersonal
+                                      ? () => handleDeleteBlock(bloco.id)
                                       : undefined
                                   }
                                   onToggleConcluido={
-                                    isAluno ? marcarBlocoConcluido : undefined
+                                    isAluno
+                                      ? (blocoId, concluido) =>
+                                          marcarBlocoConcluido(
+                                            blocoId,
+                                            concluido
+                                          )
+                                      : undefined
                                   }
                                 />
                               );

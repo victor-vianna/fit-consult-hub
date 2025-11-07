@@ -1,5 +1,5 @@
 // components/WorkoutDayView.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -9,34 +9,30 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 import {
   Dumbbell,
   Calendar,
   CheckCircle2,
   Loader2,
   Link as LinkIcon,
+  Blocks,
 } from "lucide-react";
 import { SortableExercicioCard } from "@/components/SortableExercicioCard";
 import { GroupedExerciseCard } from "./GroupedExerciseCard";
 import { WorkoutTimer } from "./WorkoutTimer";
-import { useExerciseGroups } from "@/hooks/useExerciseGroups";
-import type { TreinoDia } from "@/types/treino";
-import { BlocoTreino } from "@/types/workoutBlocks";
 import { WorkoutBlockCard } from "./WorkoutBlockCard";
+import type { TreinoDia } from "@/types/treino";
+import type { BlocoTreino } from "@/types/workoutBlocks";
+import type { GrupoExercicio } from "@/hooks/useExerciseGroups";
 
 interface WorkoutDayViewProps {
   treinos: TreinoDia[];
   profileId: string;
   personalId: string;
-  groupsByTreino?: Record<string, any[]>;
-  blocosByTreino?: Record<string, BlocoTreino[]>;
-  onToggleConcluido: (
-    id: string,
-    concluido: boolean
-  ) => Promise<{
-    exercicioId: string;
-    concluido: boolean;
-  }>;
+  gruposPorTreino?: Record<string, GrupoExercicio[]>;
+  blocosPorTreino?: Record<string, BlocoTreino[]>;
+  onToggleConcluido: (id: string, concluido: boolean) => Promise<any>;
   onToggleGrupoConcluido?: (
     grupoId: string,
     concluido: boolean
@@ -44,7 +40,7 @@ interface WorkoutDayViewProps {
   onToggleBlocoConcluido?: (
     blocoId: string,
     concluido: boolean
-  ) => Promise<void> | void;
+  ) => Promise<void>;
 }
 
 const diasSemana = [
@@ -58,220 +54,191 @@ const diasSemana = [
 ];
 
 export function WorkoutDayView({
-  treinos: initialTreinos,
+  treinos,
   profileId,
   personalId,
+  gruposPorTreino = {},
+  blocosPorTreino = {},
   onToggleConcluido,
   onToggleGrupoConcluido,
   onToggleBlocoConcluido,
-  groupsByTreino: groupsByTreinoProp,
-  blocosByTreino: blocosByTreinoProp,
 }: WorkoutDayViewProps) {
-  const [treinos, setTreinos] = useState<TreinoDia[]>(initialTreinos);
-  const { obterGruposDoTreino } = useExerciseGroups();
-  const [groupsByTreino, setGroupsByTreino] = useState<Record<string, any[]>>(
-    groupsByTreinoProp ?? {}
-  );
-  const [loadingGroups, setLoadingGroups] = useState(false);
-  const [localGroups, setLocalGroups] = useState<Record<string, any[]>>(
-    groupsByTreinoProp ?? {}
-  );
+  // Estado local para updates otimistas
+  const [localTreinos, setLocalTreinos] = useState<TreinoDia[]>(treinos);
+  const [localGrupos, setLocalGrupos] =
+    useState<Record<string, GrupoExercicio[]>>(gruposPorTreino);
+  const [localBlocos, setLocalBlocos] =
+    useState<Record<string, BlocoTreino[]>>(blocosPorTreino);
 
-  const [blocosByTreino, setBlocosByTreino] = useState<
-    Record<string, BlocoTreino[]>
-  >(blocosByTreinoProp ?? {});
-  const [loadingBlocks, setLoadingBlocks] = useState(false);
+  // Sincronizar com props quando mudarem
+  useEffect(() => {
+    setLocalTreinos(treinos);
+  }, [treinos]);
 
-  const getTreinoId = (treino: TreinoDia): string | null => {
+  useEffect(() => {
+    setLocalGrupos(gruposPorTreino);
+  }, [gruposPorTreino]);
+
+  useEffect(() => {
+    setLocalBlocos(blocosPorTreino);
+  }, [blocosPorTreino]);
+
+  // 🔧 Helper: Obter ID do treino de forma consistente
+  const getTreinoId = useCallback((treino: TreinoDia): string | null => {
     const rawId = (treino as any).treinoId ?? (treino as any).id;
     return rawId ? String(rawId) : null;
-  };
+  }, []);
 
-  const calcularProgresso = (treino: TreinoDia) => {
-    if (treino.exercicios.length === 0) return 0;
-    const concluidos = treino.exercicios.filter((e) => e.concluido).length;
-    return Math.round((concluidos / treino.exercicios.length) * 100);
-  };
+  // 🔧 Calcular progresso do treino
+  const calcularProgresso = useCallback(
+    (treino: TreinoDia, grupos: GrupoExercicio[]): number => {
+      let totalExercicios = 0;
+      let exerciciosConcluidos = 0;
 
-  const primeiroDiaComExercicios =
-    treinos.find((t) => t.exercicios.length > 0)?.dia || 1;
+      // Exercícios isolados
+      const exerciciosIsolados = treino.exercicios.filter((ex) => !ex.grupo_id);
+      totalExercicios += exerciciosIsolados.length;
+      exerciciosConcluidos += exerciciosIsolados.filter(
+        (ex) => ex.concluido
+      ).length;
 
-  const handleToggleConcluido = async (id: string, concluido: boolean) => {
+      // Exercícios em grupos
+      grupos.forEach((grupo) => {
+        if (grupo.exercicios && grupo.exercicios.length > 0) {
+          totalExercicios += grupo.exercicios.length;
+          exerciciosConcluidos += grupo.exercicios.filter(
+            (ex: any) => ex.concluido
+          ).length;
+        }
+      });
+
+      if (totalExercicios === 0) return 0;
+      return Math.round((exerciciosConcluidos / totalExercicios) * 100);
+    },
+    []
+  );
+
+  // 🔧 Calcular total de exercícios (isolados + em grupos)
+  const calcularTotalExercicios = useCallback(
+    (treino: TreinoDia, grupos: GrupoExercicio[]): number => {
+      const exerciciosIsolados = treino.exercicios.filter(
+        (ex) => !ex.grupo_id
+      ).length;
+      const exerciciosEmGrupos = grupos.reduce(
+        (total, grupo) => total + (grupo.exercicios?.length || 0),
+        0
+      );
+      return exerciciosIsolados + exerciciosEmGrupos;
+    },
+    []
+  );
+
+  // ✅ Handler para toggle de exercício isolado
+  const handleToggleExercicio = async (id: string, concluido: boolean) => {
+    // Update otimista
+    setLocalTreinos((prev) =>
+      prev.map((t) => ({
+        ...t,
+        exercicios: t.exercicios.map((ex) =>
+          ex.id === id ? { ...ex, concluido } : ex
+        ),
+      }))
+    );
+
+    // Update otimista nos grupos também
+    setLocalGrupos((prev) => {
+      const updated = { ...prev };
+      Object.keys(updated).forEach((treinoId) => {
+        updated[treinoId] = updated[treinoId].map((grupo) => ({
+          ...grupo,
+          exercicios: grupo.exercicios.map((ex: any) =>
+            ex.id === id ? { ...ex, concluido } : ex
+          ),
+        }));
+      });
+      return updated;
+    });
+
     try {
-      return await onToggleConcluido(id, concluido);
+      await onToggleConcluido(id, concluido);
     } catch (error) {
-      console.error("Erro ao marcar exercício:", error);
-      throw error;
+      console.error("[WorkoutDayView] Erro ao marcar exercício:", error);
+      // Reverter em caso de erro
+      setLocalTreinos(treinos);
+      setLocalGrupos(gruposPorTreino);
     }
   };
 
-  const handleOptimisticToggle = (id: string, concluido: boolean) => {
-    setLocalGroups((prev) => {
-      const updated = { ...prev };
-
-      for (const treinoId in updated) {
-        updated[treinoId] = updated[treinoId].map((grupo) => {
-          const newExercicios = grupo.exercicios.map((ex) =>
-            ex.id === id ? { ...ex, concluido } : ex
-          );
-
-          const changed = newExercicios.some(
-            (ex, i) => ex.concluido !== grupo.exercicios[i]?.concluido
-          );
-
-          return changed ? { ...grupo, exercicios: newExercicios } : grupo;
-        });
-      }
-
-      return { ...updated };
-    });
-  };
-
-  // ✅ Toggle completo de grupo (marca/desmarca todos os exercícios)
+  // ✅ Handler para toggle de grupo completo
   const handleToggleGrupo = async (grupoId: string, concluido: boolean) => {
-    setLocalGroups((prev) => {
+    if (!onToggleGrupoConcluido) {
+      console.warn("[WorkoutDayView] onToggleGrupoConcluido não fornecido");
+      return;
+    }
+
+    // Update otimista
+    setLocalGrupos((prev) => {
       const updated = { ...prev };
-      for (const treinoId in updated) {
+      Object.keys(updated).forEach((treinoId) => {
         updated[treinoId] = updated[treinoId].map((grupo) =>
           grupo.grupo_id === grupoId
             ? {
                 ...grupo,
-                exercicios: grupo.exercicios.map((ex) => ({
+                exercicios: grupo.exercicios.map((ex: any) => ({
                   ...ex,
                   concluido,
                 })),
               }
             : grupo
         );
-      }
-      return { ...updated };
+      });
+      return updated;
     });
 
-    if (onToggleGrupoConcluido) {
+    try {
       await onToggleGrupoConcluido(grupoId, concluido);
+    } catch (error) {
+      console.error("[WorkoutDayView] Erro ao marcar grupo:", error);
+      // Reverter em caso de erro
+      setLocalGrupos(gruposPorTreino);
     }
   };
 
-  // ✅ Toggle individual (marca apenas um exercício)
-  const handleToggleExercicio = async (id: string, concluido: boolean) => {
-    handleOptimisticToggle(id, concluido);
-    await onToggleConcluido(id, concluido);
-  };
+  // ✅ Handler para toggle de bloco
+  const handleToggleBloco = async (blocoId: string, concluido: boolean) => {
+    if (!onToggleBlocoConcluido) {
+      console.warn("[WorkoutDayView] onToggleBlocoConcluido não fornecido");
+      return;
+    }
 
-  // Toggle blocos - otimistic update e chamada da prop
-  const handleOptimisticToggleBloco = (blocoId: string, concluido: boolean) => {
-    setBlocosByTreino((prev) => {
+    // Update otimista
+    setLocalBlocos((prev) => {
       const updated = { ...prev };
-      for (const treinoId in updated) {
+      Object.keys(updated).forEach((treinoId) => {
         updated[treinoId] = updated[treinoId].map((bloco) =>
           bloco.id === blocoId ? { ...bloco, concluido } : bloco
         );
-      }
+      });
       return updated;
     });
-  };
 
-  const handleToggleBloco = async (blocoId: string, concluido: boolean) => {
-    handleOptimisticToggleBloco(blocoId, concluido);
-    if (onToggleBlocoConcluido) {
+    try {
       await onToggleBlocoConcluido(blocoId, concluido);
+    } catch (error) {
+      console.error("[WorkoutDayView] Erro ao marcar bloco:", error);
+      // Reverter em caso de erro
+      setLocalBlocos(blocosPorTreino);
     }
   };
 
-  // Carregar grupos ao montar ou atualizar treinos
-  useEffect(() => {
-    let mounted = true;
-
-    const loadGroups = async () => {
-      if (!treinos || treinos.length === 0) {
-        if (mounted) {
-          setGroupsByTreino({});
-          setLoadingGroups(false);
-        }
-        return;
-      }
-
-      setLoadingGroups(true);
-      const mapping: Record<string, any[]> = {};
-
-      for (const treino of treinos) {
-        if (!mounted) break;
-        const treinoId = getTreinoId(treino);
-
-        console.log("🔍 Carregando grupos do treino:", {
-          dia: treino.dia,
-          treinoId,
-          exercicios: treino.exercicios.length,
-        });
-
-        if (!treinoId) {
-          mapping[String(treino.dia)] = [];
-          continue;
-        }
-        try {
-          const grupos = await obterGruposDoTreino(treinoId);
-          mapping[treinoId] = Array.isArray(grupos) ? grupos : [];
-
-          console.log("✅ Grupos carregados:", {
-            treinoId,
-            totalGrupos: grupos.length,
-            grupos,
-            primeiroGrupo: grupos[0],
-          });
-        } catch (err) {
-          console.warn(`[WorkoutDayView] Erro ao carregar grupos:`, err);
-          mapping[treinoId] = [];
-        }
-      }
-
-      if (mounted) {
-        console.log("✅ Todos os grupos carregados:", mapping);
-        setGroupsByTreino(mapping);
-        setLoadingGroups(false);
-      }
-    };
-
-    loadGroups();
-    return () => {
-      mounted = false;
-    };
-  }, [treinos, obterGruposDoTreino]);
-
-  // Sincronizar blocos quando parent passar blocosByTreino
-  useEffect(() => {
-    if (blocosByTreinoProp && Object.keys(blocosByTreinoProp).length > 0) {
-      setBlocosByTreino(blocosByTreinoProp);
-      setLoadingBlocks(false);
-    } else {
-      // Se parent não passou, mantemos o estado vazio (ou outra lógica de carregamento pode ser adicionada)
-      setBlocosByTreino(blocosByTreinoProp ?? {});
-    }
-  }, [blocosByTreinoProp]);
-
-  useEffect(() => {
-    setLocalGroups(groupsByTreino);
-  }, [groupsByTreino]);
-
-  // ✅ Exemplo de handler completo para toggle de grupo
-  const handleToggleGrupoConcluido = (grupoId: string, concluido: boolean) => {
-    setGroupsByTreino((prev) => {
-      const newGroups = { ...prev };
-      for (const treinoId in newGroups) {
-        newGroups[treinoId] = newGroups[treinoId].map((grupo) =>
-          grupo.grupo_id === grupoId
-            ? {
-                ...grupo,
-                exercicios: grupo.exercicios.map((ex) => ({
-                  ...ex,
-                  concluido,
-                })),
-              }
-            : grupo
-        );
-      }
-      return newGroups;
-    });
-  };
+  // Encontrar primeiro dia com conteúdo
+  const primeiroDiaComConteudo =
+    localTreinos.find((t) => {
+      const treinoId = getTreinoId(t);
+      const grupos = treinoId ? localGrupos[treinoId] ?? [] : [];
+      const blocos = treinoId ? localBlocos[treinoId] ?? [] : [];
+      return t.exercicios.length > 0 || grupos.length > 0 || blocos.length > 0;
+    })?.dia || 1;
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -293,30 +260,37 @@ export function WorkoutDayView({
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue={String(primeiroDiaComExercicios)} className="w-full">
+      <Tabs defaultValue={String(primeiroDiaComConteudo)} className="w-full">
         <TabsList className="grid w-full grid-cols-7 h-auto p-1 bg-card/50 backdrop-blur-sm border shadow-lg rounded-xl">
           {diasSemana.map((dia, index) => {
-            const treino = treinos.find((t) => t.dia === index + 1);
-            const temExercicios = treino && treino.exercicios.length > 0;
-            const progresso = treino ? calcularProgresso(treino) : 0;
+            const treino = localTreinos.find((t) => t.dia === index + 1);
+            const treinoId = treino ? getTreinoId(treino) : null;
+            const grupos = treinoId ? localGrupos[treinoId] ?? [] : [];
+            const blocos = treinoId ? localBlocos[treinoId] ?? [] : [];
+
+            const totalExercicios = treino
+              ? calcularTotalExercicios(treino, grupos)
+              : 0;
+            const temConteudo = totalExercicios > 0 || blocos.length > 0;
+            const progresso = treino ? calcularProgresso(treino, grupos) : 0;
 
             return (
               <TabsTrigger
                 key={index + 1}
                 value={String(index + 1)}
-                disabled={!temExercicios}
+                disabled={!temConteudo}
                 className="flex flex-col gap-0.5 sm:gap-1 py-2 sm:py-3 px-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-lg transition-all"
               >
                 <span className="text-[10px] sm:text-xs font-bold">
                   {dia.abrev}
                 </span>
-                {temExercicios && (
+                {temConteudo && (
                   <div className="flex flex-col items-center gap-0.5">
                     <Badge
                       variant="secondary"
                       className="text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0 h-3 sm:h-4"
                     >
-                      {treino.exercicios.length}
+                      {totalExercicios}
                     </Badge>
                     {progresso > 0 && (
                       <span className="text-[9px] sm:text-[10px] font-bold opacity-80">
@@ -331,18 +305,25 @@ export function WorkoutDayView({
         </TabsList>
 
         {/* Conteúdo de cada dia */}
-        {treinos.map((treino) => {
+        {localTreinos.map((treino) => {
           const diaInfo = diasSemana[treino.dia - 1];
-          const temExercicios = treino.exercicios.length > 0;
-          const progresso = calcularProgresso(treino);
-
           const treinoId = getTreinoId(treino);
-          const grupos = treinoId ? groupsByTreino[treinoId] ?? [] : [];
-          const blocos = treinoId ? blocosByTreino[treinoId] ?? [] : [];
+          const grupos = treinoId ? localGrupos[treinoId] ?? [] : [];
+          const blocos = treinoId ? localBlocos[treinoId] ?? [] : [];
 
+          const totalExercicios = calcularTotalExercicios(treino, grupos);
+          const temConteudo = totalExercicios > 0 || blocos.length > 0;
+          const progresso = calcularProgresso(treino, grupos);
+
+          // Separar blocos por posição
           const blocosInicio = blocos.filter((b) => b.posicao === "inicio");
           const blocosMeio = blocos.filter((b) => b.posicao === "meio");
           const blocosFim = blocos.filter((b) => b.posicao === "fim");
+
+          // Exercícios isolados (não estão em grupos)
+          const exerciciosIsolados = treino.exercicios.filter(
+            (ex) => !ex.grupo_id
+          );
 
           return (
             <TabsContent
@@ -350,10 +331,10 @@ export function WorkoutDayView({
               value={String(treino.dia)}
               className="mt-4 sm:mt-6 space-y-4 sm:space-y-6"
             >
-              {/* Cronômetro */}
-              {temExercicios && treino.treinoId && (
+              {/* Cronômetro - apenas se tiver conteúdo */}
+              {temConteudo && treinoId && (
                 <WorkoutTimer
-                  treinoId={treino.treinoId}
+                  treinoId={treinoId}
                   profileId={profileId}
                   personalId={personalId}
                   readOnly={false}
@@ -377,53 +358,68 @@ export function WorkoutDayView({
                       </CardDescription>
                     )}
 
-                    {/* Badges */}
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge
-                        variant="outline"
-                        className="font-mono text-xs sm:text-sm"
-                      >
-                        <Dumbbell className="h-3 w-3 mr-1" />
-                        {treino.exercicios.length} exercício
-                        {treino.exercicios.length !== 1 ? "s" : ""}
-                      </Badge>
+                    {/* Badges de informação */}
+                    {temConteudo && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        {totalExercicios > 0 && (
+                          <Badge
+                            variant="outline"
+                            className="font-mono text-xs sm:text-sm"
+                          >
+                            <Dumbbell className="h-3 w-3 mr-1" />
+                            {totalExercicios} exercício
+                            {totalExercicios !== 1 ? "s" : ""}
+                          </Badge>
+                        )}
 
-                      {grupos.length > 0 && (
-                        <Badge
-                          variant="outline"
-                          className="text-xs sm:text-sm bg-blue-50 border-blue-200"
-                        >
-                          <LinkIcon className="h-3 w-3 mr-1" />
-                          {grupos.length} grupo
-                          {grupos.length !== 1 ? "s" : ""}
-                        </Badge>
-                      )}
+                        {grupos.length > 0 && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs sm:text-sm bg-blue-50 border-blue-200 text-blue-700"
+                          >
+                            <LinkIcon className="h-3 w-3 mr-1" />
+                            {grupos.length} grupo
+                            {grupos.length !== 1 ? "s" : ""}
+                          </Badge>
+                        )}
 
-                      {progresso > 0 && progresso < 100 && (
-                        <Badge
-                          variant="default"
-                          className="bg-primary text-xs sm:text-sm"
-                        >
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                          {progresso}% concluído
-                        </Badge>
-                      )}
+                        {blocos.length > 0 && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs sm:text-sm bg-purple-50 border-purple-200 text-purple-700"
+                          >
+                            <Blocks className="h-3 w-3 mr-1" />
+                            {blocos.length} bloco
+                            {blocos.length !== 1 ? "s" : ""}
+                          </Badge>
+                        )}
 
-                      {progresso === 100 && (
-                        <Badge
-                          variant="default"
-                          className="bg-green-600 text-xs sm:text-sm animate-pulse"
-                        >
-                          ✓ Treino Completo!
-                        </Badge>
-                      )}
-                    </div>
+                        {progresso > 0 && progresso < 100 && (
+                          <Badge
+                            variant="default"
+                            className="bg-primary text-xs sm:text-sm"
+                          >
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            {progresso}% concluído
+                          </Badge>
+                        )}
+
+                        {progresso === 100 && (
+                          <Badge
+                            variant="default"
+                            className="bg-green-600 text-xs sm:text-sm animate-pulse"
+                          >
+                            ✓ Treino Completo!
+                          </Badge>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </CardHeader>
 
                 {/* Conteúdo do Card */}
                 <CardContent className="p-4 sm:p-6">
-                  {!temExercicios ? (
+                  {!temConteudo ? (
                     <div className="flex flex-col items-center justify-center py-16 sm:py-20 text-center space-y-4">
                       <div className="p-4 sm:p-5 bg-muted/50 rounded-full">
                         <Dumbbell className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground" />
@@ -433,21 +429,23 @@ export function WorkoutDayView({
                           Dia de Descanso
                         </p>
                         <p className="text-xs sm:text-sm text-muted-foreground max-w-md px-4">
-                          Nenhum exercício programado para este dia.
+                          Nenhum conteúdo programado para este dia.
                           <br />
                           Aproveite para recuperar!
                         </p>
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-3 sm:space-y-4">
+                    <div className="space-y-4">
                       {/* 🎬 BLOCOS DO INÍCIO */}
                       {blocosInicio.length > 0 && (
                         <div className="space-y-2">
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span className="font-semibold text-sm">
-                              Blocos - Início
+                            <Separator className="flex-1" />
+                            <span className="font-semibold">
+                              Início do Treino
                             </span>
+                            <Separator className="flex-1" />
                           </div>
                           {blocosInicio.map((bloco, idx) => (
                             <WorkoutBlockCard
@@ -461,41 +459,41 @@ export function WorkoutDayView({
                         </div>
                       )}
 
-                      {/* ✅ GRUPOS DE EXERCÍCIOS */}
-                      {grupos.length > 0 &&
-                        grupos.map((grupo, idx) => (
-                          <GroupedExerciseCard
-                            key={grupo.grupo_id || grupo.id || idx}
-                            grupo={grupo}
-                            index={idx}
-                            readOnly={false}
-                            onToggleGrupoConcluido={handleToggleGrupoConcluido}
-                            onToggleConcluido={handleOptimisticToggle}
-                            onOptimisticToggle={handleOptimisticToggle}
-                          />
-                        ))}
+                      {/* 💪 GRUPOS + EXERCÍCIOS ISOLADOS */}
+                      <div className="space-y-3">
+                        {/* Grupos */}
+                        {grupos.length > 0 &&
+                          grupos.map((grupo, idx) => (
+                            <GroupedExerciseCard
+                              key={grupo.grupo_id ?? `grupo-${idx}`}
+                              grupo={grupo}
+                              index={idx}
+                              readOnly={false}
+                              onToggleGrupoConcluido={handleToggleGrupo}
+                              onToggleConcluido={handleToggleExercicio}
+                            />
+                          ))}
 
-                      {/* ✅ EXERCÍCIOS ISOLADOS */}
-                      {treino.exercicios
-                        .filter((ex) => !ex.grupo_id)
-                        .map((exercicio, index) => (
-                          <SortableExercicioCard
-                            key={exercicio.id}
-                            exercicio={exercicio}
-                            index={index}
-                            readOnly={false}
-                            onToggleConcluido={handleToggleConcluido}
-                            onOptimisticToggle={handleOptimisticToggle}
-                          />
-                        ))}
+                        {/* Exercícios Isolados */}
+                        {exerciciosIsolados.length > 0 &&
+                          exerciciosIsolados.map((exercicio, index) => (
+                            <SortableExercicioCard
+                              key={exercicio.id}
+                              exercicio={exercicio}
+                              index={index}
+                              readOnly={false}
+                              onToggleConcluido={handleToggleExercicio}
+                            />
+                          ))}
+                      </div>
 
                       {/* 🧘 BLOCOS DO MEIO */}
                       {blocosMeio.length > 0 && (
                         <div className="space-y-2">
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span className="font-semibold text-sm">
-                              Blocos - Complementar
-                            </span>
+                            <Separator className="flex-1" />
+                            <span className="font-semibold">Complementar</span>
+                            <Separator className="flex-1" />
                           </div>
                           {blocosMeio.map((bloco, idx) => (
                             <WorkoutBlockCard
@@ -513,9 +511,9 @@ export function WorkoutDayView({
                       {blocosFim.length > 0 && (
                         <div className="space-y-2">
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span className="font-semibold text-sm">
-                              Blocos - Finalização
-                            </span>
+                            <Separator className="flex-1" />
+                            <span className="font-semibold">Finalização</span>
+                            <Separator className="flex-1" />
                           </div>
                           {blocosFim.map((bloco, idx) => (
                             <WorkoutBlockCard
@@ -526,21 +524,6 @@ export function WorkoutDayView({
                               onToggleConcluido={handleToggleBloco}
                             />
                           ))}
-                        </div>
-                      )}
-
-                      {/* Loader */}
-                      {loadingGroups && (
-                        <div className="flex items-center justify-center py-4 text-muted-foreground">
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          <span className="text-xs">Carregando grupos...</span>
-                        </div>
-                      )}
-
-                      {loadingBlocks && (
-                        <div className="flex items-center justify-center py-4 text-muted-foreground">
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          <span className="text-xs">Carregando blocos...</span>
                         </div>
                       )}
                     </div>

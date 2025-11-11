@@ -3,13 +3,17 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dumbbell, Loader2 } from "lucide-react";
+import { Dumbbell, Loader2, CalendarDays } from "lucide-react";
 import { WorkoutTimer } from "./WorkoutTimer";
 import { WorkoutDayHeader } from "./WorkoutDayHeader";
 import { WorkoutExerciseList } from "./WorkoutExerciseList";
 import type { TreinoDia } from "@/types/treino";
 import type { BlocoTreino } from "@/types/workoutBlocks";
 import type { GrupoExercicio } from "@/hooks/useExerciseGroups";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface WorkoutDayViewProps {
   treinos: TreinoDia[];
@@ -57,6 +61,23 @@ export function WorkoutDayView({
   const [treinoIniciado, setTreinoIniciado] = useState<Record<number, boolean>>(
     {}
   );
+
+  // Buscar semana ativa
+  const { data: semanaAtiva } = useQuery({
+    queryKey: ["semana-ativa", profileId, personalId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("treino_semana_ativa")
+        .select("semana_inicio")
+        .eq("profile_id", profileId)
+        .eq("personal_id", personalId)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!profileId && !!personalId,
+  });
 
   // Sincronizar com props quando mudarem
   useEffect(() => {
@@ -227,18 +248,30 @@ export function WorkoutDayView({
   return (
     <div className="space-y-4 sm:space-y-6 pb-20">
       {/* Header Principal */}
-      <div className="flex items-center gap-3">
-        <div className="p-3 bg-primary/10 rounded-xl shadow-lg">
-          <Dumbbell className="h-6 w-6 text-primary" />
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-primary/10 rounded-xl shadow-lg">
+            <Dumbbell className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              Meus Treinos
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Acompanhe seu progresso semanal
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            Meus Treinos
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Acompanhe seu progresso semanal
-          </p>
-        </div>
+
+        {/* Indicador de Semana Ativa */}
+        {semanaAtiva?.semana_inicio && (
+          <Badge variant="outline" className="gap-2 px-3 py-1.5">
+            <CalendarDays className="h-3 w-3" />
+            <span className="text-xs">
+              Semana: {format(new Date(semanaAtiva.semana_inicio), "dd/MM", { locale: ptBR })}
+            </span>
+          </Badge>
+        )}
       </div>
 
       {/* Tabs dos Dias */}

@@ -673,6 +673,7 @@ export type Database = {
           deleted_at: string | null
           descanso: number | null
           descanso_entre_grupos: number | null
+          exercise_library_id: string | null
           grupo_id: string | null
           id: string
           link_video: string | null
@@ -694,6 +695,7 @@ export type Database = {
           deleted_at?: string | null
           descanso?: number | null
           descanso_entre_grupos?: number | null
+          exercise_library_id?: string | null
           grupo_id?: string | null
           id?: string
           link_video?: string | null
@@ -715,6 +717,7 @@ export type Database = {
           deleted_at?: string | null
           descanso?: number | null
           descanso_entre_grupos?: number | null
+          exercise_library_id?: string | null
           grupo_id?: string | null
           id?: string
           link_video?: string | null
@@ -730,6 +733,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "exercicios_exercise_library_id_fkey"
+            columns: ["exercise_library_id"]
+            isOneToOne: false
+            referencedRelation: "exercises_library"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "exercicios_treino_semanal_id_fkey"
             columns: ["treino_semanal_id"]
@@ -1353,6 +1363,62 @@ export type Database = {
           {
             foreignKeyName: "subscriptions_student_id_fkey"
             columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "v_status_checkins"
+            referencedColumns: ["profile_id"]
+          },
+        ]
+      }
+      treino_semana_ativa: {
+        Row: {
+          created_at: string | null
+          id: string
+          personal_id: string
+          profile_id: string
+          semana_inicio: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          personal_id: string
+          profile_id: string
+          semana_inicio: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          personal_id?: string
+          profile_id?: string
+          semana_inicio?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "treino_semana_ativa_personal_id_fkey"
+            columns: ["personal_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "treino_semana_ativa_personal_id_fkey"
+            columns: ["personal_id"]
+            isOneToOne: false
+            referencedRelation: "v_status_checkins"
+            referencedColumns: ["profile_id"]
+          },
+          {
+            foreignKeyName: "treino_semana_ativa_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "treino_semana_ativa_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "v_status_checkins"
             referencedColumns: ["profile_id"]

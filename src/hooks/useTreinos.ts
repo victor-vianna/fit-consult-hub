@@ -82,12 +82,31 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
       const inicioDaSemana = new Date(hoje);
       inicioDaSemana.setDate(hoje.getDate() - hoje.getDay() + 1);
 
+      // ✅ Buscar semana ativa configurada pelo personal
+      const { data: semanaAtiva } = await supabase
+        .from("treino_semana_ativa")
+        .select("semana_inicio")
+        .eq("profile_id", profileId)
+        .eq("personal_id", personalId)
+        .maybeSingle();
+
+      // Usar semana ativa se existir, senão usar semana atual
+      const semanaParaBuscar = semanaAtiva?.semana_inicio 
+        ? new Date(semanaAtiva.semana_inicio).toISOString().split("T")[0]
+        : inicioDaSemana.toISOString().split("T")[0];
+
+      console.log(`[useTreinos] Buscando treinos para semana: ${semanaParaBuscar}`, {
+        semanaAtiva: semanaAtiva?.semana_inicio,
+        semanaAtual: inicioDaSemana.toISOString().split("T")[0],
+        usandoSemanaAtiva: !!semanaAtiva
+      });
+
       const { data: treinosSemanais, error: treinosError } = await supabase
         .from("treinos_semanais")
         .select("*")
         .eq("profile_id", profileId)
         .eq("personal_id", personalId)
-        .gte("semana", inicioDaSemana.toISOString().split("T")[0])
+        .eq("semana", semanaParaBuscar)
         .order("dia_semana");
 
       if (treinosError) {

@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { useTreinos } from "@/hooks/useTreinos";
 import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { SemanaTreinoAtiva } from "@/components/SemanaTreinoAtiva";
 import {
   Card,
   CardContent,
@@ -117,6 +120,22 @@ export function TreinosManager({
     editarDescricao,
     marcarExercicioConcluido,
   } = useTreinos({ profileId, personalId });
+
+  // Buscar nome do aluno
+  const { data: alunoProfile } = useQuery({
+    queryKey: ["profile", profileId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("nome")
+        .eq("id", profileId)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!profileId,
+  });
 
   // Hook de agrupamentos
   const {
@@ -517,18 +536,29 @@ export function TreinosManager({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <Dumbbell className="h-6 w-6 text-primary" />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Dumbbell className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-3xl font-bold tracking-tight">
+                Treinos da Semana
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Gerencie os treinos do aluno
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight">
-              Treinos da Semana
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Gerencie os treinos do aluno
-            </p>
-          </div>
+          
+          {/* Controle de Semana Ativa */}
+          {isPersonal && !readOnly && alunoProfile && (
+            <SemanaTreinoAtiva
+              profileId={profileId}
+              personalId={personalId}
+              alunoNome={alunoProfile.nome}
+            />
+          )}
         </div>
       </div>
 

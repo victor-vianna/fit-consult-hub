@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTreinos } from "@/hooks/useTreinos";
 import { useAuth } from "@/hooks/useAuth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { SemanaTreinoAtiva } from "@/components/SemanaTreinoAtiva";
 import {
@@ -110,6 +110,7 @@ export function TreinosManager({
   readOnly = false,
 }: TreinosManagerProps) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const {
     treinos,
     loading,
@@ -130,7 +131,7 @@ export function TreinosManager({
         .select("nome")
         .eq("id", profileId)
         .single();
-      
+
       if (error) throw error;
       return data;
     },
@@ -202,10 +203,9 @@ export function TreinosManager({
     })
   );
 
-  // 🔧 HELPER: Obter ID do treino de forma consistente
+  // 🔧 HELPER: Obter ID do treino de forma consistente (com debug)
   const getTreinoId = (treino: TreinoDia): string | null => {
-    const rawId = (treino as any).treinoId ?? (treino as any).id;
-    return rawId ? String(rawId) : null;
+    return treino.treinoId || null;
   };
 
   const handleDragEnd = async (event: DragEndEvent, dia: number) => {
@@ -350,6 +350,56 @@ export function TreinosManager({
     return exerciciosIsolados + exerciciosEmGrupos;
   };
 
+  /**
+   * Cria um treino semanal se ele não existir para o dia especificado
+   * @returns O ID do treino (existente ou recém-criado)
+   */
+  const criarTreinoSeNecessario = async (dia: number): Promise<string> => {
+    const treino = treinos.find((t) => t.dia === dia);
+
+    // Se já existe o treinoId, retorna ele
+    if (treino?.treinoId) {
+      console.log(
+        `[TreinosManager] Usando treino existente: ${treino.treinoId}`
+      );
+      return treino.treinoId;
+    }
+
+    // Se não existe, cria um novo treino semanal
+    console.log(`[TreinosManager] Criando treino semanal para dia ${dia}`);
+
+    const hoje = new Date();
+    const inicioDaSemana = new Date(hoje);
+    inicioDaSemana.setDate(hoje.getDate() - hoje.getDay() + 1);
+
+    const { data, error } = await supabase
+      .from("treinos_semanais")
+      .insert({
+        profile_id: profileId,
+        personal_id: personalId,
+        semana: inicioDaSemana.toISOString().split("T")[0],
+        dia_semana: dia,
+        concluido: false,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("[TreinosManager] Erro ao criar treino:", error);
+      toast.error("Erro ao criar registro de treino");
+      throw error;
+    }
+
+    console.log("[TreinosManager] Treino criado com sucesso:", data.id);
+
+    // ✅ Recarregar os treinos após criar
+    await queryClient.invalidateQueries({
+      queryKey: ["treinos", profileId, personalId],
+    });
+
+    return data.id;
+  };
+
   // 🔧 Função para salvar grupo
   const handleSaveGroup = async (grupoData: GrupoExerciciosInput) => {
     if (selectedDia === null) return;
@@ -357,17 +407,8 @@ export function TreinosManager({
     try {
       setLoadingStates((prev) => ({ ...prev, adicionando: true }));
 
-      const treino = treinos.find((t) => t.dia === selectedDia);
-      if (!treino) {
-        toast.error("Treino não encontrado");
-        return;
-      }
-
-      const treinoId = getTreinoId(treino);
-      if (!treinoId) {
-        toast.error("ID do treino não encontrado");
-        return;
-      }
+      // ✅ Criar treino se não existir
+      const treinoId = await criarTreinoSeNecessario(selectedDia);
 
       console.log("[TreinosManager] Criando grupo para treino:", treinoId);
 
@@ -454,16 +495,20 @@ export function TreinosManager({
     try {
       setLoadingStates((prev) => ({ ...prev, adicionando: true }));
 
-      const treino = treinos.find((t) => t.dia === selectedDia);
-      if (!treino) {
-        toast.error("Treino não encontrado");
-        return;
-      }
+      // ✅ Criar treino se não existir (EXCETO se estiver editando)
+      let treinoId: string;
 
-      const treinoId = getTreinoId(treino);
-      if (!treinoId) {
-        toast.error("ID do treino não encontrado");
-        return;
+      if (blocoEditando) {
+        // Se está editando, o treino já deve existir
+        const treino = treinos.find((t) => t.dia === selectedDia);
+        if (!treino?.treinoId) {
+          toast.error("Treino não encontrado para edição");
+          return;
+        }
+        treinoId = treino.treinoId;
+      } else {
+        // Se está criando novo, cria o treino se necessário
+        treinoId = await criarTreinoSeNecessario(selectedDia);
       }
 
       console.log("[TreinosManager] Salvando bloco para treino:", treinoId);
@@ -550,7 +595,7 @@ export function TreinosManager({
               </p>
             </div>
           </div>
-          
+
           {/* Controle de Semana Ativa */}
           {isPersonal && !readOnly && alunoProfile && (
             <SemanaTreinoAtiva

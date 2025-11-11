@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { startOfWeek, addDays, format, isSameDay } from "date-fns";
+import { startOfWeek, addDays, format, isSameDay, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Button } from "./ui/button";
 import { Calendar } from "lucide-react";
@@ -21,7 +21,7 @@ interface CalendarioSemanalProps {
   personalId: string;
   themeColor?: string;
   onVerHistoricoCompleto?: () => void;
-  onTreinoAtualizado?: () => void; // ✅ NOVO CALLBACK
+  onTreinoAtualizado?: () => void;
 }
 
 const diasSemana = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -31,36 +31,52 @@ export function CalendarioSemanal({
   personalId,
   themeColor,
   onVerHistoricoCompleto,
-  onTreinoAtualizado, // ✅ NOVO PROP
+  onTreinoAtualizado,
 }: CalendarioSemanalProps) {
   const [treinos, setTreinos] = useState<TreinoSemanal[]>([]);
   const [semanaAtual, setSemanaAtual] = useState<Date>(
-    startOfWeek(new Date(), {
-      weekStartsOn: 0,
-    })
+    startOfWeek(new Date(), { weekStartsOn: 0 })
   );
   const { toast } = useToast();
 
   useEffect(() => {
-    carregarTreinos();
+    if (profileId) carregarTreinos();
   }, [profileId, semanaAtual]);
 
   const carregarTreinos = async () => {
-    const { data, error } = await supabase
-      .from("treinos_semanais")
-      .select("*")
-      .eq("profile_id", profileId)
-      .eq("semana", format(semanaAtual, "yyyy-MM-dd"));
+    try {
+      const { data, error } = await supabase
+        .from("treinos_semanais")
+        .select("*")
+        .eq("profile_id", profileId);
 
-    if (error) {
-      console.error("Erro ao carregar treinos:", error);
-      return;
-    }
+      if (error) throw error;
 
-    if (data && data.length > 0) {
-      setTreinos(data);
-    } else {
-      await criarTreinosSemana();
+      // 🔍 Filtro: pegar apenas os treinos que pertencem à semana atual (domingo a sábado)
+      const inicioSemana = semanaAtual;
+      const fimSemana = addDays(semanaAtual, 6);
+
+      const treinosDaSemana = (data || []).filter((t) => {
+        const dataTreino = addDays(parseISO(t.semana), t.dia_semana);
+        return dataTreino >= inicioSemana && dataTreino <= fimSemana;
+      });
+
+      console.log("📅 Treinos da semana atual:", treinosDaSemana);
+
+      // Se não houver treinos da semana, cria automaticamente
+      if (treinosDaSemana.length === 0) {
+        console.log("⚠️ Nenhum treino encontrado, criando nova semana...");
+        await criarTreinosSemana();
+      } else {
+        setTreinos(treinosDaSemana);
+      }
+    } catch (err) {
+      console.error("❌ Erro ao carregar treinos:", err);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar os treinos da semana",
+        variant: "destructive",
+      });
     }
   };
 
@@ -91,7 +107,7 @@ export function CalendarioSemanal({
       .from("treinos_semanais")
       .update({
         concluido: !concluido,
-        updated_at: new Date().toISOString(), // ✅ ATUALIZAR TIMESTAMP
+        updated_at: new Date().toISOString(),
       })
       .eq("id", treinoId);
 
@@ -104,14 +120,10 @@ export function CalendarioSemanal({
       return;
     }
 
-    // ✅ ATUALIZAR ESTADO LOCAL
-    setTreinos(
-      treinos.map((t) =>
-        t.id === treinoId ? { ...t, concluido: !concluido } : t
-      )
+    setTreinos((prev) =>
+      prev.map((t) => (t.id === treinoId ? { ...t, concluido: !concluido } : t))
     );
 
-    // ✅ NOTIFICAR COMPONENTE PAI
     onTreinoAtualizado?.();
   };
 
@@ -125,8 +137,12 @@ export function CalendarioSemanal({
       <CardContent>
         <div className="grid grid-cols-7 gap-1 md:gap-2">
           {diasSemana.map((dia, index) => {
-            const treino = treinos.find((t) => t.dia_semana === index);
             const diaMes = addDays(semanaAtual, index);
+            const treino = treinos.find((t) => {
+              const dataTreino = addDays(parseISO(t.semana), t.dia_semana);
+              return isSameDay(dataTreino, diaMes);
+            });
+
             const isHoje = isSameDay(diaMes, new Date());
 
             return (
@@ -157,6 +173,7 @@ export function CalendarioSemanal({
             );
           })}
         </div>
+
         <div className="mt-6 pt-4 border-t">
           <Button
             variant="outline"

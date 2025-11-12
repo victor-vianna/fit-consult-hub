@@ -209,17 +209,18 @@ export function useAplicarModelo() {
             `[useAplicarModelo] Copiando ${blocosModelo.length} blocos para dia ${dia}`
           );
 
-          const blocosInsert = blocosModelo.map((bloco: any) => ({
-            treino_semanal_id: treinoId,
-            tipo: bloco.tipo,
-            nome: bloco.nome,
-            duracao_minutos: bloco.duracao_minutos,
-            intensidade: bloco.intensidade,
-            observacoes: bloco.observacoes,
-            posicao: bloco.posicao,
-            ordem: bloco.ordem,
-            concluido: false,
-          }));
+          const blocosInsert = blocosModelo.map(
+            (bloco: any, index: number) => ({
+              treino_semanal_id: treinoId,
+              tipo: bloco.tipo,
+              nome: bloco.nome,
+              duracao_estimada_minutos: bloco.duracao_estimada_minutos,
+              descricao: bloco.descricao,
+              posicao: bloco.posicao,
+              ordem: bloco.ordem && bloco.ordem > 0 ? bloco.ordem : index + 1,
+              concluido: false,
+            })
+          );
 
           console.log("[useAplicarModelo] Blocos para inserir:", blocosInsert);
 

@@ -31,6 +31,56 @@ const buildQueryKey = (
   semana: string
 ): QueryKey => ["blocos-treino", profileId, personalId, semana];
 
+const garantirTreinoExisteBloco = async (
+  treinoSemanalId: string | null,
+  profileId: string,
+  personalId: string,
+  dia?: number
+): Promise<string> => {
+  // Se o ID já existe, verifica se o registro realmente existe no banco
+  if (treinoSemanalId) {
+    const { data, error } = await supabase
+      .from("treinos_semanais")
+      .select("id")
+      .eq("id", treinoSemanalId)
+      .maybeSingle();
+
+    if (!error && data) {
+      return treinoSemanalId;
+    }
+  }
+
+  // Se não existe ou houve erro, cria um novo
+  console.log(
+    `[useWorkoutBlocks] Criando treino semanal para dia ${
+      dia || "desconhecido"
+    }`
+  );
+
+  const hoje = new Date();
+  const inicioDaSemana = new Date(hoje);
+  inicioDaSemana.setDate(hoje.getDate() - hoje.getDay() + 1);
+
+  const { data: novoTreino, error: createError } = await supabase
+    .from("treinos_semanais")
+    .insert({
+      profile_id: profileId,
+      personal_id: personalId,
+      semana: inicioDaSemana.toISOString().split("T")[0],
+      dia_semana: dia || 1,
+      concluido: false,
+    })
+    .select()
+    .single();
+
+  if (createError) {
+    console.error("[useWorkoutBlocks] Erro ao criar treino:", createError);
+    throw createError;
+  }
+
+  return novoTreino.id;
+};
+
 export function useWorkoutBlocks({
   profileId,
   personalId,
@@ -115,12 +165,19 @@ export function useWorkoutBlocks({
         bloco,
       });
 
+      // ✅ GARANTIR que o treino existe antes de criar o bloco
+      const treinoIdValido = await garantirTreinoExisteBloco(
+        treinoSemanalId,
+        profileId,
+        personalId
+      );
+
       // 1. Obter próxima ordem
       const posicaoAlvo = bloco.posicao ?? "meio";
       const { data: ultimoBloco, error: queryError } = await supabase
         .from("blocos_treino")
         .select("ordem")
-        .eq("treino_semanal_id", treinoSemanalId)
+        .eq("treino_semanal_id", treinoIdValido) // ✅ Usar ID validado
         .eq("posicao", posicaoAlvo)
         .is("deleted_at", null)
         .order("ordem", { ascending: false })
@@ -137,7 +194,7 @@ export function useWorkoutBlocks({
       const { data, error } = await supabase
         .from("blocos_treino")
         .insert({
-          treino_semanal_id: treinoSemanalId,
+          treino_semanal_id: treinoIdValido, // ✅ Usar ID validado
           tipo: bloco.tipo as any,
           posicao: posicaoAlvo,
           ordem: proximaOrdem,
@@ -156,11 +213,18 @@ export function useWorkoutBlocks({
       if (error) throw error;
 
       console.log("[useWorkoutBlocks] Bloco criado:", data.id);
-      return { treinoSemanalId, bloco: data as any as BlocoTreino };
+      return {
+        treinoSemanalId: treinoIdValido,
+        bloco: data as any as BlocoTreino,
+      };
     },
     onSuccess: async (_, variables) => {
       await queryClient.invalidateQueries({
         queryKey: buildQueryKey(profileId, personalId, semana),
+      });
+      // ✅ IMPORTANTE: Invalidar também a query de treinos
+      await queryClient.invalidateQueries({
+        queryKey: ["treinos", profileId, personalId, semana],
       });
       await refetch();
       toast.success("Bloco adicionado com sucesso");

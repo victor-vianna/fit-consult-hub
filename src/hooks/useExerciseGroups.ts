@@ -64,6 +64,64 @@ const buildQueryKey = (
   semana: string
 ): QueryKey => ["grupos-exercicios", profileId, personalId, semana];
 
+/**
+ * Cria um treino semanal se ele não existir
+ * @param treinoSemanalId - ID que queremos verificar/criar
+ * @param profileId - ID do aluno
+ * @param personalId - ID do personal
+ * @param dia - Dia da semana (1-7)
+ * @returns Promise<string> - ID do treino (existente ou criado)
+ */
+const garantirTreinoExiste = async (
+  treinoSemanalId: string | null,
+  profileId: string,
+  personalId: string,
+  dia?: number
+): Promise<string> => {
+  // Se o ID já existe, verifica se o registro realmente existe no banco
+  if (treinoSemanalId) {
+    const { data, error } = await supabase
+      .from("treinos_semanais")
+      .select("id")
+      .eq("id", treinoSemanalId)
+      .maybeSingle();
+
+    if (!error && data) {
+      return treinoSemanalId;
+    }
+  }
+
+  // Se não existe ou houve erro, cria um novo
+  console.log(
+    `[useExerciseGroups] Criando treino semanal para dia ${
+      dia || "desconhecido"
+    }`
+  );
+
+  const hoje = new Date();
+  const inicioDaSemana = new Date(hoje);
+  inicioDaSemana.setDate(hoje.getDate() - hoje.getDay() + 1);
+
+  const { data: novoTreino, error: createError } = await supabase
+    .from("treinos_semanais")
+    .insert({
+      profile_id: profileId,
+      personal_id: personalId,
+      semana: inicioDaSemana.toISOString().split("T")[0],
+      dia_semana: dia || 1, // Default para segunda se não especificado
+      concluido: false,
+    })
+    .select()
+    .single();
+
+  if (createError) {
+    console.error("[useExerciseGroups] Erro ao criar treino:", createError);
+    throw createError;
+  }
+
+  return novoTreino.id;
+};
+
 // Gera UUID no client
 const genUUID = () => {
   if (typeof crypto !== "undefined" && (crypto as any).randomUUID) {
@@ -187,13 +245,20 @@ export function useExerciseGroups({
         exercicios: payload.exercicios.length,
       });
 
+      // ✅ GARANTIR que o treino existe antes de criar o grupo
+      const treinoIdValido = await garantirTreinoExiste(
+        treinoSemanalId,
+        profileId,
+        personalId
+      );
+
       const grupoId = genUUID();
 
       // 1. Calcular ordem base
       const { data: ordemData, error: ordemErr } = await supabase
         .from("exercicios")
         .select("ordem")
-        .eq("treino_semanal_id", treinoSemanalId)
+        .eq("treino_semanal_id", treinoIdValido) // ✅ Usar ID validado
         .is("deleted_at", null)
         .order("ordem", { ascending: false })
         .limit(1)
@@ -210,7 +275,7 @@ export function useExerciseGroups({
 
       // 2. Montar inserts
       const inserts = payload.exercicios.map((ex, idx) => ({
-        treino_semanal_id: treinoSemanalId,
+        treino_semanal_id: treinoIdValido, // ✅ Usar ID validado
         nome: ex.nome,
         link_video: ex.link_video ?? null,
         series: ex.series,
@@ -237,7 +302,7 @@ export function useExerciseGroups({
       console.log("[useExerciseGroups] Grupo criado:", grupoId);
 
       return {
-        treinoSemanalId,
+        treinoSemanalId: treinoIdValido, // ✅ Retornar ID validado
         grupo: {
           grupo_id: grupoId,
           tipo_agrupamento: payload.tipo,
@@ -250,6 +315,10 @@ export function useExerciseGroups({
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: buildQueryKey(profileId, personalId, semana),
+      });
+      // ✅ IMPORTANTE: Invalidar também a query de treinos
+      await queryClient.invalidateQueries({
+        queryKey: ["treinos", profileId, personalId, semana],
       });
       await refetch();
       toast.success("Grupo de exercícios criado com sucesso");

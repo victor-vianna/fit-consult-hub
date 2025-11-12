@@ -663,7 +663,7 @@ export function TreinosManager({
       const blocosMapeados = blocos.map((bloco: any, index: number) => ({
         tipo: bloco.tipo,
         nome: bloco.nome,
-        duracao_minutos: bloco.duracao_minutos ?? undefined,
+        duracao_estimada_minutos: bloco.duracao_estimada_minutos ?? undefined,
         intensidade: bloco.intensidade ?? undefined,
         observacoes: bloco.observacoes ?? undefined,
         posicao: bloco.posicao,

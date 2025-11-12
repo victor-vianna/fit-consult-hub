@@ -23,8 +23,7 @@ export interface ModeloTreinoBloco {
   id?: string;
   tipo: "cardio" | "alongamento" | "mobilidade" | "aquecimento" | "core";
   nome: string;
-  duracao_minutos?: number | null;
-  intensidade?: "baixa" | "moderada" | "alta" | null;
+  duracao_estimada_minutos?: number | null;
   observacoes?: string | null;
   posicao: "inicio" | "meio" | "fim";
   ordem: number;
@@ -111,9 +110,6 @@ export function useModelosTreino({
             ...b,
             tipo: b.tipo as ModeloTreinoBloco["tipo"],
             posicao: b.posicao as ModeloTreinoBloco["posicao"],
-            intensidade: b.intensidade as
-              | ModeloTreinoBloco["intensidade"]
-              | null,
           }));
 
           return {
@@ -197,8 +193,7 @@ export function useModelosTreino({
           modelo_id: modeloData.id,
           tipo: bloco.tipo,
           nome: bloco.nome,
-          duracao_minutos: bloco.duracao_minutos || null,
-          intensidade: bloco.intensidade || null,
+          duracao_estimada_minutos: bloco.duracao_estimada_minutos || null,
           observacoes: bloco.observacoes || null,
           posicao: bloco.posicao,
           ordem: bloco.ordem ?? index,

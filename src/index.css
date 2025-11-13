@@ -119,8 +119,23 @@ All colors MUST be HSL.
     @apply pb-20 md:pb-0;
   }
 
-  /* Touch target minimum size */
+  /* Touch target minimum size - WCAG compliant */
   .touch-target {
     @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* Scroll horizontal seguro para mobile */
+  .scroll-mobile {
+    @apply overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0;
+  }
+
+  /* Padding responsivo padrão */
+  .container-mobile {
+    @apply px-4 md:px-6 lg:px-8;
+  }
+
+  /* Gap responsivo padrão */
+  .gap-mobile {
+    @apply gap-4 md:gap-6;
   }
 }

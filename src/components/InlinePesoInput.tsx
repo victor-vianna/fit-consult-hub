@@ -58,8 +58,8 @@ export function InlinePesoInput({
         onClick={() => setEditing(true)}
         disabled={disabled}
         className={cn(
-          "flex items-center gap-1.5 px-2 py-1 rounded transition-all",
-          "font-mono font-semibold text-sm min-w-[44px] min-h-[44px]",
+          "flex items-center gap-1.5 px-3 py-2 rounded transition-all",
+          "font-mono font-semibold text-base md:text-sm touch-target",
           pesoExecutado && pesoExecutado !== pesoRecomendado
             ? "text-blue-700 bg-blue-100 hover:bg-blue-200 dark:text-blue-300 dark:bg-blue-950 dark:hover:bg-blue-900"
             : "text-primary bg-primary/10 hover:bg-primary/20",
@@ -72,7 +72,7 @@ export function InlinePesoInput({
         }
       >
         <span>{value}kg</span>
-        <Edit2 className="h-3 w-3 opacity-60" />
+        <Edit2 className="h-4 w-4 md:h-3 md:w-3 opacity-60" />
       </button>
     );
   }
@@ -87,7 +87,7 @@ export function InlinePesoInput({
           if (e.key === "Enter") handleSave();
           if (e.key === "Escape") handleCancel();
         }}
-        className="h-9 w-20 px-2 text-xs font-mono"
+        className="h-11 md:h-9 w-24 md:w-20 px-3 md:px-2 text-base md:text-xs font-mono"
         placeholder="kg"
         autoFocus
         disabled={saving}
@@ -97,18 +97,18 @@ export function InlinePesoInput({
         variant="ghost"
         onClick={handleSave}
         disabled={saving}
-        className="h-9 w-9 text-green-600 hover:bg-green-100 dark:hover:bg-green-950"
+        className="h-11 w-11 md:h-9 md:w-9 text-green-600 hover:bg-green-100 dark:hover:bg-green-950 touch-target"
       >
-        <Check className="h-4 w-4" />
+        <Check className="h-5 w-5 md:h-4 md:w-4" />
       </Button>
       <Button
         size="icon"
         variant="ghost"
         onClick={handleCancel}
         disabled={saving}
-        className="h-9 w-9 text-red-600 hover:bg-red-100 dark:hover:bg-red-950"
+        className="h-11 w-11 md:h-9 md:w-9 text-red-600 hover:bg-red-100 dark:hover:bg-red-950 touch-target"
       >
-        <X className="h-4 w-4" />
+        <X className="h-5 w-5 md:h-4 md:w-4" />
       </Button>
     </div>
   );

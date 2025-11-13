@@ -130,7 +130,7 @@ export function WorkoutBlockCard({
                   <span className="text-xl">{tipoConfig.icon}</span>
                   <h4
                     className={cn(
-                      "font-semibold text-base",
+                      "font-semibold text-lg md:text-base",
                       bloco.concluido && "line-through text-muted-foreground"
                     )}
                   >
@@ -154,7 +154,7 @@ export function WorkoutBlockCard({
 
               {/* Descrição */}
               {bloco.descricao && (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-base md:text-sm text-muted-foreground">
                   {bloco.descricao}
                 </p>
               )}
@@ -371,18 +371,23 @@ export function WorkoutBlockCard({
           {!readOnly && (
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               {onEdit && (
-                <Button size="sm" variant="ghost" onClick={onEdit}>
-                  <Edit className="h-4 w-4" />
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  onClick={onEdit}
+                  className="h-10 w-10 md:h-9 md:w-9 touch-target"
+                >
+                  <Edit className="h-5 w-5 md:h-4 md:w-4" />
                 </Button>
               )}
               {onDelete && (
                 <Button
-                  size="sm"
+                  size="icon"
                   variant="ghost"
-                  className="text-destructive hover:text-destructive"
+                  className="h-10 w-10 md:h-9 md:w-9 text-destructive hover:text-destructive touch-target"
                   onClick={onDelete}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-5 w-5 md:h-4 md:w-4" />
                 </Button>
               )}
             </div>

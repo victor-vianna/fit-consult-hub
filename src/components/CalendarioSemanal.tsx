@@ -130,12 +130,12 @@ export function CalendarioSemanal({
   return (
     <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
       <CardHeader>
-        <CardTitle className="text-lg md:text-xl">
+        <CardTitle className="text-xl md:text-lg">
           Frequência de Treinos da Semana
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-7 gap-1 md:gap-2">
+      <CardContent className="p-4 md:p-6">
+        <div className="grid grid-cols-7 gap-2 md:gap-3">
           {diasSemana.map((dia, index) => {
             const diaMes = addDays(semanaAtual, index);
             const treino = treinos.find((t) => {
@@ -148,24 +148,24 @@ export function CalendarioSemanal({
             return (
               <div
                 key={index}
-                className={`flex flex-col items-center p-2 md:p-3 rounded-lg border transition-all ${
+                className={`flex flex-col items-center p-3 md:p-2 rounded-lg border transition-all ${
                   isHoje
                     ? "border-primary bg-primary/15 shadow-md scale-105"
                     : "border-border hover:border-primary/30"
                 }`}
               >
-                <p className="text-xs font-semibold mb-1">{dia}</p>
-                <p className="text-xs text-muted-foreground mb-2">
+                <p className="text-sm md:text-xs font-semibold mb-1">{dia}</p>
+                <p className="text-sm md:text-xs text-muted-foreground mb-2">
                   {format(diaMes, "d", { locale: ptBR })}
                 </p>
                 {treino && (
-                  <div className="flex items-center justify-center w-full">
+                  <div className="flex items-center justify-center w-full touch-target">
                     <Checkbox
                       checked={treino.concluido}
                       onCheckedChange={() =>
                         toggleTreino(treino.id, treino.concluido)
                       }
-                      className="h-5 w-5 md:h-4 md:w-4"
+                      className="h-6 w-6 md:h-5 md:w-5"
                     />
                   </div>
                 )}
@@ -177,14 +177,14 @@ export function CalendarioSemanal({
         <div className="mt-6 pt-4 border-t">
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full h-12 md:h-10 text-base md:text-sm"
             onClick={onVerHistoricoCompleto}
             style={{
               borderColor: themeColor ? `${themeColor}50` : undefined,
               color: themeColor || undefined,
             }}
           >
-            <Calendar className="h-4 w-4 mr-2" />
+            <Calendar className="h-5 w-5 md:h-4 md:w-4 mr-2" />
             Ver Calendário Completo
           </Button>
         </div>

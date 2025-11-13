@@ -92,7 +92,7 @@ export function CompactExerciseCard({
           {/* Checkbox */}
           <button
             onClick={handleToggle}
-            className="shrink-0 transition-transform hover:scale-110"
+            className="shrink-0 transition-transform hover:scale-110 touch-target"
           >
             {localConcluido ? (
               <CheckCircle2 className="h-6 w-6 text-green-600" />
@@ -120,13 +120,13 @@ export function CompactExerciseCard({
           <div className="flex-1 min-w-0">
             <p
               className={cn(
-                "font-semibold text-sm truncate",
+                "font-semibold text-base md:text-sm truncate",
                 localConcluido && "line-through text-muted-foreground"
               )}
             >
               {exercicio.nome}
             </p>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+            <div className="flex items-center gap-2 text-sm md:text-xs text-muted-foreground mt-0.5">
               <span className="flex items-center gap-1">
                 <Dumbbell className="h-3 w-3" />
                 {exercicio.series || 3}x{exercicio.repeticoes || "12"}
@@ -141,14 +141,14 @@ export function CompactExerciseCard({
 
           {/* Botão Expandir */}
           <Button
-            size="sm"
+            size="icon"
             variant="ghost"
             onClick={() => setExpanded(!expanded)}
-            className="shrink-0"
+            className="shrink-0 h-10 w-10 md:h-9 md:w-9 touch-target"
           >
             <ChevronDown
               className={cn(
-                "h-4 w-4 transition-transform",
+                "h-5 w-5 md:h-4 md:w-4 transition-transform",
                 expanded && "rotate-180"
               )}
             />
@@ -165,17 +165,17 @@ export function CompactExerciseCard({
                   href={exercicio.link_video}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                  className="text-sm md:text-xs text-blue-600 hover:underline flex items-center gap-1 touch-target"
                 >
-                  <Play className="h-3 w-3" />
+                  <Play className="h-4 w-4 md:h-3 md:w-3" />
                   Ver demonstração
                 </a>
               )}
               <button
                 onClick={() => abrirExercicioNaBiblioteca(exercicio.nome)}
-                className="text-xs text-purple-600 hover:underline flex items-center gap-1"
+                className="text-sm md:text-xs text-purple-600 hover:underline flex items-center gap-1 touch-target"
               >
-                <BookOpen className="h-3 w-3" />
+                <BookOpen className="h-4 w-4 md:h-3 md:w-3" />
                 Ver na biblioteca
               </button>
             </div>
@@ -183,12 +183,12 @@ export function CompactExerciseCard({
             {/* Detalhes Completos */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Séries:</span>
+                <span className="text-sm md:text-xs text-muted-foreground">Séries:</span>
                 <Badge variant="outline">{exercicio.series || 3}</Badge>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">
+                <span className="text-sm md:text-xs text-muted-foreground">
                   Repetições:
                 </span>
                 <Badge variant="outline">{exercicio.repeticoes || "12"}</Badge>
@@ -196,8 +196,8 @@ export function CompactExerciseCard({
 
               {exercicio.descanso && exercicio.descanso > 0 && (
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
+                  <span className="text-sm md:text-xs text-muted-foreground flex items-center gap-1">
+                    <Clock className="h-4 w-4 md:h-3 md:w-3" />
                     Descanso:
                   </span>
                   <Badge variant="outline">{exercicio.descanso}s</Badge>
@@ -206,8 +206,8 @@ export function CompactExerciseCard({
 
               {exercicio.carga && (
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Weight className="h-3 w-3" />
+                  <span className="text-sm md:text-xs text-muted-foreground flex items-center gap-1">
+                    <Weight className="h-4 w-4 md:h-3 md:w-3" />
                     Carga:
                   </span>
                   <InlinePesoInput
@@ -223,7 +223,7 @@ export function CompactExerciseCard({
             {/* Observações */}
             {exercicio.observacoes && (
               <div className="p-2 bg-muted/50 rounded-lg">
-                <p className="text-xs text-muted-foreground italic">
+                <p className="text-sm md:text-xs text-muted-foreground italic">
                   💡 {exercicio.observacoes}
                 </p>
               </div>

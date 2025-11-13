@@ -210,7 +210,7 @@ export function ExercicioCard({
               <div className="flex-1 space-y-1">
                 <p
                   className={cn(
-                    "font-semibold text-sm",
+                    "font-semibold text-base md:text-sm",
                     localConcluido && "line-through text-muted-foreground"
                   )}
                 >
@@ -223,10 +223,10 @@ export function ExercicioCard({
                       href={exercicio.link_video}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                      className="text-sm md:text-xs text-blue-600 hover:underline flex items-center gap-1 touch-target"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <Play className="h-3 w-3" />
+                      <Play className="h-4 w-4 md:h-3 md:w-3" />
                       Ver demonstração
                     </a>
                   )}
@@ -234,17 +234,17 @@ export function ExercicioCard({
                   {onToggleConcluido && (
                     <button
                       onClick={() => abrirExercicioNaBiblioteca(exercicio.nome)}
-                      className="text-xs text-purple-600 hover:underline flex items-center gap-1"
+                      className="text-sm md:text-xs text-purple-600 hover:underline flex items-center gap-1 touch-target"
                     >
-                      <BookOpen className="h-3 w-3" />
+                      <BookOpen className="h-4 w-4 md:h-3 md:w-3" />
                       Ver na biblioteca
                     </button>
                   )}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-2 text-sm md:text-xs text-muted-foreground">
                   <span className="flex items-center gap-1 font-medium">
-                    <Dumbbell className="h-3 w-3" />
+                    <Dumbbell className="h-4 w-4 md:h-3 md:w-3" />
                     {exercicio.series}x{exercicio.repeticoes}
                   </span>
 
@@ -271,7 +271,7 @@ export function ExercicioCard({
                 </div>
 
                 {exercicio.observacoes && (
-                  <p className="text-xs text-muted-foreground italic">
+                  <p className="text-sm md:text-xs text-muted-foreground italic">
                     {exercicio.observacoes}
                   </p>
                 )}
@@ -286,22 +286,22 @@ export function ExercicioCard({
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-7 w-7 sm:h-8 sm:w-8"
+                  className="h-10 w-10 md:h-8 md:w-8 touch-target"
                   onClick={() => onEdit(exercicio)}
                   title="Editar exercício"
                 >
-                  <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <Edit className="h-5 w-5 md:h-4 md:w-4" />
                 </Button>
               )}
               {onDelete && (
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-7 w-7 sm:h-8 sm:w-8 text-destructive hover:text-destructive"
+                  className="h-10 w-10 md:h-8 md:w-8 text-destructive hover:text-destructive touch-target"
                   onClick={() => onDelete(exercicio.id)}
                   title="Excluir exercício"
                 >
-                  <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <Trash2 className="h-5 w-5 md:h-4 md:w-4" />
                 </Button>
               )}
             </div>

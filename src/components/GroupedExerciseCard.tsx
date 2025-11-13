@@ -379,7 +379,7 @@ export function GroupedExerciseCard({
                         <div className="flex-1 space-y-1.5">
                           <p
                             className={cn(
-                              "font-semibold text-sm",
+                              "font-semibold text-base md:text-sm",
                               exercicio.concluido &&
                                 "line-through text-muted-foreground"
                             )}
@@ -394,10 +394,10 @@ export function GroupedExerciseCard({
                                 href={exercicio.link_video}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                                className="text-sm md:text-xs text-blue-600 hover:underline flex items-center gap-1 touch-target"
                                 onClick={(e) => e.stopPropagation()}
                               >
-                                <Play className="h-3 w-3" />
+                                <Play className="h-4 w-4 md:h-3 md:w-3" />
                                 Ver demonstração
                               </a>
                             )}
@@ -405,16 +405,16 @@ export function GroupedExerciseCard({
                             {!readOnly && (
                               <button
                                 onClick={() => abrirExercicioNaBiblioteca(exercicio.nome)}
-                                className="text-xs text-purple-600 hover:underline flex items-center gap-1"
+                                className="text-sm md:text-xs text-purple-600 hover:underline flex items-center gap-1 touch-target"
                               >
-                                <BookOpen className="h-3 w-3" />
+                                <BookOpen className="h-4 w-4 md:h-3 md:w-3" />
                                 Ver na biblioteca
                               </button>
                             )}
                           </div>
 
                           {/* Informações de treino */}
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <div className="flex flex-wrap items-center gap-2 text-sm md:text-xs text-muted-foreground">
                             <span className="flex items-center gap-1 font-medium">
                               <Dumbbell className="h-3 w-3" />
                               {exercicio.series || 3}x
@@ -446,7 +446,7 @@ export function GroupedExerciseCard({
 
                           {/* Observações do exercício */}
                           {exercicio.observacoes && (
-                            <p className="text-xs text-muted-foreground italic">
+                            <p className="text-sm md:text-xs text-muted-foreground italic">
                               💡 {exercicio.observacoes}
                             </p>
                           )}
@@ -471,23 +471,24 @@ export function GroupedExerciseCard({
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               {onEdit && (
                 <Button
-                  size="sm"
+                  size="icon"
                   variant="ghost"
+                  className="h-10 w-10 md:h-9 md:w-9 touch-target"
                   onClick={onEdit}
                   title="Editar grupo"
                 >
-                  <Edit className="h-4 w-4" />
+                  <Edit className="h-5 w-5 md:h-4 md:w-4" />
                 </Button>
               )}
               {onDelete && (
                 <Button
-                  size="sm"
+                  size="icon"
                   variant="ghost"
-                  className="text-destructive hover:text-destructive"
+                  className="h-10 w-10 md:h-9 md:w-9 text-destructive hover:text-destructive touch-target"
                   onClick={onDelete}
                   title="Deletar grupo"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-5 w-5 md:h-4 md:w-4" />
                 </Button>
               )}
             </div>

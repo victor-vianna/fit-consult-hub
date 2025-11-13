@@ -88,57 +88,67 @@ export function CalendarioTreinosMensal({
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle
-              className="text-2xl"
+              className="text-2xl md:text-xl"
               style={{ color: themeColor || undefined }}
             >
               Histórico de Treinos
             </CardTitle>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" onClick={mesAnterior}>
-                <ChevronLeft className="h-4 w-4" />
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={mesAnterior}
+                className="h-10 w-10 md:h-9 md:w-9 touch-target"
+              >
+                <ChevronLeft className="h-5 w-5 md:h-4 md:w-4" />
               </Button>
-              <span className="font-semibold min-w-[150px] text-center capitalize">
+              <span className="font-semibold min-w-[150px] text-center capitalize text-base md:text-sm">
                 {format(mesAtual, "MMMM yyyy", { locale: ptBR })}
               </span>
-              <Button variant="outline" size="icon" onClick={proximoMes}>
-                <ChevronRight className="h-4 w-4" />
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={proximoMes}
+                className="h-10 w-10 md:h-9 md:w-9 touch-target"
+              >
+                <ChevronRight className="h-5 w-5 md:h-4 md:w-4" />
               </Button>
             </div>
           </div>
 
           {/* Estatísticas */}
-          <div className="grid grid-cols-3 gap-4 mt-4">
-            <div className="text-center p-3 bg-muted rounded-lg">
-              <div className="text-2xl font-bold">{stats.total}</div>
-              <div className="text-xs text-muted-foreground">
+          <div className="grid grid-cols-3 gap-4 md:gap-3 mt-4">
+            <div className="text-center p-4 md:p-3 bg-muted rounded-lg">
+              <div className="text-3xl md:text-2xl font-bold">{stats.total}</div>
+              <div className="text-sm md:text-xs text-muted-foreground">
                 Treinos Planejados
               </div>
             </div>
-            <div className="text-center p-3 bg-muted rounded-lg">
+            <div className="text-center p-4 md:p-3 bg-muted rounded-lg">
               <div
-                className="text-2xl font-bold"
+                className="text-3xl md:text-2xl font-bold"
                 style={{ color: themeColor || undefined }}
               >
                 {stats.concluidos}
               </div>
-              <div className="text-xs text-muted-foreground">
+              <div className="text-sm md:text-xs text-muted-foreground">
                 Treinos Concluídos
               </div>
             </div>
-            <div className="text-center p-3 bg-muted rounded-lg">
-              <div className="text-2xl font-bold">{stats.percentual}%</div>
-              <div className="text-xs text-muted-foreground">Frequência</div>
+            <div className="text-center p-4 md:p-3 bg-muted rounded-lg">
+              <div className="text-3xl md:text-2xl font-bold">{stats.percentual}%</div>
+              <div className="text-sm md:text-xs text-muted-foreground">Frequência</div>
             </div>
           </div>
         </CardHeader>
 
         <CardContent>
           {/* Cabeçalho dos dias da semana */}
-          <div className="grid grid-cols-7 gap-2 mb-2">
+          <div className="grid grid-cols-7 gap-3 md:gap-2 mb-3 md:mb-2">
             {diasSemana.map((dia) => (
               <div
                 key={dia}
-                className="text-center text-sm font-semibold text-muted-foreground py-2"
+                className="text-center text-base md:text-sm font-semibold text-muted-foreground py-2"
               >
                 {dia}
               </div>
@@ -146,7 +156,7 @@ export function CalendarioTreinosMensal({
           </div>
 
           {/* Grid do calendário */}
-          <div className="grid grid-cols-7 gap-2">
+          <div className="grid grid-cols-7 gap-3 md:gap-2">
             {/* Dias vazios no início */}
             {Array.from({ length: diasVaziosInicio }).map((_, index) => (
               <div key={`empty-${index}`} className="aspect-square" />
@@ -169,7 +179,7 @@ export function CalendarioTreinosMensal({
                   onClick={() => temTreino && setDiaSelecionado(dia)}
                   disabled={!temTreino}
                   className={`
-                    aspect-square p-2 rounded-lg border-2 transition-all
+                    aspect-square p-3 md:p-2 rounded-lg border-2 transition-all touch-target
                     ${
                       temTreino
                         ? "cursor-pointer hover:scale-105"
@@ -195,20 +205,20 @@ export function CalendarioTreinosMensal({
                   }
                 >
                   <div className="flex flex-col items-center justify-center h-full">
-                    <span className="text-sm font-semibold">
+                    <span className="text-base md:text-sm font-semibold">
                       {format(dia, "d")}
                     </span>
                     {temTreino && (
                       <div className="flex gap-1 mt-1">
                         {todosCompletos ? (
                           <CheckCircle2
-                            className="h-3 w-3"
+                            className="h-4 w-4 md:h-3 md:w-3"
                             style={{ color: themeColor || "#22c55e" }}
                           />
                         ) : algunsCompletos ? (
-                          <Circle className="h-3 w-3 text-yellow-500" />
+                          <Circle className="h-4 w-4 md:h-3 md:w-3 text-yellow-500" />
                         ) : (
-                          <Circle className="h-3 w-3 text-muted-foreground" />
+                          <Circle className="h-4 w-4 md:h-3 md:w-3 text-muted-foreground" />
                         )}
                       </div>
                     )}
@@ -219,20 +229,20 @@ export function CalendarioTreinosMensal({
           </div>
 
           {/* Legenda */}
-          <div className="flex items-center justify-center gap-6 mt-6 text-sm">
+          <div className="flex items-center justify-center gap-6 md:gap-4 mt-6 text-base md:text-sm">
             <div className="flex items-center gap-2">
               <CheckCircle2
-                className="h-4 w-4"
+                className="h-5 w-5 md:h-4 md:w-4"
                 style={{ color: themeColor || "#22c55e" }}
               />
               <span>Concluído</span>
             </div>
             <div className="flex items-center gap-2">
-              <Circle className="h-4 w-4 text-yellow-500" />
+              <Circle className="h-5 w-5 md:h-4 md:w-4 text-yellow-500" />
               <span>Parcial</span>
             </div>
             <div className="flex items-center gap-2">
-              <Circle className="h-4 w-4 text-muted-foreground" />
+              <Circle className="h-5 w-5 md:h-4 md:w-4 text-muted-foreground" />
               <span>Pendente</span>
             </div>
           </div>

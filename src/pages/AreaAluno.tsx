@@ -127,7 +127,7 @@ export default function AreaAluno() {
 
   const renderMobileHome = () => {
     return (
-      <div className="space-y-4 px-4 pb-24 animate-fade-in">
+      <div className="space-y-4 container-mobile pb-24 animate-fade-in">
         {profile?.personal_id && (
           <CalendarioSemanal
             profileId={user!.id}
@@ -137,7 +137,7 @@ export default function AreaAluno() {
           />
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4 sm:gap-6 md:gap-4">
           <ActionCard
             title="Treinos"
             icon={Dumbbell}

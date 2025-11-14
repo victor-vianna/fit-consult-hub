@@ -60,28 +60,29 @@ export default function ExerciseCard({
       }`}
       onClick={handleClick}
     >
-      {/* ✅ Thumbnail */}
+      {/* ✅ Thumbnail Responsiva */}
       {exercise.imagem_thumbnail ? (
-        <div className="w-full h-40 overflow-hidden bg-muted">
+        <div className="w-full h-32 sm:h-40 md:h-48 overflow-hidden bg-muted rounded-t-lg">
           <img
             src={exercise.imagem_thumbnail}
             alt={exercise.nome}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover transition-transform group-hover:scale-105"
+            loading="lazy"
           />
         </div>
       ) : (
-        <div className="w-full h-40 bg-muted flex items-center justify-center">
-          <ImageIcon className="w-12 h-12 text-muted-foreground/30" />
+        <div className="w-full h-32 sm:h-40 md:h-48 bg-muted flex items-center justify-center rounded-t-lg">
+          <ImageIcon className="w-12 h-12 md:w-16 md:h-16 text-muted-foreground/30" />
         </div>
       )}
 
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-3 p-4 md:p-6">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex-1">
-            <CardTitle className="text-lg line-clamp-2">
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-base md:text-lg line-clamp-2">
               {exercise.nome}
             </CardTitle>
-            <CardDescription className="mt-1 capitalize">
+            <CardDescription className="mt-1 capitalize text-sm md:text-xs">
               {exercise.grupo_muscular?.replace("_", " ")}
             </CardDescription>
           </div>
@@ -89,9 +90,9 @@ export default function ExerciseCard({
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-3 p-4 md:p-6 pt-0 md:pt-0">
         {exercise.descricao && (
-          <p className="text-sm text-muted-foreground line-clamp-2">
+          <p className="text-sm md:text-xs text-muted-foreground line-clamp-2">
             {exercise.descricao}
           </p>
         )}
@@ -136,7 +137,7 @@ export default function ExerciseCard({
             <Button
               size="sm"
               variant="outline"
-              className="flex-1"
+              className="flex-1 h-10 md:h-9"
               onClick={handleEdit}
             >
               <Edit className="w-4 h-4 mr-1" />
@@ -145,7 +146,7 @@ export default function ExerciseCard({
             <Button
               size="sm"
               variant="destructive"
-              className="flex-1"
+              className="flex-1 h-10 md:h-9"
               onClick={handleDelete}
             >
               <Trash2 className="w-4 h-4 mr-1" />

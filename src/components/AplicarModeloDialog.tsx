@@ -68,13 +68,13 @@ export function AplicarModeloDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="max-w-full md:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-xl md:text-2xl">
             <Calendar className="h-5 w-5" />
             Aplicar Modelo de Treino
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-base md:text-sm">
             Escolha os dias da semana para aplicar o modelo "{modelo.nome}"
           </DialogDescription>
         </DialogHeader>
@@ -114,8 +114,8 @@ export function AplicarModeloDialog({
 
           {/* Seleção de dias */}
           <div className="space-y-3">
-            <Label>Selecione os dias da semana</Label>
-            <div className="grid grid-cols-2 gap-3">
+            <Label className="text-base md:text-sm">Selecione os dias da semana</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {DIAS_SEMANA.map((dia) => {
                 const selecionado = diasSelecionados.includes(dia.num);
 
@@ -123,7 +123,7 @@ export function AplicarModeloDialog({
                   <div
                     key={dia.num}
                     className={cn(
-                      "flex items-center space-x-3 rounded-lg border p-4 cursor-pointer transition-all hover:bg-accent",
+                      "flex items-center space-x-3 rounded-lg border p-4 md:p-3 cursor-pointer transition-all hover:bg-accent touch-target",
                       selecionado && "bg-primary/5 border-primary"
                     )}
                     onClick={() => !loading && toggleDia(dia.num)}
@@ -132,16 +132,17 @@ export function AplicarModeloDialog({
                       checked={selecionado}
                       onCheckedChange={() => !loading && toggleDia(dia.num)}
                       disabled={loading}
+                      className="h-5 w-5"
                     />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <Badge
                           variant={selecionado ? "default" : "outline"}
                           className="font-mono text-xs"
                         >
                           {dia.abrev}
                         </Badge>
-                        <span className="text-sm font-medium">{dia.nome}</span>
+                        <span className="text-base md:text-sm font-medium">{dia.nome}</span>
                       </div>
                     </div>
                   </div>

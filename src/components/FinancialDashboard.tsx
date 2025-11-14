@@ -240,37 +240,37 @@ export function FinancialDashboard() {
       {/* Lista de Inadimplentes */}
       {inadimplentesList.length > 0 && (
         <Card className="border-yellow-500/50">
-          <CardHeader>
+          <CardHeader className="p-4 md:p-6">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-yellow-500" />
-              <CardTitle>Alunos Inadimplentes</CardTitle>
+              <CardTitle className="text-lg md:text-xl">Alunos Inadimplentes</CardTitle>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
+          <CardContent className="p-4 md:p-6 pt-0">
+            <div className="space-y-3 md:space-y-4">
               {inadimplentesList.map((student) => (
                 <div
                   key={student.id}
-                  className="flex items-center justify-between p-4 border rounded-lg bg-yellow-50 dark:bg-yellow-950/20"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border rounded-lg bg-yellow-50 dark:bg-yellow-950/20"
                 >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-semibold">{student.nome}</h4>
-                      <Badge variant="destructive">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <h4 className="font-semibold text-base md:text-sm">{student.nome}</h4>
+                      <Badge variant="destructive" className="text-xs">
                         {student.diasAtraso} dias de atraso
                       </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm md:text-xs text-muted-foreground truncate">
                       {student.email}
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm md:text-xs text-muted-foreground">
                       Valor: {formatCurrency(student.valor)} • Vencimento:{" "}
                       {format(new Date(student.data_expiracao), "dd/MM/yyyy", {
                         locale: ptBR,
                       })}
                     </p>
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" className="h-10 md:h-9 w-full sm:w-auto">
                     Enviar Lembrete
                   </Button>
                 </div>

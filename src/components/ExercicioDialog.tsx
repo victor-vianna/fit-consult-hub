@@ -12,9 +12,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Library } from "lucide-react";
+import { Library, Loader2 } from "lucide-react";
 import ExercisePicker from "@/components/exercises/ExercisePicker";
 import type { Exercise } from "@/types/exercise";
+import { cn } from "@/lib/utils";
 
 interface Exercicio {
   id?: string;
@@ -182,7 +183,7 @@ export function ExercicioDialog({
 
             {/* Link vídeo */}
             <div className="space-y-2">
-              <Label htmlFor="link_video">Link do Vídeo (opcional)</Label>
+              <Label htmlFor="link_video" className="text-base md:text-sm">Link do Vídeo (opcional)</Label>
               <Input
                 id="link_video"
                 value={formData.link_video}
@@ -190,18 +191,18 @@ export function ExercicioDialog({
                   setFormData({ ...formData, link_video: e.target.value })
                 }
                 placeholder="https://youtube.com/watch?v=..."
-                className={errors.link_video ? "border-destructive" : ""}
+                className={cn("h-12 md:h-10 text-base md:text-sm", errors.link_video && "border-destructive")}
               />
               {errors.link_video && (
-                <p className="text-sm text-destructive">{errors.link_video}</p>
+                <p className="text-sm md:text-xs text-destructive">{errors.link_video}</p>
               )}
             </div>
 
             {/* Grid principal */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {/* Séries */}
               <div className="space-y-2">
-                <Label htmlFor="series">Séries *</Label>
+                <Label htmlFor="series" className="text-base md:text-sm">Séries *</Label>
                 <Input
                   id="series"
                   type="number"
@@ -214,16 +215,16 @@ export function ExercicioDialog({
                       series: parseInt(e.target.value) || 1,
                     })
                   }
-                  className={errors.series ? "border-destructive" : ""}
+                  className={cn("h-12 md:h-10 text-base md:text-sm", errors.series && "border-destructive")}
                 />
                 {errors.series && (
-                  <p className="text-sm text-destructive">{errors.series}</p>
+                  <p className="text-sm md:text-xs text-destructive">{errors.series}</p>
                 )}
               </div>
 
               {/* Repetições */}
               <div className="space-y-2">
-                <Label htmlFor="repeticoes">Repetições *</Label>
+                <Label htmlFor="repeticoes" className="text-base md:text-sm">Repetições *</Label>
                 <Input
                   id="repeticoes"
                   value={formData.repeticoes}
@@ -231,10 +232,10 @@ export function ExercicioDialog({
                     setFormData({ ...formData, repeticoes: e.target.value })
                   }
                   placeholder="Ex: 10-12, até a falha"
-                  className={errors.repeticoes ? "border-destructive" : ""}
+                  className={cn("h-12 md:h-10 text-base md:text-sm", errors.repeticoes && "border-destructive")}
                 />
                 {errors.repeticoes && (
-                  <p className="text-sm text-destructive">
+                  <p className="text-sm md:text-xs text-destructive">
                     {errors.repeticoes}
                   </p>
                 )}

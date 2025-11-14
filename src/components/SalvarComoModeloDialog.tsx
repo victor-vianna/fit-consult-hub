@@ -71,13 +71,13 @@ export function SalvarComoModeloDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="max-w-full md:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-xl md:text-2xl">
             <Save className="h-5 w-5" />
             Salvar como Modelo Reutilizável
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-base md:text-sm">
             Crie um modelo de treino que pode ser aplicado rapidamente a outros
             alunos
           </DialogDescription>
@@ -85,7 +85,7 @@ export function SalvarComoModeloDialog({
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="nome-modelo" className="required">
+            <Label htmlFor="nome-modelo" className="required text-base md:text-sm">
               Nome do Modelo
             </Label>
             <Input
@@ -95,8 +95,9 @@ export function SalvarComoModeloDialog({
               onChange={(e) => setNome(e.target.value)}
               maxLength={100}
               disabled={loading}
+              className="h-12 md:h-10 text-base md:text-sm"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm md:text-xs text-muted-foreground">
               Dê um nome claro e descritivo
             </p>
           </div>
@@ -141,16 +142,17 @@ export function SalvarComoModeloDialog({
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={loading}
+            className="h-12 md:h-10 w-full sm:w-auto"
           >
             Cancelar
           </Button>
-          <Button onClick={handleSave} disabled={loading || !nome.trim()}>
-            {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          <Button onClick={handleSave} disabled={loading || !nome.trim()} className="h-12 md:h-10 w-full sm:w-auto">
+            {loading && <Loader2 className="h-5 w-5 md:h-4 md:w-4 mr-2 animate-spin" />}
             Salvar Modelo
           </Button>
         </DialogFooter>

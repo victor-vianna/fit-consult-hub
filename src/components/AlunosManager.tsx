@@ -457,11 +457,11 @@ export default function AlunosManager() {
         </Card>
 
         {alunosFiltrados.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {alunosFiltrados.map((aluno) => (
               <Card
                 key={aluno.id}
-                className="group hover:shadow-xl transition-all duration-300 border-2 cursor-pointer relative overflow-hidden"
+                className="group hover:shadow-xl transition-all duration-300 border-2 cursor-pointer relative overflow-hidden touch-target"
                 onClick={() => navigate(`/aluno/${aluno.id}`)}
               >
                 <div

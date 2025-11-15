@@ -3,6 +3,7 @@ import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { fetchUserProfile, fetchUserRole } from "@/services/supabaseService";
 
 export type UserRole = "admin" | "personal" | "aluno";
 
@@ -24,6 +25,17 @@ export const useAuth = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    const initializeUserData = async (userId: string) => {
+      setLoading(true);
+      const [profileData, roleData] = await Promise.all([
+        fetchUserProfile(userId),
+        fetchUserRole(userId),
+      ]);
+      setProfile(profileData);
+      setRole(roleData?.role as UserRole);
+      setLoading(false);
+    };
+
     let initialized = false;
 
     const {
@@ -62,44 +74,6 @@ export const useAuth = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const initializeUserData = async (userId: string) => {
-    setLoading(true);
-    await Promise.all([fetchUserRole(userId), fetchUserProfile(userId)]);
-    setLoading(false);
-  };
-
-  const fetchUserRole = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userId)
-        .single();
-
-      if (error) throw error;
-      setRole(data.role as UserRole);
-    } catch (error) {
-      console.error("Erro ao buscar role:", error);
-      setRole(null);
-    }
-  };
-
-  const fetchUserProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
-
-      if (error) throw error;
-      setProfile(data);
-    } catch (error) {
-      console.error("Erro ao buscar profile:", error);
-      setProfile(null);
-    }
-  };
-
   // 🔁 Listener de mudanças no perfil do aluno
   useEffect(() => {
     if (user && role === "aluno") {
@@ -122,7 +96,6 @@ export const useAuth = () => {
             setProfile(payload.new as Profile);
           }
         )
-
         .subscribe();
 
       return () => {

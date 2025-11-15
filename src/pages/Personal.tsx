@@ -64,6 +64,8 @@ export default function Personal() {
   const [openDialog, setOpenDialog] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const { settings: personalSettings } = usePersonalSettings(user?.id);
 
@@ -84,7 +86,7 @@ export default function Personal() {
     if (user) {
       fetchData();
     }
-  }, [user]);
+  }, [user, currentPage]);
 
   const fetchData = async () => {
     if (!user) return;
@@ -98,11 +100,15 @@ export default function Personal() {
 
       setProfile(profileData);
 
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage - 1;
+
       const { data: alunosData } = await supabase
         .from("profiles")
         .select("*")
         .eq("personal_id", user.id)
-        .order("nome");
+        .order("nome")
+        .range(startIndex, endIndex);
 
       setAlunos(alunosData || []);
 
@@ -150,27 +156,18 @@ export default function Personal() {
         }
       );
 
-      if (error) {
-        // Trata erros específicos
+      const errorMessage = error?.message || data?.error;
+
+      if (errorMessage) {
         if (
-          error.message?.includes("Email já cadastrado") ||
-          error.message?.includes("already been registered")
+          errorMessage.includes("Email já cadastrado") ||
+          errorMessage.includes("already been registered")
         ) {
           throw new Error(
             "Este email já está cadastrado. Use um email diferente."
           );
         }
-        throw error;
-      }
-
-      // Verifica se há erro na resposta
-      if (data?.error) {
-        if (data.error.includes("Email já cadastrado")) {
-          throw new Error(
-            "Este email já está cadastrado. Use um email diferente."
-          );
-        }
-        throw new Error(data.error);
+        throw new Error(errorMessage);
       }
 
       toast({
@@ -379,6 +376,21 @@ export default function Personal() {
                         onClick={() => navigate("/alunos")}
                       >
                         Acessar Gerenciador de Alunos
+                      </Button>
+                    </div>
+                    <div className="flex justify-center items-center gap-4 mt-4">
+                      <Button
+                        onClick={() => setCurrentPage(currentPage - 1)}
+                        disabled={currentPage === 1}
+                      >
+                        Anterior
+                      </Button>
+                      <span>Página {currentPage}</span>
+                      <Button
+                        onClick={() => setCurrentPage(currentPage + 1)}
+                        disabled={alunos.length < itemsPerPage}
+                      >
+                        Próxima
                       </Button>
                     </div>
                   </CardContent>

@@ -19,6 +19,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useHaptic } from "@/hooks/useHaptic";
+import { cn } from "@/lib/utils";
 
 interface MobileMenuDrawerProps {
   open: boolean;
@@ -46,10 +48,18 @@ export function MobileMenuDrawer({
   onSignOut,
 }: MobileMenuDrawerProps) {
   const navigate = useNavigate();
+  const { light } = useHaptic();
 
   const handleNavigateToExercises = () => {
+    light();
     navigate("/exercicios");
-    onOpenChange(false); // Fecha o drawer após navegar
+    onOpenChange(false);
+  };
+
+  const handleMenuItemClick = (value: string) => {
+    light();
+    onSectionChange(value);
+    onOpenChange(false);
   };
 
   return (
@@ -68,14 +78,16 @@ export function MobileMenuDrawer({
             <Button
               key={item.value}
               variant={activeSection === item.value ? "default" : "ghost"}
-              className="justify-start w-full"
-              onClick={() => {
-                onSectionChange(item.value);
-                onOpenChange(false); // Fecha o drawer
-              }}
+              className={cn(
+                "justify-start w-full h-12 md:h-10",
+                "transition-all duration-300 ease-in-out",
+                "active:scale-95",
+                "touch-target"
+              )}
+              onClick={() => handleMenuItemClick(item.value)}
             >
-              <item.icon className="h-4 w-4 mr-2" />
-              {item.title}
+              <item.icon className="h-5 w-5 md:h-4 md:w-4 mr-2" />
+              <span className="text-base md:text-sm">{item.title}</span>
             </Button>
           ))}
         </div>
@@ -112,27 +124,39 @@ export function MobileMenuDrawer({
 
           <Button
             variant="ghost"
-            className="justify-start w-full"
+            className={cn(
+              "justify-start w-full h-12 md:h-10",
+              "transition-all duration-300 ease-in-out",
+              "active:scale-95",
+              "touch-target"
+            )}
             onClick={() => {
-              // TODO: Implementar troca de senha
+              light();
               alert("Funcionalidade em desenvolvimento");
               onOpenChange(false);
             }}
           >
-            <KeyRound className="h-4 w-4 mr-2" />
-            Trocar senha
+            <KeyRound className="h-5 w-5 md:h-4 md:w-4 mr-2" />
+            <span className="text-base md:text-sm">Trocar senha</span>
           </Button>
 
           <Button
             variant="ghost"
-            className="justify-start w-full text-destructive hover:text-destructive"
+            className={cn(
+              "justify-start w-full h-12 md:h-10",
+              "transition-all duration-300 ease-in-out",
+              "active:scale-95",
+              "touch-target",
+              "text-destructive hover:text-destructive"
+            )}
             onClick={() => {
+              light();
               onSignOut();
               onOpenChange(false);
             }}
           >
-            <LogOut className="h-4 w-4 mr-2" />
-            Sair
+            <LogOut className="h-5 w-5 md:h-4 md:w-4 mr-2" />
+            <span className="text-base md:text-sm">Sair</span>
           </Button>
         </div>
       </SheetContent>

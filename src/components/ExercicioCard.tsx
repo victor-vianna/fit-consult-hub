@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { InlinePesoInput } from "@/components/InlinePesoInput";
 import { useExerciseLibrary } from "@/hooks/useExerciseLibrary";
+import { useHaptic } from "@/hooks/useHaptic";
 
 interface Exercicio {
   id: string;
@@ -74,6 +75,7 @@ export function ExercicioCard({
 }: ExercicioCardProps) {
   const [localConcluido, setLocalConcluido] = useState(exercicio.concluido);
   const [isUpdating, setIsUpdating] = useState(false);
+  const { success, light } = useHaptic();
 
   // marca que o usuário interagiu (p/ evitar sobrescrever durante a interação ativa)
   const hasUserInteracted = useRef(false);
@@ -86,9 +88,11 @@ export function ExercicioCard({
   const { abrirExercicioNaBiblioteca } = useExerciseLibrary();
 
   const handleToggle = async (novoValor: boolean) => {
-    // Haptic feedback para mobile
-    if ("vibrate" in navigator) {
-      navigator.vibrate(10);
+    // Feedback háptico: sucesso ao completar, leve ao desmarcar
+    if (novoValor) {
+      success();
+    } else {
+      light();
     }
 
     setLocalConcluido(novoValor);

@@ -9,6 +9,8 @@ import {
   Library,
   UserIcon,
 } from "lucide-react";
+import { useHaptic } from "@/hooks/useHaptic";
+import { cn } from "@/lib/utils";
 
 interface BottomNavigationPersonalProps {
   onMenuClick: () => void;
@@ -21,8 +23,19 @@ export function BottomNavigationPersonal({
 }: BottomNavigationPersonalProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { light } = useHaptic();
 
   const isActive = (path: string) => location.pathname === path;
+
+  const handleNavigate = (path: string) => {
+    light();
+    navigate(path);
+  };
+
+  const handleMenuClick = () => {
+    light();
+    onMenuClick();
+  };
 
   const navItems = [
     {
@@ -55,17 +68,23 @@ export function BottomNavigationPersonal({
             key={item.path}
             variant="ghost"
             size="sm"
-            className={`flex flex-col items-center gap-1 h-14 px-3 ${
-              isActive(item.path) ? "text-primary" : "text-muted-foreground"
-            }`}
-            onClick={() => navigate(item.path)}
+            className={cn(
+              "flex flex-col items-center gap-1 h-14 px-3",
+              "transition-all duration-300 ease-in-out",
+              "active:scale-95",
+              "touch-target",
+              isActive(item.path) 
+                ? "text-primary scale-105" 
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            onClick={() => handleNavigate(item.path)}
             style={
               isActive(item.path) && themeColor
                 ? { color: themeColor }
                 : undefined
             }
           >
-            <item.icon className="h-5 w-5" />
+            <item.icon className="h-5 w-5 transition-transform" />
             <span className="text-xs">{item.label}</span>
           </Button>
         ))}
@@ -73,10 +92,16 @@ export function BottomNavigationPersonal({
         <Button
           variant="ghost"
           size="sm"
-          className="flex flex-col items-center gap-1 h-14 px-3 text-muted-foreground"
-          onClick={onMenuClick}
+          className={cn(
+            "flex flex-col items-center gap-1 h-14 px-3",
+            "transition-all duration-300 ease-in-out",
+            "active:scale-95",
+            "touch-target",
+            "text-muted-foreground hover:text-foreground"
+          )}
+          onClick={handleMenuClick}
         >
-          <Menu className="h-5 w-5" />
+          <Menu className="h-5 w-5 transition-transform" />
           <span className="text-xs">Menu</span>
         </Button>
       </div>

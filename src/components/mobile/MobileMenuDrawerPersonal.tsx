@@ -20,6 +20,8 @@ import {
   Library,
   UserIcon,
 } from "lucide-react";
+import { useHaptic } from "@/hooks/useHaptic";
+import { cn } from "@/lib/utils";
 
 interface MobileMenuDrawerPersonalProps {
   open: boolean;
@@ -38,10 +40,16 @@ export function MobileMenuDrawerPersonal({
   onSignOut,
 }: MobileMenuDrawerPersonalProps) {
   const navigate = useNavigate();
+  const { light } = useHaptic();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/login");
+  };
+
+  const handleMenuItemClick = (onClick: () => void) => {
+    light();
+    onClick();
   };
 
   const menuItems = [
@@ -108,11 +116,16 @@ export function MobileMenuDrawerPersonal({
               <Button
                 key={index}
                 variant="ghost"
-                className="w-full justify-start"
-                onClick={item.onClick}
+                className={cn(
+                  "w-full justify-start h-12 md:h-10",
+                  "transition-all duration-300 ease-in-out",
+                  "active:scale-95",
+                  "touch-target"
+                )}
+                onClick={() => handleMenuItemClick(item.onClick)}
               >
-                <item.icon className="mr-3 h-5 w-5" />
-                {item.label}
+                <item.icon className="mr-3 h-6 w-6 md:h-5 md:w-5" />
+                <span className="text-base md:text-sm">{item.label}</span>
               </Button>
             ))}
           </nav>
@@ -120,14 +133,21 @@ export function MobileMenuDrawerPersonal({
           <div className="p-4 border-t">
             <Button
               variant="ghost"
-              className="w-full justify-start text-destructive hover:text-destructive"
+              className={cn(
+                "w-full justify-start h-12 md:h-10",
+                "transition-all duration-300 ease-in-out",
+                "active:scale-95",
+                "touch-target",
+                "text-destructive hover:text-destructive"
+              )}
               onClick={() => {
+                light();
                 onSignOut();
                 onOpenChange(false);
               }}
             >
-              <LogOut className="mr-3 h-5 w-5" />
-              Sair
+              <LogOut className="mr-3 h-6 w-6 md:h-5 md:w-5" />
+              <span className="text-base md:text-sm">Sair</span>
             </Button>
           </div>
         </div>

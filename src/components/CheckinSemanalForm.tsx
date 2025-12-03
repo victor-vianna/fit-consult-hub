@@ -1,3 +1,4 @@
+// CheckinSemanalForm.tsx
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,7 +39,6 @@ interface CheckinExistente {
   duvidas?: string;
 }
 
-// Função auxiliar para calcular semana do ano
 function getWeekNumber(date: Date): number {
   const d = new Date(
     Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
@@ -108,7 +108,6 @@ export function CheckinSemanalForm({
     verificarSePrimeiraVez();
   }, [profileId, personalId]);
 
-  // Adicione esta função:
   const verificarSePrimeiraVez = async () => {
     try {
       const { data: anamnese, error } = await supabase
@@ -119,20 +118,17 @@ export function CheckinSemanalForm({
         .single();
 
       if (error || !anamnese) {
-        // Sem anamnese = não mostra checkin
         setPodeMostrarCheckin(false);
         setVerificandoPrimeiraVez(false);
         return;
       }
 
-      // Calcula dias desde a anamnese
       const dataAnamnese = new Date(anamnese.created_at);
       const hoje = new Date();
       const diasDesdeAnamnese = Math.floor(
         (hoje.getTime() - dataAnamnese.getTime()) / (1000 * 60 * 60 * 24)
       );
 
-      // Só mostra se passou pelo menos 7 dias
       setPodeMostrarCheckin(diasDesdeAnamnese >= 7);
       setVerificandoPrimeiraVez(false);
     } catch (error) {
@@ -317,6 +313,11 @@ export function CheckinSemanalForm({
             O check-in semanal estará disponível após você completar sua
             primeira semana de treino. Continue firme nos treinos! 💪
           </p>
+          {isModal && onComplete && (
+            <Button onClick={onComplete} variant="outline" className="mt-4">
+              Fechar
+            </Button>
+          )}
         </CardContent>
       </Card>
     );

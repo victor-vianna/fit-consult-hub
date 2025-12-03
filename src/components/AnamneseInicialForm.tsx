@@ -700,7 +700,9 @@ export function AnamneseInicialForm({
                 />
               </div>
               <div>
-                <Label htmlFor="peso_desejado">🏆 Peso desejado (kg)</Label>
+                <Label htmlFor="peso_desejado">
+                  🏆 Quanto gostaria de pesar? (kg)
+                </Label>
                 <Input
                   id="peso_desejado"
                   name="peso_desejado"

@@ -435,7 +435,7 @@ export function AnamneseVisualizacao({
           icon="📏"
         />
         <InfoItem
-          label="Peso Desejado"
+          label="Quanto Gostaria de Pesar"
           value={
             anamnese.peso_desejado ? `${anamnese.peso_desejado} kg` : undefined
           }

@@ -43,6 +43,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ExercicioDialog } from "@/components/ExercicioDialog";
 import { SortableExercicioCard } from "@/components/SortableExercicioCard";
+import { SortableGroupCard } from "@/components/SortableGroupCard";
+import { SortableBlockCard } from "@/components/SortableBlockCard";
 import { WorkoutTimer } from "./WorkoutTimer";
 import { WorkoutDayView } from "./WorkoutDayView";
 import ExercisePicker from "@/components/exercises/ExercisePicker";
@@ -173,6 +175,7 @@ export function TreinosManager({
     obterGruposDoTreino,
     criarGrupo,
     deletarGrupo,
+    reordenarGrupos,
     isCriando: isCriandoGrupo,
     isDeletando: isDeletandoGrupo,
   } = useExerciseGroups({
@@ -190,6 +193,7 @@ export function TreinosManager({
     atualizarBloco,
     deletarBloco,
     marcarConcluido: marcarBlocoConcluido,
+    reordenarBlocos,
     isCriando: isCriandoBloco,
     isDeletando: isDeletandoBloco,
   } = useWorkoutBlocks({
@@ -236,21 +240,75 @@ export function TreinosManager({
     return treino.treinoId || null;
   };
 
-  const handleDragEnd = async (event: DragEndEvent, dia: number) => {
+  // Tipo de item para identificação no drag-and-drop unificado
+  type DraggableItemType = "exercise" | "group" | "block";
+  
+  const parseItemId = (id: string): { type: DraggableItemType; realId: string } => {
+    if (id.startsWith("group-")) {
+      return { type: "group", realId: id.replace("group-", "") };
+    }
+    if (id.startsWith("block-")) {
+      return { type: "block", realId: id.replace("block-", "") };
+    }
+    return { type: "exercise", realId: id };
+  };
+
+  const handleUnifiedDragEnd = async (event: DragEndEvent, dia: number) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
     const treino = treinos.find((t) => t.dia === dia);
     if (!treino) return;
 
-    const oldIndex = treino.exercicios.findIndex((ex) => ex.id === active.id);
-    const newIndex = treino.exercicios.findIndex((ex) => ex.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
+    const treinoId = getTreinoId(treino);
+    if (!treinoId) return;
 
-    const newOrder = arrayMove(treino.exercicios, oldIndex, newIndex);
+    const activeItem = parseItemId(String(active.id));
+    const overItem = parseItemId(String(over.id));
+
+    // Só permite reordenar itens do mesmo tipo
+    if (activeItem.type !== overItem.type) {
+      toast.info("Não é possível reordenar itens de tipos diferentes");
+      return;
+    }
 
     try {
-      await reordenarExercicios(dia, newOrder);
+      if (activeItem.type === "exercise") {
+        // Exercícios isolados
+        const exerciciosIsolados = treino.exercicios.filter((ex) => !ex.grupo_id);
+        const oldIndex = exerciciosIsolados.findIndex((ex) => ex.id === activeItem.realId);
+        const newIndex = exerciciosIsolados.findIndex((ex) => ex.id === overItem.realId);
+        if (oldIndex === -1 || newIndex === -1) return;
+
+        const newOrder = arrayMove(exerciciosIsolados, oldIndex, newIndex);
+        await reordenarExercicios(dia, newOrder);
+      } else if (activeItem.type === "group") {
+        // Grupos de exercícios
+        const grupos = obterGruposDoTreino(treinoId);
+        const oldIndex = grupos.findIndex((g) => g.grupo_id === activeItem.realId);
+        const newIndex = grupos.findIndex((g) => g.grupo_id === overItem.realId);
+        if (oldIndex === -1 || newIndex === -1) return;
+
+        const newOrder = arrayMove(grupos, oldIndex, newIndex);
+        const updates = newOrder.map((grupo, idx) => ({
+          grupo_id: grupo.grupo_id,
+          ordem: idx + 1,
+        }));
+        await reordenarGrupos(updates);
+      } else if (activeItem.type === "block") {
+        // Blocos de treino
+        const blocos = obterBlocos(treinoId);
+        const oldIndex = blocos.findIndex((b) => b.id === activeItem.realId);
+        const newIndex = blocos.findIndex((b) => b.id === overItem.realId);
+        if (oldIndex === -1 || newIndex === -1) return;
+
+        const newOrder = arrayMove(blocos, oldIndex, newIndex);
+        const updates = newOrder.map((bloco, idx) => ({
+          id: bloco.id,
+          ordem: idx + 1,
+        }));
+        await reordenarBlocos(updates);
+      }
     } catch (error) {
       console.error("[TreinosManager] Erro ao reordenar:", error);
     }
@@ -1063,89 +1121,98 @@ export function TreinosManager({
                             </div>
                           </div>
                         ) : (
-                          <div className="space-y-4">
-                            {blocosInicio.length > 0 && (
-                              <div className="space-y-2">
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <Separator className="flex-1" />
-                                  <span>Início do Treino</span>
-                                  <Separator className="flex-1" />
-                                </div>
-                                {blocosInicio.map((bloco, idx) => (
-                                  <WorkoutBlockCard
-                                    key={bloco.id}
-                                    bloco={bloco}
-                                    index={idx}
-                                    readOnly={readOnly}
-                                    onEdit={
-                                      isPersonal
-                                        ? () => {
-                                            setBlocoEditando(bloco);
-                                            setBlockDialogOpen(true);
-                                          }
-                                        : undefined
-                                    }
-                                    onDelete={
-                                      isPersonal
-                                        ? () => handleDeleteBlock(bloco.id)
-                                        : undefined
-                                    }
-                                    onToggleConcluido={
-                                      isAluno
-                                        ? (blocoId, concluido) =>
-                                            marcarBlocoConcluido(
-                                              blocoId,
-                                              concluido
-                                            )
-                                        : undefined
-                                    }
-                                  />
-                                ))}
-                              </div>
-                            )}
-
-                            <div className="space-y-3">
-                              {grupos.length > 0 &&
-                                grupos.map((grupo: any, idx: number) => (
-                                  <GroupedExerciseCard
-                                    key={grupo.grupo_id ?? `grupo-${idx}`}
-                                    grupo={grupo}
-                                    index={idx}
-                                    readOnly={readOnly}
-                                    onEdit={
-                                      isPersonal
-                                        ? () => {
-                                            console.log(
-                                              "[TreinosManager] Editar grupo:",
-                                              grupo.grupo_id
-                                            );
-                                          }
-                                        : undefined
-                                    }
-                                    onDelete={
-                                      isPersonal
-                                        ? () => {
-                                            if (grupo.grupo_id) {
-                                              handleDeleteGroup(grupo.grupo_id);
-                                            }
-                                          }
-                                        : undefined
-                                    }
-                                  />
-                                ))}
-
-                              {exerciciosIsolados.length > 0 && (
-                                <DndContext
-                                  sensors={sensors}
-                                  collisionDetection={closestCenter}
-                                  onDragEnd={(event) =>
-                                    handleDragEnd(event, treino.dia)
-                                  }
-                                >
+                          <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={(event) =>
+                              handleUnifiedDragEnd(event, treino.dia)
+                            }
+                          >
+                            <div className="space-y-4">
+                              {blocosInicio.length > 0 && (
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Separator className="flex-1" />
+                                    <span>Início do Treino</span>
+                                    <Separator className="flex-1" />
+                                  </div>
                                   <SortableContext
-                                    items={exerciciosIsolados.map(
-                                      (ex) => ex.id
-                                    )}
+                                    items={blocosInicio.map((b) => `block-${b.id}`)}
+                                    strategy={verticalListSortingStrategy}
+                                  >
+                                    {blocosInicio.map((bloco, idx) => (
+                                      <SortableBlockCard
+                                        key={bloco.id}
+                                        bloco={bloco}
+                                        index={idx}
+                                        readOnly={readOnly}
+                                        onEdit={
+                                          isPersonal
+                                            ? () => {
+                                                setBlocoEditando(bloco);
+                                                setBlockDialogOpen(true);
+                                              }
+                                            : undefined
+                                        }
+                                        onDelete={
+                                          isPersonal
+                                            ? () => handleDeleteBlock(bloco.id)
+                                            : undefined
+                                        }
+                                        onToggleConcluido={
+                                          isAluno
+                                            ? (blocoId, concluido) =>
+                                                marcarBlocoConcluido(
+                                                  blocoId,
+                                                  concluido
+                                                )
+                                            : undefined
+                                        }
+                                      />
+                                    ))}
+                                  </SortableContext>
+                                </div>
+                              )}
+
+                              <div className="space-y-3">
+                                {grupos.length > 0 && (
+                                  <SortableContext
+                                    items={grupos.map((g: any) => `group-${g.grupo_id}`)}
+                                    strategy={verticalListSortingStrategy}
+                                  >
+                                    {grupos.map((grupo: any, idx: number) => (
+                                      <SortableGroupCard
+                                        key={grupo.grupo_id ?? `grupo-${idx}`}
+                                        grupo={grupo}
+                                        index={idx}
+                                        readOnly={readOnly}
+                                        onEdit={
+                                          isPersonal
+                                            ? () => {
+                                                console.log(
+                                                  "[TreinosManager] Editar grupo:",
+                                                  grupo.grupo_id
+                                                );
+                                              }
+                                            : undefined
+                                        }
+                                        onDelete={
+                                          isPersonal
+                                            ? () => {
+                                                if (grupo.grupo_id) {
+                                                  handleDeleteGroup(grupo.grupo_id);
+                                                }
+                                              }
+                                            : undefined
+                                        }
+                                      />
+                                    ))}
+                                  </SortableContext>
+                                )}
+
+                                {exerciciosIsolados.length > 0 && (
+                                  <SortableContext
+                                    items={exerciciosIsolados.map((ex) => ex.id)}
                                     strategy={verticalListSortingStrategy}
                                   >
                                     <div className="space-y-2">
@@ -1189,90 +1256,100 @@ export function TreinosManager({
                                       )}
                                     </div>
                                   </SortableContext>
-                                </DndContext>
+                                )}
+                              </div>
+
+                              {blocosMeio.length > 0 && (
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Separator className="flex-1" />
+                                    <span>Complementar</span>
+                                    <Separator className="flex-1" />
+                                  </div>
+                                  <SortableContext
+                                    items={blocosMeio.map((b) => `block-${b.id}`)}
+                                    strategy={verticalListSortingStrategy}
+                                  >
+                                    {blocosMeio.map((bloco, idx) => (
+                                      <SortableBlockCard
+                                        key={bloco.id}
+                                        bloco={bloco}
+                                        index={idx}
+                                        readOnly={readOnly}
+                                        onEdit={
+                                          isPersonal
+                                            ? () => {
+                                                setBlocoEditando(bloco);
+                                                setBlockDialogOpen(true);
+                                              }
+                                            : undefined
+                                        }
+                                        onDelete={
+                                          isPersonal
+                                            ? () => handleDeleteBlock(bloco.id)
+                                            : undefined
+                                        }
+                                        onToggleConcluido={
+                                          isAluno
+                                            ? (blocoId, concluido) =>
+                                                marcarBlocoConcluido(
+                                                  blocoId,
+                                                  concluido
+                                                )
+                                            : undefined
+                                        }
+                                      />
+                                    ))}
+                                  </SortableContext>
+                                </div>
+                              )}
+
+                              {blocosFim.length > 0 && (
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Separator className="flex-1" />
+                                    <span>Finalização</span>
+                                    <Separator className="flex-1" />
+                                  </div>
+                                  <SortableContext
+                                    items={blocosFim.map((b) => `block-${b.id}`)}
+                                    strategy={verticalListSortingStrategy}
+                                  >
+                                    {blocosFim.map((bloco, idx) => (
+                                      <SortableBlockCard
+                                        key={bloco.id}
+                                        bloco={bloco}
+                                        index={idx}
+                                        readOnly={readOnly}
+                                        onEdit={
+                                          isPersonal
+                                            ? () => {
+                                                setBlocoEditando(bloco);
+                                                setBlockDialogOpen(true);
+                                              }
+                                            : undefined
+                                        }
+                                        onDelete={
+                                          isPersonal
+                                            ? () => handleDeleteBlock(bloco.id)
+                                            : undefined
+                                        }
+                                        onToggleConcluido={
+                                          isAluno
+                                            ? (blocoId, concluido) =>
+                                                marcarBlocoConcluido(
+                                                  blocoId,
+                                                  concluido
+                                                )
+                                            : undefined
+                                        }
+                                      />
+                                    ))}
+                                  </SortableContext>
+                                </div>
                               )}
                             </div>
-
-                            {blocosMeio.length > 0 && (
-                              <div className="space-y-2">
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <Separator className="flex-1" />
-                                  <span>Complementar</span>
-                                  <Separator className="flex-1" />
-                                </div>
-                                {blocosMeio.map((bloco, idx) => (
-                                  <WorkoutBlockCard
-                                    key={bloco.id}
-                                    bloco={bloco}
-                                    index={idx}
-                                    readOnly={readOnly}
-                                    onEdit={
-                                      isPersonal
-                                        ? () => {
-                                            setBlocoEditando(bloco);
-                                            setBlockDialogOpen(true);
-                                          }
-                                        : undefined
-                                    }
-                                    onDelete={
-                                      isPersonal
-                                        ? () => handleDeleteBlock(bloco.id)
-                                        : undefined
-                                    }
-                                    onToggleConcluido={
-                                      isAluno
-                                        ? (blocoId, concluido) =>
-                                            marcarBlocoConcluido(
-                                              blocoId,
-                                              concluido
-                                            )
-                                        : undefined
-                                    }
-                                  />
-                                ))}
-                              </div>
-                            )}
-
-                            {blocosFim.length > 0 && (
-                              <div className="space-y-2">
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <Separator className="flex-1" />
-                                  <span>Finalização</span>
-                                  <Separator className="flex-1" />
-                                </div>
-                                {blocosFim.map((bloco, idx) => (
-                                  <WorkoutBlockCard
-                                    key={bloco.id}
-                                    bloco={bloco}
-                                    index={idx}
-                                    readOnly={readOnly}
-                                    onEdit={
-                                      isPersonal
-                                        ? () => {
-                                            setBlocoEditando(bloco);
-                                            setBlockDialogOpen(true);
-                                          }
-                                        : undefined
-                                    }
-                                    onDelete={
-                                      isPersonal
-                                        ? () => handleDeleteBlock(bloco.id)
-                                        : undefined
-                                    }
-                                    onToggleConcluido={
-                                      isAluno
-                                        ? (blocoId, concluido) =>
-                                            marcarBlocoConcluido(
-                                              blocoId,
-                                              concluido
-                                            )
-                                        : undefined
-                                    }
-                                  />
-                                ))}
-                              </div>
-                            )}
-                          </div>
+                          </DndContext>
                         )}
                       </CardContent>
                     </CollapsibleContent>

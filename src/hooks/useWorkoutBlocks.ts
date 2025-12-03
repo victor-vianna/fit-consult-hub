@@ -373,6 +373,37 @@ export function useWorkoutBlocks({
     },
   });
 
+  // Mutation: Reordenar blocos
+  const reordenarBlocosMutation = useMutation({
+    mutationFn: async ({
+      blocos,
+    }: {
+      blocos: { id: string; ordem: number }[];
+    }) => {
+      console.log("[useWorkoutBlocks] Reordenando blocos:", blocos.length);
+
+      // Atualizar ordem de cada bloco
+      const updates = blocos.map((bloco) =>
+        supabase
+          .from("blocos_treino")
+          .update({ ordem: bloco.ordem })
+          .eq("id", bloco.id)
+      );
+
+      await Promise.all(updates);
+      return blocos;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: buildQueryKey(profileId, personalId, semana),
+      });
+    },
+    onError: (error: any) => {
+      console.error("[useWorkoutBlocks] Erro ao reordenar:", error);
+      toast.error("Erro ao reordenar blocos");
+    },
+  });
+
   // Função auxiliar para obter blocos de um treino específico
   const obterBlocos = useCallback(
     (treinoSemanalId: string): BlocoTreino[] => {
@@ -402,9 +433,12 @@ export function useWorkoutBlocks({
       queryClient.invalidateQueries({
         queryKey: buildQueryKey(profileId, personalId, semana),
       }),
+    reordenarBlocos: (blocos: { id: string; ordem: number }[]) =>
+      reordenarBlocosMutation.mutateAsync({ blocos }),
     isCriando: criarBlocoMutation.status === "pending",
     isAtualizando: atualizarBlocoMutation.status === "pending",
     isDeletando: deletarBlocoMutation.status === "pending",
     isMarcando: marcarConcluidoMutation.status === "pending",
+    isReordenando: reordenarBlocosMutation.status === "pending",
   };
 }

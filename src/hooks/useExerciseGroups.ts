@@ -471,6 +471,36 @@ export function useExerciseGroups({
     },
   });
 
+  // Mutation: Reordenar grupos (atualiza ordem de todos os exercícios do grupo)
+  const reordenarGruposMutation = useMutation({
+    mutationFn: async ({
+      grupos,
+    }: {
+      grupos: { grupo_id: string; ordem: number }[];
+    }) => {
+      console.log("[useExerciseGroups] Reordenando grupos:", grupos.length);
+
+      // Atualizar ordem de cada grupo (todos os exercícios do grupo)
+      for (const grupo of grupos) {
+        await supabase
+          .from("exercicios")
+          .update({ ordem: grupo.ordem })
+          .eq("grupo_id", grupo.grupo_id);
+      }
+
+      return grupos;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: buildQueryKey(profileId, personalId, semana),
+      });
+    },
+    onError: (error: any) => {
+      console.error("[useExerciseGroups] Erro ao reordenar:", error);
+      toast.error("Erro ao reordenar grupos");
+    },
+  });
+
   // Função auxiliar para obter grupos de um treino específico
   const obterGruposDoTreino = useCallback(
     (treinoSemanalId: string): GrupoExercicio[] => {
@@ -505,6 +535,8 @@ export function useExerciseGroups({
     ) => atualizarMetaGrupoMutation.mutateAsync({ grupoId, dataPatch }),
     deletarGrupo: (grupoId: string) =>
       deletarGrupoMutation.mutateAsync(grupoId),
+    reordenarGrupos: (grupos: { grupo_id: string; ordem: number }[]) =>
+      reordenarGruposMutation.mutateAsync({ grupos }),
     refetch: () => refetch(),
     recarregar: () =>
       queryClient.invalidateQueries({
@@ -514,5 +546,6 @@ export function useExerciseGroups({
     isAdicionando: adicionarExercicioMutation.status === "pending",
     isAtualizando: atualizarMetaGrupoMutation.status === "pending",
     isDeletando: deletarGrupoMutation.status === "pending",
+    isReordenando: reordenarGruposMutation.status === "pending",
   };
 }

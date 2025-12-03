@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 function getWeekNumber(date: Date): number {
@@ -20,69 +20,74 @@ interface AnamneseCheckinStatus {
   loading: boolean;
   error: string | null;
   refresh: () => void;
+  dismissCheckinModal: () => void;
 }
 
 export function useAnamneseCheckin(
   profileId?: string,
   personalId?: string
 ): AnamneseCheckinStatus {
-  const [status, setStatus] = useState<AnamneseCheckinStatus>({
-    anamnesePreenchida: false,
-    checkinSemanalFeito: false,
-    podeAcessarTreinos: true, // Padrão true para não bloquear durante loading
-    mostrarModalAnamnese: false,
-    mostrarModalCheckin: false,
-    loading: true,
-    error: null,
-    refresh: () => {},
-  });
+  const [anamnesePreenchida, setAnamnesePreenchida] = useState(false);
+  const [checkinSemanalFeito, setCheckinSemanalFeito] = useState(false);
+  const [podeAcessarTreinos, setPodeAcessarTreinos] = useState(true);
+  const [mostrarModalAnamnese, setMostrarModalAnamnese] = useState(false);
+  const [mostrarModalCheckin, setMostrarModalCheckin] = useState(false);
+  const [checkinModalDismissed, setCheckinModalDismissed] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const verificarStatus = async () => {
+  const dismissCheckinModal = useCallback(() => {
+    setCheckinModalDismissed(true);
+    setMostrarModalCheckin(false);
+  }, []);
+
+  const verificarStatus = useCallback(async () => {
     // Se não tem profileId ou personalId, não faz nada
     if (!profileId || !personalId) {
-      setStatus((prev) => ({
-        ...prev,
-        loading: false,
-        podeAcessarTreinos: true,
-        mostrarModalAnamnese: false,
-        mostrarModalCheckin: false,
-        refresh: verificarStatus,
-      }));
+      setLoading(false);
+      setPodeAcessarTreinos(true);
+      setMostrarModalAnamnese(false);
+      setMostrarModalCheckin(false);
       return;
     }
 
     try {
-      setStatus((prev) => ({ ...prev, loading: true, error: null }));
+      setLoading(true);
+      setError(null);
 
       // Verificar anamnese
       const { data: anamnese, error: anamneseError } = await supabase
         .from("anamnese_inicial")
-        .select("id")
+        .select("id, created_at")
         .eq("profile_id", profileId)
         .eq("personal_id", personalId)
-        .maybeSingle(); // Usa maybeSingle ao invés de single
+        .maybeSingle();
 
       if (anamneseError) {
         console.error("Erro ao verificar anamnese:", anamneseError);
         throw anamneseError;
       }
 
-      const anamnesePreenchida = !!anamnese;
+      const anamneseExists = !!anamnese;
+      setAnamnesePreenchida(anamneseExists);
 
       // Se não tem anamnese, já retorna bloqueado
-      if (!anamnesePreenchida) {
-        setStatus({
-          anamnesePreenchida: false,
-          checkinSemanalFeito: false,
-          podeAcessarTreinos: false,
-          mostrarModalAnamnese: true,
-          mostrarModalCheckin: false,
-          loading: false,
-          error: null,
-          refresh: verificarStatus,
-        });
+      if (!anamneseExists) {
+        setCheckinSemanalFeito(false);
+        setPodeAcessarTreinos(false);
+        setMostrarModalAnamnese(true);
+        setMostrarModalCheckin(false);
+        setLoading(false);
         return;
       }
+
+      // Verificar se já passou 7 dias desde a anamnese
+      const dataAnamnese = new Date(anamnese.created_at);
+      const hoje = new Date();
+      const diasDesdeAnamnese = Math.floor(
+        (hoje.getTime() - dataAnamnese.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      const primeiraSemana = diasDesdeAnamnese < 7;
 
       // Verificar check-in semanal
       const ano = new Date().getFullYear();
@@ -95,62 +100,76 @@ export function useAnamneseCheckin(
         .eq("personal_id", personalId)
         .eq("ano", ano)
         .eq("numero_semana", semana)
-        .maybeSingle(); // Usa maybeSingle ao invés de single
+        .maybeSingle();
 
       if (checkinError) {
         console.error("Erro ao verificar check-in:", checkinError);
         throw checkinError;
       }
 
-      const checkinSemanalFeito = !!checkin;
+      const checkinFeito = !!checkin;
+      setCheckinSemanalFeito(checkinFeito);
 
       // Verificar configuração do personal
-      const { data: config, error: configError } = await supabase
+      const { data: config } = await supabase
         .from("configuracao_checkins")
         .select("checkin_obrigatorio, bloquear_treinos")
         .eq("personal_id", personalId)
         .maybeSingle();
 
-      // Se não tiver configuração ou erro, assume padrões
+      // Se não tiver configuração, assume padrões
       const checkinObrigatorio = config?.checkin_obrigatorio ?? true;
       const bloquearTreinos = config?.bloquear_treinos ?? true;
 
-      // Determinar se pode acessar treinos
-      let podeAcessarTreinos = true;
-      let mostrarModalCheckin = false;
-
-      if (checkinObrigatorio && bloquearTreinos && !checkinSemanalFeito) {
-        podeAcessarTreinos = false;
-        mostrarModalCheckin = true;
+      // Determinar se pode acessar treinos e mostrar modal
+      // Na primeira semana: pode acessar treinos, modal pode ser dismissado
+      // Após primeira semana: se check-in obrigatório e não feito, bloqueia
+      if (primeiraSemana) {
+        // Primeira semana: libera treinos, mas mostra modal se não foi dismissado
+        setPodeAcessarTreinos(true);
+        setMostrarModalAnamnese(false);
+        // Só mostra modal se não foi dismissado pelo usuário
+        if (!checkinModalDismissed && checkinObrigatorio && !checkinFeito) {
+          setMostrarModalCheckin(true);
+        } else {
+          setMostrarModalCheckin(false);
+        }
+      } else {
+        // Após primeira semana: segue regra normal
+        if (checkinObrigatorio && bloquearTreinos && !checkinFeito) {
+          setPodeAcessarTreinos(false);
+          setMostrarModalCheckin(true);
+        } else {
+          setPodeAcessarTreinos(true);
+          setMostrarModalCheckin(false);
+        }
       }
 
-      setStatus({
-        anamnesePreenchida,
-        checkinSemanalFeito,
-        podeAcessarTreinos,
-        mostrarModalAnamnese: false,
-        mostrarModalCheckin,
-        loading: false,
-        error: null,
-        refresh: verificarStatus,
-      });
-    } catch (error: any) {
-      console.error("Erro ao verificar status:", error);
-      setStatus((prev) => ({
-        ...prev,
-        loading: false,
-        error: error.message,
-        podeAcessarTreinos: true, // Em caso de erro, não bloqueia
-        mostrarModalAnamnese: false,
-        mostrarModalCheckin: false,
-        refresh: verificarStatus,
-      }));
+      setMostrarModalAnamnese(false);
+      setLoading(false);
+    } catch (err: any) {
+      console.error("Erro ao verificar status:", err);
+      setError(err.message);
+      setLoading(false);
+      setPodeAcessarTreinos(true); // Em caso de erro, não bloqueia
+      setMostrarModalAnamnese(false);
+      setMostrarModalCheckin(false);
     }
-  };
+  }, [profileId, personalId, checkinModalDismissed]);
 
   useEffect(() => {
     verificarStatus();
-  }, [profileId, personalId]);
+  }, [verificarStatus]);
 
-  return { ...status, refresh: verificarStatus };
+  return {
+    anamnesePreenchida,
+    checkinSemanalFeito,
+    podeAcessarTreinos,
+    mostrarModalAnamnese,
+    mostrarModalCheckin,
+    loading,
+    error,
+    refresh: verificarStatus,
+    dismissCheckinModal,
+  };
 }

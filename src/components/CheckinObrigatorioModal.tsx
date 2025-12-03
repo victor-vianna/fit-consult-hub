@@ -18,6 +18,7 @@ interface Props {
   themeColor?: string;
   open: boolean;
   onComplete: () => void;
+  onClose?: () => void;
 }
 
 export function CheckinObrigatorioModal({
@@ -26,6 +27,7 @@ export function CheckinObrigatorioModal({
   themeColor,
   open,
   onComplete,
+  onClose,
 }: Props) {
   const [personalName, setPersonalName] = useState<string>("");
   const [lastCheckinDate, setLastCheckinDate] = useState<string | null>(null);
@@ -115,13 +117,26 @@ export function CheckinObrigatorioModal({
     onComplete();
   };
 
+  const handleClose = () => {
+    setInternalOpen(false);
+    if (onClose) {
+      onClose();
+    }
+  };
+
   return (
     <Dialog
       open={internalOpen}
       onOpenChange={(isOpen) => {
         if (!isOpen) {
           setInternalOpen(false);
-          onComplete();
+          // Se está na primeira semana, chama onClose (dismiss)
+          // Se não, chama onComplete (foi preenchido ou fechou forçado)
+          if (!alreadyOneWeek && onClose) {
+            onClose();
+          } else {
+            onComplete();
+          }
         }
       }}
     >
@@ -168,7 +183,7 @@ export function CheckinObrigatorioModal({
             
             <div className="flex justify-end">
               <button
-                onClick={handleComplete}
+                onClick={handleClose}
                 className="px-6 py-2 rounded-lg font-medium transition-colors bg-muted hover:bg-muted/80 text-foreground"
               >
                 Fechar

@@ -13,7 +13,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     profile?.personal_id
   );
 
-  const { mostrarModalAnamnese, mostrarModalCheckin, loading, refresh } =
+  const { mostrarModalAnamnese, mostrarModalCheckin, loading, refresh, dismissCheckinModal } =
     useAnamneseCheckin(user?.id, profile?.personal_id);
 
   const handleAnamneseComplete = () => {
@@ -21,7 +21,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   const handleCheckinComplete = () => {
+    // Se o check-in foi preenchido, refresh para atualizar o estado
+    // Se foi apenas fechado (primeira semana), o dismissCheckinModal já foi chamado
     refresh();
+  };
+
+  const handleCheckinClose = () => {
+    // Chamado quando o modal é fechado sem preencher (primeira semana)
+    dismissCheckinModal();
   };
 
   // Renderiza os modais apenas se:
@@ -59,6 +66,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           themeColor={personalSettings?.theme_color}
           open={mostrarModalCheckin}
           onComplete={handleCheckinComplete}
+          onClose={handleCheckinClose}
         />
       )}
     </div>

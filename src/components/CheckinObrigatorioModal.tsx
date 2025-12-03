@@ -145,25 +145,36 @@ export function CheckinObrigatorioModal({
 
         {/* ----------- BLOQUEIO SE AINDA NÃO COMPLETOU 1 SEMANA ----------- */}
         {!alreadyOneWeek ? (
-          <Alert className="border-2 border-yellow-300 bg-yellow-50 mt-4">
-            <Calendar className="h-5 w-5 text-yellow-600" />
-            <AlertDescription className="ml-2">
-              <p className="font-semibold mb-1 text-yellow-900">
-                ⏳ Check-in disponível após 7 dias
-              </p>
-              <p className="text-sm text-yellow-800">
-                Como você está na sua primeira semana de treino, o check-in será
-                liberado somente após uma semana completa.
-              </p>
-
-              {firstAccessDate && (
-                <p className="text-xs text-yellow-700 mt-2 italic">
-                  📅 Sua anamnese foi preenchida em:{" "}
-                  {format(firstAccessDate, "dd/MM/yyyy HH:mm")}
+          <div className="space-y-4">
+            <Alert className="border-2 border-yellow-300 bg-yellow-50 mt-4">
+              <Calendar className="h-5 w-5 text-yellow-600" />
+              <AlertDescription className="ml-2">
+                <p className="font-semibold mb-1 text-yellow-900">
+                  ⏳ Check-in disponível após 7 dias
                 </p>
-              )}
-            </AlertDescription>
-          </Alert>
+                <p className="text-sm text-yellow-800">
+                  Como você está na sua primeira semana de treino, o check-in será
+                  liberado somente após uma semana completa.
+                </p>
+
+                {firstAccessDate && (
+                  <p className="text-xs text-yellow-700 mt-2 italic">
+                    📅 Sua anamnese foi preenchida em:{" "}
+                    {format(firstAccessDate, "dd/MM/yyyy HH:mm")}
+                  </p>
+                )}
+              </AlertDescription>
+            </Alert>
+            
+            <div className="flex justify-end">
+              <button
+                onClick={handleComplete}
+                className="px-6 py-2 rounded-lg font-medium transition-colors bg-muted hover:bg-muted/80 text-foreground"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
         ) : (
           <>
             {/* ----------- CHECK-IN LIBERADO ----------- */}

@@ -82,6 +82,8 @@ export function CheckinSemanalForm({
   const [saudeGeral, setSaudeGeral] = useState([5]);
   const [qualidadeVida, setQualidadeVida] = useState([5]);
   const [nivelDificuldade, setNivelDificuldade] = useState([5]);
+  const [podeMostrarCheckin, setPodeMostrarCheckin] = useState(false);
+  const [verificandoPrimeiraVez, setVerificandoPrimeiraVez] = useState(true);
 
   const [formData, setFormData] = useState({
     peso_atual: "",
@@ -101,6 +103,44 @@ export function CheckinSemanalForm({
   const anoAtual = today.getFullYear();
   const inicioSemana = getStartOfWeek(today);
   const fimSemana = getEndOfWeek(today);
+
+  useEffect(() => {
+    verificarSePrimeiraVez();
+  }, [profileId, personalId]);
+
+  // Adicione esta função:
+  const verificarSePrimeiraVez = async () => {
+    try {
+      const { data: anamnese, error } = await supabase
+        .from("anamnese_inicial")
+        .select("created_at")
+        .eq("profile_id", profileId)
+        .eq("personal_id", personalId)
+        .single();
+
+      if (error || !anamnese) {
+        // Sem anamnese = não mostra checkin
+        setPodeMostrarCheckin(false);
+        setVerificandoPrimeiraVez(false);
+        return;
+      }
+
+      // Calcula dias desde a anamnese
+      const dataAnamnese = new Date(anamnese.created_at);
+      const hoje = new Date();
+      const diasDesdeAnamnese = Math.floor(
+        (hoje.getTime() - dataAnamnese.getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      // Só mostra se passou pelo menos 7 dias
+      setPodeMostrarCheckin(diasDesdeAnamnese >= 7);
+      setVerificandoPrimeiraVez(false);
+    } catch (error) {
+      console.error("Erro ao verificar primeira vez:", error);
+      setPodeMostrarCheckin(false);
+      setVerificandoPrimeiraVez(false);
+    }
+  };
 
   useEffect(() => {
     fetchPersonalName();
@@ -243,6 +283,44 @@ export function CheckinSemanalForm({
     if (nota <= 6) return "😐";
     return "😊";
   };
+
+  if (verificandoPrimeiraVez) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <div
+            className="animate-spin rounded-full h-12 w-12 border-4 mx-auto mb-4"
+            style={{
+              borderColor: themeColor
+                ? `${themeColor}40`
+                : "rgba(0, 0, 0, 0.1)",
+              borderTopColor: themeColor || "#000000",
+            }}
+          />
+          <p className="text-muted-foreground">Verificando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!podeMostrarCheckin) {
+    return (
+      <Card className="border-2 shadow-md">
+        <CardContent className="py-16 text-center">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-muted mb-4">
+            <TrendingUp className="h-10 w-10 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">
+            Check-in ainda não disponível
+          </h3>
+          <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+            O check-in semanal estará disponível após você completar sua
+            primeira semana de treino. Continue firme nos treinos! 💪
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className={`border-2 shadow-lg ${isModal ? "" : ""}`}>

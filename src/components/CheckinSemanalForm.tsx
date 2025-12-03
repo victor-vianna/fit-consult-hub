@@ -270,13 +270,13 @@ export function CheckinSemanalForm({
 
   const getCorNota = (nota: number) => {
     if (nota <= 3) return "text-red-600";
-    if (nota <= 6) return "text-yellow-600";
+    if (nota <= 7) return "text-yellow-600";
     return "text-green-600";
   };
 
   const getEmojiNota = (nota: number) => {
     if (nota <= 3) return "😞";
-    if (nota <= 6) return "😐";
+    if (nota <= 7) return "😐";
     return "😊";
   };
 

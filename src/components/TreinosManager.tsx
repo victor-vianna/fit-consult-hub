@@ -26,6 +26,8 @@ import {
   Plus,
   Edit,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Loader2,
   Dumbbell,
   Calendar,
@@ -34,6 +36,8 @@ import {
   Link as LinkIcon,
   Blocks,
 } from "lucide-react";
+import { format, parseISO, addDays } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   Collapsible,
   CollapsibleContent,
@@ -132,6 +136,12 @@ export function TreinosManager({
     reordenarExercicios,
     editarDescricao,
     marcarExercicioConcluido,
+    // Navegação de semanas
+    semanaSelecionada,
+    irParaSemanaAnterior,
+    irParaProximaSemana,
+    irParaSemanaAtual,
+    isSemanaAtual,
   } = useTreinos({ profileId, personalId });
 
   // Buscar nome do aluno
@@ -787,11 +797,18 @@ export function TreinosManager({
     }
   };
 
+  // Formatar data da semana selecionada para exibição
+  const formatarSemana = () => {
+    const inicio = parseISO(semanaSelecionada);
+    const fim = addDays(inicio, 6);
+    return `${format(inicio, "dd/MM", { locale: ptBR })} - ${format(fim, "dd/MM/yyyy", { locale: ptBR })}`;
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-lg">
               <Dumbbell className="h-6 w-6 text-primary" />
@@ -804,6 +821,43 @@ export function TreinosManager({
                 Gerencie os treinos do aluno
               </p>
             </div>
+          </div>
+
+          {/* Navegação de Semanas */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+              onClick={irParaSemanaAnterior}
+              title="Semana anterior"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            
+            <div className="flex flex-col items-center min-w-[140px]">
+              <span className="text-sm font-medium">{formatarSemana()}</span>
+              {!isSemanaAtual && (
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0 text-xs text-primary"
+                  onClick={irParaSemanaAtual}
+                >
+                  Ir para semana atual
+                </Button>
+              )}
+            </div>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+              onClick={irParaProximaSemana}
+              title="Próxima semana"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </Button>
           </div>
 
           {/* Controle de Semana Ativa */}

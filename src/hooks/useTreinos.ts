@@ -1,5 +1,5 @@
 // hooks/useTreinos.ts
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import {
   useQuery,
   useMutation,
@@ -11,20 +11,13 @@ import { toast } from "sonner";
 import { exercicioSchema } from "@/lib/schemas/exercicioSchema";
 import type { Exercicio, TreinoDia } from "@/types/treino";
 import { useExerciseGroups } from "@/hooks/useExerciseGroups";
+import { getWeekStart, getPreviousWeekStart, getNextWeekStart, isCurrentWeek } from "@/utils/weekUtils";
 
 interface UseTreinosProps {
   profileId: string;
   personalId: string;
+  initialWeek?: string;
 }
-
-// Utilitário: retorna início da semana (segunda-feira)
-const getWeekStart = (date = new Date()) => {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  const diff = d.getDate() - d.getDay() + 1;
-  const inicio = new Date(d.setDate(diff));
-  return inicio.toISOString().split("T")[0];
-};
 
 const buildQueryKey = (
   profileId: string,
@@ -61,14 +54,38 @@ const validarDiaSemana = (dia: number): number => {
   return diaValido;
 };
 
-export function useTreinos({ profileId, personalId }: UseTreinosProps) {
+export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosProps) {
   const queryClient = useQueryClient();
   const { obterGruposDoTreino } = useExerciseGroups({
     profileId,
     personalId,
     enabled: true,
   });
-  const semana = getWeekStart();
+  
+  // Estado para semana selecionada (navegável)
+  const [semanaSelecionada, setSemanaSelecionada] = useState<string>(
+    initialWeek || getWeekStart()
+  );
+
+  // Query separada para buscar semana ativa do personal
+  const { data: semanaAtivaData } = useQuery({
+    queryKey: ["semana-ativa", profileId, personalId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("treino_semana_ativa")
+        .select("semana_inicio")
+        .eq("profile_id", profileId)
+        .eq("personal_id", personalId)
+        .maybeSingle();
+      
+      return data?.semana_inicio || null;
+    },
+    enabled: !!profileId && !!personalId,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // ✅ A semana a ser buscada: prioriza semana selecionada, depois ativa, depois atual
+  const semanaParaBuscar = semanaSelecionada;
 
   const {
     data: treinos = buildInitialTreinos(),
@@ -76,30 +93,10 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
     error,
     refetch,
   } = useQuery({
-    queryKey: buildQueryKey(profileId, personalId, semana),
+    // ✅ CORREÇÃO: queryKey usa semanaParaBuscar (a mesma que é buscada)
+    queryKey: buildQueryKey(profileId, personalId, semanaParaBuscar),
     queryFn: async (): Promise<TreinoDia[]> => {
-      const hoje = new Date();
-      const inicioDaSemana = new Date(hoje);
-      inicioDaSemana.setDate(hoje.getDate() - hoje.getDay() + 1);
-
-      // ✅ Buscar semana ativa configurada pelo personal
-      const { data: semanaAtiva } = await supabase
-        .from("treino_semana_ativa")
-        .select("semana_inicio")
-        .eq("profile_id", profileId)
-        .eq("personal_id", personalId)
-        .maybeSingle();
-
-      // Usar semana ativa se existir, senão usar semana atual
-      const semanaParaBuscar = semanaAtiva?.semana_inicio 
-        ? new Date(semanaAtiva.semana_inicio).toISOString().split("T")[0]
-        : inicioDaSemana.toISOString().split("T")[0];
-
-      console.log(`[useTreinos] Buscando treinos para semana: ${semanaParaBuscar}`, {
-        semanaAtiva: semanaAtiva?.semana_inicio,
-        semanaAtual: inicioDaSemana.toISOString().split("T")[0],
-        usandoSemanaAtiva: !!semanaAtiva
-      });
+      console.log(`[useTreinos] Buscando treinos para semana: ${semanaParaBuscar}`);
 
       const { data: treinosSemanais, error: treinosError } = await supabase
         .from("treinos_semanais")
@@ -229,10 +226,6 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
         return treino.treinoId as string;
       }
 
-      const hoje = new Date();
-      const inicioDaSemana = new Date(hoje);
-      inicioDaSemana.setDate(hoje.getDate() - hoje.getDay() + 1);
-
       console.log(`[useTreinos] Criando treino semanal para dia ${diaValido}`);
 
       const { data, error } = await supabase
@@ -240,8 +233,8 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
         .insert({
           profile_id: profileId,
           personal_id: personalId,
-          semana: inicioDaSemana.toISOString().split("T")[0],
-          dia_semana: diaValido, // ✅ Usar dia validado
+          semana: semanaParaBuscar,
+          dia_semana: diaValido,
           concluido: false,
         })
         .select()
@@ -258,8 +251,23 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
       console.log(`[useTreinos] Treino criado com sucesso:`, data.id);
       return data.id;
     },
-    [personalId, profileId, treinos]
+    [personalId, profileId, treinos, semanaParaBuscar]
   );
+
+  // Funções de navegação de semana
+  const irParaSemanaAnterior = useCallback(() => {
+    setSemanaSelecionada(getPreviousWeekStart(semanaSelecionada));
+  }, [semanaSelecionada]);
+
+  const irParaProximaSemana = useCallback(() => {
+    setSemanaSelecionada(getNextWeekStart(semanaSelecionada));
+  }, [semanaSelecionada]);
+
+  const irParaSemanaAtual = useCallback(() => {
+    setSemanaSelecionada(getWeekStart());
+  }, []);
+
+  const isSemanaAtual = isCurrentWeek(semanaSelecionada);
 
   // ---------- Mutations ----------
   const adicionarExercicioMutation = useMutation({
@@ -345,7 +353,7 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: buildQueryKey(profileId, personalId, semana),
+        queryKey: buildQueryKey(profileId, personalId, semanaParaBuscar),
       });
       await refetch();
       toast.success("Exercício adicionado com sucesso");
@@ -385,7 +393,7 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: buildQueryKey(profileId, personalId, semana),
+        queryKey: buildQueryKey(profileId, personalId, semanaParaBuscar),
       });
       await refetch();
       toast.success("Exercício atualizado com sucesso");
@@ -407,7 +415,7 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: buildQueryKey(profileId, personalId, semana),
+        queryKey: buildQueryKey(profileId, personalId, semanaParaBuscar),
       });
       await refetch();
       toast.success("Exercício removido com sucesso");
@@ -437,7 +445,7 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: buildQueryKey(profileId, personalId, semana),
+        queryKey: buildQueryKey(profileId, personalId, semanaParaBuscar),
       });
       toast.success("Ordem atualizada");
     },
@@ -467,7 +475,7 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: buildQueryKey(profileId, personalId, semana),
+        queryKey: buildQueryKey(profileId, personalId, semanaParaBuscar),
       });
       toast.success("Grupo muscular atualizado");
     },
@@ -494,10 +502,10 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
     },
     onMutate: async ({ exercicioId, concluido }) => {
       await queryClient.cancelQueries({
-        queryKey: buildQueryKey(profileId, personalId, semana),
+        queryKey: buildQueryKey(profileId, personalId, semanaParaBuscar),
       });
       const previous = queryClient.getQueryData<TreinoDia[]>(
-        buildQueryKey(profileId, personalId, semana)
+        buildQueryKey(profileId, personalId, semanaParaBuscar)
       );
       if (previous) {
         const next = previous.map((t) => ({
@@ -507,7 +515,7 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
           ),
         }));
         queryClient.setQueryData(
-          buildQueryKey(profileId, personalId, semana),
+          buildQueryKey(profileId, personalId, semanaParaBuscar),
           next
         );
       }
@@ -516,7 +524,7 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
     onError: (_err, _vars, context: any) => {
       if (context?.previous) {
         queryClient.setQueryData(
-          buildQueryKey(profileId, personalId, semana),
+          buildQueryKey(profileId, personalId, semanaParaBuscar),
           context.previous
         );
       }
@@ -524,7 +532,7 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
     },
     onSettled: () => {
       queryClient.invalidateQueries({
-        queryKey: buildQueryKey(profileId, personalId, semana),
+        queryKey: buildQueryKey(profileId, personalId, semanaParaBuscar),
       });
     },
   });
@@ -533,6 +541,15 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
     treinos,
     loading,
     error,
+    // Navegação de semanas
+    semanaSelecionada,
+    setSemanaSelecionada,
+    irParaSemanaAnterior,
+    irParaProximaSemana,
+    irParaSemanaAtual,
+    isSemanaAtual,
+    semanaAtivaData,
+    // Mutations
     adicionarExercicio: (dia: number, exercicio: Partial<Exercicio>) =>
       adicionarExercicioMutation.mutateAsync({ dia, exercicio }),
     editarExercicio: (exercicioId: string, dados: Partial<Exercicio>) =>
@@ -548,7 +565,7 @@ export function useTreinos({ profileId, personalId }: UseTreinosProps) {
     refetch: () => refetch(),
     recarregar: () =>
       queryClient.invalidateQueries({
-        queryKey: buildQueryKey(profileId, personalId, semana),
+        queryKey: buildQueryKey(profileId, personalId, semanaParaBuscar),
       }),
     isAdicionando: adicionarExercicioMutation.status === "pending",
     isEditando: editarExercicioMutation.status === "pending",

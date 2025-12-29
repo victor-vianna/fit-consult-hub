@@ -68,8 +68,8 @@ export function AplicarModeloDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-full md:max-w-[600px]">
-        <DialogHeader>
+      <DialogContent className="max-w-full md:max-w-[600px] max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2 text-xl md:text-2xl">
             <Calendar className="h-5 w-5" />
             Aplicar Modelo de Treino
@@ -79,9 +79,9 @@ export function AplicarModeloDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="flex-1 overflow-y-auto space-y-4 py-2">
           {/* Informações do modelo */}
-          <div className="rounded-lg border p-4 space-y-3 bg-muted/30">
+          <div className="rounded-lg border p-3 space-y-2 bg-muted/30">
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1">
                 <h4 className="font-semibold text-base">{modelo.nome}</h4>
@@ -113,9 +113,9 @@ export function AplicarModeloDialog({
           </div>
 
           {/* Seleção de dias */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <Label className="text-base md:text-sm">Selecione os dias da semana</Label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2">
               {DIAS_SEMANA.map((dia) => {
                 const selecionado = diasSelecionados.includes(dia.num);
 
@@ -123,7 +123,7 @@ export function AplicarModeloDialog({
                   <div
                     key={dia.num}
                     className={cn(
-                      "flex items-center space-x-3 rounded-lg border p-4 md:p-3 cursor-pointer transition-all hover:bg-accent touch-target",
+                      "flex items-center space-x-2 rounded-lg border p-3 cursor-pointer transition-all hover:bg-accent",
                       selecionado && "bg-primary/5 border-primary"
                     )}
                     onClick={() => !loading && toggleDia(dia.num)}
@@ -132,17 +132,17 @@ export function AplicarModeloDialog({
                       checked={selecionado}
                       onCheckedChange={() => !loading && toggleDia(dia.num)}
                       disabled={loading}
-                      className="h-5 w-5"
+                      className="h-4 w-4"
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <Badge
                           variant={selecionado ? "default" : "outline"}
-                          className="font-mono text-xs"
+                          className="font-mono text-xs px-1.5 py-0"
                         >
                           {dia.abrev}
                         </Badge>
-                        <span className="text-base md:text-sm font-medium">{dia.nome}</span>
+                        <span className="text-sm font-medium hidden sm:inline">{dia.nome}</span>
                       </div>
                     </div>
                   </div>
@@ -161,8 +161,8 @@ export function AplicarModeloDialog({
 
           {/* Aviso */}
           {diasSelecionados.length > 0 && (
-            <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-950">
-              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+            <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-2 dark:border-yellow-800 dark:bg-yellow-950">
+              <p className="text-xs text-yellow-800 dark:text-yellow-200">
                 ⚠️ Se já existir treino nos dias selecionados, ele será
                 substituído pelo modelo.
               </p>
@@ -170,13 +170,14 @@ export function AplicarModeloDialog({
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={loading}>
+        <DialogFooter className="flex-shrink-0 pt-2 border-t">
+          <Button variant="outline" onClick={handleClose} disabled={loading} size="sm">
             Cancelar
           </Button>
           <Button
             onClick={handleAplicar}
             disabled={loading || diasSelecionados.length === 0}
+            size="sm"
           >
             {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Aplicar Modelo

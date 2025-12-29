@@ -38,6 +38,14 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
         return "👤";
       case "mensagem":
         return "💬";
+      case "planilha_expira_7dias":
+      case "planilha_expira_3dias":
+        return "⏰";
+      case "planilha_expirou":
+        return "⚠️";
+      case "planilha_aluno_lembrete":
+      case "planilha_aluno_fim":
+        return "📋";
       default:
         return "🔔";
     }

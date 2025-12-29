@@ -40,6 +40,7 @@ import { CalendarioTreinosMensal } from "@/components/CalendarioTreinosMensal";
 import Biblioteca from "./Biblioteca";
 import { AppLayout } from "@/components/AppLayout";
 import ExercisesLibrary from "@/components/ExercisesLibrary";
+import { PlanilhaStatusCard } from "@/components/PlanilhaStatusCard";
 
 interface Material {
   id: string;
@@ -137,6 +138,16 @@ export default function AreaAluno() {
           />
         )}
 
+        {/* Card de status da planilha */}
+        {profile?.personal_id && (
+          <PlanilhaStatusCard
+            profileId={user!.id}
+            personalId={profile.personal_id}
+            variant="aluno"
+            compact
+          />
+        )}
+
         <div className="grid grid-cols-2 gap-4 sm:gap-6 md:gap-4">
           <ActionCard
             title="Treinos"
@@ -217,6 +228,15 @@ export default function AreaAluno() {
       case "inicio":
         return (
           <div className="space-y-6 animate-fade-in">
+            {/* Card de status da planilha */}
+            {profile?.personal_id && (
+              <PlanilhaStatusCard
+                profileId={user!.id}
+                personalId={profile.personal_id}
+                variant="aluno"
+              />
+            )}
+
             {profile?.personal_id && (
               <CalendarioSemanal
                 profileId={user!.id}

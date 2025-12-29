@@ -1,1 +1,10 @@
 project_id = "jqpxlqggkstytgrkyhyb"
+
+[functions.create-aluno-user]
+verify_jwt = true
+
+[functions.create-personal-user]
+verify_jwt = true
+
+[functions.verificar-planilhas-expirando]
+verify_jwt = false

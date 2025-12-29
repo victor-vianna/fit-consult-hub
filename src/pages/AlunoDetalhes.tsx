@@ -66,6 +66,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { AvaliacaoFisicaManager } from "@/components/AvaliacaoFisicaManager";
 import { AnamneseVisualizacao } from "@/components/AnamneseVisualizacao";
 import { CheckinsDashboard } from "@/components/CheckinsDashboard";
+import { PlanilhaStatusCard } from "@/components/PlanilhaStatusCard";
 
 interface Material {
   id: string;
@@ -608,6 +609,15 @@ export default function AlunoDetalhes() {
 
             {/* Aba Geral */}
             <TabsContent value="geral" className="space-y-6">
+              {/* Card de status da planilha */}
+              {user && (
+                <PlanilhaStatusCard
+                  profileId={id!}
+                  personalId={user.id}
+                  variant="personal"
+                />
+              )}
+
               {user && (
                 <CalendarioSemanal
                   profileId={id!}

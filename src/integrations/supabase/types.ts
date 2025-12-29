@@ -1175,6 +1175,86 @@ export type Database = {
           },
         ]
       }
+      planilhas_treino: {
+        Row: {
+          created_at: string | null
+          data_inicio: string
+          data_prevista_fim: string | null
+          duracao_semanas: number
+          id: string
+          lembrete_enviado_3dias: boolean | null
+          lembrete_enviado_7dias: boolean | null
+          lembrete_enviado_expirou: boolean | null
+          nome: string
+          observacoes: string | null
+          personal_id: string
+          profile_id: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_inicio?: string
+          data_prevista_fim?: string | null
+          duracao_semanas?: number
+          id?: string
+          lembrete_enviado_3dias?: boolean | null
+          lembrete_enviado_7dias?: boolean | null
+          lembrete_enviado_expirou?: boolean | null
+          nome?: string
+          observacoes?: string | null
+          personal_id: string
+          profile_id: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data_inicio?: string
+          data_prevista_fim?: string | null
+          duracao_semanas?: number
+          id?: string
+          lembrete_enviado_3dias?: boolean | null
+          lembrete_enviado_7dias?: boolean | null
+          lembrete_enviado_expirou?: boolean | null
+          nome?: string
+          observacoes?: string | null
+          personal_id?: string
+          profile_id?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planilhas_treino_personal_id_fkey"
+            columns: ["personal_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planilhas_treino_personal_id_fkey"
+            columns: ["personal_id"]
+            isOneToOne: false
+            referencedRelation: "v_status_checkins"
+            referencedColumns: ["profile_id"]
+          },
+          {
+            foreignKeyName: "planilhas_treino_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planilhas_treino_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_status_checkins"
+            referencedColumns: ["profile_id"]
+          },
+        ]
+      }
       planos: {
         Row: {
           ativo: boolean | null

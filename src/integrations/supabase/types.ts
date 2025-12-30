@@ -946,6 +946,51 @@ export type Database = {
           },
         ]
       }
+      modelo_pastas: {
+        Row: {
+          cor: string | null
+          created_at: string | null
+          id: string
+          nome: string
+          ordem: number | null
+          personal_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          cor?: string | null
+          created_at?: string | null
+          id?: string
+          nome: string
+          ordem?: number | null
+          personal_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          cor?: string | null
+          created_at?: string | null
+          id?: string
+          nome?: string
+          ordem?: number | null
+          personal_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "modelo_pastas_personal_id_fkey"
+            columns: ["personal_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "modelo_pastas_personal_id_fkey"
+            columns: ["personal_id"]
+            isOneToOne: false
+            referencedRelation: "v_status_checkins"
+            referencedColumns: ["profile_id"]
+          },
+        ]
+      }
       notificacoes: {
         Row: {
           created_at: string | null
@@ -1582,6 +1627,7 @@ export type Database = {
           descricao: string | null
           id: string
           nome: string
+          pasta_id: string | null
           personal_id: string
           updated_at: string | null
         }
@@ -1591,6 +1637,7 @@ export type Database = {
           descricao?: string | null
           id?: string
           nome: string
+          pasta_id?: string | null
           personal_id: string
           updated_at?: string | null
         }
@@ -1600,10 +1647,18 @@ export type Database = {
           descricao?: string | null
           id?: string
           nome?: string
+          pasta_id?: string | null
           personal_id?: string
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "treino_modelos_pasta_id_fkey"
+            columns: ["pasta_id"]
+            isOneToOne: false
+            referencedRelation: "modelo_pastas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "treino_modelos_personal_id_fkey"
             columns: ["personal_id"]

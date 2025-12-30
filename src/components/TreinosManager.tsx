@@ -61,6 +61,7 @@ import {
   useModelosTreino,
   type CriarModeloInput,
 } from "@/hooks/useModelosTreino";
+import { useModeloPastas } from "@/hooks/useModeloPastas";
 import { useAplicarModelo } from "@/hooks/useAplicarModelo";
 import { SalvarComoModeloDialog } from "@/components/SalvarComoModeloDialog";
 import { AplicarModeloDialog } from "@/components/AplicarModeloDialog";
@@ -171,6 +172,19 @@ export function TreinosManager({
     deletarModelo,
     isCriando: isCriandoModelo,
   } = useModelosTreino({
+    personalId,
+    enabled: isPersonal,
+  });
+
+  // 🆕 Hook de pastas de modelos
+  const {
+    pastas,
+    loading: loadingPastas,
+    criarPasta,
+    deletarPasta,
+    atualizarPasta,
+    moverModeloParaPasta,
+  } = useModeloPastas({
     personalId,
     enabled: isPersonal,
   });
@@ -1417,9 +1431,18 @@ export function TreinosManager({
         <TabsContent value="modelos" className="space-y-6 mt-6">
           <ModelosTreinoList
             modelos={modelos}
-            loading={loadingModelos}
+            pastas={pastas}
+            loading={loadingModelos || loadingPastas}
             onAplicar={handleSelecionarModeloParaAplicar}
             onDeletar={deletarModelo}
+            onCriarPasta={async (nome) => {
+              await criarPasta({ nome });
+            }}
+            onDeletarPasta={deletarPasta}
+            onRenomearPasta={async (pastaId, nome) => {
+              await atualizarPasta(pastaId, { nome });
+            }}
+            onMoverModelo={moverModeloParaPasta}
           />
         </TabsContent>
       </Tabs>

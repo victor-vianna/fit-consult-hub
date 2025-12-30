@@ -10,6 +10,7 @@ import {
   Plus,
   AlertTriangle,
   CheckCircle2,
+  RotateCcw,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -59,9 +60,11 @@ export function PlanilhaStatusCard({
     criarPlanilha,
     renovarPlanilha,
     encerrarPlanilha,
+    sincronizarTreinos,
     isCriando,
     isRenovando,
     isEncerrando,
+    isSincronizando,
   } = usePlanilhaAtiva({ profileId, personalId });
 
   const [showNovaDialog, setShowNovaDialog] = useState(false);
@@ -273,32 +276,49 @@ export function PlanilhaStatusCard({
 
           {/* Ações (somente personal) */}
           {variant === "personal" && (
-            <div className="flex gap-2 pt-2 border-t">
+            <div className="space-y-2 pt-2 border-t">
+              {/* Botão de sincronização */}
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
-                className="flex-1"
-                onClick={() => {
-                  setFormData({
-                    nome: planilha.nome,
-                    duracaoSemanas: planilha.duracao_semanas.toString(),
-                    observacoes: "",
-                  });
-                  setShowRenovarDialog(true);
-                }}
+                className="w-full"
+                onClick={() => sincronizarTreinos()}
+                disabled={isSincronizando}
               >
-                <RefreshCw className="h-4 w-4 mr-1" />
-                Renovar
+                <RotateCcw className={cn("h-4 w-4 mr-1", isSincronizando && "animate-spin")} />
+                {isSincronizando ? "Sincronizando..." : "Sincronizar Treinos"}
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => encerrarPlanilha()}
-                disabled={isEncerrando}
-              >
-                <X className="h-4 w-4 mr-1" />
-                Encerrar
-              </Button>
+              <p className="text-xs text-muted-foreground text-center">
+                Replica a semana atual para as demais semanas
+              </p>
+
+              <div className="flex gap-2 pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => {
+                    setFormData({
+                      nome: planilha.nome,
+                      duracaoSemanas: planilha.duracao_semanas.toString(),
+                      observacoes: "",
+                    });
+                    setShowRenovarDialog(true);
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                  Renovar
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => encerrarPlanilha()}
+                  disabled={isEncerrando}
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Encerrar
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

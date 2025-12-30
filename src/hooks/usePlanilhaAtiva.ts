@@ -428,6 +428,29 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
     },
   });
 
+  // Sincronizar treinos (replicar semana base para demais semanas)
+  const sincronizarTreinosMutation = useMutation({
+    mutationFn: async () => {
+      if (!planilha || !profileId || !personalId) throw new Error("Dados insuficientes");
+
+      const semanaBase = getWeekStart(new Date());
+      await replicarTreinosParaSemanasRestantes(
+        planilha.profile_id,
+        planilha.personal_id,
+        semanaBase,
+        planilha.duracao_semanas
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["treinos"] });
+      toast.success("Treinos sincronizados com sucesso!");
+    },
+    onError: (error) => {
+      console.error("Erro ao sincronizar treinos:", error);
+      toast.error("Erro ao sincronizar treinos");
+    },
+  });
+
   return {
     planilha,
     historico,
@@ -440,8 +463,10 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
     criarPlanilha: criarPlanilhaMutation.mutate,
     renovarPlanilha: renovarPlanilhaMutation.mutate,
     encerrarPlanilha: encerrarPlanilhaMutation.mutate,
+    sincronizarTreinos: sincronizarTreinosMutation.mutate,
     isCriando: criarPlanilhaMutation.isPending,
     isRenovando: renovarPlanilhaMutation.isPending,
     isEncerrando: encerrarPlanilhaMutation.isPending,
+    isSincronizando: sincronizarTreinosMutation.isPending,
   };
 }

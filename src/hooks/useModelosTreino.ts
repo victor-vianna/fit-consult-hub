@@ -35,6 +35,7 @@ export interface ModeloTreino {
   nome: string;
   descricao?: string | null;
   categoria?: string | null;
+  pasta_id?: string | null;
   created_at: string;
   updated_at: string;
   exercicios?: ModeloTreinoExercicio[];
@@ -45,6 +46,7 @@ export interface CriarModeloInput {
   nome: string;
   descricao?: string;
   categoria?: string;
+  pasta_id?: string | null;
   exercicios: ModeloTreinoExercicio[];
   blocos?: ModeloTreinoBloco[];
 }
@@ -143,6 +145,7 @@ export function useModelosTreino({
           nome: input.nome,
           descricao: input.descricao || null,
           categoria: input.categoria || null,
+          pasta_id: input.pasta_id || null,
         })
         .select()
         .single();

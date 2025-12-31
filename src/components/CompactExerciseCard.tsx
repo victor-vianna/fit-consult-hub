@@ -120,7 +120,7 @@ export function CompactExerciseCard({
           <div className="flex-1 min-w-0">
             <p
               className={cn(
-                "font-semibold text-base md:text-sm truncate",
+                "font-semibold text-base md:text-sm break-words leading-tight",
                 localConcluido && "line-through text-muted-foreground"
               )}
             >

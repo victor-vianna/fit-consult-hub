@@ -88,9 +88,23 @@ export function WorkoutDayView({
     setLocalGrupos(gruposPorTreino);
   }, [gruposPorTreino]);
 
+  // Sincronizar blocos: prioriza blocosPorTreino, mas também usa blocos de cada treino
   useEffect(() => {
-    setLocalBlocos(blocosPorTreino);
-  }, [blocosPorTreino]);
+    // Mesclar blocos da prop com blocos que vêm dentro de cada treino
+    const blocosAtualizados: Record<string, BlocoTreino[]> = { ...blocosPorTreino };
+    
+    treinos.forEach((treino) => {
+      const treinoId = (treino as any).treinoId ?? (treino as any).id;
+      if (treinoId && treino.blocos && treino.blocos.length > 0) {
+        // Se não existe na prop ou está vazio, usa os blocos do treino
+        if (!blocosAtualizados[treinoId] || blocosAtualizados[treinoId].length === 0) {
+          blocosAtualizados[treinoId] = treino.blocos as BlocoTreino[];
+        }
+      }
+    });
+    
+    setLocalBlocos(blocosAtualizados);
+  }, [blocosPorTreino, treinos]);
 
   // 🔧 Helper: Obter ID do treino
   const getTreinoId = useCallback((treino: TreinoDia): string | null => {

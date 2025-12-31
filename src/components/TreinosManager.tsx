@@ -223,6 +223,7 @@ export function TreinosManager({
   } = useWorkoutBlocks({
     profileId,
     personalId,
+    semana: semanaSelecionada,
     enabled: true,
   });
 

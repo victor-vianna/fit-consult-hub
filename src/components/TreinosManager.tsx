@@ -1062,70 +1062,30 @@ export function TreinosManager({
                         </CollapsibleTrigger>
 
                         {!readOnly && isPersonal && (
-                          <div className="flex gap-2">
-                            {/* 🆕 Botão Salvar como Modelo */}
-                            {(temExercicios ||
-                              temBlocos ||
-                              grupos.length > 0) && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSalvarModeloOpen(true);
-                                }}
-                                disabled={isCriandoModelo}
-                                className="hidden sm:flex"
-                              >
-                                {isCriandoModelo && (
-                                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                )}
-                                <FileDown className="h-4 w-4 mr-1" />
-                                <span>Salvar Modelo</span>
-                              </Button>
-                            )}
-
+                          <div className="flex flex-wrap gap-1 sm:gap-2 justify-end">
+                            {/* Botão principal: Adicionar Exercício */}
                             <Button
                               size="sm"
-                              variant="ghost"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setDescricaoEditando(treino.descricao ?? "");
-                                setEditDescricaoOpen(true);
+                                setExercicioTemp(null);
+                                setExercicioEditando(null);
+                                setExercicioDialogOpen(true);
                               }}
-                              disabled={loadingStates.editando}
+                              disabled={loadingStates.adicionando}
+                              className="gap-1"
                             >
-                              {loadingStates.editando ? (
+                              {loadingStates.adicionando ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                               ) : (
                                 <>
-                                  <Edit className="h-4 w-4 mr-1" />
-                                  <span className="hidden sm:inline">
-                                    Grupo
-                                  </span>
+                                  <Plus className="h-4 w-4" />
+                                  <span className="hidden sm:inline">Exercício</span>
                                 </>
                               )}
                             </Button>
 
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setGroupDialogOpen(true);
-                              }}
-                              disabled={
-                                isCriandoGrupo || loadingStates.adicionando
-                              }
-                            >
-                              {(isCriandoGrupo ||
-                                loadingStates.adicionando) && (
-                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                              )}
-                              <LinkIcon className="h-4 w-4 mr-1" />
-                              <span className="hidden sm:inline">Agrupar</span>
-                            </Button>
-
+                            {/* Botão Bloco */}
                             <Button
                               size="sm"
                               variant="outline"
@@ -1137,36 +1097,59 @@ export function TreinosManager({
                               disabled={
                                 isCriandoBloco || loadingStates.adicionando
                               }
+                              className="gap-1"
                             >
                               {(isCriandoBloco ||
                                 loadingStates.adicionando) && (
-                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                <Loader2 className="h-4 w-4 animate-spin" />
                               )}
-                              <Blocks className="h-4 w-4 mr-1" />
+                              <Blocks className="h-4 w-4" />
                               <span className="hidden sm:inline">Bloco</span>
                             </Button>
 
+                            {/* Botão Editar Descrição */}
                             <Button
                               size="sm"
+                              variant="ghost"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setExercicioTemp(null);
-                                setExercicioEditando(null);
-                                setExercicioDialogOpen(true);
+                                setDescricaoEditando(treino.descricao ?? "");
+                                setEditDescricaoOpen(true);
                               }}
-                              disabled={loadingStates.adicionando}
+                              disabled={loadingStates.editando}
+                              className="gap-1"
                             >
-                              {loadingStates.adicionando ? (
+                              {loadingStates.editando ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                               ) : (
                                 <>
-                                  <Plus className="h-4 w-4 mr-1" />
-                                  <span className="hidden sm:inline">
-                                    Exercício
-                                  </span>
+                                  <Edit className="h-4 w-4" />
+                                  <span className="hidden sm:inline">Descrição</span>
                                 </>
                               )}
                             </Button>
+
+                            {/* Botão Salvar como Modelo - apenas desktop */}
+                            {(temExercicios ||
+                              temBlocos ||
+                              grupos.length > 0) && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSalvarModeloOpen(true);
+                                }}
+                                disabled={isCriandoModelo}
+                                className="hidden sm:flex gap-1"
+                              >
+                                {isCriandoModelo && (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                )}
+                                <FileDown className="h-4 w-4" />
+                                <span>Salvar Modelo</span>
+                              </Button>
+                            )}
                           </div>
                         )}
                       </div>

@@ -13,6 +13,8 @@ import type { BlocoTreino } from "@/types/workoutBlocks";
 interface UseWorkoutBlocksProps {
   profileId: string;
   personalId: string;
+  /** Semana (YYYY-MM-DD) para buscar blocos; se omitido usa a semana atual */
+  semana?: string;
   enabled?: boolean;
 }
 
@@ -84,10 +86,11 @@ const garantirTreinoExisteBloco = async (
 export function useWorkoutBlocks({
   profileId,
   personalId,
+  semana: semanaProp,
   enabled = true,
 }: UseWorkoutBlocksProps) {
   const queryClient = useQueryClient();
-  const semana = getWeekStart();
+  const semana = semanaProp ?? getWeekStart();
 
   // Query para buscar todos os blocos da semana
   const {
@@ -99,17 +102,13 @@ export function useWorkoutBlocks({
     queryKey: buildQueryKey(profileId, personalId, semana),
     queryFn: async (): Promise<Record<string, BlocoTreino[]>> => {
       try {
-        const hoje = new Date();
-        const inicioDaSemana = new Date(hoje);
-        inicioDaSemana.setDate(hoje.getDate() - hoje.getDay() + 1);
-
-        // 1. Buscar treinos semanais
+        // 1. Buscar treinos semanais da semana solicitada
         const { data: treinosSemanais, error: treinosError } = await supabase
           .from("treinos_semanais")
           .select("id")
           .eq("profile_id", profileId)
           .eq("personal_id", personalId)
-          .gte("semana", inicioDaSemana.toISOString().split("T")[0]);
+          .eq("semana", semana);
 
         if (treinosError) throw treinosError;
         if (!treinosSemanais || treinosSemanais.length === 0) return {};

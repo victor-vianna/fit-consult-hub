@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { useSubscriptions } from "@/hooks/useSubscriptions";
+import { useSubscriptions, Subscription } from "@/hooks/useSubscriptions";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -38,7 +38,19 @@ import {
   XCircle,
   Calendar,
   DollarSign,
+  Edit,
+  Trash2,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface SubscriptionManagerProps {
   studentId: string;
@@ -62,14 +74,19 @@ export function SubscriptionManager({
     subscriptions,
     loading,
     createSubscription,
+    updateSubscription,
     registerPayment,
     deleteSubscription,
     getActiveSubscription,
   } = useSubscriptions(studentId);
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState<string>("");
+  const [subscriptionToEdit, setSubscriptionToEdit] = useState<Subscription | null>(null);
+  const [subscriptionToDelete, setSubscriptionToDelete] = useState<string | null>(null);
 
   // Form states
   const [plano, setPlano] = useState<string>("mensal");
@@ -78,6 +95,14 @@ export function SubscriptionManager({
     new Date().toISOString().split("T")[0]
   );
   const [observacoes, setObservacoes] = useState<string>("");
+
+  // Edit form states
+  const [editPlano, setEditPlano] = useState<string>("mensal");
+  const [editValor, setEditValor] = useState<string>("");
+  const [editDataExpiracao, setEditDataExpiracao] = useState<string>("");
+  const [editDataPagamento, setEditDataPagamento] = useState<string>("");
+  const [editStatus, setEditStatus] = useState<string>("pendente");
+  const [editObservacoes, setEditObservacoes] = useState<string>("");
 
   // Payment form states
   const [valorPagamento, setValorPagamento] = useState<string>("");
@@ -126,6 +151,40 @@ export function SubscriptionManager({
     setMetodoPagamento("");
     setObservacoesPagamento("");
     setPaymentDialogOpen(false);
+  };
+
+  const handleOpenEdit = (sub: Subscription) => {
+    setSubscriptionToEdit(sub);
+    setEditPlano(sub.plano);
+    setEditValor(sub.valor.toString());
+    setEditDataExpiracao(new Date(sub.data_expiracao).toISOString().split("T")[0]);
+    setEditDataPagamento(sub.data_pagamento ? new Date(sub.data_pagamento).toISOString().split("T")[0] : "");
+    setEditStatus(sub.status_pagamento);
+    setEditObservacoes(sub.observacoes || "");
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdateSubscription = async () => {
+    if (!subscriptionToEdit || !editValor) return;
+
+    await updateSubscription(subscriptionToEdit.id, {
+      plano: editPlano as any,
+      valor: parseFloat(editValor),
+      data_expiracao: new Date(editDataExpiracao).toISOString(),
+      data_pagamento: editDataPagamento ? new Date(editDataPagamento).toISOString() : null,
+      status_pagamento: editStatus as any,
+      observacoes: editObservacoes || null,
+    });
+
+    setEditDialogOpen(false);
+    setSubscriptionToEdit(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!subscriptionToDelete) return;
+    await deleteSubscription(subscriptionToDelete);
+    setDeleteDialogOpen(false);
+    setSubscriptionToDelete(null);
   };
 
   const getStatusBadge = (status: string) => {
@@ -300,117 +359,141 @@ export function SubscriptionManager({
                         R$ {sub.valor.toFixed(2)}
                       </p>
                     </div>
-                    {sub.status_pagamento !== "pago" && (
-                      <Dialog
-                        open={
-                          paymentDialogOpen && selectedSubscription === sub.id
-                        }
-                        onOpenChange={(open) => {
-                          setPaymentDialogOpen(open);
-                          if (open) {
-                            setSelectedSubscription(sub.id);
-                            setValorPagamento(sub.valor.toString());
+                    <div className="flex items-center gap-2">
+                      {sub.status_pagamento !== "pago" && (
+                        <Dialog
+                          open={
+                            paymentDialogOpen && selectedSubscription === sub.id
                           }
+                          onOpenChange={(open) => {
+                            setPaymentDialogOpen(open);
+                            if (open) {
+                              setSelectedSubscription(sub.id);
+                              setValorPagamento(sub.valor.toString());
+                            }
+                          }}
+                        >
+                          <DialogTrigger asChild>
+                            <Button size="sm">
+                              <CreditCard className="h-4 w-4 mr-2" />
+                              Pagar
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Registrar Pagamento</DialogTitle>
+                              <DialogDescription>
+                                Registrar pagamento da assinatura {sub.plano}
+                              </DialogDescription>
+                            </DialogHeader>
+
+                            <div className="space-y-4">
+                              <div>
+                                <Label htmlFor="valorPagamento">Valor (R$)</Label>
+                                <Input
+                                  id="valorPagamento"
+                                  type="number"
+                                  step="0.01"
+                                  value={valorPagamento}
+                                  onChange={(e) =>
+                                    setValorPagamento(e.target.value)
+                                  }
+                                />
+                              </div>
+
+                              <div>
+                                <Label htmlFor="dataPagamento">
+                                  Data do Pagamento
+                                </Label>
+                                <Input
+                                  id="dataPagamento"
+                                  type="date"
+                                  value={dataPagamento}
+                                  onChange={(e) =>
+                                    setDataPagamento(e.target.value)
+                                  }
+                                />
+                              </div>
+
+                              <div>
+                                <Label htmlFor="metodoPagamento">
+                                  Método de Pagamento
+                                </Label>
+                                <Select
+                                  value={metodoPagamento}
+                                  onValueChange={setMetodoPagamento}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Selecione..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="pix">PIX</SelectItem>
+                                    <SelectItem value="cartao">
+                                      Cartão de Crédito
+                                    </SelectItem>
+                                    <SelectItem value="boleto">Boleto</SelectItem>
+                                    <SelectItem value="dinheiro">
+                                      Dinheiro
+                                    </SelectItem>
+                                    <SelectItem value="transferencia">
+                                      Transferência
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div>
+                                <Label htmlFor="observacoesPagamento">
+                                  Observações
+                                </Label>
+                                <Textarea
+                                  id="observacoesPagamento"
+                                  value={observacoesPagamento}
+                                  onChange={(e) =>
+                                    setObservacoesPagamento(e.target.value)
+                                  }
+                                  placeholder="Observações sobre o pagamento..."
+                                />
+                              </div>
+                            </div>
+
+                            <DialogFooter>
+                              <Button
+                                variant="outline"
+                                onClick={() => setPaymentDialogOpen(false)}
+                              >
+                                Cancelar
+                              </Button>
+                              <Button onClick={handleRegisterPayment}>
+                                Confirmar Pagamento
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      )}
+                      
+                      {/* Botão Editar */}
+                      <Button 
+                        size="icon" 
+                        variant="ghost"
+                        onClick={() => handleOpenEdit(sub)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      
+                      {/* Botão Excluir */}
+                      <Button 
+                        size="icon" 
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => {
+                          setSubscriptionToDelete(sub.id);
+                          setDeleteDialogOpen(true);
                         }}
                       >
-                        <DialogTrigger asChild>
-                          <Button size="sm">
-                            <CreditCard className="h-4 w-4 mr-2" />
-                            Registrar Pagamento
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Registrar Pagamento</DialogTitle>
-                            <DialogDescription>
-                              Registrar pagamento da assinatura {sub.plano}
-                            </DialogDescription>
-                          </DialogHeader>
-
-                          <div className="space-y-4">
-                            <div>
-                              <Label htmlFor="valorPagamento">Valor (R$)</Label>
-                              <Input
-                                id="valorPagamento"
-                                type="number"
-                                step="0.01"
-                                value={valorPagamento}
-                                onChange={(e) =>
-                                  setValorPagamento(e.target.value)
-                                }
-                              />
-                            </div>
-
-                            <div>
-                              <Label htmlFor="dataPagamento">
-                                Data do Pagamento
-                              </Label>
-                              <Input
-                                id="dataPagamento"
-                                type="date"
-                                value={dataPagamento}
-                                onChange={(e) =>
-                                  setDataPagamento(e.target.value)
-                                }
-                              />
-                            </div>
-
-                            <div>
-                              <Label htmlFor="metodoPagamento">
-                                Método de Pagamento
-                              </Label>
-                              <Select
-                                value={metodoPagamento}
-                                onValueChange={setMetodoPagamento}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Selecione..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="pix">PIX</SelectItem>
-                                  <SelectItem value="cartao">
-                                    Cartão de Crédito
-                                  </SelectItem>
-                                  <SelectItem value="boleto">Boleto</SelectItem>
-                                  <SelectItem value="dinheiro">
-                                    Dinheiro
-                                  </SelectItem>
-                                  <SelectItem value="transferencia">
-                                    Transferência
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            <div>
-                              <Label htmlFor="observacoesPagamento">
-                                Observações
-                              </Label>
-                              <Textarea
-                                id="observacoesPagamento"
-                                value={observacoesPagamento}
-                                onChange={(e) =>
-                                  setObservacoesPagamento(e.target.value)
-                                }
-                                placeholder="Observações sobre o pagamento..."
-                              />
-                            </div>
-                          </div>
-
-                          <DialogFooter>
-                            <Button
-                              variant="outline"
-                              onClick={() => setPaymentDialogOpen(false)}
-                            >
-                              Cancelar
-                            </Button>
-                            <Button onClick={handleRegisterPayment}>
-                              Confirmar Pagamento
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                    )}
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="space-y-1 text-sm">
@@ -436,17 +519,6 @@ export function SubscriptionManager({
                       </p>
                     )}
                   </div>
-
-                  {sub.status_pagamento === "pendente" && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="mt-2 text-red-500"
-                      onClick={() => deleteSubscription(sub.id)}
-                    >
-                      Remover
-                    </Button>
-                  )}
                 </CardContent>
               </Card>
             ))}
@@ -459,6 +531,114 @@ export function SubscriptionManager({
           </div>
         </CardContent>
       </Card>
+
+      {/* Dialog de Edição */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Assinatura</DialogTitle>
+            <DialogDescription>
+              Altere os dados da assinatura
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label>Plano</Label>
+              <Select value={editPlano} onValueChange={setEditPlano}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PLANOS.map((p) => (
+                    <SelectItem key={p.value} value={p.value}>
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Valor (R$)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={editValor}
+                onChange={(e) => setEditValor(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <Label>Status</Label>
+              <Select value={editStatus} onValueChange={setEditStatus}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pendente">Pendente</SelectItem>
+                  <SelectItem value="pago">Pago</SelectItem>
+                  <SelectItem value="atrasado">Atrasado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Data de Pagamento</Label>
+              <Input
+                type="date"
+                value={editDataPagamento}
+                onChange={(e) => setEditDataPagamento(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <Label>Data de Expiração</Label>
+              <Input
+                type="date"
+                value={editDataExpiracao}
+                onChange={(e) => setEditDataExpiracao(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <Label>Observações</Label>
+              <Textarea
+                value={editObservacoes}
+                onChange={(e) => setEditObservacoes(e.target.value)}
+                placeholder="Observações..."
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleUpdateSubscription}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Confirmação de Exclusão */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta assinatura? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteDialogOpen(false)}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

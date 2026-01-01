@@ -63,6 +63,7 @@ import {
 } from "@/hooks/useModelosTreino";
 import { useModeloPastas } from "@/hooks/useModeloPastas";
 import { useAplicarModelo } from "@/hooks/useAplicarModelo";
+import { useBlocoTemplates } from "@/hooks/useBlocoTemplates";
 import { SalvarComoModeloDialog } from "@/components/SalvarComoModeloDialog";
 import { AplicarModeloDialog } from "@/components/AplicarModeloDialog";
 import { ModelosTreinoList } from "@/components/ModelosTreinoList";
@@ -191,6 +192,12 @@ export function TreinosManager({
 
   // 🆕 Hook para aplicar modelos
   const { aplicarModelo, isAplicando } = useAplicarModelo();
+
+  // 🆕 Hook de templates de blocos
+  const { salvarBlocoComoTemplate } = useBlocoTemplates({
+    personalId,
+    enabled: isPersonal,
+  });
 
   // Hook de agrupamentos
   const {
@@ -1220,6 +1227,11 @@ export function TreinosManager({
                                                 )
                                             : undefined
                                         }
+                                        onSaveAsTemplate={
+                                          isPersonal
+                                            ? salvarBlocoComoTemplate
+                                            : undefined
+                                        }
                                       />
                                     ))}
                                   </SortableContext>
@@ -1350,6 +1362,11 @@ export function TreinosManager({
                                                 )
                                             : undefined
                                         }
+                                        onSaveAsTemplate={
+                                          isPersonal
+                                            ? salvarBlocoComoTemplate
+                                            : undefined
+                                        }
                                       />
                                     ))}
                                   </SortableContext>
@@ -1393,6 +1410,11 @@ export function TreinosManager({
                                                   blocoId,
                                                   concluido
                                                 )
+                                            : undefined
+                                        }
+                                        onSaveAsTemplate={
+                                          isPersonal
+                                            ? salvarBlocoComoTemplate
                                             : undefined
                                         }
                                       />

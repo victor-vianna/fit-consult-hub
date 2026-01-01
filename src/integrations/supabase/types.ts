@@ -430,6 +430,69 @@ export type Database = {
           },
         ]
       }
+      bloco_templates: {
+        Row: {
+          config_alongamento: Json | null
+          config_aquecimento: Json | null
+          config_cardio: Json | null
+          config_outro: Json | null
+          created_at: string | null
+          descricao: string | null
+          duracao_estimada_minutos: number | null
+          id: string
+          nome: string
+          personal_id: string
+          posicao: string
+          tipo: string
+          updated_at: string | null
+        }
+        Insert: {
+          config_alongamento?: Json | null
+          config_aquecimento?: Json | null
+          config_cardio?: Json | null
+          config_outro?: Json | null
+          created_at?: string | null
+          descricao?: string | null
+          duracao_estimada_minutos?: number | null
+          id?: string
+          nome: string
+          personal_id: string
+          posicao?: string
+          tipo: string
+          updated_at?: string | null
+        }
+        Update: {
+          config_alongamento?: Json | null
+          config_aquecimento?: Json | null
+          config_cardio?: Json | null
+          config_outro?: Json | null
+          created_at?: string | null
+          descricao?: string | null
+          duracao_estimada_minutos?: number | null
+          id?: string
+          nome?: string
+          personal_id?: string
+          posicao?: string
+          tipo?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bloco_templates_personal_id_fkey"
+            columns: ["personal_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bloco_templates_personal_id_fkey"
+            columns: ["personal_id"]
+            isOneToOne: false
+            referencedRelation: "v_status_checkins"
+            referencedColumns: ["profile_id"]
+          },
+        ]
+      }
       blocos_treino: {
         Row: {
           concluido: boolean | null

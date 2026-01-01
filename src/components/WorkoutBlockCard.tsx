@@ -1,6 +1,16 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Clock,
   CheckCircle2,
@@ -13,6 +23,7 @@ import {
   GripVertical,
   Heart,
   Gauge,
+  Save,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -32,6 +43,7 @@ interface WorkoutBlockCardProps {
   onEdit?: () => void;
   onDelete?: () => void;
   onToggleConcluido?: (id: string, concluido: boolean) => void;
+  onSaveAsTemplate?: (bloco: BlocoTreino, nome: string) => Promise<unknown>;
 }
 
 export function WorkoutBlockCard({
@@ -41,7 +53,11 @@ export function WorkoutBlockCard({
   onEdit,
   onDelete,
   onToggleConcluido,
+  onSaveAsTemplate,
 }: WorkoutBlockCardProps) {
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [templateName, setTemplateName] = useState(bloco.nome);
+  const [isSaving, setIsSaving] = useState(false);
   const tipoConfig = TIPOS_BLOCO[bloco.tipo];
   const cor = getCorTipoBloco(bloco.tipo);
   const tipoChave = bloco.tipo as TipoBloco;
@@ -72,6 +88,20 @@ export function WorkoutBlockCard({
     } catch (error) {
       console.error("Erro ao marcar bloco:", error);
       toast.error("Erro ao atualizar bloco");
+    }
+  };
+
+  const handleSaveAsTemplate = async () => {
+    if (!onSaveAsTemplate || !templateName.trim()) return;
+    
+    setIsSaving(true);
+    try {
+      await onSaveAsTemplate(bloco, templateName.trim());
+      setSaveDialogOpen(false);
+    } catch (error) {
+      console.error("Erro ao salvar template:", error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -370,6 +400,20 @@ export function WorkoutBlockCard({
           {/* Ações (só para Personal) */}
           {!readOnly && (
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {onSaveAsTemplate && (
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  onClick={() => {
+                    setTemplateName(bloco.nome);
+                    setSaveDialogOpen(true);
+                  }}
+                  className="h-10 w-10 md:h-9 md:w-9 touch-target"
+                  title="Salvar como template"
+                >
+                  <Save className="h-5 w-5 md:h-4 md:w-4" />
+                </Button>
+              )}
               {onEdit && (
                 <Button 
                   size="icon" 
@@ -394,6 +438,36 @@ export function WorkoutBlockCard({
           )}
         </div>
       </CardHeader>
+
+      {/* Dialog para salvar como template */}
+      <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Salvar como Template</DialogTitle>
+            <DialogDescription>
+              Salve este bloco como um template reutilizável
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Nome do Template</label>
+              <Input
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                placeholder="Ex: HIIT Bike 10x30"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveAsTemplate} disabled={isSaving || !templateName.trim()}>
+              {isSaving ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

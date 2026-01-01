@@ -49,13 +49,13 @@ export function useBlocoTemplates({
     queryKey: ["bloco-templates", personalId],
     queryFn: async (): Promise<BlocoTemplate[]> => {
       const { data, error } = await supabase
-        .from("bloco_templates")
+        .from("bloco_templates" as any)
         .select("*")
         .eq("personal_id", personalId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return (data || []) as unknown as BlocoTemplate[];
     },
     enabled: enabled && !!personalId,
     staleTime: 1000 * 60 * 5,
@@ -64,7 +64,7 @@ export function useBlocoTemplates({
   const criarTemplateMutation = useMutation({
     mutationFn: async (input: CriarBlocoTemplateInput) => {
       const { data, error } = await supabase
-        .from("bloco_templates")
+        .from("bloco_templates" as any)
         .insert({
           personal_id: personalId,
           nome: input.nome,
@@ -81,7 +81,7 @@ export function useBlocoTemplates({
         .single();
 
       if (error) throw error;
-      return data;
+      return data as unknown as BlocoTemplate;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -98,7 +98,7 @@ export function useBlocoTemplates({
   const deletarTemplateMutation = useMutation({
     mutationFn: async (templateId: string) => {
       const { error } = await supabase
-        .from("bloco_templates")
+        .from("bloco_templates" as any)
         .delete()
         .eq("id", templateId);
 

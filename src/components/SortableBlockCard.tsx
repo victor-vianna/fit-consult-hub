@@ -10,6 +10,7 @@ interface SortableBlockCardProps {
   onEdit?: () => void;
   onDelete?: () => void;
   onToggleConcluido?: (id: string, concluido: boolean) => void;
+  onSaveAsTemplate?: (bloco: BlocoTreino, nome: string) => Promise<unknown>;
 }
 
 export function SortableBlockCard({
@@ -19,6 +20,7 @@ export function SortableBlockCard({
   onEdit,
   onDelete,
   onToggleConcluido,
+  onSaveAsTemplate,
 }: SortableBlockCardProps) {
   const {
     attributes,
@@ -48,6 +50,7 @@ export function SortableBlockCard({
         onEdit={onEdit}
         onDelete={onDelete}
         onToggleConcluido={onToggleConcluido}
+        onSaveAsTemplate={onSaveAsTemplate}
       />
     </div>
   );

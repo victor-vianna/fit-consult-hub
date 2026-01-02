@@ -1540,6 +1540,7 @@ export function TreinosManager({
           diaNome={
             selectedDia !== null ? diasSemana[selectedDia - 1].nome : undefined
           }
+          personalId={personalId}
         />
 
         {/* 🆕 DIALOG: Salvar como Modelo */}

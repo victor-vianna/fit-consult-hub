@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -29,7 +29,17 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Sparkles, Info, Clock } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Loader2, Sparkles, Info, Clock, Trash2, Edit, BookmarkPlus, User } from "lucide-react";
 import {
   TipoBloco,
   PosicaoBloco,
@@ -41,6 +51,7 @@ import {
   TEMPLATES_BLOCOS,
   formatarDuracao,
 } from "@/types/workoutBlocks";
+import { useBlocoTemplates, BlocoTemplate } from "@/hooks/useBlocoTemplates";
 
 interface WorkoutBlockDialogProps {
   open: boolean;
@@ -48,6 +59,7 @@ interface WorkoutBlockDialogProps {
   onSave: (bloco: Partial<BlocoTreino>) => Promise<void>;
   blocoEditando?: Partial<BlocoTreino> | null;
   diaNome?: string;
+  personalId?: string;
 }
 
 export function WorkoutBlockDialog({
@@ -56,9 +68,18 @@ export function WorkoutBlockDialog({
   onSave,
   blocoEditando,
   diaNome,
+  personalId,
 }: WorkoutBlockDialogProps) {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"manual" | "template">("template");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<BlocoTemplate | null>(null);
+
+  // Hook para templates do BD
+  const { templates: meusTemplates, loading: loadingTemplates, deletarTemplate, isDeletando } = useBlocoTemplates({
+    personalId: personalId || "",
+    enabled: !!personalId,
+  });
 
   // Estados do formulário
   const [tipo, setTipo] = useState<TipoBloco>(blocoEditando?.tipo ?? "cardio");
@@ -126,6 +147,44 @@ export function WorkoutBlockDialog({
     blocoEditando?.config_aquecimento?.atividades?.join(", ") ?? ""
   );
 
+  // Carregar template do BD (meu template salvo)
+  const handleSelectMeuTemplate = (template: BlocoTemplate) => {
+    setTipo(template.tipo as TipoBloco);
+    setPosicao(template.posicao as PosicaoBloco);
+    setNome(template.nome);
+    setDescricao(template.descricao || "");
+    setDuracaoMinutos(template.duracao_estimada_minutos || 10);
+
+    if (template.config_cardio) {
+      const cc = template.config_cardio as any;
+      setTipoCardio(cc.tipo || "bike");
+      setModalidade(cc.modalidade || "hiit");
+      setTrabalhoSeg(cc.trabalho_segundos ?? 30);
+      setDescansoSeg(cc.descanso_segundos ?? 30);
+      setRounds(cc.rounds ?? 10);
+      setVelocidade(cc.velocidade_kmh ?? 0);
+      setInclinacao(cc.inclinacao_percentual ?? 0);
+      setBpmMin(cc.batimentos_alvo?.minimo ?? 0);
+      setBpmMax(cc.batimentos_alvo?.maximo ?? 0);
+      setIntensidadeValor(cc.intensidade?.valor ?? 80);
+      setIntensidadeUnidade(cc.intensidade?.unidade ?? "percentual");
+    }
+
+    if (template.config_alongamento) {
+      const ca = template.config_alongamento as any;
+      setGruposMusculares(ca.grupos_musculares?.join(", ") || "");
+      setTipoAlongamento(ca.tipo || "estatico");
+    }
+
+    if (template.config_aquecimento) {
+      const caq = template.config_aquecimento as any;
+      setTipoAquecimento(caq.tipo || "geral");
+      setAtividades(caq.atividades?.join(", ") || "");
+    }
+
+    setActiveTab("manual");
+  };
+
   const handleSelectTemplate = (templateId: string) => {
     const template = TEMPLATES_BLOCOS.find((t) => t.id === templateId);
     if (!template) return;
@@ -163,6 +222,17 @@ export function WorkoutBlockDialog({
     }
 
     setActiveTab("manual");
+  };
+
+  const handleDeleteTemplate = async () => {
+    if (!templateToDelete) return;
+    try {
+      await deletarTemplate(templateToDelete.id);
+      setDeleteDialogOpen(false);
+      setTemplateToDelete(null);
+    } catch (error) {
+      console.error("Erro ao deletar template:", error);
+    }
   };
 
   const handleSave = async () => {
@@ -269,7 +339,61 @@ export function WorkoutBlockDialog({
 
           {/* TAB: TEMPLATES */}
           <TabsContent value="template" className="space-y-4 mt-4">
-            <div className="space-y-3">
+            <div className="space-y-4">
+              {/* MEUS TEMPLATES SALVOS */}
+              {personalId && meusTemplates.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Meus Templates
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {meusTemplates.map((template) => (
+                      <Card
+                        key={template.id}
+                        className="cursor-pointer hover:border-primary transition-colors group relative"
+                      >
+                        <CardHeader className="p-3">
+                          <div className="flex items-center justify-between">
+                            <CardTitle 
+                              className="text-sm flex items-center gap-2 flex-1"
+                              onClick={() => handleSelectMeuTemplate(template)}
+                            >
+                              {TIPOS_BLOCO[template.tipo as TipoBloco]?.icon || "📦"}
+                              {template.nome}
+                              <Badge variant="outline" className="text-xs">
+                                Salvo
+                              </Badge>
+                            </CardTitle>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setTemplateToDelete(template);
+                                setDeleteDialogOpen(true);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <CardDescription 
+                            className="text-xs"
+                            onClick={() => handleSelectMeuTemplate(template)}
+                          >
+                            {template.descricao || `${template.tipo} - ${template.posicao}`}
+                            {template.duracao_estimada_minutos && ` • ${template.duracao_estimada_minutos}min`}
+                          </CardDescription>
+                        </CardHeader>
+                      </Card>
+                    ))}
+                  </div>
+                  <Separator className="my-4" />
+                </div>
+              )}
+
+              {/* TEMPLATES PRONTOS DO SISTEMA */}
               {Object.entries(
                 TEMPLATES_BLOCOS.reduce((acc, t) => {
                   if (!acc[t.categoria]) acc[t.categoria] = [];
@@ -716,6 +840,36 @@ export function WorkoutBlockDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Dialog de confirmação de exclusão */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir template?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o template "{templateToDelete?.nome}"? 
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTemplate}
+              disabled={isDeletando}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeletando ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Excluindo...
+                </>
+              ) : (
+                "Excluir"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

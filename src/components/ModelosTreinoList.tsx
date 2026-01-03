@@ -1,5 +1,5 @@
 // components/ModelosTreinoList.tsx
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -25,6 +25,10 @@ import {
   FolderInput,
   ChevronDown,
   ChevronRight,
+  Eye,
+  SortAsc,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -59,12 +63,23 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { ModeloTreino } from "@/hooks/useModelosTreino";
 import type { ModeloPasta } from "@/hooks/useModeloPastas";
 import { cn } from "@/lib/utils";
+import { ModeloVisualizacaoModal } from "./ModeloVisualizacaoModal";
+
+type OrdenacaoTipo = "pasta" | "alfabetica" | "recentes";
+type VisualizacaoTipo = "grid" | "lista";
 
 interface ModelosTreinoListProps {
   modelos: ModeloTreino[];
@@ -76,6 +91,8 @@ interface ModelosTreinoListProps {
   onDeletarPasta: (pastaId: string) => Promise<void>;
   onRenomearPasta: (pastaId: string, nome: string) => Promise<void>;
   onMoverModelo: (modeloId: string, pastaId: string | null) => Promise<void>;
+  onAtualizarModelo: (modeloId: string, dados: { nome?: string; descricao?: string; categoria?: string }) => Promise<unknown>;
+  isAtualizando?: boolean;
 }
 
 export function ModelosTreinoList({
@@ -88,6 +105,8 @@ export function ModelosTreinoList({
   onDeletarPasta,
   onRenomearPasta,
   onMoverModelo,
+  onAtualizarModelo,
+  isAtualizando = false,
 }: ModelosTreinoListProps) {
   const [modeloDeletar, setModeloDeletar] = useState<string | null>(null);
   const [deletando, setDeletando] = useState(false);
@@ -97,12 +116,29 @@ export function ModelosTreinoList({
   const [pastasDeletando, setPastasDeletando] = useState<string | null>(null);
   const [pastaEditando, setPastaEditando] = useState<{ id: string; nome: string } | null>(null);
   const [pastasAbertas, setPastasAbertas] = useState<Set<string>>(new Set());
+  
+  // Novos estados para modal e ordenação
+  const [modeloVisualizando, setModeloVisualizando] = useState<ModeloTreino | null>(null);
+  const [ordenacao, setOrdenacao] = useState<OrdenacaoTipo>("pasta");
 
-  // Agrupar modelos por pasta
-  const modelosSemPasta = modelos.filter((m) => !m.pasta_id);
+  // Ordenar modelos de acordo com a escolha do usuário
+  const modelosOrdenados = useMemo(() => {
+    if (ordenacao === "alfabetica") {
+      return [...modelos].sort((a, b) => a.nome.localeCompare(b.nome));
+    }
+    if (ordenacao === "recentes") {
+      return [...modelos].sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    }
+    return modelos; // pasta - usa a organização por pastas
+  }, [modelos, ordenacao]);
+
+  // Agrupar modelos por pasta (só usado quando ordenacao === "pasta")
+  const modelosSemPasta = modelosOrdenados.filter((m) => !m.pasta_id);
   const modelosPorPasta = pastas.map((pasta) => ({
     pasta,
-    modelos: modelos.filter((m) => m.pasta_id === pasta.id),
+    modelos: modelosOrdenados.filter((m) => m.pasta_id === pasta.id),
   }));
 
   const handleConfirmarDelecao = async () => {
@@ -216,8 +252,39 @@ export function ModelosTreinoList({
   return (
     <>
       <div className="space-y-4">
-        {/* Header com botão de nova pasta */}
-        <div className="flex justify-end">
+        {/* Header com controles */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Controle de ordenação */}
+          <div className="flex items-center gap-2">
+            <SortAsc className="h-4 w-4 text-muted-foreground" />
+            <Select value={ordenacao} onValueChange={(v) => setOrdenacao(v as OrdenacaoTipo)}>
+              <SelectTrigger className="w-[160px] h-9">
+                <SelectValue placeholder="Ordenar por..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pasta">
+                  <span className="flex items-center gap-2">
+                    <Folder className="h-4 w-4" />
+                    Por Pastas
+                  </span>
+                </SelectItem>
+                <SelectItem value="alfabetica">
+                  <span className="flex items-center gap-2">
+                    <SortAsc className="h-4 w-4" />
+                    Alfabética
+                  </span>
+                </SelectItem>
+                <SelectItem value="recentes">
+                  <span className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Mais Recentes
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Botão de nova pasta */}
           <Button
             variant="outline"
             size="sm"
@@ -228,8 +295,11 @@ export function ModelosTreinoList({
           </Button>
         </div>
 
-        {/* Pastas com modelos */}
-        {modelosPorPasta.map(({ pasta, modelos: modelosDaPasta }) => (
+        {/* Visualização por pastas */}
+        {ordenacao === "pasta" && (
+          <>
+            {/* Pastas com modelos */}
+            {modelosPorPasta.map(({ pasta, modelos: modelosDaPasta }) => (
           <Collapsible
             key={pasta.id}
             open={pastasAbertas.has(pasta.id)}
@@ -306,6 +376,7 @@ export function ModelosTreinoList({
                         modelo={modelo}
                         pastas={pastas}
                         onAplicar={onAplicar}
+                        onVisualizar={() => setModeloVisualizando(modelo)}
                         onDeletar={() => setModeloDeletar(modelo.id)}
                         onMoverModelo={onMoverModelo}
                       />
@@ -317,28 +388,61 @@ export function ModelosTreinoList({
           </Collapsible>
         ))}
 
-        {/* Modelos sem pasta */}
-        {modelosSemPasta.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground px-1">
-              <BookTemplate className="h-4 w-4" />
-              <span>Sem pasta ({modelosSemPasta.length})</span>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {modelosSemPasta.map((modelo) => (
-                <ModeloCard
-                  key={modelo.id}
-                  modelo={modelo}
-                  pastas={pastas}
-                  onAplicar={onAplicar}
-                  onDeletar={() => setModeloDeletar(modelo.id)}
-                  onMoverModelo={onMoverModelo}
-                />
-              ))}
-            </div>
+            {/* Modelos sem pasta */}
+            {modelosSemPasta.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground px-1">
+                  <BookTemplate className="h-4 w-4" />
+                  <span>Sem pasta ({modelosSemPasta.length})</span>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {modelosSemPasta.map((modelo) => (
+                    <ModeloCard
+                      key={modelo.id}
+                      modelo={modelo}
+                      pastas={pastas}
+                      onAplicar={onAplicar}
+                      onVisualizar={() => setModeloVisualizando(modelo)}
+                      onDeletar={() => setModeloDeletar(modelo.id)}
+                      onMoverModelo={onMoverModelo}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Visualização lista/alfabética ou recentes */}
+        {ordenacao !== "pasta" && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {modelosOrdenados.map((modelo) => (
+              <ModeloCard
+                key={modelo.id}
+                modelo={modelo}
+                pastas={pastas}
+                onAplicar={onAplicar}
+                onVisualizar={() => setModeloVisualizando(modelo)}
+                onDeletar={() => setModeloDeletar(modelo.id)}
+                onMoverModelo={onMoverModelo}
+              />
+            ))}
           </div>
         )}
       </div>
+
+      {/* Modal de visualização/edição */}
+      <ModeloVisualizacaoModal
+        modelo={modeloVisualizando}
+        open={!!modeloVisualizando}
+        onOpenChange={(open) => !open && setModeloVisualizando(null)}
+        onAplicar={(modelo) => {
+          onAplicar(modelo);
+          setModeloVisualizando(null);
+        }}
+        onAtualizar={onAtualizarModelo}
+        isAtualizando={isAtualizando}
+      />
 
       {/* Dialog de confirmação de deleção */}
       <AlertDialog
@@ -412,12 +516,14 @@ function ModeloCard({
   modelo,
   pastas,
   onAplicar,
+  onVisualizar,
   onDeletar,
   onMoverModelo,
 }: {
   modelo: ModeloTreino;
   pastas: ModeloPasta[];
   onAplicar: (modelo: ModeloTreino) => void;
+  onVisualizar: () => void;
   onDeletar: () => void;
   onMoverModelo: (modeloId: string, pastaId: string | null) => Promise<void>;
 }) {
@@ -429,7 +535,7 @@ function ModeloCard({
   });
 
   return (
-    <Card className="group hover:shadow-md transition-all">
+    <Card className="group hover:shadow-md transition-all cursor-pointer" onClick={onVisualizar}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
@@ -443,20 +549,24 @@ function ModeloCard({
             )}
           </div>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
               <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onVisualizar(); }}>
+                <Eye className="h-4 w-4 mr-2" />
+                Ver detalhes
+              </DropdownMenuItem>
               <DropdownMenuSub>
-                <DropdownMenuSubTrigger>
+                <DropdownMenuSubTrigger onClick={(e) => e.stopPropagation()}>
                   <FolderInput className="h-4 w-4 mr-2" />
                   Mover para pasta
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
                   <DropdownMenuItem
-                    onClick={() => onMoverModelo(modelo.id, null)}
+                    onClick={(e) => { e.stopPropagation(); onMoverModelo(modelo.id, null); }}
                     disabled={!modelo.pasta_id}
                   >
                     <BookTemplate className="h-4 w-4 mr-2" />
@@ -466,7 +576,7 @@ function ModeloCard({
                   {pastas.map((pasta) => (
                     <DropdownMenuItem
                       key={pasta.id}
-                      onClick={() => onMoverModelo(modelo.id, pasta.id)}
+                      onClick={(e) => { e.stopPropagation(); onMoverModelo(modelo.id, pasta.id); }}
                       disabled={modelo.pasta_id === pasta.id}
                     >
                       <Folder className="h-4 w-4 mr-2" />
@@ -476,7 +586,10 @@ function ModeloCard({
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onDeletar} className="text-destructive focus:text-destructive">
+              <DropdownMenuItem 
+                onClick={(e) => { e.stopPropagation(); onDeletar(); }} 
+                className="text-destructive focus:text-destructive"
+              >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Deletar
               </DropdownMenuItem>
@@ -514,10 +627,25 @@ function ModeloCard({
         <p className="text-xs text-muted-foreground">Criado {tempoRelativo}</p>
 
         {/* Ações */}
-        <Button size="sm" onClick={() => onAplicar(modelo)} className="w-full">
-          <Calendar className="h-4 w-4 mr-1" />
-          Aplicar
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            size="sm" 
+            variant="outline"
+            onClick={(e) => { e.stopPropagation(); onVisualizar(); }} 
+            className="flex-1"
+          >
+            <Eye className="h-4 w-4 mr-1" />
+            Ver
+          </Button>
+          <Button 
+            size="sm" 
+            onClick={(e) => { e.stopPropagation(); onAplicar(modelo); }} 
+            className="flex-1"
+          >
+            <Calendar className="h-4 w-4 mr-1" />
+            Aplicar
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

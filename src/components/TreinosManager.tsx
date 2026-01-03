@@ -171,7 +171,9 @@ export function TreinosManager({
     loading: loadingModelos,
     criarModelo,
     deletarModelo,
+    atualizarModelo,
     isCriando: isCriandoModelo,
+    isAtualizando: isAtualizandoModelo,
   } = useModelosTreino({
     personalId,
     enabled: isPersonal,
@@ -1449,6 +1451,8 @@ export function TreinosManager({
               await atualizarPasta(pastaId, { nome });
             }}
             onMoverModelo={moverModeloParaPasta}
+            onAtualizarModelo={atualizarModelo}
+            isAtualizando={isAtualizandoModelo}
           />
         </TabsContent>
       </Tabs>

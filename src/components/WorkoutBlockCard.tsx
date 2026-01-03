@@ -182,10 +182,14 @@ export function WorkoutBlockCard({
                 </div>
               </div>
 
-              {/* Descrição */}
-              {bloco.descricao && (
+              {/* Descrição - fallback para observações das configs */}
+              {(bloco.descricao || 
+                bloco.config_alongamento?.observacoes || 
+                bloco.config_aquecimento?.observacoes) && (
                 <p className="text-base md:text-sm text-muted-foreground">
-                  {bloco.descricao}
+                  {bloco.descricao || 
+                   bloco.config_alongamento?.observacoes || 
+                   bloco.config_aquecimento?.observacoes}
                 </p>
               )}
 

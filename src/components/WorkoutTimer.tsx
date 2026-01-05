@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, Check, X, Timer } from "lucide-react";
+import { Play, Pause, Check, X, Timer, Coffee, Dumbbell } from "lucide-react";
 import { useWorkoutTimer } from "@/hooks/useWorkoutTimer";
 import {
   AlertDialog,
@@ -14,6 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface WorkoutTimerProps {
   treinoId: string;
@@ -34,14 +35,37 @@ export function WorkoutTimer({
   const {
     isRunning,
     isPaused,
+    isResting,
+    isLoading,
     formattedTime,
+    formattedRestTime,
+    formattedDescansoTotal,
+    restType,
+    tempoDescansoTotal,
+    descansos,
     iniciar,
     togglePause,
     finalizar,
     cancelar,
+    iniciarDescanso,
+    encerrarDescanso,
   } = useWorkoutTimer({ treinoId, profileId, personalId });
 
   if (readOnly) return null;
+
+  if (isLoading) {
+    return (
+      <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/5">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col items-center gap-4">
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-14 w-48" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const handleFinalizar = async () => {
     await finalizar();
@@ -53,9 +77,10 @@ export function WorkoutTimer({
     setShowCancelarDialog(false);
   };
 
+  const isActive = isRunning || isPaused;
+
   return (
     <>
-      {/* Card do Cronômetro */}
       <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/5 shadow-xl backdrop-blur-sm">
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col items-center gap-3 sm:gap-4">
@@ -67,35 +92,109 @@ export function WorkoutTimer({
               </h3>
             </div>
 
-            {/* Tempo formatado */}
+            {/* Tempo total */}
             <div className="text-4xl sm:text-5xl md:text-6xl font-bold font-mono tabular-nums tracking-tight bg-gradient-to-br from-primary to-primary/60 bg-clip-text text-transparent">
               {formattedTime}
             </div>
 
             {/* Indicador de status */}
-            {(isRunning || isPaused) && (
-              <div className="flex items-center justify-center gap-2 text-xs sm:text-sm">
-                <div
-                  className={`w-2 h-2 rounded-full ${
-                    isPaused ? "bg-yellow-500" : "bg-green-500 animate-pulse"
-                  }`}
-                />
-                <span className="text-muted-foreground font-medium">
-                  {isPaused ? "Pausado" : "Em andamento"}
-                </span>
+            {isActive && (
+              <div className="flex flex-col items-center gap-1">
+                <div className="flex items-center justify-center gap-2 text-xs sm:text-sm">
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      isPaused ? "bg-yellow-500" : isResting ? "bg-blue-500 animate-pulse" : "bg-green-500 animate-pulse"
+                    }`}
+                  />
+                  <span className="text-muted-foreground font-medium">
+                    {isPaused ? "Pausado" : isResting ? "Descansando" : "Em andamento"}
+                  </span>
+                </div>
+                
+                {/* Info de descanso total */}
+                {tempoDescansoTotal > 0 && (
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Coffee className="h-3 w-3" />
+                    Descanso total: {formattedDescansoTotal}
+                  </div>
+                )}
               </div>
             )}
 
             {/* Dica inicial */}
-            {!isRunning && !isPaused && (
+            {!isActive && (
               <p className="text-xs sm:text-sm text-muted-foreground text-center max-w-xs">
                 Inicie o cronômetro para acompanhar seu desempenho
               </p>
             )}
 
+            {/* Seção de Descanso */}
+            {isActive && !isPaused && (
+              <div className="w-full border rounded-lg p-3 bg-muted/30">
+                {isResting ? (
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="flex items-center gap-2 text-blue-600">
+                      <Coffee className="h-4 w-4" />
+                      <span className="text-sm font-medium">
+                        Descanso {restType === "serie" ? "entre séries" : "entre exercícios"}
+                      </span>
+                    </div>
+                    <div className="text-3xl font-mono font-bold text-blue-600">
+                      {formattedRestTime}
+                    </div>
+                    <Button
+                      onClick={encerrarDescanso}
+                      variant="outline"
+                      className="w-full border-blue-500 text-blue-600 hover:bg-blue-50"
+                    >
+                      <Check className="h-4 w-4 mr-2" />
+                      Encerrar Descanso
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                      <Coffee className="h-4 w-4" />
+                      <span className="text-xs font-medium">Iniciar descanso</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => iniciarDescanso("serie")}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 text-xs"
+                      >
+                        <Dumbbell className="h-3 w-3 mr-1" />
+                        Entre Séries
+                      </Button>
+                      <Button
+                        onClick={() => iniciarDescanso("exercicio")}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 text-xs"
+                      >
+                        <Coffee className="h-3 w-3 mr-1" />
+                        Entre Exercícios
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Resumo de descansos */}
+            {isActive && descansos.length > 0 && (
+              <div className="w-full text-xs text-muted-foreground">
+                <div className="flex justify-between">
+                  <span>Descansos realizados:</span>
+                  <span className="font-medium">{descansos.filter(d => d.duracao_segundos).length}</span>
+                </div>
+              </div>
+            )}
+
             {/* Botões de controle */}
             <div className="flex gap-2 w-full flex-wrap sm:flex-nowrap">
-              {!isRunning && !isPaused && (
+              {!isActive && (
                 <Button
                   onClick={iniciar}
                   size="lg"
@@ -106,7 +205,7 @@ export function WorkoutTimer({
                 </Button>
               )}
 
-              {isRunning && (
+              {isRunning && !isResting && (
                 <>
                   <Button
                     onClick={togglePause}
@@ -136,6 +235,17 @@ export function WorkoutTimer({
                     <X className="h-4 w-4 sm:h-5 sm:w-5" />
                   </Button>
                 </>
+              )}
+
+              {isRunning && isResting && (
+                <Button
+                  onClick={() => setShowFinalizarDialog(true)}
+                  size="lg"
+                  className="w-full shadow-lg"
+                >
+                  <Check className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
+                  <span className="text-sm sm:text-base">Finalizar Treino</span>
+                </Button>
               )}
 
               {isPaused && (
@@ -181,9 +291,22 @@ export function WorkoutTimer({
         <AlertDialogContent className="max-w-[90vw] sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>Finalizar treino?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja finalizar este treino? Ele será marcado
-              como concluído e o cronômetro será zerado.
+            <AlertDialogDescription className="space-y-2">
+              <p>Seu treino será marcado como concluído.</p>
+              <div className="bg-muted p-3 rounded-lg space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span>Tempo total:</span>
+                  <span className="font-medium">{formattedTime}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Tempo de descanso:</span>
+                  <span className="font-medium">{formattedDescansoTotal}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Descansos realizados:</span>
+                  <span className="font-medium">{descansos.filter(d => d.duracao_segundos).length}</span>
+                </div>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
@@ -209,8 +332,8 @@ export function WorkoutTimer({
           <AlertDialogHeader>
             <AlertDialogTitle>Cancelar treino?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja cancelar este treino? O progresso não será
-              salvo e o cronômetro será zerado.
+              Tem certeza que deseja cancelar? O progresso não será salvo e o
+              cronômetro será zerado.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">

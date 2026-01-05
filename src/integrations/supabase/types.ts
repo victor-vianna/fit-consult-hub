@@ -1557,6 +1557,44 @@ export type Database = {
           },
         ]
       }
+      treino_descansos: {
+        Row: {
+          created_at: string | null
+          duracao_segundos: number | null
+          fim: string | null
+          id: string
+          inicio: string
+          sessao_id: string
+          tipo: string
+        }
+        Insert: {
+          created_at?: string | null
+          duracao_segundos?: number | null
+          fim?: string | null
+          id?: string
+          inicio?: string
+          sessao_id: string
+          tipo: string
+        }
+        Update: {
+          created_at?: string | null
+          duracao_segundos?: number | null
+          fim?: string | null
+          id?: string
+          inicio?: string
+          sessao_id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "treino_descansos_sessao_id_fkey"
+            columns: ["sessao_id"]
+            isOneToOne: false
+            referencedRelation: "treino_sessoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       treino_modelo_blocos: {
         Row: {
           created_at: string | null
@@ -1802,9 +1840,12 @@ export type Database = {
           id: string
           inicio: string | null
           observacoes: string | null
+          pausado_em: string | null
           personal_id: string | null
           profile_id: string | null
           status: string | null
+          tempo_descanso_total: number | null
+          tempo_pausado_total: number | null
           treino_semanal_id: string | null
         }
         Insert: {
@@ -1814,9 +1855,12 @@ export type Database = {
           id?: string
           inicio?: string | null
           observacoes?: string | null
+          pausado_em?: string | null
           personal_id?: string | null
           profile_id?: string | null
           status?: string | null
+          tempo_descanso_total?: number | null
+          tempo_pausado_total?: number | null
           treino_semanal_id?: string | null
         }
         Update: {
@@ -1826,9 +1870,12 @@ export type Database = {
           id?: string
           inicio?: string | null
           observacoes?: string | null
+          pausado_em?: string | null
           personal_id?: string | null
           profile_id?: string | null
           status?: string | null
+          tempo_descanso_total?: number | null
+          tempo_pausado_total?: number | null
           treino_semanal_id?: string | null
         }
         Relationships: [

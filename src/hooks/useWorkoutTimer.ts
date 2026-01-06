@@ -603,24 +603,41 @@ export function useWorkoutTimer({
 
       if (error) throw error;
 
-      // Buscar descansos para notificação
+      // Buscar nome do aluno
+      const { data: alunoData } = await supabase
+        .from("profiles")
+        .select("nome")
+        .eq("id", profileId)
+        .single();
+
+      const nomeAluno = alunoData?.nome || "Aluno";
+
+      // Buscar descansos para notificação e calcular tempo total
       const { data: descansosFinais } = await supabase
         .from("treino_descansos")
         .select("*")
         .eq("sessao_id", sessaoId)
         .order("created_at", { ascending: true });
 
+      // Calcular tempo de descanso total a partir dos registros do banco
+      const tempoDescansoCalculado = descansosFinais?.reduce(
+        (acc: number, d: any) => acc + (d.duracao_segundos || 0), 
+        0
+      ) || 0;
+
       // Enviar notificação ao personal
       await supabase.from("notificacoes").insert({
         destinatario_id: personalId,
         tipo: "treino_concluido",
-        titulo: "Treino Concluído",
-        mensagem: `Aluno finalizou o treino em ${formatTime(elapsedRef.current)} (descanso: ${formatTime(tempoDescansoTotal)})`,
+        titulo: "🎉 Treino Concluído",
+        mensagem: `${nomeAluno} finalizou o treino em ${formatTime(elapsedRef.current)} (descanso: ${formatTime(tempoDescansoCalculado)})`,
         dados: {
           sessao_id: sessaoId,
           treino_id: treinoId,
+          aluno_nome: nomeAluno,
+          aluno_id: profileId,
           duracao_total: elapsedRef.current,
-          duracao_descanso: tempoDescansoTotal,
+          duracao_descanso: tempoDescansoCalculado,
           duracao_pausas: tempoPausadoTotal,
           total_descansos: descansosFinais?.length || 0,
           descansos: descansosFinais?.map((d: any) => ({

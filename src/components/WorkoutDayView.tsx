@@ -141,9 +141,9 @@ export function WorkoutDayView({
     []
   );
 
-  // 🔧 Calcular total de exercícios
-  const calcularTotalExercicios = useCallback(
-    (treino: TreinoDia, grupos: GrupoExercicio[]): number => {
+  // 🔧 Calcular total de itens de treino (exercícios isolados + exercícios em grupos + blocos)
+  const calcularTotalItens = useCallback(
+    (treino: TreinoDia, grupos: GrupoExercicio[], blocos: BlocoTreino[]): number => {
       const exerciciosIsolados = treino.exercicios.filter(
         (ex) => !ex.grupo_id
       ).length;
@@ -151,7 +151,8 @@ export function WorkoutDayView({
         (total, grupo) => total + (grupo.exercicios?.length || 0),
         0
       );
-      return exerciciosIsolados + exerciciosEmGrupos;
+      const totalBlocos = blocos.length;
+      return exerciciosIsolados + exerciciosEmGrupos + totalBlocos;
     },
     []
   );
@@ -297,10 +298,11 @@ export function WorkoutDayView({
             const grupos = treinoId ? localGrupos[treinoId] ?? [] : [];
             const blocos = treinoId ? localBlocos[treinoId] ?? [] : [];
 
-            const totalExercicios = treino
-              ? calcularTotalExercicios(treino, grupos)
+            // Total de itens agora inclui blocos
+            const totalItens = treino
+              ? calcularTotalItens(treino, grupos, blocos)
               : 0;
-            const temConteudo = totalExercicios > 0 || blocos.length > 0;
+            const temConteudo = totalItens > 0;
             const progresso = treino ? calcularProgresso(treino, grupos) : 0;
 
             return (
@@ -317,7 +319,7 @@ export function WorkoutDayView({
                       variant="secondary"
                       className="text-[10px] px-1.5 py-0 h-4"
                     >
-                      {totalExercicios}
+                      {totalItens}
                     </Badge>
                     {progresso > 0 && (
                       <span className="text-[10px] font-bold opacity-80">
@@ -338,8 +340,8 @@ export function WorkoutDayView({
           const grupos = treinoId ? localGrupos[treinoId] ?? [] : [];
           const blocos = treinoId ? localBlocos[treinoId] ?? [] : [];
 
-          const totalExercicios = calcularTotalExercicios(treino, grupos);
-          const temConteudo = totalExercicios > 0 || blocos.length > 0;
+          const totalItens = calcularTotalItens(treino, grupos, blocos);
+          const temConteudo = totalItens > 0;
           const progresso = calcularProgresso(treino, grupos);
 
           // Separar blocos por posição
@@ -366,7 +368,7 @@ export function WorkoutDayView({
                   <WorkoutDayHeader
                     diaNome={diaInfo.nome}
                     descricao={treino.descricao}
-                    totalExercicios={totalExercicios}
+                    totalExercicios={totalItens}
                     totalGrupos={grupos.length}
                     totalBlocos={blocos.length}
                     progresso={progresso}

@@ -591,7 +591,7 @@ export default function AlunoDetalhes() {
                   <ClipboardCheck
                     className={`${isMobile ? "h-5 w-5" : "h-4 w-4 mr-2"}`}
                   />
-                  {!isMobile && "Check-ins"}
+                  {!isMobile && "Feedbacks Semanais"}
                 </TabsTrigger>
                 <TabsTrigger
                   value="financeiro"
@@ -947,7 +947,7 @@ export default function AlunoDetalhes() {
                 />
               )}
             </TabsContent>
-            {/* Aba Check-ins */}
+            {/* Aba Feedbacks Semanais */}
             <TabsContent value="checkins" className="space-y-6">
               {user && aluno && (
                 <CheckinsDashboard

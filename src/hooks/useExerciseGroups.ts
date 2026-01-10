@@ -46,6 +46,8 @@ export interface GrupoExercicio {
 interface UseExerciseGroupsProps {
   profileId: string;
   personalId: string;
+  /** Semana (YYYY-MM-DD) para buscar grupos; se omitido usa a semana atual */
+  semana?: string;
   enabled?: boolean;
 }
 
@@ -137,10 +139,11 @@ const genUUID = () => {
 export function useExerciseGroups({
   profileId,
   personalId,
+  semana: semanaProp,
   enabled = true,
 }: UseExerciseGroupsProps) {
   const queryClient = useQueryClient();
-  const semana = getWeekStart();
+  const semana = semanaProp ?? getWeekStart();
 
   // Query para buscar todos os grupos da semana
   const {
@@ -152,17 +155,13 @@ export function useExerciseGroups({
     queryKey: buildQueryKey(profileId, personalId, semana),
     queryFn: async (): Promise<Record<string, GrupoExercicio[]>> => {
       try {
-        const hoje = new Date();
-        const inicioDaSemana = new Date(hoje);
-        inicioDaSemana.setDate(hoje.getDate() - hoje.getDay() + 1);
-
-        // 1. Buscar treinos semanais
+        // 1. Buscar treinos semanais da semana especificada
         const { data: treinosSemanais, error: treinosError } = await supabase
           .from("treinos_semanais")
           .select("id")
           .eq("profile_id", profileId)
           .eq("personal_id", personalId)
-          .gte("semana", inicioDaSemana.toISOString().split("T")[0]);
+          .eq("semana", semana);
 
         if (treinosError) throw treinosError;
         if (!treinosSemanais || treinosSemanais.length === 0) return {};

@@ -206,7 +206,7 @@ export function CheckinsDashboard({
               borderTopColor: themeColor || "#000000",
             }}
           />
-          <p className="text-muted-foreground">Carregando check-ins...</p>
+          <p className="text-muted-foreground">Carregando feedbacks...</p>
         </div>
       </div>
     );
@@ -220,11 +220,11 @@ export function CheckinsDashboard({
             <BarChart3 className="h-10 w-10 text-muted-foreground" />
           </div>
           <h3 className="text-lg font-semibold mb-2">
-            Nenhum check-in registrado
+            Nenhum feedback registrado
           </h3>
           <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-            {studentName} ainda não preencheu nenhum check-in semanal. Os
-            check-ins aparecerão aqui quando forem preenchidos.
+            {studentName} ainda não preencheu nenhum feedback semanal. Os
+            feedbacks aparecerão aqui quando forem preenchidos.
           </p>
         </CardContent>
       </Card>
@@ -253,12 +253,12 @@ export function CheckinsDashboard({
               </div>
               <div>
                 <CardTitle className="text-2xl mb-2">
-                  Check-ins de {studentName}
+                  Feedbacks Semanais de {studentName}
                 </CardTitle>
                 <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    <span>{checkins.length} check-ins realizados</span>
+                    <span>{checkins.length} feedbacks enviados</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Calendar className="h-4 w-4" />

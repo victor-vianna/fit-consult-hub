@@ -214,6 +214,7 @@ export function TreinosManager({
   } = useExerciseGroups({
     profileId,
     personalId,
+    semana: semanaSelecionada,
     enabled: true,
   });
 
@@ -452,10 +453,11 @@ export function TreinosManager({
     return Math.round((concluidos / treino.exercicios.length) * 100);
   };
 
-  // 🔧 Esta função conta TODOS os exercícios (isolados + em grupos)
-  const calcularTotalExercicios = (treino: TreinoDia): number => {
+  // 🔧 Esta função conta TODOS os itens de treino (exercícios isolados + em grupos + blocos)
+  const calcularTotalItens = (treino: TreinoDia): number => {
     const treinoId = getTreinoId(treino);
     const grupos = treinoId ? obterGruposDoTreino(treinoId) : [];
+    const blocos = treinoId ? obterBlocos(treinoId) : [];
 
     // Exercícios isolados (não estão em nenhum grupo)
     const exerciciosIsolados = treino.exercicios.filter(
@@ -467,7 +469,10 @@ export function TreinosManager({
       return total + (grupo.exercicios?.length || 0);
     }, 0);
 
-    return exerciciosIsolados + exerciciosEmGrupos;
+    // Blocos de treino
+    const totalBlocos = blocos.length;
+
+    return exerciciosIsolados + exerciciosEmGrupos + totalBlocos;
   };
 
   /**
@@ -927,7 +932,7 @@ export function TreinosManager({
               const blocos = treinoId ? obterBlocos(treinoId) : [];
               const temConteudo =
                 temExercicios || blocos.length > 0 || grupos.length > 0;
-              const totalExercicios = calcularTotalExercicios(treino);
+              const totalItens = calcularTotalItens(treino);
 
               return (
                 <button
@@ -946,7 +951,7 @@ export function TreinosManager({
                   </span>
                   {temConteudo && (
                     <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">
-                      {totalExercicios}
+                      {totalItens}
                     </div>
                   )}
                 </button>
@@ -1025,10 +1030,10 @@ export function TreinosManager({
                                       <span className="text-xs text-muted-foreground flex items-center gap-1">
                                         <Dumbbell className="h-3 w-3" />
                                         {(() => {
-                                          const totalExercicios =
-                                            calcularTotalExercicios(treino);
-                                          return `${totalExercicios} exercício${
-                                            totalExercicios !== 1 ? "s" : ""
+                                          const totalItens =
+                                            calcularTotalItens(treino);
+                                          return `${totalItens} item${
+                                            totalItens !== 1 ? "ns" : ""
                                           }`;
                                         })()}
                                       </span>

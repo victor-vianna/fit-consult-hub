@@ -30,4 +30,13 @@ export interface TreinoDia {
   blocos?: any[];
   descricao: string | null;
   concluido: boolean;
+  // Novos campos para múltiplos treinos por dia
+  nome_treino?: string;
+  ordem_no_dia?: number;
+}
+
+// Interface para agrupar múltiplos treinos do mesmo dia
+export interface TreinosDoDia {
+  dia: number;
+  treinos: TreinoDia[];
 }

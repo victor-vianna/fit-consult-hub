@@ -11,6 +11,12 @@ export interface ModeloPasta {
   ordem: number;
   created_at: string;
   updated_at: string;
+  // Novos campos para hierarquia
+  parent_id: string | null;
+  nivel: number;
+  caminho: string | null;
+  // Campo calculado para UI
+  subpastas?: ModeloPasta[];
 }
 
 interface UseModeloPastasProps {
@@ -49,10 +55,14 @@ export function useModeloPastas({
     staleTime: 1000 * 60 * 5,
   });
 
-  // Criar nova pasta
+  // Criar nova pasta (agora com suporte a parent_id)
   const criarPastaMutation = useMutation({
-    mutationFn: async (dados: { nome: string; cor?: string }) => {
-      const maxOrdem = pastas.length > 0 ? Math.max(...pastas.map((p) => p.ordem)) : 0;
+    mutationFn: async (dados: { nome: string; cor?: string; parent_id?: string | null }) => {
+      // Calcular próxima ordem baseada no parent
+      const pastasDoMesmoNivel = pastas.filter(p => p.parent_id === (dados.parent_id || null));
+      const maxOrdem = pastasDoMesmoNivel.length > 0 
+        ? Math.max(...pastasDoMesmoNivel.map((p) => p.ordem)) 
+        : 0;
 
       const { data, error } = await supabase
         .from("modelo_pastas")
@@ -61,6 +71,7 @@ export function useModeloPastas({
           nome: dados.nome,
           cor: dados.cor || "#3b82f6",
           ordem: maxOrdem + 1,
+          parent_id: dados.parent_id || null,
         })
         .select()
         .single();
@@ -77,6 +88,34 @@ export function useModeloPastas({
       toast.error("Erro ao criar pasta");
     },
   });
+
+  // Função para organizar pastas em hierarquia
+  const organizarHierarquia = (pastasList: ModeloPasta[]): ModeloPasta[] => {
+    const pastasMap = new Map<string, ModeloPasta>();
+    const raiz: ModeloPasta[] = [];
+
+    // Primeiro, criar o mapa de todas as pastas
+    pastasList.forEach(pasta => {
+      pastasMap.set(pasta.id, { ...pasta, subpastas: [] });
+    });
+
+    // Depois, organizar a hierarquia
+    pastasList.forEach(pasta => {
+      const pastaComSubs = pastasMap.get(pasta.id)!;
+      if (pasta.parent_id && pastasMap.has(pasta.parent_id)) {
+        const parent = pastasMap.get(pasta.parent_id)!;
+        parent.subpastas = parent.subpastas || [];
+        parent.subpastas.push(pastaComSubs);
+      } else {
+        raiz.push(pastaComSubs);
+      }
+    });
+
+    return raiz;
+  };
+
+  // Pastas organizadas hierarquicamente
+  const pastasHierarquicas = organizarHierarquia(pastas);
 
   // Atualizar pasta
   const atualizarPastaMutation = useMutation({
@@ -155,9 +194,10 @@ export function useModeloPastas({
 
   return {
     pastas,
+    pastasHierarquicas,
     loading,
     error,
-    criarPasta: (dados: { nome: string; cor?: string }) =>
+    criarPasta: (dados: { nome: string; cor?: string; parent_id?: string | null }) =>
       criarPastaMutation.mutateAsync(dados),
     atualizarPasta: (
       pastaId: string,
@@ -166,6 +206,7 @@ export function useModeloPastas({
     deletarPasta: (pastaId: string) => deletarPastaMutation.mutateAsync(pastaId),
     moverModeloParaPasta: (modeloId: string, pastaId: string | null) =>
       moverModeloParaPastaMutation.mutateAsync({ modeloId, pastaId }),
+    organizarHierarquia,
     isCriando: criarPastaMutation.isPending,
     isAtualizando: atualizarPastaMutation.isPending,
     isDeletando: deletarPastaMutation.isPending,

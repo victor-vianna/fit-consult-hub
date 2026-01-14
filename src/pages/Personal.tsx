@@ -2,39 +2,10 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  Users,
-  UserPlus,
-  Trash2,
-  FileText,
-  UserCheck,
-  UserX,
-  LogOut,
-} from "lucide-react";
+import { Users, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebarPersonal } from "@/components/AppSidebarPersonal";
@@ -44,6 +15,8 @@ import { MobileHeaderPersonal } from "@/components/mobile/MobileHeaderPersonal";
 import { BottomNavigationPersonal } from "@/components/mobile/BottomNavigationPersonal";
 import { MobileMenuDrawerPersonal } from "@/components/mobile/MobileMenuDrawerPersonal";
 import { AppLayout } from "@/components/AppLayout";
+import { PersonalDashboardCards } from "@/components/dashboard/PersonalDashboardCards";
+import { LojaPlaceholder } from "@/components/loja/LojaPlaceholder";
 
 interface Aluno {
   id: string;
@@ -232,8 +205,16 @@ export default function Personal() {
             profileName={profile?.nome}
           />
 
-          {/* ✅ Versão Mobile do bloco "Meus Alunos" */}
-          <main className="flex-1 overflow-auto pb-20 px-4 pt-4">
+          <main className="flex-1 overflow-auto pb-20 px-4 pt-4 space-y-4">
+            {/* Dashboard Cards para Mobile */}
+            {user?.id && (
+              <PersonalDashboardCards
+                personalId={user.id}
+                themeColor={personalSettings?.theme_color}
+              />
+            )}
+
+            {/* Card de Acesso aos Alunos */}
             <Card className="shadow-sm">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
@@ -270,6 +251,9 @@ export default function Personal() {
                 </Button>
               </CardContent>
             </Card>
+
+            {/* Loja Placeholder */}
+            <LojaPlaceholder isPersonal={true} themeColor={personalSettings?.theme_color} />
           </main>
 
           <BottomNavigationPersonal
@@ -352,37 +336,44 @@ export default function Personal() {
             </header>
 
             <main className="flex-1 overflow-auto">
-              <div className="container mx-auto px-4 py-8">
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle>Meus Alunos</CardTitle>
-                      <Button
-                        onClick={() => navigate("/alunos")}
-                        style={{
-                          backgroundColor:
-                            personalSettings?.theme_color || undefined,
-                        }}
-                      >
-                        <Users className="mr-2 h-4 w-4" />
-                        Ver Todos os Alunos
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-8">
-                      <p className="text-muted-foreground mb-4">
-                        Gerencie todos os seus alunos em um só lugar
+              <div className="container mx-auto px-4 py-8 space-y-8">
+                {/* Dashboard Inteligente */}
+                {user?.id && (
+                  <PersonalDashboardCards
+                    personalId={user.id}
+                    themeColor={personalSettings?.theme_color}
+                  />
+                )}
+
+                {/* Grid com Cards de Acesso Rápido */}
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* Card de Alunos */}
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle>Meus Alunos</CardTitle>
+                        <Button
+                          onClick={() => navigate("/alunos")}
+                          style={{
+                            backgroundColor:
+                              personalSettings?.theme_color || undefined,
+                          }}
+                        >
+                          <Users className="mr-2 h-4 w-4" />
+                          Ver Todos
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-muted-foreground">
+                        Gerencie treinos, feedbacks e acompanhe a evolução dos seus alunos.
                       </p>
-                      <Button
-                        variant="outline"
-                        onClick={() => navigate("/alunos")}
-                      >
-                        Acessar Gerenciador de Alunos
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+
+                  {/* Loja Placeholder */}
+                  <LojaPlaceholder isPersonal={true} themeColor={personalSettings?.theme_color} />
+                </div>
               </div>
             </main>
           </div>

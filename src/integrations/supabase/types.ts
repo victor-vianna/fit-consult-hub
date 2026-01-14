@@ -1011,33 +1011,49 @@ export type Database = {
       }
       modelo_pastas: {
         Row: {
+          caminho: string | null
           cor: string | null
           created_at: string | null
           id: string
+          nivel: number | null
           nome: string
           ordem: number | null
+          parent_id: string | null
           personal_id: string
           updated_at: string | null
         }
         Insert: {
+          caminho?: string | null
           cor?: string | null
           created_at?: string | null
           id?: string
+          nivel?: number | null
           nome: string
           ordem?: number | null
+          parent_id?: string | null
           personal_id: string
           updated_at?: string | null
         }
         Update: {
+          caminho?: string | null
           cor?: string | null
           created_at?: string | null
           id?: string
+          nivel?: number | null
           nome?: string
           ordem?: number | null
+          parent_id?: string | null
           personal_id?: string
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "modelo_pastas_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "modelo_pastas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "modelo_pastas_personal_id_fkey"
             columns: ["personal_id"]
@@ -1395,6 +1411,72 @@ export type Database = {
           preco_mensal?: number
         }
         Relationships: []
+      }
+      produtos_personal: {
+        Row: {
+          arquivo_url: string | null
+          ativo: boolean | null
+          created_at: string | null
+          descricao: string | null
+          destaque: boolean | null
+          id: string
+          imagem_url: string | null
+          nome: string
+          ordem: number | null
+          personal_id: string
+          preco: number
+          preco_promocional: number | null
+          tipo: string
+          updated_at: string | null
+        }
+        Insert: {
+          arquivo_url?: string | null
+          ativo?: boolean | null
+          created_at?: string | null
+          descricao?: string | null
+          destaque?: boolean | null
+          id?: string
+          imagem_url?: string | null
+          nome: string
+          ordem?: number | null
+          personal_id: string
+          preco?: number
+          preco_promocional?: number | null
+          tipo?: string
+          updated_at?: string | null
+        }
+        Update: {
+          arquivo_url?: string | null
+          ativo?: boolean | null
+          created_at?: string | null
+          descricao?: string | null
+          destaque?: boolean | null
+          id?: string
+          imagem_url?: string | null
+          nome?: string
+          ordem?: number | null
+          personal_id?: string
+          preco?: number
+          preco_promocional?: number | null
+          tipo?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "produtos_personal_personal_id_fkey"
+            columns: ["personal_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produtos_personal_personal_id_fkey"
+            columns: ["personal_id"]
+            isOneToOne: false
+            referencedRelation: "v_status_checkins"
+            referencedColumns: ["profile_id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -1911,7 +1993,9 @@ export type Database = {
           id: string
           modelo_id: string | null
           nome_modelo: string | null
+          nome_treino: string | null
           observacoes: string | null
+          ordem_no_dia: number | null
           personal_id: string
           profile_id: string
           semana: string
@@ -1925,7 +2009,9 @@ export type Database = {
           id?: string
           modelo_id?: string | null
           nome_modelo?: string | null
+          nome_treino?: string | null
           observacoes?: string | null
+          ordem_no_dia?: number | null
           personal_id: string
           profile_id: string
           semana: string
@@ -1939,7 +2025,9 @@ export type Database = {
           id?: string
           modelo_id?: string | null
           nome_modelo?: string | null
+          nome_treino?: string | null
           observacoes?: string | null
+          ordem_no_dia?: number | null
           personal_id?: string
           profile_id?: string
           semana?: string

@@ -30,6 +30,29 @@ interface Descanso {
   duracao_segundos?: number;
 }
 
+export interface WorkoutCompletionData {
+  tempoTotal: number;
+  tempoFormatado: string;
+  horaInicio: string;
+  horaFim: string;
+  data: string;
+  tempoDescanso: number;
+  tempoPausas: number;
+  totalDescansos: number;
+  mensagemMotivacional: string;
+}
+
+const mensagensMotivacionais = [
+  "💪 Você arrasou! Cada treino te deixa mais forte!",
+  "🔥 Treino concluído com sucesso! Continue assim!",
+  "🏆 Parabéns! Mais um passo em direção aos seus objetivos!",
+  "⭐ Incrível! Sua dedicação está fazendo a diferença!",
+  "🎯 Missão cumprida! Seu esforço vale a pena!",
+  "💥 Você é imparável! Que treino sensacional!",
+  "🌟 Excelente trabalho! Seu corpo agradece!",
+  "🚀 Treino finalizado! Você está evoluindo a cada dia!",
+];
+
 export function useWorkoutTimer({
   treinoId,
   profileId,
@@ -40,6 +63,9 @@ export function useWorkoutTimer({
   const [elapsedTime, setElapsedTime] = useState(0);
   const [sessaoId, setSessaoId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showCompletionScreen, setShowCompletionScreen] = useState(false);
+  const [completionData, setCompletionData] = useState<WorkoutCompletionData | null>(null);
+  const [inicioTreino, setInicioTreino] = useState<Date | null>(null);
 
   // Descansos
   const [isResting, setIsResting] = useState(false);
@@ -147,6 +173,7 @@ export function useWorkoutTimer({
             setIsPaused(session.isPaused);
             setTempoDescansoTotal(session.tempoDescansoTotal);
             setTempoPausadoTotal(session.tempoPausadoTotal);
+            setInicioTreino(new Date(session.startTime));
 
             if (session.isPaused && session.pausedAt) {
               pausedAtRef.current = session.pausedAt;
@@ -217,6 +244,7 @@ export function useWorkoutTimer({
             setIsPaused(sessaoAtiva.status === "pausado");
             setTempoDescansoTotal(sessaoAtiva.tempo_descanso_total || 0);
             setTempoPausadoTotal(sessaoAtiva.tempo_pausado_total || 0);
+            setInicioTreino(new Date(sessaoAtiva.inicio!));
 
             if (sessaoAtiva.pausado_em) {
               pausedAtRef.current = new Date(sessaoAtiva.pausado_em).getTime();
@@ -358,12 +386,27 @@ export function useWorkoutTimer({
   // Iniciar treino
   const iniciar = async () => {
     try {
+      // Verifica se o usuário está autenticado
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        toast.error("Você precisa estar logado para iniciar o treino");
+        return;
+      }
+
+      // Verifica se o usuário autenticado é o dono do treino
+      if (user.id !== profileId) {
+        toast.error("Você não tem permissão para iniciar este treino");
+        return;
+      }
+
       if (!treinoId || !profileId || !personalId) {
         toast.error("Dados inválidos para iniciar o treino");
         return;
       }
 
       const now = Date.now();
+      const inicioDate = new Date();
 
       const { data, error } = await supabase
         .from("treino_sessoes")
@@ -371,7 +414,7 @@ export function useWorkoutTimer({
           treino_semanal_id: treinoId,
           profile_id: profileId,
           personal_id: personalId,
-          inicio: new Date().toISOString(),
+          inicio: inicioDate.toISOString(),
           status: "em_andamento",
           duracao_segundos: 0,
           tempo_descanso_total: 0,
@@ -380,7 +423,15 @@ export function useWorkoutTimer({
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Erro ao inserir sessão:", error);
+        if (error.code === "42501") {
+          toast.error("Você não tem permissão para iniciar este treino. Por favor, faça login novamente.");
+        } else {
+          toast.error("Não foi possível iniciar o treino. Tente novamente.");
+        }
+        return;
+      }
 
       setSessaoId(data.id);
       setIsRunning(true);
@@ -391,6 +442,7 @@ export function useWorkoutTimer({
       setDescansos([]);
       setTempoDescansoTotal(0);
       setTempoPausadoTotal(0);
+      setInicioTreino(inicioDate);
 
       // Salvar no localStorage
       const session: StoredSession = {
@@ -403,10 +455,10 @@ export function useWorkoutTimer({
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
 
-      toast.success("Treino iniciado!");
+      toast.success("🚀 Treino iniciado! Vamos nessa!");
     } catch (err) {
       console.error("Erro ao iniciar treino:", err);
-      toast.error("Erro ao iniciar treino");
+      toast.error("Erro ao iniciar treino. Verifique sua conexão.");
     }
   };
 
@@ -437,7 +489,7 @@ export function useWorkoutTimer({
 
         setIsPaused(true);
         setIsRunning(false);
-        toast.info("Treino pausado");
+        toast.info("⏸️ Treino pausado");
       } else {
         // Retomando
         const tempoPausado = pausedAtRef.current 
@@ -459,7 +511,7 @@ export function useWorkoutTimer({
 
         setIsPaused(false);
         setIsRunning(true);
-        toast.info("Treino retomado");
+        toast.info("▶️ Treino retomado! Continue assim!");
       }
 
       saveToStorage();
@@ -504,7 +556,7 @@ export function useWorkoutTimer({
       setCurrentRestId(data.id);
 
       const label = tipo === "serie" ? "séries" : "exercícios";
-      toast.info(`Descanso entre ${label} iniciado`);
+      toast.info(`☕ Descanso entre ${label} iniciado`);
     } catch (err) {
       console.error("Erro ao iniciar descanso:", err);
       toast.error("Erro ao iniciar descanso");
@@ -568,7 +620,7 @@ export function useWorkoutTimer({
       setRestElapsedTime(0);
       setCurrentRestId(null);
 
-      toast.success(`Descanso encerrado: ${formatTime(duracao)}`);
+      toast.success(`✅ Descanso encerrado: ${formatTime(duracao)}`);
     } catch (err) {
       console.error("Erro ao encerrar descanso:", err);
       toast.error("Erro ao encerrar descanso");
@@ -576,10 +628,10 @@ export function useWorkoutTimer({
   };
 
   // Finalizar treino
-  const finalizar = async () => {
+  const finalizar = async (): Promise<WorkoutCompletionData | null> => {
     if (!sessaoId) {
       toast.error("Nenhuma sessão ativa");
-      return;
+      return null;
     }
 
     try {
@@ -590,10 +642,12 @@ export function useWorkoutTimer({
 
       await persistirTempo();
 
+      const fimDate = new Date();
+      
       const { error } = await supabase
         .from("treino_sessoes")
         .update({
-          fim: new Date().toISOString(),
+          fim: fimDate.toISOString(),
           duracao_segundos: elapsedRef.current,
           tempo_descanso_total: tempoDescansoTotal,
           tempo_pausado_total: tempoPausadoTotal,
@@ -648,6 +702,24 @@ export function useWorkoutTimer({
         lida: false,
       });
 
+      // Preparar dados de conclusão
+      const mensagemMotivacional = mensagensMotivacionais[Math.floor(Math.random() * mensagensMotivacionais.length)];
+      
+      const dadosConclusao: WorkoutCompletionData = {
+        tempoTotal: elapsedRef.current,
+        tempoFormatado: formatTime(elapsedRef.current),
+        horaInicio: inicioTreino ? inicioTreino.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--',
+        horaFim: fimDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        data: fimDate.toLocaleDateString('pt-BR'),
+        tempoDescanso: tempoDescansoCalculado,
+        tempoPausas: tempoPausadoTotal,
+        totalDescansos: descansosFinais?.length || 0,
+        mensagemMotivacional,
+      };
+
+      setCompletionData(dadosConclusao);
+      setShowCompletionScreen(true);
+
       // Limpar estado
       localStorage.removeItem(STORAGE_KEY);
       setIsRunning(false);
@@ -658,11 +730,18 @@ export function useWorkoutTimer({
       setTempoDescansoTotal(0);
       setTempoPausadoTotal(0);
 
-      toast.success(`Treino finalizado! Duração: ${formatTime(elapsedRef.current)}`);
+      return dadosConclusao;
     } catch (err) {
       console.error("Erro ao finalizar treino:", err);
       toast.error("Erro ao finalizar treino");
+      return null;
     }
+  };
+
+  // Fechar tela de conclusão
+  const fecharTelaConclusao = () => {
+    setShowCompletionScreen(false);
+    setCompletionData(null);
   };
 
   // Cancelar treino
@@ -690,6 +769,7 @@ export function useWorkoutTimer({
       setTempoDescansoTotal(0);
       setTempoPausadoTotal(0);
       setRestElapsedTime(0);
+      setInicioTreino(null);
 
       toast.info("Treino cancelado");
     } catch (err) {
@@ -708,6 +788,18 @@ export function useWorkoutTimer({
       .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
+  // Formatar tempo curto (para exibição compacta)
+  const formatTimeShort = (seconds: number): string => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hrs > 0) {
+      return `${hrs}h ${mins}m`;
+    }
+    return `${mins}m ${secs}s`;
+  };
+
   return {
     // Estados
     isRunning,
@@ -721,6 +813,8 @@ export function useWorkoutTimer({
     tempoDescansoTotal,
     tempoPausadoTotal,
     sessaoId,
+    showCompletionScreen,
+    completionData,
     
     // Formatados
     formattedTime: formatTime(elapsedTime),
@@ -734,8 +828,10 @@ export function useWorkoutTimer({
     cancelar,
     iniciarDescanso,
     encerrarDescanso,
+    fecharTelaConclusao,
     
     // Utils
     formatTime,
+    formatTimeShort,
   };
 }

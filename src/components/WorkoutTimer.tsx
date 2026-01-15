@@ -2,8 +2,9 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, Check, X, Timer, Coffee, Dumbbell } from "lucide-react";
+import { Play, Pause, Check, X, Timer, Coffee, Dumbbell, Loader2 } from "lucide-react";
 import { useWorkoutTimer } from "@/hooks/useWorkoutTimer";
+import { WorkoutCompletionScreen } from "./WorkoutCompletionScreen";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +32,7 @@ export function WorkoutTimer({
 }: WorkoutTimerProps) {
   const [showFinalizarDialog, setShowFinalizarDialog] = useState(false);
   const [showCancelarDialog, setShowCancelarDialog] = useState(false);
+  const [isFinalizando, setIsFinalizando] = useState(false);
 
   const {
     isRunning,
@@ -43,15 +45,29 @@ export function WorkoutTimer({
     restType,
     tempoDescansoTotal,
     descansos,
+    showCompletionScreen,
+    completionData,
     iniciar,
     togglePause,
     finalizar,
     cancelar,
     iniciarDescanso,
     encerrarDescanso,
+    fecharTelaConclusao,
   } = useWorkoutTimer({ treinoId, profileId, personalId });
 
   if (readOnly) return null;
+
+  // Mostrar tela de conclusão
+  if (showCompletionScreen && completionData) {
+    return (
+      <WorkoutCompletionScreen
+        data={completionData}
+        treinoId={treinoId}
+        onClose={fecharTelaConclusao}
+      />
+    );
+  }
 
   if (isLoading) {
     return (
@@ -68,8 +84,10 @@ export function WorkoutTimer({
   }
 
   const handleFinalizar = async () => {
+    setIsFinalizando(true);
     await finalizar();
     setShowFinalizarDialog(false);
+    setIsFinalizando(false);
   };
 
   const handleCancelar = async () => {
@@ -290,7 +308,10 @@ export function WorkoutTimer({
       >
         <AlertDialogContent className="max-w-[90vw] sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Finalizar treino?</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Check className="h-5 w-5 text-green-500" />
+              Finalizar treino?
+            </AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
               <p>Seu treino será marcado como concluído.</p>
               <div className="bg-muted p-3 rounded-lg space-y-1 text-sm">
@@ -310,14 +331,22 @@ export function WorkoutTimer({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <AlertDialogCancel className="w-full sm:w-auto">
+            <AlertDialogCancel className="w-full sm:w-auto" disabled={isFinalizando}>
               Voltar
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleFinalizar}
               className="w-full sm:w-auto"
+              disabled={isFinalizando}
             >
-              Sim, finalizar
+              {isFinalizando ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Finalizando...
+                </>
+              ) : (
+                "Sim, finalizar!"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -330,7 +359,10 @@ export function WorkoutTimer({
       >
         <AlertDialogContent className="max-w-[90vw] sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Cancelar treino?</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <X className="h-5 w-5 text-destructive" />
+              Cancelar treino?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja cancelar? O progresso não será salvo e o
               cronômetro será zerado.

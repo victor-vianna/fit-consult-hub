@@ -104,106 +104,124 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
         .eq("profile_id", profileId)
         .eq("personal_id", personalId)
         .eq("semana", semanaParaBuscar)
-        .order("dia_semana");
+        .order("dia_semana")
+        .order("ordem_no_dia", { ascending: true });
 
       if (treinosError) {
         console.error("❌ Erro ao buscar treinos:", treinosError);
         throw treinosError;
       }
 
-      const treinosCompletos: TreinoDia[] = await Promise.all(
-        Array.from({ length: 7 }, async (_, i) => {
-          const dia = i + 1;
-          const treino = treinosSemanais?.find(
-            (t: any) => t.dia_semana === dia
-          );
+      // Agrupar treinos por dia_semana (suporta múltiplos treinos por dia)
+      const treinosPorDia = new Map<number, any[]>();
+      (treinosSemanais || []).forEach((treino: any) => {
+        const dia = treino.dia_semana;
+        if (!treinosPorDia.has(dia)) {
+          treinosPorDia.set(dia, []);
+        }
+        treinosPorDia.get(dia)!.push(treino);
+      });
 
-          if (!treino) {
-            return {
-              dia,
-              treinoId: null,
-              exercicios: [],
-              grupos: [],
-              descricao: null,
-              concluido: false,
-            };
-          }
+      // Processar todos os treinos (flatten para manter compatibilidade com a UI atual)
+      const todosTreinos: TreinoDia[] = [];
 
-          const { data: exercicios, error: exerciciosError } = await supabase
-            .from("exercicios")
-            .select("*")
-            .eq("treino_semanal_id", treino.id)
-            .is("deleted_at", null)
-            .order("ordem");
+      for (let i = 0; i < 7; i++) {
+        const dia = i + 1;
+        const treinosDoDia = treinosPorDia.get(dia) || [];
 
-          if (exerciciosError) {
-            console.error("❌ Erro ao buscar exercícios:", exerciciosError);
-            throw exerciciosError;
-          }
-
-          // Mapear cada registro do banco para o tipo Exercicio com conversões corretas
-          const exerciciosTipados: Exercicio[] = (exercicios || []).map(
-            (ex: any) => {
-              const mapped: Exercicio = {
-                id: String(ex.id),
-                treino_semanal_id:
-                  ex.treino_semanal_id != null
-                    ? String(ex.treino_semanal_id)
-                    : null,
-                nome: String(ex.nome ?? ""),
-                link_video: ex.link_video ?? null,
-                ordem:
-                  typeof ex.ordem === "number"
-                    ? ex.ordem
-                    : Number(ex.ordem ?? 0),
-                ordem_no_grupo:
-                  ex.ordem_no_grupo != null ? Number(ex.ordem_no_grupo) : null,
-                series: ex.series != null ? Number(ex.series) : 3,
-                repeticoes: ex.repeticoes ?? "12",
-                descanso: ex.descanso != null ? Number(ex.descanso) : 60,
-                descanso_entre_grupos:
-                  ex.descanso_entre_grupos != null
-                    ? Number(ex.descanso_entre_grupos)
-                    : null,
-                carga: cargaFromDb(ex.carga),
-                peso_executado: ex.peso_executado ?? null,
-                observacoes: ex.observacoes ?? null,
-                concluido: Boolean(ex.concluido),
-                grupo_id: ex.grupo_id ?? null,
-                tipo_agrupamento: ex.tipo_agrupamento ?? null,
-                created_at: ex.created_at ?? null,
-                updated_at: ex.updated_at ?? null,
-                deleted_at: ex.deleted_at ?? null,
-              };
-              return mapped;
-            }
-          );
-
-          // Buscar grupos associados ao treino
-          const grupos = await obterGruposDoTreino(treino.id);
-
-          // Buscar blocos do treino
-          const { data: blocos } = await supabase
-            .from("blocos_treino")
-            .select("*")
-            .eq("treino_semanal_id", treino.id)
-            .is("deleted_at", null)
-            .order("posicao", { ascending: true })
-            .order("ordem", { ascending: true });
-
-          return {
+        if (treinosDoDia.length === 0) {
+          // Dia sem treino - adicionar placeholder
+          todosTreinos.push({
             dia,
-            treinoId: treino.id,
-            exercicios: exerciciosTipados,
-            grupos,
-            blocos: blocos ?? [],
-            descricao: treino.descricao ?? null,
-            concluido: Boolean(treino.concluido),
-          };
-        })
-      );
+            treinoId: null,
+            exercicios: [],
+            grupos: [],
+            descricao: null,
+            concluido: false,
+            nome_treino: undefined,
+            ordem_no_dia: 1,
+          });
+        } else {
+          // Processar cada treino do dia
+          for (const treino of treinosDoDia) {
+            const { data: exercicios, error: exerciciosError } = await supabase
+              .from("exercicios")
+              .select("*")
+              .eq("treino_semanal_id", treino.id)
+              .is("deleted_at", null)
+              .order("ordem");
 
-      return treinosCompletos;
+            if (exerciciosError) {
+              console.error("❌ Erro ao buscar exercícios:", exerciciosError);
+              throw exerciciosError;
+            }
+
+            // Mapear cada registro do banco para o tipo Exercicio com conversões corretas
+            const exerciciosTipados: Exercicio[] = (exercicios || []).map(
+              (ex: any) => {
+                const mapped: Exercicio = {
+                  id: String(ex.id),
+                  treino_semanal_id:
+                    ex.treino_semanal_id != null
+                      ? String(ex.treino_semanal_id)
+                      : null,
+                  nome: String(ex.nome ?? ""),
+                  link_video: ex.link_video ?? null,
+                  ordem:
+                    typeof ex.ordem === "number"
+                      ? ex.ordem
+                      : Number(ex.ordem ?? 0),
+                  ordem_no_grupo:
+                    ex.ordem_no_grupo != null ? Number(ex.ordem_no_grupo) : null,
+                  series: ex.series != null ? Number(ex.series) : 3,
+                  repeticoes: ex.repeticoes ?? "12",
+                  descanso: ex.descanso != null ? Number(ex.descanso) : 60,
+                  descanso_entre_grupos:
+                    ex.descanso_entre_grupos != null
+                      ? Number(ex.descanso_entre_grupos)
+                      : null,
+                  carga: cargaFromDb(ex.carga),
+                  peso_executado: ex.peso_executado ?? null,
+                  observacoes: ex.observacoes ?? null,
+                  concluido: Boolean(ex.concluido),
+                  grupo_id: ex.grupo_id ?? null,
+                  tipo_agrupamento: ex.tipo_agrupamento ?? null,
+                  created_at: ex.created_at ?? null,
+                  updated_at: ex.updated_at ?? null,
+                  deleted_at: ex.deleted_at ?? null,
+                };
+                return mapped;
+              }
+            );
+
+            // Buscar grupos associados ao treino
+            const grupos = await obterGruposDoTreino(treino.id);
+
+            // Buscar blocos do treino
+            const { data: blocos } = await supabase
+              .from("blocos_treino")
+              .select("*")
+              .eq("treino_semanal_id", treino.id)
+              .is("deleted_at", null)
+              .order("posicao", { ascending: true })
+              .order("ordem", { ascending: true });
+
+            todosTreinos.push({
+              dia,
+              treinoId: treino.id,
+              exercicios: exerciciosTipados,
+              grupos,
+              blocos: blocos ?? [],
+              descricao: treino.descricao ?? null,
+              concluido: Boolean(treino.concluido),
+              nome_treino: treino.nome_treino || undefined,
+              ordem_no_dia: treino.ordem_no_dia || 1,
+            });
+          }
+        }
+      }
+
+      return todosTreinos;
     },
     staleTime: 1000 * 60 * 2,
     enabled: !!profileId && !!personalId,
@@ -537,6 +555,116 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
     },
   });
 
+  // 🆕 Mutation para criar treino adicional no mesmo dia
+  const criarTreinoNoDiaMutation = useMutation({
+    mutationFn: async ({
+      dia,
+      nomeTreino,
+    }: {
+      dia: number;
+      nomeTreino: string;
+    }) => {
+      const diaValido = validarDiaSemana(dia);
+      
+      // Buscar quantos treinos já existem para este dia
+      const treinosDoDia = treinos.filter((t) => t.dia === diaValido);
+      const proximaOrdem = treinosDoDia.length > 0 
+        ? Math.max(...treinosDoDia.map((t) => t.ordem_no_dia || 1)) + 1 
+        : 1;
+
+      const { data, error } = await supabase
+        .from("treinos_semanais")
+        .insert({
+          profile_id: profileId,
+          personal_id: personalId,
+          semana: semanaParaBuscar,
+          dia_semana: diaValido,
+          nome_treino: nomeTreino,
+          ordem_no_dia: proximaOrdem,
+          concluido: false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: buildQueryKey(profileId, personalId, semanaParaBuscar),
+      });
+      toast.success("Treino adicionado!");
+    },
+    onError: (err) => {
+      toast.error("Erro ao criar treino");
+      console.error("[useTreinos] criarTreinoNoDia error:", err);
+    },
+  });
+
+  // 🆕 Mutation para renomear treino
+  const renomearTreinoMutation = useMutation({
+    mutationFn: async ({
+      treinoId,
+      nomeTreino,
+    }: {
+      treinoId: string;
+      nomeTreino: string;
+    }) => {
+      const { error } = await supabase
+        .from("treinos_semanais")
+        .update({ nome_treino: nomeTreino })
+        .eq("id", treinoId);
+
+      if (error) throw error;
+      return { treinoId, nomeTreino };
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: buildQueryKey(profileId, personalId, semanaParaBuscar),
+      });
+      toast.success("Treino renomeado!");
+    },
+    onError: (err) => {
+      toast.error("Erro ao renomear treino");
+      console.error("[useTreinos] renomearTreino error:", err);
+    },
+  });
+
+  // 🆕 Mutation para deletar treino específico
+  const deletarTreinoMutation = useMutation({
+    mutationFn: async (treinoId: string) => {
+      // Primeiro deleta exercícios
+      await supabase.from("exercicios").delete().eq("treino_semanal_id", treinoId);
+      
+      // Depois deleta blocos
+      await supabase.from("blocos_treino").delete().eq("treino_semanal_id", treinoId);
+      
+      // Finalmente deleta o treino
+      const { error } = await supabase
+        .from("treinos_semanais")
+        .delete()
+        .eq("id", treinoId);
+
+      if (error) throw error;
+      return treinoId;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: buildQueryKey(profileId, personalId, semanaParaBuscar),
+      });
+      toast.success("Treino excluído!");
+    },
+    onError: (err) => {
+      toast.error("Erro ao excluir treino");
+      console.error("[useTreinos] deletarTreino error:", err);
+    },
+  });
+
+  // Helper para agrupar treinos por dia
+  const treinosPorDia = (dia: number): TreinoDia[] => {
+    return treinos.filter((t) => t.dia === dia);
+  };
+
   return {
     treinos,
     loading,
@@ -562,6 +690,14 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
       editarDescricaoMutation.mutateAsync({ dia, descricao }),
     marcarExercicioConcluido: (exercicioId: string, concluido: boolean) =>
       marcarExercicioConcluidoMutation.mutateAsync({ exercicioId, concluido }),
+    // 🆕 Novos métodos para múltiplos treinos por dia
+    criarTreinoNoDia: (dia: number, nomeTreino: string) =>
+      criarTreinoNoDiaMutation.mutateAsync({ dia, nomeTreino }),
+    renomearTreino: (treinoId: string, nomeTreino: string) =>
+      renomearTreinoMutation.mutateAsync({ treinoId, nomeTreino }),
+    deletarTreino: (treinoId: string) =>
+      deletarTreinoMutation.mutateAsync(treinoId),
+    treinosPorDia,
     refetch: () => refetch(),
     recarregar: () =>
       queryClient.invalidateQueries({
@@ -571,5 +707,6 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
     isEditando: editarExercicioMutation.status === "pending",
     isRemovendo: removerExercicioMutation.status === "pending",
     isReordenando: reordenarExerciciosMutation.status === "pending",
+    isCriandoTreino: criarTreinoNoDiaMutation.status === "pending",
   };
 }

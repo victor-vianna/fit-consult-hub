@@ -231,25 +231,43 @@ export default function AlunosManager() {
 
   const handleDeleteAluno = async (alunoId: string) => {
     try {
-      await supabase.from("user_roles").delete().eq("user_id", alunoId);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      const { error } = await supabase
-        .from("profiles")
-        .delete()
-        .eq("id", alunoId);
+      if (!session?.access_token) {
+        throw new Error("Sessão não encontrada. Faça login novamente.");
+      }
 
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke(
+        "delete-aluno-user",
+        {
+          body: { aluno_id: alunoId },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
 
       toast({
-        title: "Aluno removido",
-        description: "Aluno removido com sucesso",
+        title: "✅ Aluno removido",
+        description: "Aluno e todos os dados foram removidos com sucesso",
       });
 
       fetchAlunos();
     } catch (error: any) {
+      console.error("Erro ao remover aluno:", error);
       toast({
-        title: "Erro ao remover aluno",
-        description: error.message,
+        title: "❌ Erro ao remover aluno",
+        description: error.message || "Ocorreu um erro ao remover o aluno",
         variant: "destructive",
       });
     }

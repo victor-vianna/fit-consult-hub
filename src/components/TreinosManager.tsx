@@ -803,16 +803,40 @@ export function TreinosManager({
       // ✅ Aguardar um pouco para o banco processar
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // ✅ Forçar recarregamento de todas as queries relacionadas
+      // ✅ Forçar recarregamento de todas as queries relacionadas (com predicate para pegar todas as semanas)
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ["treinos", profileId, personalId],
+          predicate: (query) => {
+            const key = query.queryKey;
+            return (
+              Array.isArray(key) &&
+              key[0] === "treinos" &&
+              key[1] === profileId &&
+              key[2] === personalId
+            );
+          },
         }),
         queryClient.invalidateQueries({
-          queryKey: ["grupos-exercicios", profileId, personalId],
+          predicate: (query) => {
+            const key = query.queryKey;
+            return (
+              Array.isArray(key) &&
+              key[0] === "grupos-exercicios" &&
+              key[1] === profileId &&
+              key[2] === personalId
+            );
+          },
         }),
         queryClient.invalidateQueries({
-          queryKey: ["blocos-treino", profileId, personalId],
+          predicate: (query) => {
+            const key = query.queryKey;
+            return (
+              Array.isArray(key) &&
+              key[0] === "blocos-treino" &&
+              key[1] === profileId &&
+              key[2] === personalId
+            );
+          },
         }),
       ]);
 

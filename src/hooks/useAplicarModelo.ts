@@ -260,24 +260,40 @@ export function useAplicarModelo() {
       };
     },
     onSuccess: async (data, variables) => {
-      // Invalidar TODAS as queries relacionadas aos treinos
+      // Invalidar TODAS as queries relacionadas aos treinos (com predicate para pegar todas as semanas)
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ["treinos", variables.profileId, variables.personalId],
+          predicate: (query) => {
+            const key = query.queryKey;
+            return (
+              Array.isArray(key) &&
+              key[0] === "treinos" &&
+              key[1] === variables.profileId &&
+              key[2] === variables.personalId
+            );
+          },
         }),
         queryClient.invalidateQueries({
-          queryKey: [
-            "grupos-exercicios",
-            variables.profileId,
-            variables.personalId,
-          ],
+          predicate: (query) => {
+            const key = query.queryKey;
+            return (
+              Array.isArray(key) &&
+              key[0] === "grupos-exercicios" &&
+              key[1] === variables.profileId &&
+              key[2] === variables.personalId
+            );
+          },
         }),
         queryClient.invalidateQueries({
-          queryKey: [
-            "blocos-treino",
-            variables.profileId,
-            variables.personalId,
-          ],
+          predicate: (query) => {
+            const key = query.queryKey;
+            return (
+              Array.isArray(key) &&
+              key[0] === "blocos-treino" &&
+              key[1] === variables.profileId &&
+              key[2] === variables.personalId
+            );
+          },
         }),
       ]);
 

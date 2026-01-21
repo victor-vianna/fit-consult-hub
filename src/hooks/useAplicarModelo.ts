@@ -17,7 +17,15 @@ export function useAplicarModelo() {
 
   const aplicarModeloMutation = useMutation({
     mutationFn: async (input: AplicarModeloInput) => {
-      console.log("[useAplicarModelo] Aplicando modelo:", input);
+      console.log("[useAplicarModelo] ========== INICIANDO APLICAÇÃO ==========");
+      console.log("[useAplicarModelo] Input recebido:", {
+        modeloId: input.modeloId,
+        profileId: input.profileId,
+        personalId: input.personalId,
+        diasSemana: input.diasSemana,
+        semanaRecebida: input.semana,
+        semanaFoiPassada: !!input.semana,
+      });
 
       // 1. Buscar dados completos do modelo
       const { data: modeloData, error: modeloError } = await supabase
@@ -26,7 +34,12 @@ export function useAplicarModelo() {
         .eq("id", input.modeloId)
         .single();
 
-      if (modeloError) throw modeloError;
+      if (modeloError) {
+        console.error("[useAplicarModelo] Erro ao buscar modelo:", modeloError);
+        throw modeloError;
+      }
+
+      console.log("[useAplicarModelo] Modelo encontrado:", modeloData.nome);
 
       // 2. Buscar exercícios do modelo
       const { data: exerciciosModelo, error: exerciciosError } = await supabase
@@ -35,7 +48,12 @@ export function useAplicarModelo() {
         .eq("modelo_id", input.modeloId)
         .order("ordem");
 
-      if (exerciciosError) throw exerciciosError;
+      if (exerciciosError) {
+        console.error("[useAplicarModelo] Erro ao buscar exercícios:", exerciciosError);
+        throw exerciciosError;
+      }
+
+      console.log("[useAplicarModelo] Exercícios encontrados:", exerciciosModelo?.length || 0);
 
       // 3. Buscar blocos do modelo
       const { data: blocosModelo, error: blocosError } = await supabase
@@ -44,22 +62,28 @@ export function useAplicarModelo() {
         .eq("modelo_id", input.modeloId)
         .order("ordem");
 
-      if (blocosError) throw blocosError;
+      if (blocosError) {
+        console.error("[useAplicarModelo] Erro ao buscar blocos:", blocosError);
+        throw blocosError;
+      }
 
-      // 4. Definir semana (usar semana ativa ou semana atual)
+      console.log("[useAplicarModelo] Blocos encontrados:", blocosModelo?.length || 0);
+
+      // 4. Definir semana - USAR SEMANA PASSADA, NÃO CALCULAR!
       let semanaParaAplicar = input.semana;
 
       if (!semanaParaAplicar) {
+        console.warn("[useAplicarModelo] ⚠️ ATENÇÃO: Semana não foi passada! Calculando automaticamente...");
         const hoje = new Date();
         const inicioDaSemana = new Date(hoje);
         inicioDaSemana.setDate(hoje.getDate() - hoje.getDay() + 1);
         semanaParaAplicar = inicioDaSemana.toISOString().split("T")[0];
+        console.warn("[useAplicarModelo] Semana calculada:", semanaParaAplicar);
+      } else {
+        console.log("[useAplicarModelo] ✅ Usando semana passada pelo componente:", semanaParaAplicar);
       }
 
-      console.log(
-        "[useAplicarModelo] Aplicando para semana:",
-        semanaParaAplicar
-      );
+      console.log("[useAplicarModelo] 📅 SEMANA FINAL PARA APLICAR:", semanaParaAplicar);
 
       // 5. Para cada dia selecionado, criar/atualizar treino_semanal
       const treinosCriados = [];
@@ -304,9 +328,16 @@ export function useAplicarModelo() {
         })
         .join(", ");
 
+      // Formatar a semana para exibição
+      const semanaFormatada = variables.semana 
+        ? new Date(variables.semana + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+        : "atual";
+
       toast.success(
-        `Modelo "${data.modeloNome}" aplicado com sucesso aos dias: ${diasNomes}`
+        `✅ Modelo "${data.modeloNome}" aplicado!\nDias: ${diasNomes}\nSemana: ${semanaFormatada}`
       );
+      
+      console.log("[useAplicarModelo] ========== APLICAÇÃO CONCLUÍDA ==========");
     },
     onError: (error: any) => {
       console.error("[useAplicarModelo] Erro ao aplicar modelo:", error);

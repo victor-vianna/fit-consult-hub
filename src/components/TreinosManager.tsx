@@ -792,12 +792,22 @@ export function TreinosManager({
   const handleAplicarModelo = async (diasSelecionados: number[]) => {
     if (!modeloParaAplicar) return;
 
+    console.log("[TreinosManager] Aplicando modelo:", {
+      modeloId: modeloParaAplicar.id,
+      modeloNome: modeloParaAplicar.nome,
+      profileId,
+      personalId,
+      diasSelecionados,
+      semanaSelecionada, // ✅ CRÍTICO: verificar que esta semana está correta
+    });
+
     try {
       await aplicarModelo({
         modeloId: modeloParaAplicar.id,
         profileId,
         personalId,
         diasSemana: diasSelecionados,
+        semana: semanaSelecionada, // ✅ CORREÇÃO CRÍTICA: passar a semana selecionada
       });
 
       // ✅ Aguardar um pouco para o banco processar
@@ -845,7 +855,7 @@ export function TreinosManager({
 
       // ✅ Mensagem de sucesso já vem do hook useAplicarModelo
     } catch (error) {
-      console.error("Erro ao aplicar modelo:", error);
+      console.error("[TreinosManager] Erro ao aplicar modelo:", error);
       toast.error("Erro ao aplicar modelo de treino");
     }
   };

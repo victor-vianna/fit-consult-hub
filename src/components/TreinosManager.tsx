@@ -35,6 +35,7 @@ import {
   Circle,
   Link as LinkIcon,
   Blocks,
+  Trash2,
 } from "lucide-react";
 import { format, parseISO, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -138,6 +139,8 @@ export function TreinosManager({
     reordenarExercicios,
     editarDescricao,
     marcarExercicioConcluido,
+    limparTreinoDia,
+    isLimpandoTreino,
     // Navegação de semanas
     semanaSelecionada,
     irParaSemanaAnterior,
@@ -259,6 +262,8 @@ export function TreinosManager({
   const [salvarModeloOpen, setSalvarModeloOpen] = useState(false);
   const [aplicarModeloOpen, setAplicarModeloOpen] = useState(false);
   const [modeloParaAplicar, setModeloParaAplicar] = useState<any>(null);
+  const [limparTreinoDialogOpen, setLimparTreinoDialogOpen] = useState(false);
+  const [treinoParaLimpar, setTreinoParaLimpar] = useState<{ treinoId: string; diaNome: string } | null>(null);
 
   // DnD sensors
   const sensors = useSensors(
@@ -1181,22 +1186,50 @@ export function TreinosManager({
                             {(temExercicios ||
                               temBlocos ||
                               grupos.length > 0) && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSalvarModeloOpen(true);
-                                }}
-                                disabled={isCriandoModelo}
-                                className="hidden sm:flex gap-1"
-                              >
-                                {isCriandoModelo && (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                )}
-                                <FileDown className="h-4 w-4" />
-                                <span>Salvar Modelo</span>
-                              </Button>
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSalvarModeloOpen(true);
+                                  }}
+                                  disabled={isCriandoModelo}
+                                  className="hidden sm:flex gap-1"
+                                >
+                                  {isCriandoModelo && (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  )}
+                                  <FileDown className="h-4 w-4" />
+                                  <span>Salvar Modelo</span>
+                                </Button>
+
+                                {/* Botão Limpar Treino */}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const treinoId = getTreinoId(treino);
+                                    if (treinoId) {
+                                      setTreinoParaLimpar({
+                                        treinoId,
+                                        diaNome: diaInfo.nome,
+                                      });
+                                      setLimparTreinoDialogOpen(true);
+                                    }
+                                  }}
+                                  disabled={isLimpandoTreino}
+                                  className="gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                >
+                                  {isLimpandoTreino ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
+                                  <span className="hidden sm:inline">Limpar</span>
+                                </Button>
+                              </>
                             )}
                           </div>
                         )}
@@ -1602,6 +1635,56 @@ export function TreinosManager({
           onAplicar={handleAplicarModelo}
           loading={isAplicando}
         />
+
+        {/* 🆕 DIALOG: Confirmação Limpar Treino */}
+        <Dialog open={limparTreinoDialogOpen} onOpenChange={setLimparTreinoDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="text-destructive">Limpar Treino</DialogTitle>
+              <DialogDescription>
+                Tem certeza que deseja excluir <strong>todos os exercícios e blocos</strong> de{" "}
+                <strong>{treinoParaLimpar?.diaNome}</strong>?
+                <br />
+                <br />
+                Esta ação não pode ser desfeita.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setLimparTreinoDialogOpen(false);
+                  setTreinoParaLimpar(null);
+                }}
+                disabled={isLimpandoTreino}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  if (treinoParaLimpar) {
+                    try {
+                      await limparTreinoDia(treinoParaLimpar.treinoId);
+                      setLimparTreinoDialogOpen(false);
+                      setTreinoParaLimpar(null);
+                    } catch (error) {
+                      console.error("[TreinosManager] Erro ao limpar treino:", error);
+                    }
+                  }
+                }}
+                disabled={isLimpandoTreino}
+              >
+                {isLimpandoTreino ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4 mr-2" />
+                )}
+                Limpar Tudo
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </>
     </div>
   );

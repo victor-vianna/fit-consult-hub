@@ -660,6 +660,53 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
     },
   });
 
+  // 🆕 Mutation para limpar TODO o conteúdo de um treino (exercícios + blocos) sem deletar o registro
+  const limparTreinoDiaMutation = useMutation({
+    mutationFn: async (treinoId: string) => {
+      console.log(`[useTreinos] Limpando conteúdo do treino: ${treinoId}`);
+      
+      // Deleta todos os exercícios do treino
+      const { error: errExercicios } = await supabase
+        .from("exercicios")
+        .delete()
+        .eq("treino_semanal_id", treinoId);
+      
+      if (errExercicios) throw errExercicios;
+      
+      // Deleta todos os blocos do treino
+      const { error: errBlocos } = await supabase
+        .from("blocos_treino")
+        .delete()
+        .eq("treino_semanal_id", treinoId);
+      
+      if (errBlocos) throw errBlocos;
+      
+      return treinoId;
+    },
+    onSuccess: async () => {
+      // Invalida queries relacionadas
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: buildQueryKey(profileId, personalId, semanaParaBuscar),
+        }),
+        queryClient.invalidateQueries({
+          predicate: (query) => {
+            const key = query.queryKey as string[];
+            return (
+              key[0] === "grupos-exercicios" ||
+              key[0] === "blocos-treino"
+            );
+          },
+        }),
+      ]);
+      toast.success("Treino limpo com sucesso!");
+    },
+    onError: (err) => {
+      toast.error("Erro ao limpar treino");
+      console.error("[useTreinos] limparTreinoDia error:", err);
+    },
+  });
+
   // Helper para agrupar treinos por dia
   const treinosPorDia = (dia: number): TreinoDia[] => {
     return treinos.filter((t) => t.dia === dia);
@@ -697,6 +744,8 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
       renomearTreinoMutation.mutateAsync({ treinoId, nomeTreino }),
     deletarTreino: (treinoId: string) =>
       deletarTreinoMutation.mutateAsync(treinoId),
+    limparTreinoDia: (treinoId: string) =>
+      limparTreinoDiaMutation.mutateAsync(treinoId),
     treinosPorDia,
     refetch: () => refetch(),
     recarregar: () =>
@@ -708,5 +757,6 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
     isRemovendo: removerExercicioMutation.status === "pending",
     isReordenando: reordenarExerciciosMutation.status === "pending",
     isCriandoTreino: criarTreinoNoDiaMutation.status === "pending",
+    isLimpandoTreino: limparTreinoDiaMutation.status === "pending",
   };
 }

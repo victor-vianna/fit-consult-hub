@@ -17,7 +17,6 @@ import { MobileMenuDrawerPersonal } from "@/components/mobile/MobileMenuDrawerPe
 import { AppLayout } from "@/components/AppLayout";
 import { PersonalDashboardCards } from "@/components/dashboard/PersonalDashboardCards";
 import { LojaPlaceholder } from "@/components/loja/LojaPlaceholder";
-
 interface Aluno {
   id: string;
   nome: string;
@@ -25,11 +24,15 @@ interface Aluno {
   telefone: string | null;
   is_active: boolean;
 }
-
 export default function Personal() {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
-  const { toast } = useToast();
+  const {
+    user,
+    signOut
+  } = useAuth();
+  const {
+    toast
+  } = useToast();
   const [alunos, setAlunos] = useState<Aluno[]>([]);
   const [totalMateriais, setTotalMateriais] = useState(0);
   const [profile, setProfile] = useState<any>(null);
@@ -37,101 +40,80 @@ export default function Personal() {
   const [openDialog, setOpenDialog] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-
-  const { settings: personalSettings } = usePersonalSettings(user?.id);
-
-  const alunosAtivos = alunos.filter((a) => a.is_active).length;
-  const alunosInativos = alunos.filter((a) => !a.is_active).length;
-
+  const {
+    settings: personalSettings
+  } = usePersonalSettings(user?.id);
+  const alunosAtivos = alunos.filter(a => a.is_active).length;
+  const alunosInativos = alunos.filter(a => !a.is_active).length;
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
-
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
-
   useEffect(() => {
     if (user) {
       fetchData();
     }
   }, [user]);
-
   const fetchData = async () => {
     if (!user) return;
-
     try {
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
+      const {
+        data: profileData
+      } = await supabase.from("profiles").select("*").eq("id", user.id).single();
       setProfile(profileData);
-
-      const { data: alunosData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("personal_id", user.id)
-        .order("nome");
-
+      const {
+        data: alunosData
+      } = await supabase.from("profiles").select("*").eq("personal_id", user.id).order("nome");
       setAlunos(alunosData || []);
-
-      const { count } = await supabase
-        .from("materiais")
-        .select("*", { count: "exact", head: true })
-        .eq("personal_id", user.id);
-
+      const {
+        count
+      } = await supabase.from("materiais").select("*", {
+        count: "exact",
+        head: true
+      }).eq("personal_id", user.id);
       setTotalMateriais(count || 0);
     } catch (error) {
       console.error("Erro ao carregar dados:", error);
     }
   };
-
   const handleCreateAluno = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
     setLoading(true);
-
     const formData = new FormData(form);
     const dados = {
       nome: formData.get("nome") as string,
       email: formData.get("email") as string,
       password: formData.get("password") as string,
       telefone: formData.get("telefone") as string,
-      personal_id: user?.id,
+      personal_id: user?.id
     };
-
     try {
       const {
-        data: { session },
+        data: {
+          session
+        }
       } = await supabase.auth.getSession();
-
       if (!session?.access_token) {
         throw new Error("Sessão não encontrada. Faça login novamente.");
       }
-
-      const { data, error } = await supabase.functions.invoke(
-        "create-aluno-user",
-        {
-          body: dados,
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke("create-aluno-user", {
+        body: dados,
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
         }
-      );
-
+      });
       if (error) {
         // Trata erros específicos
-        if (
-          error.message?.includes("Email já cadastrado") ||
-          error.message?.includes("already been registered")
-        ) {
-          throw new Error(
-            "Este email já está cadastrado. Use um email diferente."
-          );
+        if (error.message?.includes("Email já cadastrado") || error.message?.includes("already been registered")) {
+          throw new Error("Este email já está cadastrado. Use um email diferente.");
         }
         throw error;
       }
@@ -139,80 +121,58 @@ export default function Personal() {
       // Verifica se há erro na resposta
       if (data?.error) {
         if (data.error.includes("Email já cadastrado")) {
-          throw new Error(
-            "Este email já está cadastrado. Use um email diferente."
-          );
+          throw new Error("Este email já está cadastrado. Use um email diferente.");
         }
         throw new Error(data.error);
       }
-
       toast({
         title: "✅ Aluno criado!",
-        description: "Aluno cadastrado com sucesso",
+        description: "Aluno cadastrado com sucesso"
       });
-
       form.reset(); // Limpa o formulário
       setOpenDialog(false);
       fetchData();
     } catch (error: any) {
       console.error("Erro ao criar aluno:", error);
-
       toast({
         title: "❌ Erro ao criar aluno",
         description: error.message || "Ocorreu um erro ao criar o aluno",
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
   };
-
   const handleDeleteAluno = async (alunoId: string) => {
     try {
       await supabase.from("user_roles").delete().eq("user_id", alunoId);
-
-      const { error } = await supabase
-        .from("profiles")
-        .delete()
-        .eq("id", alunoId);
-
+      const {
+        error
+      } = await supabase.from("profiles").delete().eq("id", alunoId);
       if (error) throw error;
-
       toast({
         title: "Aluno removido",
-        description: "Aluno removido com sucesso",
+        description: "Aluno removido com sucesso"
       });
-
       fetchData();
     } catch (error: any) {
       toast({
         title: "Erro ao remover aluno",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
 
   // Versão Mobile
   if (isMobile) {
-    return (
-      <AppLayout>
+    return <AppLayout>
         <div className="flex flex-col min-h-screen bg-background">
-          <MobileHeaderPersonal
-            onMenuClick={() => setMenuOpen(true)}
-            personalId={user?.id}
-            personalSettings={personalSettings}
-            profileName={profile?.nome}
-          />
+          <MobileHeaderPersonal onMenuClick={() => setMenuOpen(true)} personalId={user?.id} personalSettings={personalSettings} profileName={profile?.nome} />
 
           <main className="flex-1 overflow-auto pb-20 px-4 pt-4 space-y-4">
             {/* Dashboard Cards para Mobile */}
-            {user?.id && (
-              <PersonalDashboardCards
-                personalId={user.id}
-                themeColor={personalSettings?.theme_color}
-              />
-            )}
+            {user?.id && <PersonalDashboardCards personalId={user.id} themeColor={personalSettings?.theme_color} />}
 
             {/* Card de Acesso aos Alunos */}
             <Card className="shadow-sm">
@@ -221,15 +181,9 @@ export default function Personal() {
                   <CardTitle className="text-base font-semibold">
                     Meus Alunos
                   </CardTitle>
-                  <Button
-                    size="sm"
-                    onClick={() => navigate("/alunos")}
-                    className="text-xs"
-                    style={{
-                      backgroundColor:
-                        personalSettings?.theme_color || undefined,
-                    }}
-                  >
+                  <Button size="sm" onClick={() => navigate("/alunos")} className="text-xs" style={{
+                  backgroundColor: personalSettings?.theme_color || undefined
+                }}>
                     <Users className="mr-1 h-4 w-4" />
                     Ver Todos
                   </Button>
@@ -240,12 +194,7 @@ export default function Personal() {
                 <p className="text-sm text-muted-foreground mb-4">
                   Gerencie todos os seus alunos em um só lugar
                 </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => navigate("/alunos")}
-                >
+                <Button variant="outline" size="sm" className="w-full" onClick={() => navigate("/alunos")}>
                   <Users className="mr-2 h-4 w-4" />
                   Acessar Gerenciador
                 </Button>
@@ -256,66 +205,38 @@ export default function Personal() {
             <LojaPlaceholder isPersonal={true} themeColor={personalSettings?.theme_color} />
           </main>
 
-          <BottomNavigationPersonal
-            onMenuClick={() => setMenuOpen(true)}
-            themeColor={personalSettings?.theme_color}
-          />
+          <BottomNavigationPersonal onMenuClick={() => setMenuOpen(true)} themeColor={personalSettings?.theme_color} />
 
-          <MobileMenuDrawerPersonal
-            open={menuOpen}
-            onOpenChange={setMenuOpen}
-            personalSettings={personalSettings}
-            onSignOut={signOut}
-          />
+          <MobileMenuDrawerPersonal open={menuOpen} onOpenChange={setMenuOpen} personalSettings={personalSettings} onSignOut={signOut} />
         </div>
-      </AppLayout>
-    );
+      </AppLayout>;
   }
 
   // Versão Desktop
-  return (
-    <AppLayout>
+  return <AppLayout>
       <SidebarProvider>
         <div className="flex min-h-screen w-full bg-background">
           <AppSidebarPersonal />
 
           <div className="flex-1 flex flex-col">
-            <header
-              className="border-b backdrop-blur-sm sticky top-0 z-10"
-              style={{
-                backgroundColor: personalSettings?.theme_color
-                  ? `${personalSettings.theme_color}10`
-                  : "hsl(var(--card) / 0.5)",
-                borderColor: personalSettings?.theme_color
-                  ? `${personalSettings.theme_color}30`
-                  : "hsl(var(--border))",
-              }}
-            >
+            <header className="border-b backdrop-blur-sm sticky top-0 z-10" style={{
+            backgroundColor: personalSettings?.theme_color ? `${personalSettings.theme_color}10` : "hsl(var(--card) / 0.5)",
+            borderColor: personalSettings?.theme_color ? `${personalSettings.theme_color}30` : "hsl(var(--border))"
+          }}>
               <div className="flex items-center justify-between px-4 py-4">
                 <div className="flex items-center gap-3">
                   <SidebarTrigger />
 
-                  {personalSettings?.logo_url && (
-                    <div className="relative">
-                      <img
-                        src={personalSettings.logo_url}
-                        alt="Logo"
-                        className="h-12 w-12 rounded-full object-cover border-2"
-                        style={{
-                          borderColor:
-                            personalSettings.theme_color || "#3b82f6",
-                        }}
-                      />
-                    </div>
-                  )}
+                  {personalSettings?.logo_url && <div className="relative">
+                      <img src={personalSettings.logo_url} alt="Logo" className="h-12 w-12 rounded-full object-cover border-2" style={{
+                    borderColor: personalSettings.theme_color || "#3b82f6"
+                  }} />
+                    </div>}
 
                   <div>
-                    <h1
-                      className="text-xl font-bold"
-                      style={{
-                        color: personalSettings?.theme_color || "inherit",
-                      }}
-                    >
+                    <h1 className="text-xl font-bold" style={{
+                    color: personalSettings?.theme_color || "inherit"
+                  }}>
                       {personalSettings?.display_name || "FitConsult"}
                     </h1>
                     <p className="text-sm text-muted-foreground">
@@ -338,38 +259,12 @@ export default function Personal() {
             <main className="flex-1 overflow-auto">
               <div className="container mx-auto px-4 py-8 space-y-8">
                 {/* Dashboard Inteligente */}
-                {user?.id && (
-                  <PersonalDashboardCards
-                    personalId={user.id}
-                    themeColor={personalSettings?.theme_color}
-                  />
-                )}
+                {user?.id && <PersonalDashboardCards personalId={user.id} themeColor={personalSettings?.theme_color} />}
 
                 {/* Grid com Cards de Acesso Rápido */}
                 <div className="grid gap-6 md:grid-cols-2">
                   {/* Card de Alunos */}
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle>Meus Alunos</CardTitle>
-                        <Button
-                          onClick={() => navigate("/alunos")}
-                          style={{
-                            backgroundColor:
-                              personalSettings?.theme_color || undefined,
-                          }}
-                        >
-                          <Users className="mr-2 h-4 w-4" />
-                          Ver Todos
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-muted-foreground">
-                        Gerencie treinos, feedbacks e acompanhe a evolução dos seus alunos.
-                      </p>
-                    </CardContent>
-                  </Card>
+                  
 
                   {/* Loja Placeholder */}
                   <LojaPlaceholder isPersonal={true} themeColor={personalSettings?.theme_color} />
@@ -379,6 +274,5 @@ export default function Personal() {
           </div>
         </div>
       </SidebarProvider>
-    </AppLayout>
-  );
+    </AppLayout>;
 }

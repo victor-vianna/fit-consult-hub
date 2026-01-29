@@ -14,6 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useWorkoutSession } from "@/hooks/useWorkoutSession";
 
 interface WorkoutDayViewProps {
   treinos: TreinoDia[];
@@ -58,12 +59,17 @@ export function WorkoutDayView({
     useState<Record<string, GrupoExercicio[]>>(gruposPorTreino);
   const [localBlocos, setLocalBlocos] =
     useState<Record<string, BlocoTreino[]>>(blocosPorTreino);
-  const [treinoIniciado, setTreinoIniciado] = useState<Record<number, boolean>>(
-    {}
-  );
+
+  // 🔧 Hook de persistência de sessão PWA
+  const { 
+    treinosIniciados, 
+    marcarTreinoIniciado, 
+    marcarTreinoFinalizado,
+    isLoading: isLoadingSession 
+  } = useWorkoutSession(profileId, personalId);
 
   // Buscar semana ativa
-  const { data: semanaAtiva } = useQuery({
+  const { data: semanaAtiva, refetch: refetchSemanaAtiva } = useQuery({
     queryKey: ["semana-ativa", profileId, personalId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -77,7 +83,23 @@ export function WorkoutDayView({
       return data;
     },
     enabled: !!profileId && !!personalId,
+    // Manter dados frescos para PWA
+    staleTime: 1000 * 60, // 1 minuto
+    refetchOnWindowFocus: true,
   });
+
+  // 🔧 PWA: Refetch dados ao voltar ao app
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        // Refetch para garantir dados atualizados ao voltar
+        refetchSemanaAtiva();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [refetchSemanaAtiva]);
 
   // Sincronizar com props quando mudarem
   useEffect(() => {
@@ -246,9 +268,11 @@ export function WorkoutDayView({
     }
   };
 
-  // Handler para iniciar treino
-  const handleIniciarTreino = (dia: number) => {
-    setTreinoIniciado((prev) => ({ ...prev, [dia]: true }));
+  // Handler para iniciar treino - usa hook de persistência
+  const handleIniciarTreino = (dia: number, treinoId: string | null) => {
+    if (treinoId) {
+      marcarTreinoIniciado(treinoId, dia);
+    }
   };
 
   // Encontrar primeiro dia com conteúdo
@@ -354,7 +378,7 @@ export function WorkoutDayView({
             (ex) => !ex.grupo_id
           );
 
-          const isDiaIniciado = treinoIniciado[treino.dia] || false;
+          const isDiaIniciado = treinosIniciados[treino.dia] || false;
 
           return (
             <TabsContent
@@ -372,7 +396,7 @@ export function WorkoutDayView({
                     totalGrupos={grupos.length}
                     totalBlocos={blocos.length}
                     progresso={progresso}
-                    onIniciarTreino={() => handleIniciarTreino(treino.dia)}
+                    onIniciarTreino={() => handleIniciarTreino(treino.dia, treinoId)}
                     treinoIniciado={isDiaIniciado}
                   />
 
@@ -383,6 +407,8 @@ export function WorkoutDayView({
                       profileId={profileId}
                       personalId={personalId}
                       readOnly={false}
+                      onWorkoutComplete={() => marcarTreinoFinalizado(treinoId, treino.dia)}
+                      onWorkoutCancel={() => marcarTreinoFinalizado(treinoId, treino.dia)}
                     />
                   )}
 

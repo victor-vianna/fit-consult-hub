@@ -1,5 +1,5 @@
 // hooks/useTreinos.ts
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import {
   useQuery,
   useMutation,
@@ -12,6 +12,7 @@ import { exercicioSchema } from "@/lib/schemas/exercicioSchema";
 import type { Exercicio, TreinoDia } from "@/types/treino";
 import { useExerciseGroups } from "@/hooks/useExerciseGroups";
 import { getWeekStart, getPreviousWeekStart, getNextWeekStart, isCurrentWeek } from "@/utils/weekUtils";
+import { useExerciseProgress } from "@/hooks/useExerciseProgress";
 
 interface UseTreinosProps {
   profileId: string;
@@ -61,6 +62,9 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
     personalId,
     enabled: true,
   });
+  
+  // 🔧 Hook para persistência de progresso PWA
+  const { salvarProgressoLocal, marcarSincronizado } = useExerciseProgress(profileId);
   
   // Estado para semana selecionada (navegável)
   const [semanaSelecionada, setSemanaSelecionada] = useState<string>(
@@ -227,7 +231,24 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
     enabled: !!profileId && !!personalId,
     refetchOnWindowFocus: true,
     refetchOnMount: true,
+    // 🔧 PWA: Manter dados mais atualizados
+    refetchOnReconnect: true,
   });
+
+  // 🔧 PWA: Refetch ao voltar da minimização
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && profileId && personalId) {
+        // Dar um pequeno delay para garantir reconexão de rede
+        setTimeout(() => {
+          refetch();
+        }, 500);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [profileId, personalId, refetch]);
 
   // ✅ Criação automática de treino semanal com validação
   const criarTreinoSeNecessario = useCallback(
@@ -511,11 +532,19 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
       exercicioId: string;
       concluido: boolean;
     }) => {
+      // 🔧 PWA: Salvar localmente ANTES de tentar sincronizar
+      salvarProgressoLocal(exercicioId, concluido);
+      
       const { error } = await supabase
         .from("exercicios")
         .update({ concluido })
         .eq("id", exercicioId);
+      
       if (error) throw error;
+      
+      // 🔧 PWA: Marcar como sincronizado após sucesso
+      marcarSincronizado(exercicioId);
+      
       return { exercicioId, concluido };
     },
     onMutate: async ({ exercicioId, concluido }) => {
@@ -546,7 +575,8 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
           context.previous
         );
       }
-      toast.error("Erro ao marcar exercício");
+      // Não mostrar toast de erro - o progresso foi salvo localmente
+      console.error("[useTreinos] Erro ao sincronizar exercício, salvo localmente");
     },
     onSettled: () => {
       queryClient.invalidateQueries({

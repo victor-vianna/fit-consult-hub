@@ -22,6 +22,8 @@ interface WorkoutTimerProps {
   profileId: string;
   personalId: string;
   readOnly?: boolean;
+  onWorkoutComplete?: () => void;
+  onWorkoutCancel?: () => void;
 }
 
 export function WorkoutTimer({
@@ -29,6 +31,8 @@ export function WorkoutTimer({
   profileId,
   personalId,
   readOnly = false,
+  onWorkoutComplete,
+  onWorkoutCancel,
 }: WorkoutTimerProps) {
   const [showFinalizarDialog, setShowFinalizarDialog] = useState(false);
   const [showCancelarDialog, setShowCancelarDialog] = useState(false);
@@ -64,7 +68,10 @@ export function WorkoutTimer({
       <WorkoutCompletionScreen
         data={completionData}
         treinoId={treinoId}
-        onClose={fecharTelaConclusao}
+        onClose={() => {
+          fecharTelaConclusao();
+          onWorkoutComplete?.();
+        }}
       />
     );
   }
@@ -93,6 +100,7 @@ export function WorkoutTimer({
   const handleCancelar = async () => {
     await cancelar();
     setShowCancelarDialog(false);
+    onWorkoutCancel?.();
   };
 
   const isActive = isRunning || isPaused;

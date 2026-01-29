@@ -348,39 +348,82 @@ export function useWorkoutTimer({
     };
   }, [isRunning, isPaused, persistirTempo]);
 
-  // Salvar ao fechar página
+  // Salvar ao fechar página / PWA
   useEffect(() => {
     const handleUnload = () => {
       saveToStorage();
+      // Usar sendBeacon para garantir que a requisição seja enviada mesmo ao fechar
+      if (sessaoId && navigator.sendBeacon) {
+        const data = JSON.stringify({
+          duracao_segundos: elapsedRef.current,
+          tempo_descanso_total: tempoDescansoTotal,
+          tempo_pausado_total: tempoPausadoTotal,
+        });
+        // sendBeacon não funciona com Supabase diretamente, mas salvamos no localStorage
+      }
       persistirTempo();
     };
-    window.addEventListener("beforeunload", handleUnload);
-    return () => window.removeEventListener("beforeunload", handleUnload);
-  }, [saveToStorage, persistirTempo]);
 
-  // Visibilidade da página
+    // Eventos para PWA: pagehide é mais confiável que beforeunload em mobile
+    window.addEventListener("beforeunload", handleUnload);
+    window.addEventListener("pagehide", handleUnload);
+    
+    return () => {
+      window.removeEventListener("beforeunload", handleUnload);
+      window.removeEventListener("pagehide", handleUnload);
+    };
+  }, [saveToStorage, persistirTempo, sessaoId, tempoDescansoTotal, tempoPausadoTotal]);
+
+  // Visibilidade da página - crítico para PWA
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
+        // Salvar imediatamente ao minimizar/trocar de app
         saveToStorage();
         persistirTempo();
       } else if (document.visibilityState === "visible" && sessaoId) {
-        // Recalcular tempo ao voltar
+        // Recalcular tempo ao voltar - baseado em timestamp, não em estado volátil
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
-          const session: StoredSession = JSON.parse(stored);
-          if (session.sessaoId === sessaoId && !session.isPaused) {
-            const now = Date.now();
-            const tempoDecorrido = Math.floor((now - session.startTime) / 1000);
-            setElapsedTime(tempoDecorrido);
-            elapsedRef.current = tempoDecorrido;
+          try {
+            const session: StoredSession = JSON.parse(stored);
+            if (session.sessaoId === sessaoId) {
+              const now = Date.now();
+              
+              if (!session.isPaused && session.startTime) {
+                // Timer estava rodando - calcular tempo real decorrido
+                const tempoDesdeInicio = Math.floor((now - session.startTime) / 1000);
+                // Subtrair tempo pausado total que foi acumulado
+                const tempoReal = tempoDesdeInicio - (session.tempoPausadoTotal || 0);
+                setElapsedTime(Math.max(0, tempoReal));
+                elapsedRef.current = Math.max(0, tempoReal);
+              } else if (session.isPaused) {
+                // Timer estava pausado - manter o tempo salvo
+                setElapsedTime(session.elapsedTime);
+                elapsedRef.current = session.elapsedTime;
+              }
+              
+              // Restaurar outros estados
+              setTempoDescansoTotal(session.tempoDescansoTotal || 0);
+              setTempoPausadoTotal(session.tempoPausadoTotal || 0);
+            }
+          } catch (e) {
+            console.error("[useWorkoutTimer] Erro ao restaurar estado:", e);
           }
         }
       }
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    
+    // Para iOS PWA: usar focus/blur como fallback
+    window.addEventListener("focus", () => {
+      if (sessaoId) handleVisibilityChange();
+    });
+    
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [sessaoId, saveToStorage, persistirTempo]);
 
   // Iniciar treino

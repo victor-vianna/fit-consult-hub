@@ -279,6 +279,12 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
             descricao: bloco.descricao,
             posicao: bloco.posicao,
             ordem: bloco.ordem,
+            obrigatorio: bloco.obrigatorio ?? false,
+            // ✅ CORREÇÃO: Incluir todos os campos de configuração dos blocos
+            config_cardio: bloco.config_cardio ?? null,
+            config_alongamento: bloco.config_alongamento ?? null,
+            config_aquecimento: bloco.config_aquecimento ?? null,
+            config_outro: bloco.config_outro ?? null,
             concluido: false,
           }));
 

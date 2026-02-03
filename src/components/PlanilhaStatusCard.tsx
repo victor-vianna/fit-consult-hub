@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   RotateCcw,
+  Copy,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,10 +62,12 @@ export function PlanilhaStatusCard({
     renovarPlanilha,
     encerrarPlanilha,
     sincronizarTreinos,
+    importarTreinosUltimaSemana,
     isCriando,
     isRenovando,
     isEncerrando,
     isSincronizando,
+    isImportandoUltimaSemana,
   } = usePlanilhaAtiva({ profileId, personalId });
 
   const [showNovaDialog, setShowNovaDialog] = useState(false);
@@ -290,6 +293,23 @@ export function PlanilhaStatusCard({
               </Button>
               <p className="text-xs text-muted-foreground text-center">
                 Replica a semana atual para as demais semanas
+              </p>
+
+              {/* Botão de importar última semana */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => importarTreinosUltimaSemana()}
+                disabled={isImportandoUltimaSemana}
+              >
+                <Copy className={cn("h-4 w-4 mr-1", isImportandoUltimaSemana && "animate-pulse")} />
+                {isImportandoUltimaSemana
+                  ? "Importando..."
+                  : "Importar treino da última semana"}
+              </Button>
+              <p className="text-xs text-muted-foreground text-center">
+                Copia o treino completo da semana anterior para a semana atual
               </p>
 
               <div className="flex gap-2 pt-1">

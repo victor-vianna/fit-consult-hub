@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { differenceInDays, parseISO, format, addWeeks } from "date-fns";
-import { getWeekStart } from "@/utils/weekUtils";
+import { getPreviousWeekStart, getWeekStart } from "@/utils/weekUtils";
 
 interface Planilha {
   id: string;
@@ -516,6 +516,47 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
     console.log("[usePlanilhaAtiva] Cópia concluída!");
   };
 
+  /**
+   * Importa (copia) o treino completo da última semana para a semana atual.
+   * Útil quando a renovação criou uma planilha nova mas a semana atual ficou vazia.
+   */
+  const importarTreinosDaUltimaSemanaMutation = useMutation({
+    mutationFn: async () => {
+      if (!planilha || !profileId || !personalId) throw new Error("Dados insuficientes");
+
+      const semanaAtual = getWeekStart(new Date());
+
+      // Preferência: última semana que possui treinos no banco
+      const { data: ultimosTreinos, error } = await supabase
+        .from("treinos_semanais")
+        .select("semana")
+        .eq("profile_id", profileId)
+        .eq("personal_id", personalId)
+        .order("semana", { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      const semanaOrigem = ultimosTreinos?.[0]?.semana || getPreviousWeekStart(semanaAtual);
+
+      if (semanaOrigem === semanaAtual) {
+        // Se por algum motivo a última semana encontrada for a mesma, força semana anterior
+        await copiarTreinosDeSemana(profileId, personalId, getPreviousWeekStart(semanaAtual), semanaAtual);
+        return;
+      }
+
+      await copiarTreinosDeSemana(profileId, personalId, semanaOrigem, semanaAtual);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["treinos"] });
+      toast.success("Treino importado da última semana com sucesso!");
+    },
+    onError: (error) => {
+      console.error("Erro ao importar treino da última semana:", error);
+      toast.error("Erro ao importar treino da última semana");
+    },
+  });
+
   // Renovar planilha
   const renovarPlanilhaMutation = useMutation({
     mutationFn: async (dados: {
@@ -652,9 +693,11 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
     renovarPlanilha: renovarPlanilhaMutation.mutate,
     encerrarPlanilha: encerrarPlanilhaMutation.mutate,
     sincronizarTreinos: sincronizarTreinosMutation.mutate,
+    importarTreinosUltimaSemana: importarTreinosDaUltimaSemanaMutation.mutate,
     isCriando: criarPlanilhaMutation.isPending,
     isRenovando: renovarPlanilhaMutation.isPending,
     isEncerrando: encerrarPlanilhaMutation.isPending,
     isSincronizando: sincronizarTreinosMutation.isPending,
+    isImportandoUltimaSemana: importarTreinosDaUltimaSemanaMutation.isPending,
   };
 }

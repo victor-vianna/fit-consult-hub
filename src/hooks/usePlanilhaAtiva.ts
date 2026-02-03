@@ -354,6 +354,168 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
     },
   });
 
+  /**
+   * Copia os treinos de uma semana para outra (usado na renovação)
+   */
+  const copiarTreinosDeSemana = async (
+    profileId: string,
+    personalId: string,
+    semanaOrigem: string,
+    semanaDestino: string
+  ) => {
+    console.log(`[usePlanilhaAtiva] Copiando treinos de ${semanaOrigem} para ${semanaDestino}`);
+
+    // Buscar treinos da semana origem
+    const { data: treinosOrigem, error: treinosError } = await supabase
+      .from("treinos_semanais")
+      .select("*")
+      .eq("profile_id", profileId)
+      .eq("personal_id", personalId)
+      .eq("semana", semanaOrigem);
+
+    if (treinosError) {
+      console.error("Erro ao buscar treinos origem:", treinosError);
+      return;
+    }
+
+    if (!treinosOrigem || treinosOrigem.length === 0) {
+      console.log("[usePlanilhaAtiva] Nenhum treino na semana origem para copiar");
+      return;
+    }
+
+    console.log(`[usePlanilhaAtiva] Encontrados ${treinosOrigem.length} treinos para copiar`);
+
+    for (const treinoOrigem of treinosOrigem) {
+      // Verificar se já existe treino nesta semana/dia
+      const { data: treinoExistente } = await supabase
+        .from("treinos_semanais")
+        .select("id")
+        .eq("profile_id", profileId)
+        .eq("personal_id", personalId)
+        .eq("semana", semanaDestino)
+        .eq("dia_semana", treinoOrigem.dia_semana)
+        .maybeSingle();
+
+      let treinoId: string;
+
+      if (treinoExistente) {
+        // Limpar exercícios e blocos antigos
+        await Promise.all([
+          supabase.from("exercicios").delete().eq("treino_semanal_id", treinoExistente.id),
+          supabase.from("blocos_treino").delete().eq("treino_semanal_id", treinoExistente.id),
+        ]);
+        treinoId = treinoExistente.id;
+
+        // Atualizar dados do treino
+        await supabase
+          .from("treinos_semanais")
+          .update({
+            modelo_id: treinoOrigem.modelo_id,
+            nome_modelo: treinoOrigem.nome_modelo,
+            descricao: treinoOrigem.descricao,
+            concluido: false,
+          })
+          .eq("id", treinoExistente.id);
+      } else {
+        // Criar novo treino
+        const { data: novoTreino, error: createError } = await supabase
+          .from("treinos_semanais")
+          .insert({
+            profile_id: profileId,
+            personal_id: personalId,
+            semana: semanaDestino,
+            dia_semana: treinoOrigem.dia_semana,
+            modelo_id: treinoOrigem.modelo_id,
+            nome_modelo: treinoOrigem.nome_modelo,
+            descricao: treinoOrigem.descricao,
+            concluido: false,
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error("Erro ao criar treino:", createError);
+          continue;
+        }
+
+        treinoId = novoTreino.id;
+      }
+
+      // Copiar exercícios
+      const { data: exerciciosOrigem } = await supabase
+        .from("exercicios")
+        .select("*")
+        .eq("treino_semanal_id", treinoOrigem.id)
+        .is("deleted_at", null)
+        .order("ordem");
+
+      if (exerciciosOrigem && exerciciosOrigem.length > 0) {
+        const grupoIdMap = new Map<string, string>();
+
+        const exerciciosInsert = exerciciosOrigem.map((ex: any) => {
+          let novoGrupoId = ex.grupo_id;
+
+          if (ex.grupo_id && !grupoIdMap.has(ex.grupo_id)) {
+            novoGrupoId = generateUUID();
+            grupoIdMap.set(ex.grupo_id, novoGrupoId);
+          } else if (ex.grupo_id) {
+            novoGrupoId = grupoIdMap.get(ex.grupo_id) || ex.grupo_id;
+          }
+
+          return {
+            treino_semanal_id: treinoId,
+            nome: ex.nome,
+            link_video: ex.link_video,
+            series: ex.series,
+            repeticoes: ex.repeticoes,
+            descanso: ex.descanso,
+            carga: ex.carga,
+            observacoes: ex.observacoes,
+            ordem: ex.ordem,
+            grupo_id: novoGrupoId,
+            tipo_agrupamento: ex.tipo_agrupamento,
+            ordem_no_grupo: ex.ordem_no_grupo,
+            descanso_entre_grupos: ex.descanso_entre_grupos,
+            exercise_library_id: ex.exercise_library_id,
+            concluido: false,
+          };
+        });
+
+        await supabase.from("exercicios").insert(exerciciosInsert);
+      }
+
+      // Copiar blocos
+      const { data: blocosOrigem } = await supabase
+        .from("blocos_treino")
+        .select("*")
+        .eq("treino_semanal_id", treinoOrigem.id)
+        .is("deleted_at", null)
+        .order("ordem");
+
+      if (blocosOrigem && blocosOrigem.length > 0) {
+        const blocosInsert = blocosOrigem.map((bloco: any) => ({
+          treino_semanal_id: treinoId,
+          tipo: bloco.tipo,
+          nome: bloco.nome,
+          duracao_estimada_minutos: bloco.duracao_estimada_minutos,
+          descricao: bloco.descricao,
+          posicao: bloco.posicao,
+          ordem: bloco.ordem,
+          obrigatorio: bloco.obrigatorio ?? false,
+          config_cardio: bloco.config_cardio ?? null,
+          config_alongamento: bloco.config_alongamento ?? null,
+          config_aquecimento: bloco.config_aquecimento ?? null,
+          config_outro: bloco.config_outro ?? null,
+          concluido: false,
+        }));
+
+        await supabase.from("blocos_treino").insert(blocosInsert);
+      }
+    }
+
+    console.log("[usePlanilhaAtiva] Cópia concluída!");
+  };
+
   // Renovar planilha
   const renovarPlanilhaMutation = useMutation({
     mutationFn: async (dados: {
@@ -362,6 +524,18 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
       observacoes?: string;
     }) => {
       if (!planilha) throw new Error("Sem planilha ativa");
+
+      // ✅ Buscar a última semana com treinos da planilha antiga
+      const { data: ultimosTreinos } = await supabase
+        .from("treinos_semanais")
+        .select("semana")
+        .eq("profile_id", planilha.profile_id)
+        .eq("personal_id", planilha.personal_id)
+        .order("semana", { ascending: false })
+        .limit(1);
+
+      const semanaOrigemTreinos = ultimosTreinos?.[0]?.semana || getWeekStart(parseISO(planilha.data_inicio));
+      console.log("[usePlanilhaAtiva] Semana origem para renovação:", semanaOrigemTreinos);
 
       // Marcar planilha atual como renovada
       await supabase
@@ -388,12 +562,20 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
 
       if (error) throw error;
 
-      // Replicar treinos da semana atual para as demais semanas
-      const semanaBase = getWeekStart(parseISO(dataInicio));
+      // ✅ Copiar treinos da última semana da planilha antiga para a nova semana atual
+      const semanaAtual = getWeekStart(new Date());
+      await copiarTreinosDeSemana(
+        planilha.profile_id,
+        planilha.personal_id,
+        semanaOrigemTreinos,
+        semanaAtual
+      );
+
+      // Replicar para as demais semanas da nova planilha
       await replicarTreinosParaSemanasRestantes(
         planilha.profile_id,
         planilha.personal_id,
-        semanaBase,
+        semanaAtual,
         duracaoSemanas
       );
 
@@ -403,7 +585,7 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
       queryClient.invalidateQueries({ queryKey: ["planilha-ativa"] });
       queryClient.invalidateQueries({ queryKey: ["planilhas-historico"] });
       queryClient.invalidateQueries({ queryKey: ["treinos"] });
-      toast.success("Planilha renovada e treinos replicados com sucesso!");
+      toast.success("Planilha renovada e treinos copiados com sucesso!");
     },
     onError: (error) => {
       console.error("Erro ao renovar planilha:", error);

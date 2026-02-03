@@ -496,18 +496,15 @@ export function TreinosManager({
     }
 
     // Se não existe, cria um novo treino semanal
-    console.log(`[TreinosManager] Criando treino semanal para dia ${dia}`);
-
-    const hoje = new Date();
-    const inicioDaSemana = new Date(hoje);
-    inicioDaSemana.setDate(hoje.getDate() - hoje.getDay() + 1);
+    // ✅ CORREÇÃO: Usar semanaSelecionada ao invés de cálculo manual
+    console.log(`[TreinosManager] Criando treino semanal para dia ${dia}, semana: ${semanaSelecionada}`);
 
     const { data, error } = await supabase
       .from("treinos_semanais")
       .insert({
         profile_id: profileId,
         personal_id: personalId,
-        semana: inicioDaSemana.toISOString().split("T")[0],
+        semana: semanaSelecionada, // ✅ Usar a semana selecionada
         dia_semana: dia,
         concluido: false,
       })
@@ -524,7 +521,7 @@ export function TreinosManager({
 
     // ✅ Recarregar os treinos após criar
     await queryClient.invalidateQueries({
-      queryKey: ["treinos", profileId, personalId],
+      queryKey: ["treinos", profileId, personalId, semanaSelecionada],
     });
 
     return data.id;

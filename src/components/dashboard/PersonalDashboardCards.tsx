@@ -471,26 +471,9 @@ export function PersonalDashboardCards({
         </CardContent>
       </Card>
 
-      {/* Stats Cards - Interativos */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Total de Alunos */}
-        <Card 
-          className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => navigate("/alunos")}
-        >
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total de Alunos</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalAlunos}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats.alunosAtivos} ativos
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Treinos Hoje - INTERATIVO */}
+      {/* Stats Cards - Interativos (sem duplicação do card de alunos) */}
+      <div className="grid gap-4 md:grid-cols-3">
+        {/* Treinos Hoje - INTERATIVO - Mostra apenas treinos finalizados */}
         <Card 
           className="cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => setTreinosHojeModalOpen(true)}
@@ -500,9 +483,9 @@ export function PersonalDashboardCards({
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.treinosHoje}</div>
+            <div className="text-2xl font-bold">{alunosTreinaramHoje.length}</div>
             <p className="text-xs text-muted-foreground">
-              {treinosAndamento.length} em andamento
+              alunos já treinaram hoje
             </p>
           </CardContent>
         </Card>
@@ -545,7 +528,7 @@ export function PersonalDashboardCards({
 
       {/* Cards Detalhados */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {/* Treinos em Andamento */}
+        {/* Treinos em Andamento - Sessões que estão acontecendo agora */}
         <Card className="col-span-1">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -555,12 +538,15 @@ export function PersonalDashboardCards({
               </CardTitle>
               <Badge variant="secondary">{treinosAndamento.length}</Badge>
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Alunos treinando neste momento
+            </p>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[180px]">
+            <ScrollArea className="h-[160px]">
               {treinosAndamento.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">
-                  Nenhum treino em andamento
+                  Nenhum aluno treinando agora
                 </p>
               ) : (
                 <div className="space-y-3">
@@ -574,7 +560,7 @@ export function PersonalDashboardCards({
                         <p className="font-medium text-sm">{treino.aluno_nome}</p>
                         <p className="text-xs text-muted-foreground flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          {formatarTempo(treino.inicio)}
+                          Iniciou há {formatarTempo(treino.inicio)}
                         </p>
                       </div>
                       <Badge
@@ -593,7 +579,7 @@ export function PersonalDashboardCards({
           </CardContent>
         </Card>
 
-        {/* Alunos Inativos */}
+        {/* Alunos Inativos - Baseado no último treino FINALIZADO */}
         <Card 
           className="col-span-1 cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => setAlertasModalOpen(true)}
@@ -602,13 +588,16 @@ export function PersonalDashboardCards({
             <div className="flex items-center justify-between">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
                 <UserX className="h-4 w-4 text-orange-500" />
-                Alunos Inativos (+7 dias)
+                Alunos Inativos
               </CardTitle>
               <Badge variant="destructive">{alunosInativos.length}</Badge>
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Sem treino finalizado há mais de 7 dias
+            </p>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[180px]">
+            <ScrollArea className="h-[160px]">
               {alunosInativos.length === 0 ? (
                 <div className="text-center py-8">
                   <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto mb-2" />
@@ -631,12 +620,12 @@ export function PersonalDashboardCards({
                         <p className="font-medium text-sm">{aluno.nome}</p>
                         <p className="text-xs text-muted-foreground">
                           {aluno.ultimo_treino
-                            ? `Último: ${format(parseISO(aluno.ultimo_treino), "dd/MM", { locale: ptBR })}`
-                            : "Nunca treinou"}
+                            ? `Último treino: ${format(parseISO(aluno.ultimo_treino), "dd/MM", { locale: ptBR })}`
+                            : "Ainda não iniciou os treinos"}
                         </p>
                       </div>
                       <Badge variant="outline" className="text-orange-600">
-                        {aluno.dias_inativo === 999 ? "Novo" : `${aluno.dias_inativo}d`}
+                        {aluno.dias_inativo === 999 ? "Novo" : `${aluno.dias_inativo} dias`}
                       </Badge>
                     </div>
                   ))}

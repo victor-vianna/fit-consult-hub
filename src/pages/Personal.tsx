@@ -171,35 +171,8 @@ export default function Personal() {
           <MobileHeaderPersonal onMenuClick={() => setMenuOpen(true)} personalId={user?.id} personalSettings={personalSettings} profileName={profile?.nome} />
 
           <main className="flex-1 overflow-auto pb-20 px-4 pt-4 space-y-4">
-            {/* Dashboard Cards para Mobile */}
+            {/* Dashboard Cards para Mobile (já inclui o card Meus Alunos) */}
             {user?.id && <PersonalDashboardCards personalId={user.id} themeColor={personalSettings?.theme_color} />}
-
-            {/* Card de Acesso aos Alunos */}
-            <Card className="shadow-sm">
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base font-semibold">
-                    Meus Alunos
-                  </CardTitle>
-                  <Button size="sm" onClick={() => navigate("/alunos")} className="text-xs" style={{
-                  backgroundColor: personalSettings?.theme_color || undefined
-                }}>
-                    <Users className="mr-1 h-4 w-4" />
-                    Ver Todos
-                  </Button>
-                </div>
-              </CardHeader>
-
-              <CardContent className="text-center pt-4 pb-6">
-                <p className="text-sm text-muted-foreground mb-4">
-                  Gerencie todos os seus alunos em um só lugar
-                </p>
-                <Button variant="outline" size="sm" className="w-full" onClick={() => navigate("/alunos")}>
-                  <Users className="mr-2 h-4 w-4" />
-                  Acessar Gerenciador
-                </Button>
-              </CardContent>
-            </Card>
 
             {/* Loja Placeholder */}
             <LojaPlaceholder isPersonal={true} themeColor={personalSettings?.theme_color} />

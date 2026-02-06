@@ -758,13 +758,17 @@ export function TreinosManager({
       // Combinar todos os exercícios
       const todosExercicios = [...exerciciosIsolados, ...exerciciosEmGrupos];
 
-      // Mapear blocos
+      // Mapear blocos com TODAS as configurações
       const blocosMapeados = blocos.map((bloco: any, index: number) => ({
         tipo: bloco.tipo,
         nome: bloco.nome,
         duracao_estimada_minutos: bloco.duracao_estimada_minutos ?? undefined,
-        intensidade: bloco.intensidade ?? undefined,
         observacoes: bloco.observacoes ?? undefined,
+        descricao: bloco.descricao ?? undefined,
+        config_cardio: bloco.config_cardio ?? undefined,
+        config_alongamento: bloco.config_alongamento ?? undefined,
+        config_aquecimento: bloco.config_aquecimento ?? undefined,
+        config_outro: bloco.config_outro ?? undefined,
         posicao: bloco.posicao,
         ordem: index,
       }));

@@ -1679,7 +1679,12 @@ export type Database = {
       }
       treino_modelo_blocos: {
         Row: {
+          config_alongamento: Json | null
+          config_aquecimento: Json | null
+          config_cardio: Json | null
+          config_outro: Json | null
           created_at: string | null
+          descricao: string | null
           duracao_estimada_minutos: number | null
           id: string
           intensidade: string | null
@@ -1691,7 +1696,12 @@ export type Database = {
           tipo: string
         }
         Insert: {
+          config_alongamento?: Json | null
+          config_aquecimento?: Json | null
+          config_cardio?: Json | null
+          config_outro?: Json | null
           created_at?: string | null
+          descricao?: string | null
           duracao_estimada_minutos?: number | null
           id?: string
           intensidade?: string | null
@@ -1703,7 +1713,12 @@ export type Database = {
           tipo: string
         }
         Update: {
+          config_alongamento?: Json | null
+          config_aquecimento?: Json | null
+          config_cardio?: Json | null
+          config_outro?: Json | null
           created_at?: string | null
+          descricao?: string | null
           duracao_estimada_minutos?: number | null
           id?: string
           intensidade?: string | null

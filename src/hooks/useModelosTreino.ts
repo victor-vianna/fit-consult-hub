@@ -25,6 +25,11 @@ export interface ModeloTreinoBloco {
   nome: string;
   duracao_estimada_minutos?: number | null;
   observacoes?: string | null;
+  descricao?: string | null;
+  config_cardio?: any | null;
+  config_alongamento?: any | null;
+  config_aquecimento?: any | null;
+  config_outro?: any | null;
   posicao: "inicio" | "meio" | "fim";
   ordem: number;
 }
@@ -198,6 +203,11 @@ export function useModelosTreino({
           nome: bloco.nome,
           duracao_estimada_minutos: bloco.duracao_estimada_minutos || null,
           observacoes: bloco.observacoes || null,
+          descricao: bloco.descricao || null,
+          config_cardio: bloco.config_cardio || null,
+          config_alongamento: bloco.config_alongamento || null,
+          config_aquecimento: bloco.config_aquecimento || null,
+          config_outro: bloco.config_outro || null,
           posicao: bloco.posicao,
           ordem: bloco.ordem ?? index,
         }));

@@ -9,6 +9,8 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { BlocoTreino } from "@/types/workoutBlocks";
+import { hidratarBlocoComTemplate } from "@/types/workoutBlocks";
+
 
 interface UseWorkoutBlocksProps {
   profileId: string;
@@ -125,12 +127,12 @@ export function useWorkoutBlocks({
 
         if (blocosError) throw blocosError;
 
-        // 3. Agrupar por treino_semanal_id
+        // 3. Agrupar por treino_semanal_id (com hidratação de configs via template quando necessário)
         const agrupados: Record<string, BlocoTreino[]> = {};
         (blocos || []).forEach((bloco) => {
-          const tid = bloco.treino_semanal_id;
+          const tid = (bloco as any).treino_semanal_id;
           if (!agrupados[tid]) agrupados[tid] = [];
-          agrupados[tid].push(bloco as any as BlocoTreino);
+          agrupados[tid].push(hidratarBlocoComTemplate(bloco as any as BlocoTreino));
         });
 
         console.log(

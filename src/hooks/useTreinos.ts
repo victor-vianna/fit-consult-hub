@@ -11,8 +11,15 @@ import { toast } from "sonner";
 import { exercicioSchema } from "@/lib/schemas/exercicioSchema";
 import type { Exercicio, TreinoDia } from "@/types/treino";
 import { useExerciseGroups } from "@/hooks/useExerciseGroups";
-import { getWeekStart, getPreviousWeekStart, getNextWeekStart, isCurrentWeek } from "@/utils/weekUtils";
+import {
+  getWeekStart,
+  getPreviousWeekStart,
+  getNextWeekStart,
+  isCurrentWeek,
+} from "@/utils/weekUtils";
 import { useExerciseProgress } from "@/hooks/useExerciseProgress";
+import { hidratarBlocoComTemplate } from "@/types/workoutBlocks";
+
 
 interface UseTreinosProps {
   profileId: string;
@@ -210,12 +217,16 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
               .order("posicao", { ascending: true })
               .order("ordem", { ascending: true });
 
+            const blocosHidratados = (blocos ?? []).map((b: any) =>
+              hidratarBlocoComTemplate(b)
+            );
+
             todosTreinos.push({
               dia,
               treinoId: treino.id,
               exercicios: exerciciosTipados,
               grupos,
-              blocos: blocos ?? [],
+              blocos: blocosHidratados,
               descricao: treino.descricao ?? null,
               concluido: Boolean(treino.concluido),
               nome_treino: treino.nome_treino || undefined,

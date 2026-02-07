@@ -104,6 +104,55 @@ export interface TemplateBloco {
   categoria: string;
 }
 
+const normalizeTemplateKey = (s: string) =>
+  (s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/**
+ * Fallback para manter as especificações completas de blocos ao importar/aplicar modelos.
+ * Se um bloco vier do banco sem configs (ex: config_cardio null), tentamos hidratar
+ * usando os templates pré-definidos (TEMPLATES_BLOCOS) pelo nome.
+ */
+export function hidratarBlocoComTemplate(bloco: BlocoTreino): BlocoTreino {
+  // Só aplicar fallback quando realmente estiver faltando alguma config
+  const precisaCardio = bloco.tipo === "cardio" && !bloco.config_cardio;
+  const precisaAlong =
+    (bloco.tipo === "alongamento" || bloco.tipo === "mobilidade") &&
+    !bloco.config_alongamento;
+  const precisaAquec = bloco.tipo === "aquecimento" && !bloco.config_aquecimento;
+
+  if (!precisaCardio && !precisaAlong && !precisaAquec) return bloco;
+
+  const key = normalizeTemplateKey(bloco.nome);
+  if (!key) return bloco;
+
+  const template = TEMPLATES_BLOCOS.find((t) => {
+    const tk = normalizeTemplateKey(t.config?.nome || t.nome);
+    return tk === key && t.tipo === bloco.tipo;
+  });
+
+  if (!template) return bloco;
+
+  return {
+    ...template.config,
+    ...bloco,
+    // mantém descrição do bloco se já existir; senão usa a do template
+    descricao: bloco.descricao ?? template.descricao,
+    // garante que não sobrescrevemos configs reais
+    config_cardio: bloco.config_cardio ?? (template.config as any).config_cardio,
+    config_alongamento:
+      bloco.config_alongamento ?? (template.config as any).config_alongamento,
+    config_aquecimento:
+      bloco.config_aquecimento ?? (template.config as any).config_aquecimento,
+    config_outro: bloco.config_outro ?? (template.config as any).config_outro,
+  };
+}
+
+
 // Configurações de cada tipo de bloco
 export const TIPOS_BLOCO = {
   alongamento: {

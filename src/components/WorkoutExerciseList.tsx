@@ -57,7 +57,7 @@ export function WorkoutExerciseList({
               key={bloco.id}
               bloco={bloco}
               index={idx}
-              readOnly={false}
+              readOnly={true}
               onToggleConcluido={onToggleBloco}
             />
           ))}
@@ -101,7 +101,7 @@ export function WorkoutExerciseList({
               key={bloco.id}
               bloco={bloco}
               index={idx}
-              readOnly={false}
+              readOnly={true}
               onToggleConcluido={onToggleBloco}
             />
           ))}
@@ -121,7 +121,7 @@ export function WorkoutExerciseList({
               key={bloco.id}
               bloco={bloco}
               index={idx}
-              readOnly={false}
+              readOnly={true}
               onToggleConcluido={onToggleBloco}
             />
           ))}

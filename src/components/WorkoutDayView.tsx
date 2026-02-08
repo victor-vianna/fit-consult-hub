@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useWorkoutSession } from "@/hooks/useWorkoutSession";
+import { useExerciseProgress } from "@/hooks/useExerciseProgress";
 
 interface WorkoutDayViewProps {
   treinos: TreinoDia[];
@@ -68,6 +69,16 @@ export function WorkoutDayView({
     isLoading: isLoadingSession 
   } = useWorkoutSession(profileId, personalId);
 
+  // 🔧 Hook de persistência de progresso PWA
+  const {
+    salvarProgressoLocal,
+    marcarSincronizado,
+    mesclarProgressoExercicios,
+    salvarBlocoProgressoLocal,
+    marcarBlocoSincronizado,
+    mesclarProgressoBlocos,
+  } = useExerciseProgress(profileId);
+
   // Buscar semana ativa
   const { data: semanaAtiva, refetch: refetchSemanaAtiva } = useQuery({
     queryKey: ["semana-ativa", profileId, personalId],
@@ -101,32 +112,51 @@ export function WorkoutDayView({
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [refetchSemanaAtiva]);
 
-  // Sincronizar com props quando mudarem
+  // 🔧 Sincronizar com props quando mudarem - mesclar com progresso local
   useEffect(() => {
-    setLocalTreinos(treinos);
-  }, [treinos]);
+    // Mesclar progresso local com dados do servidor
+    const treinosMesclados = treinos.map(treino => ({
+      ...treino,
+      exercicios: mesclarProgressoExercicios(treino.exercicios),
+    }));
+    setLocalTreinos(treinosMesclados);
+  }, [treinos, mesclarProgressoExercicios]);
 
   useEffect(() => {
-    setLocalGrupos(gruposPorTreino);
-  }, [gruposPorTreino]);
+    // Mesclar grupos com progresso local
+    const gruposMesclados: Record<string, GrupoExercicio[]> = {};
+    Object.keys(gruposPorTreino).forEach(treinoId => {
+      gruposMesclados[treinoId] = gruposPorTreino[treinoId].map(grupo => ({
+        ...grupo,
+        exercicios: mesclarProgressoExercicios(grupo.exercicios),
+      }));
+    });
+    setLocalGrupos(gruposMesclados);
+  }, [gruposPorTreino, mesclarProgressoExercicios]);
 
-  // Sincronizar blocos: prioriza blocosPorTreino, mas também usa blocos de cada treino
+  // 🔧 Sincronizar blocos: prioriza blocosPorTreino, mescla com progresso local
   useEffect(() => {
     // Mesclar blocos da prop com blocos que vêm dentro de cada treino
-    const blocosAtualizados: Record<string, BlocoTreino[]> = { ...blocosPorTreino };
+    const blocosAtualizados: Record<string, BlocoTreino[]> = {};
     
+    // Primeiro, processar blocos da prop
+    Object.keys(blocosPorTreino).forEach(treinoId => {
+      blocosAtualizados[treinoId] = mesclarProgressoBlocos(blocosPorTreino[treinoId]);
+    });
+    
+    // Depois, adicionar blocos de cada treino se não existirem
     treinos.forEach((treino) => {
       const treinoId = (treino as any).treinoId ?? (treino as any).id;
       if (treinoId && treino.blocos && treino.blocos.length > 0) {
         // Se não existe na prop ou está vazio, usa os blocos do treino
         if (!blocosAtualizados[treinoId] || blocosAtualizados[treinoId].length === 0) {
-          blocosAtualizados[treinoId] = treino.blocos as BlocoTreino[];
+          blocosAtualizados[treinoId] = mesclarProgressoBlocos(treino.blocos as BlocoTreino[]);
         }
       }
     });
     
     setLocalBlocos(blocosAtualizados);
-  }, [blocosPorTreino, treinos]);
+  }, [blocosPorTreino, treinos, mesclarProgressoBlocos]);
 
   // 🔧 Helper: Obter ID do treino
   const getTreinoId = useCallback((treino: TreinoDia): string | null => {
@@ -179,8 +209,11 @@ export function WorkoutDayView({
     []
   );
 
-  // ✅ Handler para toggle de exercício
+  // ✅ Handler para toggle de exercício - salva localmente primeiro
   const handleToggleExercicio = async (id: string, concluido: boolean) => {
+    // 🔧 Salvar no localStorage imediatamente (PWA)
+    salvarProgressoLocal(id, concluido);
+
     // Update otimista em treinos
     setLocalTreinos((prev) =>
       prev.map((t) => ({
@@ -207,10 +240,11 @@ export function WorkoutDayView({
 
     try {
       await onToggleConcluido(id, concluido);
+      // 🔧 Marcar como sincronizado após sucesso
+      marcarSincronizado(id);
     } catch (error) {
       console.error("[WorkoutDayView] Erro ao marcar exercício:", error);
-      setLocalTreinos(treinos);
-      setLocalGrupos(gruposPorTreino);
+      // Não reverter - o progresso local permanece e será sincronizado depois
     }
   };
 
@@ -245,9 +279,12 @@ export function WorkoutDayView({
     }
   };
 
-  // ✅ Handler para toggle de bloco
+  // ✅ Handler para toggle de bloco - salva localmente primeiro
   const handleToggleBloco = async (blocoId: string, concluido: boolean) => {
     if (!onToggleBlocoConcluido) return;
+
+    // 🔧 Salvar no localStorage imediatamente (PWA)
+    salvarBlocoProgressoLocal(blocoId, concluido);
 
     // Update otimista
     setLocalBlocos((prev) => {
@@ -262,9 +299,11 @@ export function WorkoutDayView({
 
     try {
       await onToggleBlocoConcluido(blocoId, concluido);
+      // 🔧 Marcar como sincronizado após sucesso
+      marcarBlocoSincronizado(blocoId);
     } catch (error) {
       console.error("[WorkoutDayView] Erro ao marcar bloco:", error);
-      setLocalBlocos(blocosPorTreino);
+      // Não reverter - o progresso local permanece e será sincronizado depois
     }
   };
 

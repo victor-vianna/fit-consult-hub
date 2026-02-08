@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Play, Pause, Check, X, Timer, Coffee, Dumbbell, Loader2 } from "lucide-react";
 import { useWorkoutTimer } from "@/hooks/useWorkoutTimer";
 import { WorkoutCompletionScreen } from "./WorkoutCompletionScreen";
+import { StickyWorkoutTimer } from "./StickyWorkoutTimer";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,6 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 interface WorkoutTimerProps {
   treinoId: string;
@@ -107,19 +109,53 @@ export function WorkoutTimer({
 
   return (
     <>
-      <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/5 shadow-xl backdrop-blur-sm">
+      {/* 🔧 Timer sticky para mobile - aparece ao scrollar */}
+      <StickyWorkoutTimer
+        isRunning={isRunning}
+        isPaused={isPaused}
+        isResting={isResting}
+        formattedTime={formattedTime}
+        formattedRestTime={formattedRestTime}
+        restType={restType}
+        onTogglePause={togglePause}
+        onFinish={() => setShowFinalizarDialog(true)}
+        onEncerrarDescanso={encerrarDescanso}
+      />
+
+      <Card className={cn(
+        "border-2 shadow-xl backdrop-blur-sm",
+        "bg-gradient-to-br from-primary/5 via-background to-primary/5",
+        isActive && "border-primary/30",
+        isPaused && "border-yellow-500/30",
+        isResting && "border-blue-500/30 animate-pulse"
+      )}>
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col items-center gap-3 sm:gap-4">
-            {/* Header */}
-            <div className="flex items-center gap-2 text-primary">
-              <Timer className="h-4 w-4 sm:h-5 sm:w-5" />
-              <h3 className="text-sm sm:text-base font-semibold">
+            {/* Header com indicador de status */}
+            <div className="flex items-center gap-2">
+              {/* 🔧 Indicador pulsante quando ativo */}
+              {isActive && (
+                <div className={cn(
+                  "w-3 h-3 rounded-full",
+                  isPaused ? "bg-yellow-500" : isResting ? "bg-blue-500 animate-pulse" : "bg-green-500 animate-pulse"
+                )} />
+              )}
+              <Timer className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+              <h3 className="text-sm sm:text-base font-semibold text-primary">
                 Cronômetro do Treino
               </h3>
             </div>
 
-            {/* Tempo total */}
-            <div className="text-4xl sm:text-5xl md:text-6xl font-bold font-mono tabular-nums tracking-tight bg-gradient-to-br from-primary to-primary/60 bg-clip-text text-transparent">
+            {/* Tempo total - maior e mais visível */}
+            <div className={cn(
+              "text-5xl sm:text-6xl md:text-7xl font-bold font-mono tabular-nums tracking-tight",
+              "bg-gradient-to-br bg-clip-text text-transparent",
+              isPaused 
+                ? "from-yellow-500 to-yellow-600" 
+                : isResting 
+                  ? "from-blue-500 to-blue-600"
+                  : "from-primary to-primary/60"
+            )}>
               {formattedTime}
             </div>
 
@@ -127,19 +163,21 @@ export function WorkoutTimer({
             {isActive && (
               <div className="flex flex-col items-center gap-1">
                 <div className="flex items-center justify-center gap-2 text-xs sm:text-sm">
-                  <div
-                    className={`w-2 h-2 rounded-full ${
-                      isPaused ? "bg-yellow-500" : isResting ? "bg-blue-500 animate-pulse" : "bg-green-500 animate-pulse"
-                    }`}
-                  />
-                  <span className="text-muted-foreground font-medium">
-                    {isPaused ? "Pausado" : isResting ? "Descansando" : "Em andamento"}
+                  <span className={cn(
+                    "font-medium px-3 py-1 rounded-full",
+                    isPaused 
+                      ? "bg-yellow-500/10 text-yellow-600" 
+                      : isResting 
+                        ? "bg-blue-500/10 text-blue-600"
+                        : "bg-green-500/10 text-green-600"
+                  )}>
+                    {isPaused ? "⏸️ Pausado" : isResting ? "☕ Descansando" : "▶️ Em andamento"}
                   </span>
                 </div>
                 
                 {/* Info de descanso total */}
                 {tempoDescansoTotal > 0 && (
-                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                  <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                     <Coffee className="h-3 w-3" />
                     Descanso total: {formattedDescansoTotal}
                   </div>
@@ -160,18 +198,18 @@ export function WorkoutTimer({
                 {isResting ? (
                   <div className="flex flex-col items-center gap-3">
                     <div className="flex items-center gap-2 text-blue-600">
-                      <Coffee className="h-4 w-4" />
+                      <Coffee className="h-4 w-4 animate-bounce" />
                       <span className="text-sm font-medium">
                         Descanso {restType === "serie" ? "entre séries" : "entre exercícios"}
                       </span>
                     </div>
-                    <div className="text-3xl font-mono font-bold text-blue-600">
+                    <div className="text-4xl font-mono font-bold text-blue-600">
                       {formattedRestTime}
                     </div>
                     <Button
                       onClick={encerrarDescanso}
                       variant="outline"
-                      className="w-full border-blue-500 text-blue-600 hover:bg-blue-50"
+                      className="w-full border-blue-500 text-blue-600 hover:bg-blue-500/10"
                     >
                       <Check className="h-4 w-4 mr-2" />
                       Encerrar Descanso

@@ -1516,9 +1516,8 @@ export function TreinosManager({
             loading={loadingModelos || loadingPastas}
             onAplicar={handleSelecionarModeloParaAplicar}
             onDeletar={deletarModelo}
-            onCriarPasta={async (nome) => {
-              await criarPasta({ nome });
-            }}
+            onCriarPasta={criarPasta}
+            isCriandoPasta={false}
             onDeletarPasta={deletarPasta}
             onRenomearPasta={async (pastaId, nome) => {
               await atualizarPasta(pastaId, { nome });

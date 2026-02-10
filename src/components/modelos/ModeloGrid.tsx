@@ -116,8 +116,24 @@ function ModeloCard({
   const pastaAtual = pastas.find((p) => p.id === currentFolderId);
   const pastaPai = pastaAtual ? pastas.find((p) => p.id === pastaAtual.parent_id) : null;
 
+  // Build full path for each folder
+  const buildFullPath = (pasta: ModeloPasta): string => {
+    const parts: string[] = [pasta.nome];
+    let current = pasta;
+    while (current.parent_id) {
+      const parent = pastas.find((p) => p.id === current.parent_id);
+      if (!parent) break;
+      parts.unshift(parent.nome);
+      current = parent;
+    }
+    return parts.join(" / ");
+  };
+
   // Pastas disponíveis para mover (todas exceto a atual)
-  const pastasParaMover = pastas.filter((p) => p.id !== modelo.pasta_id);
+  const pastasParaMover = pastas
+    .filter((p) => p.id !== modelo.pasta_id)
+    .map((p) => ({ ...p, fullPath: buildFullPath(p) }))
+    .sort((a, b) => a.fullPath.localeCompare(b.fullPath));
 
   return (
     <Card
@@ -171,11 +187,7 @@ function ModeloCard({
                   </DropdownMenuItem>
                   {pastasParaMover.length > 0 && <DropdownMenuSeparator />}
                   {/* Lista de pastas */}
-                  {pastasParaMover.map((pasta) => {
-                    // Mostrar caminho da pasta para contexto
-                    const nivel = pasta.nivel || 0;
-                    const indent = "  ".repeat(nivel);
-                    return (
+                  {pastasParaMover.map((pasta) => (
                       <DropdownMenuItem
                         key={pasta.id}
                         onClick={(e) => {
@@ -183,13 +195,12 @@ function ModeloCard({
                           onMoverModelo(modelo.id, pasta.id);
                         }}
                       >
-                        <Folder className="h-4 w-4 mr-2" style={{ color: pasta.cor }} />
-                        <span className="truncate max-w-[180px]">
-                          {pasta.caminho || pasta.nome}
+                        <Folder className="h-4 w-4 mr-2 shrink-0" style={{ color: pasta.cor }} />
+                        <span className="truncate max-w-[250px]" title={pasta.fullPath}>
+                          {pasta.fullPath}
                         </span>
                       </DropdownMenuItem>
-                    );
-                  })}
+                    ))}
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
               <DropdownMenuSeparator />

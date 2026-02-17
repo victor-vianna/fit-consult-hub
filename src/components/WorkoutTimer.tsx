@@ -1,11 +1,8 @@
-// components/WorkoutTimer.tsx
 import { useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, Check, X, Timer, Coffee, Dumbbell, Loader2 } from "lucide-react";
+import { Play, Pause, Check, X, Timer, Loader2 } from "lucide-react";
 import { useWorkoutTimer } from "@/hooks/useWorkoutTimer";
 import { WorkoutCompletionScreen } from "./WorkoutCompletionScreen";
-import { StickyWorkoutTimer } from "./StickyWorkoutTimer";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,22 +40,15 @@ export function WorkoutTimer({
   const {
     isRunning,
     isPaused,
-    isResting,
     isLoading,
     formattedTime,
-    formattedRestTime,
     formattedDescansoTotal,
-    restType,
-    tempoDescansoTotal,
-    descansos,
     showCompletionScreen,
     completionData,
     iniciar,
     togglePause,
     finalizar,
     cancelar,
-    iniciarDescanso,
-    encerrarDescanso,
     fecharTelaConclusao,
   } = useWorkoutTimer({ treinoId, profileId, personalId });
 
@@ -80,15 +70,13 @@ export function WorkoutTimer({
 
   if (isLoading) {
     return (
-      <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/5">
-        <CardContent className="p-4 sm:p-6">
-          <div className="flex flex-col items-center gap-4">
-            <Skeleton className="h-5 w-40" />
-            <Skeleton className="h-14 w-48" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="w-full p-3 bg-card border rounded-xl">
+        <div className="flex items-center justify-center gap-3">
+          <Skeleton className="h-5 w-5 rounded-full" />
+          <Skeleton className="h-6 w-28" />
+          <Skeleton className="h-9 w-20" />
+        </div>
+      </div>
     );
   }
 
@@ -107,255 +95,97 @@ export function WorkoutTimer({
 
   const isActive = isRunning || isPaused;
 
+  // Botão de iniciar (antes de começar o treino)
+  if (!isActive) {
+    return (
+      <Button
+        onClick={iniciar}
+        size="lg"
+        className="w-full shadow-lg"
+      >
+        <Play className="h-5 w-5 mr-2" />
+        Iniciar Treino
+      </Button>
+    );
+  }
+
+  // Timer fixo no topo - simples e compacto
   return (
     <>
-      {/* 🔧 Timer sticky para mobile - aparece ao scrollar */}
-      <StickyWorkoutTimer
-        isRunning={isRunning}
-        isPaused={isPaused}
-        isResting={isResting}
-        formattedTime={formattedTime}
-        formattedRestTime={formattedRestTime}
-        restType={restType}
-        onTogglePause={togglePause}
-        onFinish={() => setShowFinalizarDialog(true)}
-        onEncerrarDescanso={encerrarDescanso}
-      />
-
-      <Card className={cn(
-        "border-2 shadow-xl backdrop-blur-sm",
-        "bg-gradient-to-br from-primary/5 via-background to-primary/5",
-        isActive && "border-primary/30",
-        isPaused && "border-yellow-500/30",
-        isResting && "border-blue-500/30 animate-pulse"
-      )}>
-        <CardContent className="p-4 sm:p-6">
-          <div className="flex flex-col items-center gap-3 sm:gap-4">
-            {/* Header com indicador de status */}
-            <div className="flex items-center gap-2">
-              {/* 🔧 Indicador pulsante quando ativo */}
-              {isActive && (
-                <div className={cn(
-                  "w-3 h-3 rounded-full",
-                  isPaused ? "bg-yellow-500" : isResting ? "bg-blue-500 animate-pulse" : "bg-green-500 animate-pulse"
-                )} />
+      <div
+        className={cn(
+          "sticky top-0 z-40 -mx-4 sm:-mx-6 px-4 sm:px-6",
+          "bg-card/95 backdrop-blur-lg border-b shadow-md",
+          "transition-colors duration-200",
+          isPaused && "border-b-warning/50"
+        )}
+      >
+        <div className="flex items-center justify-between py-3 gap-3">
+          {/* Timer */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="relative">
+              <Timer className={cn(
+                "h-5 w-5",
+                isPaused ? "text-warning" : "text-primary"
+              )} />
+              {!isPaused && (
+                <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-primary animate-pulse" />
               )}
-              <Timer className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-              <h3 className="text-sm sm:text-base font-semibold text-primary">
-                Cronômetro do Treino
-              </h3>
             </div>
-
-            {/* Tempo total - maior e mais visível */}
-            <div className={cn(
-              "text-5xl sm:text-6xl md:text-7xl font-bold font-mono tabular-nums tracking-tight",
-              "bg-gradient-to-br bg-clip-text text-transparent",
-              isPaused 
-                ? "from-yellow-500 to-yellow-600" 
-                : isResting 
-                  ? "from-blue-500 to-blue-600"
-                  : "from-primary to-primary/60"
+            <span className={cn(
+              "text-2xl font-bold font-mono tabular-nums",
+              isPaused ? "text-warning" : "text-primary"
             )}>
               {formattedTime}
-            </div>
-
-            {/* Indicador de status */}
-            {isActive && (
-              <div className="flex flex-col items-center gap-1">
-                <div className="flex items-center justify-center gap-2 text-xs sm:text-sm">
-                  <span className={cn(
-                    "font-medium px-3 py-1 rounded-full",
-                    isPaused 
-                      ? "bg-yellow-500/10 text-yellow-600" 
-                      : isResting 
-                        ? "bg-blue-500/10 text-blue-600"
-                        : "bg-green-500/10 text-green-600"
-                  )}>
-                    {isPaused ? "⏸️ Pausado" : isResting ? "☕ Descansando" : "▶️ Em andamento"}
-                  </span>
-                </div>
-                
-                {/* Info de descanso total */}
-                {tempoDescansoTotal > 0 && (
-                  <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                    <Coffee className="h-3 w-3" />
-                    Descanso total: {formattedDescansoTotal}
-                  </div>
-                )}
-              </div>
+            </span>
+            {isPaused && (
+              <span className="text-xs text-warning font-medium">Pausado</span>
             )}
-
-            {/* Dica inicial */}
-            {!isActive && (
-              <p className="text-xs sm:text-sm text-muted-foreground text-center max-w-xs">
-                Inicie o cronômetro para acompanhar seu desempenho
-              </p>
-            )}
-
-            {/* Seção de Descanso */}
-            {isActive && !isPaused && (
-              <div className="w-full border rounded-lg p-3 bg-muted/30">
-                {isResting ? (
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="flex items-center gap-2 text-blue-600">
-                      <Coffee className="h-4 w-4 animate-bounce" />
-                      <span className="text-sm font-medium">
-                        Descanso {restType === "serie" ? "entre séries" : "entre exercícios"}
-                      </span>
-                    </div>
-                    <div className="text-4xl font-mono font-bold text-blue-600">
-                      {formattedRestTime}
-                    </div>
-                    <Button
-                      onClick={encerrarDescanso}
-                      variant="outline"
-                      className="w-full border-blue-500 text-blue-600 hover:bg-blue-500/10"
-                    >
-                      <Check className="h-4 w-4 mr-2" />
-                      Encerrar Descanso
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <Coffee className="h-4 w-4" />
-                      <span className="text-xs font-medium">Iniciar descanso</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => iniciarDescanso("serie")}
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 text-xs"
-                      >
-                        <Dumbbell className="h-3 w-3 mr-1" />
-                        Entre Séries
-                      </Button>
-                      <Button
-                        onClick={() => iniciarDescanso("exercicio")}
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 text-xs"
-                      >
-                        <Coffee className="h-3 w-3 mr-1" />
-                        Entre Exercícios
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Resumo de descansos */}
-            {isActive && descansos.length > 0 && (
-              <div className="w-full text-xs text-muted-foreground">
-                <div className="flex justify-between">
-                  <span>Descansos realizados:</span>
-                  <span className="font-medium">{descansos.filter(d => d.duracao_segundos).length}</span>
-                </div>
-              </div>
-            )}
-
-            {/* Botões de controle */}
-            <div className="flex gap-2 w-full flex-wrap sm:flex-nowrap">
-              {!isActive && (
-                <Button
-                  onClick={iniciar}
-                  size="lg"
-                  className="w-full shadow-lg hover:shadow-xl transition-all"
-                >
-                  <Play className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                  <span className="text-sm sm:text-base">Iniciar Treino</span>
-                </Button>
-              )}
-
-              {isRunning && !isResting && (
-                <>
-                  <Button
-                    onClick={togglePause}
-                    variant="outline"
-                    size="lg"
-                    className="flex-1 min-w-[100px]"
-                  >
-                    <Pause className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
-                    <span className="text-sm sm:text-base">Pausar</span>
-                  </Button>
-
-                  <Button
-                    onClick={() => setShowFinalizarDialog(true)}
-                    size="lg"
-                    className="flex-1 min-w-[100px] shadow-lg"
-                  >
-                    <Check className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
-                    <span className="text-sm sm:text-base">Finalizar</span>
-                  </Button>
-
-                  <Button
-                    onClick={() => setShowCancelarDialog(true)}
-                    variant="ghost"
-                    size="lg"
-                    className="w-auto px-3 sm:px-4"
-                  >
-                    <X className="h-4 w-4 sm:h-5 sm:w-5" />
-                  </Button>
-                </>
-              )}
-
-              {isRunning && isResting && (
-                <Button
-                  onClick={() => setShowFinalizarDialog(true)}
-                  size="lg"
-                  className="w-full shadow-lg"
-                >
-                  <Check className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
-                  <span className="text-sm sm:text-base">Finalizar Treino</span>
-                </Button>
-              )}
-
-              {isPaused && (
-                <>
-                  <Button
-                    onClick={togglePause}
-                    size="lg"
-                    className="flex-1 min-w-[100px] shadow-lg"
-                  >
-                    <Play className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
-                    <span className="text-sm sm:text-base">Retomar</span>
-                  </Button>
-
-                  <Button
-                    onClick={() => setShowFinalizarDialog(true)}
-                    size="lg"
-                    className="flex-1 min-w-[100px] shadow-lg"
-                  >
-                    <Check className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
-                    <span className="text-sm sm:text-base">Finalizar</span>
-                  </Button>
-
-                  <Button
-                    onClick={() => setShowCancelarDialog(true)}
-                    variant="ghost"
-                    size="lg"
-                    className="w-auto px-3 sm:px-4"
-                  >
-                    <X className="h-4 w-4 sm:h-5 sm:w-5" />
-                  </Button>
-                </>
-              )}
-            </div>
           </div>
-        </CardContent>
-      </Card>
+
+          {/* Ações */}
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={togglePause}
+              className={cn(
+                "h-9 w-9 p-0",
+                isPaused
+                  ? "border-primary text-primary hover:bg-primary/10"
+                  : "border-warning text-warning hover:bg-warning/10"
+              )}
+            >
+              {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+            </Button>
+
+            <Button
+              size="sm"
+              onClick={() => setShowFinalizarDialog(true)}
+              className="h-9 px-3 shadow-sm"
+            >
+              <Check className="h-4 w-4 mr-1" />
+              <span className="text-xs">Finalizar</span>
+            </Button>
+
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowCancelarDialog(true)}
+              className="h-9 w-9 p-0 text-muted-foreground hover:text-destructive"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
 
       {/* Dialog de Finalizar */}
-      <AlertDialog
-        open={showFinalizarDialog}
-        onOpenChange={setShowFinalizarDialog}
-      >
+      <AlertDialog open={showFinalizarDialog} onOpenChange={setShowFinalizarDialog}>
         <AlertDialogContent className="max-w-[90vw] sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <Check className="h-5 w-5 text-green-500" />
+              <Check className="h-5 w-5 text-primary" />
               Finalizar treino?
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
@@ -364,14 +194,6 @@ export function WorkoutTimer({
                 <div className="flex justify-between">
                   <span>Tempo total:</span>
                   <span className="font-medium">{formattedTime}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Tempo de descanso:</span>
-                  <span className="font-medium">{formattedDescansoTotal}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Descansos realizados:</span>
-                  <span className="font-medium">{descansos.filter(d => d.duracao_segundos).length}</span>
                 </div>
               </div>
             </AlertDialogDescription>
@@ -399,10 +221,7 @@ export function WorkoutTimer({
       </AlertDialog>
 
       {/* Dialog de Cancelar */}
-      <AlertDialog
-        open={showCancelarDialog}
-        onOpenChange={setShowCancelarDialog}
-      >
+      <AlertDialog open={showCancelarDialog} onOpenChange={setShowCancelarDialog}>
         <AlertDialogContent className="max-w-[90vw] sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">

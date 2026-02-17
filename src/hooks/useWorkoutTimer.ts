@@ -737,6 +737,12 @@ export function useWorkoutTimer({
 
       if (error) throw error;
 
+      // 🔧 CORREÇÃO: Marcar treinos_semanais.concluido = true
+      await supabase
+        .from("treinos_semanais")
+        .update({ concluido: true, updated_at: new Date().toISOString() })
+        .eq("id", treinoId);
+
       // Buscar nome do aluno
       const { data: alunoData } = await supabase
         .from("profiles")
@@ -808,6 +814,18 @@ export function useWorkoutTimer({
 
       setCompletionData(dadosConclusao);
       setShowCompletionScreen(true);
+
+      // 🔧 CORREÇÃO: Invalidar queries de treinos e histórico
+      // Importa queryClient via window para não acoplar ao React Query context
+      try {
+        const { QueryClient } = await import("@tanstack/react-query");
+        // Dispara evento customizado para que componentes pai invalidem queries
+        window.dispatchEvent(new CustomEvent("workout-completed", { 
+          detail: { treinoId, profileId, personalId } 
+        }));
+      } catch (e) {
+        console.warn("[useWorkoutTimer] Não foi possível disparar evento de invalidação:", e);
+      }
 
       // Limpar estado
       localStorage.removeItem(getStorageKey(treinoId));

@@ -240,26 +240,42 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
     },
     staleTime: 1000 * 60 * 2,
     enabled: !!profileId && !!personalId,
-    refetchOnWindowFocus: true,
+    // 🔧 CORREÇÃO: Desabilitar refetchOnWindowFocus para evitar race condition
+    // A sincronização é feita manualmente via visibilitychange com ordem controlada
+    refetchOnWindowFocus: false,
     refetchOnMount: true,
     // 🔧 PWA: Manter dados mais atualizados
     refetchOnReconnect: true,
   });
 
-  // 🔧 PWA: Refetch ao voltar da minimização
+  // 🔧 CORREÇÃO: Sync primeiro, refetch depois ao voltar do background
   useEffect(() => {
-    const handleVisibilityChange = () => {
+    const handleVisibilityChange = async () => {
       if (document.visibilityState === "visible" && profileId && personalId) {
-        // Dar um pequeno delay para garantir reconexão de rede
-        setTimeout(() => {
-          refetch();
-        }, 500);
+        // Aguardar sync do useExerciseProgress (via evento)
+        // Delay para garantir que a sync do localStorage ocorreu
+        await new Promise(r => setTimeout(r, 800));
+        refetch();
       }
     };
 
+    // 🔧 Invalidar queries quando treino é finalizado
+    const handleWorkoutCompleted = () => {
+      queryClient.invalidateQueries({
+        queryKey: buildQueryKey(profileId, personalId, semanaParaBuscar),
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["semana-ativa", profileId, personalId],
+      });
+    };
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [profileId, personalId, refetch]);
+    window.addEventListener("workout-completed", handleWorkoutCompleted);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("workout-completed", handleWorkoutCompleted);
+    };
+  }, [profileId, personalId, refetch, queryClient, semanaParaBuscar]);
 
   // ✅ Criação automática de treino semanal com validação
   const criarTreinoSeNecessario = useCallback(

@@ -243,8 +243,15 @@ export function WorkoutDayView({
       // 🔧 Marcar como sincronizado após sucesso
       marcarSincronizado(id);
     } catch (error) {
-      console.error("[WorkoutDayView] Erro ao marcar exercício:", error);
-      // Não reverter - o progresso local permanece e será sincronizado depois
+      console.error("[WorkoutDayView] Erro ao marcar exercício, tentando retry:", error);
+      // 🔧 Retry 1x
+      try {
+        await onToggleConcluido(id, concluido);
+        marcarSincronizado(id);
+      } catch (retryError) {
+        console.error("[WorkoutDayView] Retry falhou, mantido no localStorage:", retryError);
+        // Progresso local permanece e será sincronizado depois
+      }
     }
   };
 

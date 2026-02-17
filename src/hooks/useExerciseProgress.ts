@@ -35,20 +35,35 @@ export function useExerciseProgress(profileId: string) {
 
       if (naoSincronizados.length === 0) return;
 
-      // Sincronizar cada exercício pendente
-      for (const exercicioId of naoSincronizados) {
-        const data = progress[exercicioId];
-        
-        const { error } = await supabase
-          .from("exercicios")
-          .update({ concluido: data.concluido })
-          .eq("id", exercicioId);
+      // 🔧 Sincronizar em paralelo com retry
+      const results = await Promise.allSettled(
+        naoSincronizados.map(async (exercicioId) => {
+          const data = progress[exercicioId];
+          
+          const { error } = await supabase
+            .from("exercicios")
+            .update({ concluido: data.concluido })
+            .eq("id", exercicioId);
 
-        if (!error) {
-          // Marcar como sincronizado
-          progress[exercicioId].synced = true;
+          if (error) {
+            // Retry 1x
+            const { error: retryError } = await supabase
+              .from("exercicios")
+              .update({ concluido: data.concluido })
+              .eq("id", exercicioId);
+            if (retryError) throw retryError;
+          }
+
+          return exercicioId;
+        })
+      );
+
+      // Marcar sincronizados os que deram certo
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") {
+          progress[naoSincronizados[index]].synced = true;
         }
-      }
+      });
 
       localStorage.setItem(EXERCISE_PROGRESS_KEY, JSON.stringify(progress));
       setPendingSync([]);
@@ -72,23 +87,41 @@ export function useExerciseProgress(profileId: string) {
 
       if (naoSincronizados.length === 0) return;
 
-      // Sincronizar cada bloco pendente
-      for (const blocoId of naoSincronizados) {
-        const data = progress[blocoId];
-        
-        const { error } = await supabase
-          .from("blocos_treino")
-          .update({ 
-            concluido: data.concluido,
-            concluido_em: data.concluido ? new Date().toISOString() : null
-          })
-          .eq("id", blocoId);
+      // 🔧 Sincronizar em paralelo com retry
+      const results = await Promise.allSettled(
+        naoSincronizados.map(async (blocoId) => {
+          const data = progress[blocoId];
+          
+          const { error } = await supabase
+            .from("blocos_treino")
+            .update({ 
+              concluido: data.concluido,
+              concluido_em: data.concluido ? new Date().toISOString() : null
+            })
+            .eq("id", blocoId);
 
-        if (!error) {
-          // Marcar como sincronizado
-          progress[blocoId].synced = true;
+          if (error) {
+            // Retry 1x
+            const { error: retryError } = await supabase
+              .from("blocos_treino")
+              .update({ 
+                concluido: data.concluido,
+                concluido_em: data.concluido ? new Date().toISOString() : null
+              })
+              .eq("id", blocoId);
+            if (retryError) throw retryError;
+          }
+
+          return blocoId;
+        })
+      );
+
+      // Marcar sincronizados os que deram certo
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") {
+          progress[naoSincronizados[index]].synced = true;
         }
-      }
+      });
 
       localStorage.setItem(BLOCK_PROGRESS_KEY, JSON.stringify(progress));
       setPendingBlockSync([]);

@@ -53,6 +53,27 @@ export function InlinePesoInput({
   };
 
   if (!editing) {
+    const displayValue = value || pesoRecomendado || "";
+    
+    if (!displayValue) {
+      // No weight set yet - show "Registrar" button
+      return (
+        <button
+          onClick={() => setEditing(true)}
+          disabled={disabled}
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-2 rounded transition-all",
+            "font-medium text-sm md:text-xs touch-target",
+            "text-muted-foreground bg-muted/50 hover:bg-muted",
+            disabled && "opacity-50 cursor-not-allowed"
+          )}
+        >
+          <Edit2 className="h-3.5 w-3.5 opacity-60" />
+          <span>Registrar peso</span>
+        </button>
+      );
+    }
+    
     return (
       <button
         onClick={() => setEditing(true)}
@@ -68,10 +89,12 @@ export function InlinePesoInput({
         title={
           pesoExecutado && pesoExecutado !== pesoRecomendado
             ? `Recomendado: ${pesoRecomendado}kg | Executado: ${pesoExecutado}kg`
-            : `Peso recomendado: ${pesoRecomendado}kg`
+            : pesoRecomendado 
+              ? `Peso recomendado: ${pesoRecomendado}kg`
+              : `Peso executado: ${pesoExecutado}kg`
         }
       >
-        <span>{value}kg</span>
+        <span>{displayValue}kg</span>
         <Edit2 className="h-4 w-4 md:h-3 md:w-3 opacity-60" />
       </button>
     );

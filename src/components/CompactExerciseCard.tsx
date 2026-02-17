@@ -132,8 +132,16 @@ export function CompactExerciseCard({
                 {exercicio.series || 3}x{exercicio.repeticoes || "12"}
               </span>
               {exercicio.carga && (
-                <span className="font-mono font-semibold text-primary">
-                  {exercicio.carga}kg
+                <InlinePesoInput
+                  exercicioId={exercicio.id}
+                  pesoRecomendado={exercicio.carga}
+                  pesoExecutado={exercicio.peso_executado || null}
+                  onSave={handleSavePeso}
+                />
+              )}
+              {!exercicio.carga && exercicio.peso_executado && (
+                <span className="font-mono font-semibold text-blue-600">
+                  {exercicio.peso_executado}kg
                 </span>
               )}
             </div>
@@ -204,20 +212,18 @@ export function CompactExerciseCard({
                 </div>
               )}
 
-              {exercicio.carga && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm md:text-xs text-muted-foreground flex items-center gap-1">
-                    <Weight className="h-4 w-4 md:h-3 md:w-3" />
-                    Carga:
-                  </span>
-                  <InlinePesoInput
-                    exercicioId={exercicio.id}
-                    pesoRecomendado={exercicio.carga}
-                    pesoExecutado={exercicio.peso_executado || null}
-                    onSave={handleSavePeso}
-                  />
-                </div>
-              )}
+              <div className="flex items-center justify-between">
+                <span className="text-sm md:text-xs text-muted-foreground flex items-center gap-1">
+                  <Weight className="h-4 w-4 md:h-3 md:w-3" />
+                  {exercicio.carga ? "Carga:" : "Peso executado:"}
+                </span>
+                <InlinePesoInput
+                  exercicioId={exercicio.id}
+                  pesoRecomendado={exercicio.carga || null}
+                  pesoExecutado={exercicio.peso_executado || null}
+                  onSave={handleSavePeso}
+                />
+              </div>
             </div>
 
             {/* Observações */}

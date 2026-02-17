@@ -1,147 +1,105 @@
 
-# Plano: Correcao Estrutural do Sistema de Acompanhamento de Treinos
 
-## Diagnostico
+# Correcao do Cronometro de Treino (Mobile e Web)
 
-### Problema 1: Historico nao marca dias como concluidos
+## Problemas Identificados
 
-**Causa raiz confirmada:** A funcao `finalizar()` em `useWorkoutTimer.ts` (linha 708-831) atualiza apenas a tabela `treino_sessoes` com `status: "concluido"`. Porem, o calendario de historico (`CalendarioTreinosMensal`) e o hook `useTreinosHistorico` leem o campo `concluido` da tabela `treinos_semanais` -- que **nunca e atualizado para `true`** ao finalizar o treino.
+### 1. Layout sobrepondo no mobile
+O timer e os 3 botoes (pausar, finalizar, cancelar) estao todos na mesma linha horizontal (`flex items-center justify-between`). Em telas pequenas (~375px), nao ha espaco suficiente e os elementos se sobrepoem.
 
-Ou seja: o aluno finaliza o treino, a sessao e registrada corretamente, mas o registro principal do dia (`treinos_semanais`) permanece com `concluido = false`.
-
-### Problema 2: Exercicios perdem o check ao sair e voltar
-
-**Causa raiz:** Quando o aluno navega para outra secao (ex: "Inicio") e volta para "Treinos", o componente `TreinosManager` e remontado do zero. O React Query faz um refetch e traz os dados do banco. Se a sincronizacao do `useExerciseProgress` ainda nao enviou os dados ao banco (ou se houve falha silenciosa), o estado local e sobrescrito pelo estado do servidor (onde `concluido = false`).
-
-Alem disso, a atualizacao otimista do `onToggleConcluido` no `useTreinos` apenas chama `supabase.from("exercicios").update({ concluido })`, mas se essa operacao falhar por qualquer motivo (RLS, rede), o usuario nao e avisado e o check e perdido no proximo refetch.
-
-### Problema 3: Estado perdido ao bloquear tela / background
-
-**Causa raiz:** O sistema de persistencia em localStorage (`useExerciseProgress` e `useWorkoutTimer`) foi implementado recentemente, mas ha dois gaps:
-
-1. A sincronizacao dos exercicios pendentes (`sincronizarExerciciosPendentes`) tenta atualizar um exercicio de cada vez em sequencia. Se houver muitos pendentes ou a rede estiver instavel, pode falhar silenciosamente.
-2. O merge no `WorkoutDayView` depende de `mesclarProgressoExercicios` funcionar antes do React Query sobrescrever o estado. Porem o `refetchOnWindowFocus: true` do React Query pode disparar antes do merge, causando race condition.
+### 2. Pause/Resume com resposta lenta
+O estado visual (`isPaused`, `isRunning`) so atualiza apos a chamada ao Supabase completar. No mobile com rede lenta, o botao parece nao funcionar.
 
 ---
 
 ## Plano de Correcao
 
-### Correcao 1 (Critica): Marcar `treinos_semanais.concluido = true` ao finalizar
+### Correcao 1: Layout do timer em duas linhas no mobile
 
-**Arquivo:** `src/hooks/useWorkoutTimer.ts`
+Reorganizar o sticky header para usar duas linhas em telas pequenas:
+- **Linha 1**: Icone do timer + tempo formatado (grande, centralizado)
+- **Linha 2**: Botoes de acao (Pausar/Retomar, Finalizar, Cancelar) distribuidos igualmente
 
-Na funcao `finalizar()`, apos atualizar `treino_sessoes.status = "concluido"`, adicionar:
+No desktop, manter tudo em uma linha como esta atualmente.
 
-```text
-await supabase
-  .from("treinos_semanais")
-  .update({ concluido: true, updated_at: new Date().toISOString() })
-  .eq("id", treinoId);
-```
+### Correcao 2: Atualizar estado antes da chamada async (otimista)
 
-Tambem invalidar as queries relacionadas ao historico para que o calendario atualize imediatamente.
+Na funcao `togglePause`, inverter a ordem: primeiro atualizar o estado local (`setIsPaused`, `setIsRunning`) e os refs dos timestamps, depois fazer a chamada ao Supabase. Se a chamada falhar, reverter o estado. Isso garante resposta visual imediata.
 
-### Correcao 2: Garantir sincronizacao antes do refetch
+### Correcao 3: Botoes com labels claros no mobile
 
-**Arquivo:** `src/hooks/useExerciseProgress.ts`
-
-- Na funcao `sincronizarExerciciosPendentes`, usar `Promise.allSettled` em vez de um loop sequencial para paralelizar e tolerar falhas parciais.
-- Adicionar retry (1 tentativa extra) para exercicios que falharam.
-
-**Arquivo:** `src/components/WorkoutDayView.tsx`
-
-- No handler de `visibilitychange`, garantir que a sincronizacao de progresso ocorra **antes** do refetch do React Query. Usar `await sincronizar()` seguido de `refetch()` em vez de depender de dois listeners independentes.
-
-### Correcao 3: Sincronizacao imediata ao marcar exercicio
-
-**Arquivo:** `src/components/WorkoutDayView.tsx`
-
-O handler `handleToggleExercicio` ja salva localmente e depois tenta sincronizar com o banco. Melhorar para:
-
-- Adicionar retry automatico (1x) em caso de falha de rede.
-- Se a falha persistir, manter no localStorage e exibir um indicador visual sutil de "pendente de sincronizacao".
-
-### Correcao 4: Evitar race condition do React Query
-
-**Arquivo:** `src/hooks/useTreinos.ts`
-
-- Desabilitar `refetchOnWindowFocus` para a query de treinos quando houver uma sessao de treino ativa. Isso evita que o React Query sobrescreva o estado otimista enquanto o aluno esta treinando.
-- Alternativa: no `onSuccess` da query, aplicar o merge com dados locais antes de retornar.
-
-### Correcao 5: Invalidar historico apos finalizacao
-
-**Arquivo:** `src/hooks/useWorkoutTimer.ts`
-
-Apos finalizar com sucesso, invalidar as queries:
-- `["treinos", profileId, personalId, semana]` 
-- `["semana-ativa", profileId, personalId]`
-
-Isso garante que ao voltar para a tela inicial, o calendario ja mostre o dia como concluido.
-
-**Arquivo:** `src/components/WorkoutTimer.tsx`
-
-No callback `onWorkoutComplete`, propagar a invalidacao de queries para os componentes pai.
+Em vez de apenas icones, os botoes terao texto:
+- Botao de pause: mostra "Pausar" ou "Retomar" com o icone correspondente
+- Botao de finalizar: mantem "Finalizar" com check
+- Botao de cancelar: mantem apenas o X mas com touch target adequado (44x44px)
 
 ---
 
 ## Detalhes Tecnicos
 
-### Fluxo corrigido ao finalizar treino
+### Arquivo: `src/components/WorkoutTimer.tsx`
+
+Substituir o layout atual do sticky header por:
 
 ```text
-1. Encerrar descanso ativo (se houver)
-2. Persistir tempo final na tabela treino_sessoes (status = "concluido")
-3. [NOVO] Atualizar treinos_semanais.concluido = true
-4. Buscar descansos do banco para calculo final
-5. Enviar notificacao ao personal
-6. Limpar localStorage
-7. [NOVO] Invalidar queries de treinos e historico
-8. Mostrar tela de conclusao
+<div className="sticky top-0 z-40 ...">
+  {/* Linha 1: Timer */}
+  <div className="flex items-center justify-center py-2 gap-2">
+    <Timer icon />
+    <span className="text-2xl font-mono">{formattedTime}</span>
+    {isPaused && <span>Pausado</span>}
+  </div>
+  
+  {/* Linha 2: Botoes */}
+  <div className="flex items-center justify-center gap-3 pb-3">
+    <Button onClick={togglePause}>
+      {isPaused ? "Retomar" : "Pausar"}
+    </Button>
+    <Button onClick={finalizar}>Finalizar</Button>
+    <Button onClick={cancelar}>X</Button>
+  </div>
+</div>
 ```
 
-### Fluxo corrigido ao voltar do background
+### Arquivo: `src/hooks/useWorkoutTimer.ts`
+
+Na funcao `togglePause` (linha 534), mover as atualizacoes de estado para ANTES da chamada Supabase:
 
 ```text
-1. visibilitychange: "visible" dispara
-2. [NOVO] Primeiro: sincronizar exercicios pendentes do localStorage com banco
-3. [NOVO] Segundo: apos sync, refetch dos treinos
-4. Merge automatico via mesclarProgressoExercicios (ja existente)
-5. Timer recalcula tempo via timestamps absolutos (ja existente)
+const togglePause = async () => {
+  const now = Date.now();
+  const vaiPausar = !isPaused;
+  
+  // Atualizar estado IMEDIATAMENTE (otimista)
+  if (vaiPausar) {
+    pausedTimestampRef.current = now;
+    setIsPaused(true);
+    setIsRunning(false);
+  } else {
+    const tempoPausado = pausedTimestampRef.current 
+      ? now - pausedTimestampRef.current : 0;
+    totalPausedMsRef.current += tempoPausado;
+    pausedTimestampRef.current = null;
+    setIsPaused(false);
+    setIsRunning(true);
+  }
+  saveToStorage();
+  
+  // Persistir no banco (async, sem bloquear UI)
+  try {
+    await supabase.from("treino_sessoes").update({...}).eq("id", sessaoId);
+  } catch (err) {
+    // Reverter estado se falhar
+    toast.error("Erro ao pausar/retomar");
+  }
+};
 ```
 
-### Checklist de RLS
+### Resultado esperado
 
-A tabela `treinos_semanais` ja possui a policy que permite alunos atualizarem seus proprios treinos? Verificacao necessaria:
-- O aluno (role = aluno) precisa de permissao UPDATE na tabela `treinos_semanais` para o campo `concluido`
-- Atualmente nao ha policy explicita para aluno fazer UPDATE em `treinos_semanais`
-- Sera necessario criar uma policy RLS permitindo o aluno atualizar `concluido` do seu proprio treino
+1. Timer e botoes nunca se sobrepoem, mesmo em telas de 320px
+2. Pausar/Retomar responde instantaneamente ao toque
+3. Labels textuais claros ("Pausar" / "Retomar") em vez de apenas icones
+4. Touch targets de 44px minimo em todos os botoes
+5. Visual limpo e organizado em duas linhas
 
-### Migracao de banco necessaria
-
-```text
-CREATE POLICY "aluno_update_concluido_treino"
-ON treinos_semanais
-FOR UPDATE
-TO authenticated
-USING (profile_id = auth.uid())
-WITH CHECK (profile_id = auth.uid());
-```
-
----
-
-## Ordem de Implementacao
-
-1. Migracao de banco: criar policy RLS para aluno atualizar `treinos_semanais`
-2. `useWorkoutTimer.ts`: adicionar update de `treinos_semanais.concluido = true` na funcao `finalizar`
-3. `useWorkoutTimer.ts`: invalidar queries de historico apos finalizacao
-4. `useExerciseProgress.ts`: melhorar sincronizacao com paralelismo e retry
-5. `WorkoutDayView.tsx`: corrigir ordem de sync vs refetch no visibilitychange
-6. `useTreinos.ts`: desabilitar refetchOnWindowFocus durante sessao ativa
-
-## Resultado Esperado
-
-1. Ao finalizar treino, o dia aparece como concluido no historico imediatamente
-2. Exercicios marcados persistem mesmo ao navegar entre secoes ou bloquear tela
-3. Timer continua contando corretamente apos background (ja implementado)
-4. Sincronizacao resiliente com retry automatico
-5. Sem race conditions entre estado local e dados do servidor

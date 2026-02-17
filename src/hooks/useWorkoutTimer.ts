@@ -87,6 +87,7 @@ export function useWorkoutTimer({
   const startTimestampRef = useRef<number>(0);          // Timestamp absoluto do início
   const pausedTimestampRef = useRef<number | null>(null);
   const totalPausedMsRef = useRef<number>(0);           // Total pausado em ms
+  const isPausedRef = useRef<boolean>(false);            // Ref para evitar stale closure
   const restStartTimestampRef = useRef<number>(0);
 
   // 🔧 Calcula tempo decorrido baseado em timestamps absolutos
@@ -108,6 +109,7 @@ export function useWorkoutTimer({
   }, []);
 
   // 🔧 Salvar no localStorage com key única por treino
+  // Usa refs para evitar stale closures em chamadas rápidas (ex: togglePause)
   const saveToStorage = useCallback(() => {
     if (!sessaoId || !treinoId) return;
     
@@ -115,7 +117,7 @@ export function useWorkoutTimer({
       sessaoId,
       treinoId,
       startTimestamp: startTimestampRef.current,
-      isPaused,
+      isPaused: isPausedRef.current,
       pausedTimestamp: pausedTimestampRef.current || undefined,
       totalPausedMs: totalPausedMsRef.current,
       tempoDescansoTotal,
@@ -124,7 +126,7 @@ export function useWorkoutTimer({
     };
     
     localStorage.setItem(getStorageKey(treinoId), JSON.stringify(session));
-  }, [sessaoId, treinoId, isPaused, tempoDescansoTotal, isResting, restType]);
+  }, [sessaoId, treinoId, tempoDescansoTotal, isResting, restType]);
 
   // 🔧 Persistir no banco
   const persistirTempo = useCallback(async () => {
@@ -191,7 +193,7 @@ export function useWorkoutTimer({
             setElapsedTime(tempoCalculado);
             setIsRunning(!session.isPaused);
             setIsPaused(session.isPaused);
-            setTempoDescansoTotal(session.tempoDescansoTotal);
+            isPausedRef.current = session.isPaused;
             setTempoPausadoTotal(Math.floor(session.totalPausedMs / 1000));
             setInicioTreino(new Date(session.startTimestamp));
 
@@ -263,7 +265,7 @@ export function useWorkoutTimer({
             setElapsedTime(tempoCalculado);
             setIsRunning(sessaoAtiva.status === "em_andamento");
             setIsPaused(sessaoAtiva.status === "pausado");
-            setTempoDescansoTotal(sessaoAtiva.tempo_descanso_total || 0);
+            isPausedRef.current = sessaoAtiva.status === "pausado";
             setTempoPausadoTotal(sessaoAtiva.tempo_pausado_total || 0);
             setInicioTreino(new Date(sessaoAtiva.inicio!));
 
@@ -504,6 +506,7 @@ export function useWorkoutTimer({
       totalPausedMsRef.current = 0;
       
       setSessaoId(data.id);
+      isPausedRef.current = false;
       setIsRunning(true);
       setIsPaused(false);
       setElapsedTime(0);
@@ -543,6 +546,7 @@ export function useWorkoutTimer({
     // 🔧 Atualizar estado IMEDIATAMENTE (otimista)
     if (vaiPausar) {
       pausedTimestampRef.current = now;
+      isPausedRef.current = true;
       setIsPaused(true);
       setIsRunning(false);
     } else {
@@ -551,6 +555,7 @@ export function useWorkoutTimer({
         : 0;
       totalPausedMsRef.current += tempoPausado;
       pausedTimestampRef.current = null;
+      isPausedRef.current = false;
       const pausasTotalSegundos = Math.floor(totalPausedMsRef.current / 1000);
       setTempoPausadoTotal(pausasTotalSegundos);
       setIsPaused(false);
@@ -833,7 +838,7 @@ export function useWorkoutTimer({
       localStorage.removeItem(getStorageKey(treinoId));
       setIsRunning(false);
       setIsPaused(false);
-      setSessaoId(null);
+      isPausedRef.current = false;
       setElapsedTime(0);
       setDescansos([]);
       setTempoDescansoTotal(0);
@@ -874,7 +879,7 @@ export function useWorkoutTimer({
       localStorage.removeItem(getStorageKey(treinoId));
       setIsRunning(false);
       setIsPaused(false);
-      setIsResting(false);
+      isPausedRef.current = false;
       setElapsedTime(0);
       setSessaoId(null);
       setDescansos([]);

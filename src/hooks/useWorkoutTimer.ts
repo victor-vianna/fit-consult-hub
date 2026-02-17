@@ -537,40 +537,47 @@ export function useWorkoutTimer({
       return;
     }
 
-    try {
-      const now = Date.now();
-      const novoStatus = !isPaused;
+    const now = Date.now();
+    const vaiPausar = !isPaused;
 
-      if (novoStatus) {
-        // 🔧 Pausando - salvar timestamp de pausa
-        pausedTimestampRef.current = now;
-        
+    // 🔧 Atualizar estado IMEDIATAMENTE (otimista)
+    if (vaiPausar) {
+      pausedTimestampRef.current = now;
+      setIsPaused(true);
+      setIsRunning(false);
+    } else {
+      const tempoPausado = pausedTimestampRef.current
+        ? now - pausedTimestampRef.current
+        : 0;
+      totalPausedMsRef.current += tempoPausado;
+      pausedTimestampRef.current = null;
+      const pausasTotalSegundos = Math.floor(totalPausedMsRef.current / 1000);
+      setTempoPausadoTotal(pausasTotalSegundos);
+      setIsPaused(false);
+      setIsRunning(true);
+    }
+    saveToStorage();
+
+    if (vaiPausar) {
+      toast.info("⏸️ Treino pausado");
+    } else {
+      toast.info("▶️ Treino retomado!");
+    }
+
+    // Persistir no banco (async, sem bloquear UI)
+    try {
+      if (vaiPausar) {
         await supabase
           .from("treino_sessoes")
           .update({
             status: "pausado",
             duracao_segundos: calculateElapsedTime(),
-            pausado_em: new Date().toISOString(),
+            pausado_em: new Date(now).toISOString(),
             tempo_descanso_total: tempoDescansoTotal,
           })
           .eq("id", sessaoId);
-
-        setIsPaused(true);
-        setIsRunning(false);
-        saveToStorage();
-        toast.info("⏸️ Treino pausado");
       } else {
-        // 🔧 Retomando - calcular tempo pausado e atualizar total
-        const tempoPausado = pausedTimestampRef.current 
-          ? now - pausedTimestampRef.current
-          : 0;
-        
-        totalPausedMsRef.current += tempoPausado;
-        pausedTimestampRef.current = null;
-        
         const pausasTotalSegundos = Math.floor(totalPausedMsRef.current / 1000);
-        setTempoPausadoTotal(pausasTotalSegundos);
-
         await supabase
           .from("treino_sessoes")
           .update({
@@ -579,15 +586,10 @@ export function useWorkoutTimer({
             tempo_pausado_total: pausasTotalSegundos,
           })
           .eq("id", sessaoId);
-
-        setIsPaused(false);
-        setIsRunning(true);
-        saveToStorage();
-        toast.info("▶️ Treino retomado! Continue assim!");
       }
     } catch (err) {
-      console.error("Erro ao pausar/retomar:", err);
-      toast.error("Erro ao pausar/retomar treino");
+      console.error("Erro ao persistir pausa/retomada:", err);
+      toast.error("Erro ao salvar estado. Tente novamente.");
     }
   };
 

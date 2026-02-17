@@ -1,188 +1,147 @@
 
-# Plano: Melhorias no Cronometro de Treino para PWA Mobile
+# Plano: Correcao Estrutural do Sistema de Acompanhamento de Treinos
 
-## Resumo dos Problemas Identificados
+## Diagnostico
 
-O usuario reportou os seguintes problemas:
+### Problema 1: Historico nao marca dias como concluidos
 
-1. **Timer reinicia ao bloquear celular** - Quando o celular e bloqueado ou o app vai para segundo plano, o cronometro reinicia do zero
-2. **Exercicios marcados somem** - Os checkboxes de exercicios concluidos sao perdidos ao voltar ao app
-3. **Tempo de descanso nao sincroniza corretamente no feedback** - Os intervalos de descanso nao estao sendo salvos/exibidos corretamente na tela de conclusao
-4. **Timer precisa ficar mais visivel** - Para evitar que o aluno esqueca de finalizar o treino
+**Causa raiz confirmada:** A funcao `finalizar()` em `useWorkoutTimer.ts` (linha 708-831) atualiza apenas a tabela `treino_sessoes` com `status: "concluido"`. Porem, o calendario de historico (`CalendarioTreinosMensal`) e o hook `useTreinosHistorico` leem o campo `concluido` da tabela `treinos_semanais` -- que **nunca e atualizado para `true`** ao finalizar o treino.
 
----
+Ou seja: o aluno finaliza o treino, a sessao e registrada corretamente, mas o registro principal do dia (`treinos_semanais`) permanece com `concluido = false`.
 
-## Analise Tecnica
+### Problema 2: Exercicios perdem o check ao sair e voltar
 
-### Problema 1: Timer Reiniciando
+**Causa raiz:** Quando o aluno navega para outra secao (ex: "Inicio") e volta para "Treinos", o componente `TreinosManager` e remontado do zero. O React Query faz um refetch e traz os dados do banco. Se a sincronizacao do `useExerciseProgress` ainda nao enviou os dados ao banco (ou se houve falha silenciosa), o estado local e sobrescrito pelo estado do servidor (onde `concluido = false`).
 
-**Causa raiz:** O hook `useWorkoutSession` gerencia a persistencia do estado "iniciado" em localStorage, mas quando o usuario navega entre tabs (dias da semana), o componente `WorkoutTimer` e desmontado e remontado. O estado do timer e perdido porque:
+Alem disso, a atualizacao otimista do `onToggleConcluido` no `useTreinos` apenas chama `supabase.from("exercicios").update({ concluido })`, mas se essa operacao falhar por qualquer motivo (RLS, rede), o usuario nao e avisado e o check e perdido no proximo refetch.
 
-1. A key `STORAGE_KEY = "workout_timer_session"` e global (nao diferencia por treino)
-2. O `useWorkoutSession` marca dias como "iniciados" mas nao sincroniza adequadamente com o `useWorkoutTimer`
-3. Ao voltar do background, o calculo de tempo no `visibilitychange` pode falhar se o localStorage estiver desatualizado
+### Problema 3: Estado perdido ao bloquear tela / background
 
-### Problema 2: Exercicios Marcados Somem
+**Causa raiz:** O sistema de persistencia em localStorage (`useExerciseProgress` e `useWorkoutTimer`) foi implementado recentemente, mas ha dois gaps:
 
-**Causa raiz:** O hook `useExerciseProgress` salva progresso localmente, mas:
-
-1. A sincronizacao so acontece quando `visibilityState === "visible"`, e pode haver race conditions
-2. O estado local no `WorkoutDayView` (`localTreinos`) nao e restaurado do localStorage ao voltar
-3. Os dados do React Query podem sobrescrever o estado local se o refetch ocorrer antes da sincronizacao
-
-### Problema 3: Tempo de Descanso Incorreto
-
-**Causa raiz:** Na funcao `encerrarDescanso`:
-
-1. O `tempoDescansoTotal` e atualizado localmente mas pode nao refletir todos os descansos do banco
-2. Na finalizacao, os descansos sao buscados do banco, mas o calculo usa `duracao_segundos` que pode estar null se o descanso nao foi encerrado corretamente
-3. Descansos em andamento ao finalizar podem nao ser contabilizados corretamente
+1. A sincronizacao dos exercicios pendentes (`sincronizarExerciciosPendentes`) tenta atualizar um exercicio de cada vez em sequencia. Se houver muitos pendentes ou a rede estiver instavel, pode falhar silenciosamente.
+2. O merge no `WorkoutDayView` depende de `mesclarProgressoExercicios` funcionar antes do React Query sobrescrever o estado. Porem o `refetchOnWindowFocus: true` do React Query pode disparar antes do merge, causando race condition.
 
 ---
 
-## Solucao Proposta
+## Plano de Correcao
 
-### Parte 1: Timer Persistente e Resiliente
+### Correcao 1 (Critica): Marcar `treinos_semanais.concluido = true` ao finalizar
 
 **Arquivo:** `src/hooks/useWorkoutTimer.ts`
 
-Melhorias:
-- Usar key unica por treino no localStorage: `workout_timer_${treinoId}`
-- Salvar timestamp absoluto de inicio ao inves de tempo decorrido
-- Recalcular tempo com base em `Date.now() - startTimestamp` ao voltar
-- Adicionar evento `focus` como fallback para iOS
-- Persistir imediatamente antes de qualquer operacao de saida
+Na funcao `finalizar()`, apos atualizar `treino_sessoes.status = "concluido"`, adicionar:
 
-**Arquivo:** `src/hooks/useWorkoutSession.ts`
+```text
+await supabase
+  .from("treinos_semanais")
+  .update({ concluido: true, updated_at: new Date().toISOString() })
+  .eq("id", treinoId);
+```
 
-Melhorias:
-- Sincronizar estado local com banco ao voltar do background
-- Refetch automatico de sessoes ativas ao `visibilitychange`
-- Limpar estado de treinos iniciados quando sessao e concluida no banco
+Tambem invalidar as queries relacionadas ao historico para que o calendario atualize imediatamente.
 
-### Parte 2: Persistencia de Exercicios Concluidos
+### Correcao 2: Garantir sincronizacao antes do refetch
 
 **Arquivo:** `src/hooks/useExerciseProgress.ts`
 
-Melhorias:
-- Salvar progresso imediatamente (sincrono) no localStorage
-- Usar timestamp para resolver conflitos (progresso mais recente ganha)
-- Sincronizar pendentes ao voltar e ao montar
-- Incluir blocos (`blocos_treino`) no mesmo sistema de persistencia
+- Na funcao `sincronizarExerciciosPendentes`, usar `Promise.allSettled` em vez de um loop sequencial para paralelizar e tolerar falhas parciais.
+- Adicionar retry (1 tentativa extra) para exercicios que falharam.
 
 **Arquivo:** `src/components/WorkoutDayView.tsx`
 
-Melhorias:
-- Restaurar estado de exercicios do localStorage ao montar e ao voltar
-- Mesclar progresso local com dados do React Query
-- Adicionar `refetchOnWindowFocus: true` com merge inteligente
+- No handler de `visibilitychange`, garantir que a sincronizacao de progresso ocorra **antes** do refetch do React Query. Usar `await sincronizar()` seguido de `refetch()` em vez de depender de dois listeners independentes.
 
-### Parte 3: Correcao do Tempo de Descanso
+### Correcao 3: Sincronizacao imediata ao marcar exercicio
+
+**Arquivo:** `src/components/WorkoutDayView.tsx`
+
+O handler `handleToggleExercicio` ja salva localmente e depois tenta sincronizar com o banco. Melhorar para:
+
+- Adicionar retry automatico (1x) em caso de falha de rede.
+- Se a falha persistir, manter no localStorage e exibir um indicador visual sutil de "pendente de sincronizacao".
+
+### Correcao 4: Evitar race condition do React Query
+
+**Arquivo:** `src/hooks/useTreinos.ts`
+
+- Desabilitar `refetchOnWindowFocus` para a query de treinos quando houver uma sessao de treino ativa. Isso evita que o React Query sobrescreva o estado otimista enquanto o aluno esta treinando.
+- Alternativa: no `onSuccess` da query, aplicar o merge com dados locais antes de retornar.
+
+### Correcao 5: Invalidar historico apos finalizacao
 
 **Arquivo:** `src/hooks/useWorkoutTimer.ts`
 
-Melhorias na funcao `finalizar`:
-- Encerrar descanso ativo automaticamente antes de finalizar
-- Esperar confirmacao do banco antes de calcular total
-- Usar `SUM` no banco para calcular tempo total de descanso
-- Tratar descansos sem `fim` como ativos (calcular duracao em tempo real)
+Apos finalizar com sucesso, invalidar as queries:
+- `["treinos", profileId, personalId, semana]` 
+- `["semana-ativa", profileId, personalId]`
 
-**Arquivo:** `src/hooks/useWorkoutTimer.ts`
-
-Melhorias na funcao `encerrarDescanso`:
-- Garantir que o descanso seja salvo no banco antes de atualizar estado
-- Atualizar `tempoDescansoTotal` com query ao banco para consistencia
-- Adicionar tratamento de erro com retry
-
-### Parte 4: Timer Sempre Visivel
+Isso garante que ao voltar para a tela inicial, o calendario ja mostre o dia como concluido.
 
 **Arquivo:** `src/components/WorkoutTimer.tsx`
 
-Melhorias:
-- Criar versao compacta/sticky do timer para scroll
-- Mostrar mini-timer fixo no topo quando scrollar para baixo
-- Adicionar indicador visual piscante quando treino esta ativo
-
-**Arquivo:** `src/components/WorkoutDayView.tsx`
-
-Melhorias:
-- Mover timer para posicao sticky no topo
-- Mostrar indicador de treino ativo mesmo quando scrollar
-- Adicionar bottom bar com tempo quando em mobile
+No callback `onWorkoutComplete`, propagar a invalidacao de queries para os componentes pai.
 
 ---
 
 ## Detalhes Tecnicos
 
-### Estrutura de Dados no LocalStorage
+### Fluxo corrigido ao finalizar treino
 
 ```text
-// Timer por treino
-workout_timer_${treinoId}: {
-  sessaoId: string
-  startTimestamp: number      // Date.now() do inicio
-  pausedTimestamp?: number    // Date.now() quando pausou
-  totalPausedMs: number       // Tempo total pausado
-  totalRestMs: number         // Tempo total de descanso
-  restStartTimestamp?: number // Inicio do descanso atual
-  restType?: 'serie' | 'exercicio'
-}
-
-// Progresso de exercicios
-exercise_progress_${profileId}: {
-  [exercicioId]: { concluido: boolean, timestamp: number, synced: boolean }
-}
-
-// Progresso de blocos
-block_progress_${profileId}: {
-  [blocoId]: { concluido: boolean, timestamp: number, synced: boolean }
-}
+1. Encerrar descanso ativo (se houver)
+2. Persistir tempo final na tabela treino_sessoes (status = "concluido")
+3. [NOVO] Atualizar treinos_semanais.concluido = true
+4. Buscar descansos do banco para calculo final
+5. Enviar notificacao ao personal
+6. Limpar localStorage
+7. [NOVO] Invalidar queries de treinos e historico
+8. Mostrar tela de conclusao
 ```
 
-### Fluxo de Visibilidade Corrigido
+### Fluxo corrigido ao voltar do background
 
 ```text
-1. App vai para background (visibilitychange: hidden)
-   -> Salvar estado atual no localStorage imediatamente
-   -> Persistir no banco via sendBeacon ou fetch keepalive
-
-2. App volta do background (visibilitychange: visible)
-   -> Ler estado do localStorage
-   -> Recalcular tempo baseado em timestamps
-   -> Verificar se sessao ainda existe no banco
-   -> Mesclar progresso local com estado do banco
-   -> Atualizar UI
+1. visibilitychange: "visible" dispara
+2. [NOVO] Primeiro: sincronizar exercicios pendentes do localStorage com banco
+3. [NOVO] Segundo: apos sync, refetch dos treinos
+4. Merge automatico via mesclarProgressoExercicios (ja existente)
+5. Timer recalcula tempo via timestamps absolutos (ja existente)
 ```
 
-### Calculo de Tempo Robusto
+### Checklist de RLS
+
+A tabela `treinos_semanais` ja possui a policy que permite alunos atualizarem seus proprios treinos? Verificacao necessaria:
+- O aluno (role = aluno) precisa de permissao UPDATE na tabela `treinos_semanais` para o campo `concluido`
+- Atualmente nao ha policy explicita para aluno fazer UPDATE em `treinos_semanais`
+- Sera necessario criar uma policy RLS permitindo o aluno atualizar `concluido` do seu proprio treino
+
+### Migracao de banco necessaria
 
 ```text
-Tempo Total = Date.now() - startTimestamp - totalPausedMs
-
-Onde:
-- Se pausado: totalPausedMs += (Date.now() - pausedTimestamp)
-- Se em descanso: restMs = Date.now() - restStartTimestamp
-- Tempo efetivo = Tempo Total - tempoDescanso
+CREATE POLICY "aluno_update_concluido_treino"
+ON treinos_semanais
+FOR UPDATE
+TO authenticated
+USING (profile_id = auth.uid())
+WITH CHECK (profile_id = auth.uid());
 ```
 
 ---
 
 ## Ordem de Implementacao
 
-1. **useWorkoutTimer.ts** - Refatorar persistencia com timestamps absolutos
-2. **useWorkoutSession.ts** - Melhorar sincronizacao com banco
-3. **useExerciseProgress.ts** - Incluir blocos e melhorar sync
-4. **WorkoutTimer.tsx** - Criar versao sticky/mini
-5. **WorkoutDayView.tsx** - Integrar timer sticky e restaurar progresso
-
----
+1. Migracao de banco: criar policy RLS para aluno atualizar `treinos_semanais`
+2. `useWorkoutTimer.ts`: adicionar update de `treinos_semanais.concluido = true` na funcao `finalizar`
+3. `useWorkoutTimer.ts`: invalidar queries de historico apos finalizacao
+4. `useExerciseProgress.ts`: melhorar sincronizacao com paralelismo e retry
+5. `WorkoutDayView.tsx`: corrigir ordem de sync vs refetch no visibilitychange
+6. `useTreinos.ts`: desabilitar refetchOnWindowFocus durante sessao ativa
 
 ## Resultado Esperado
 
-Apos as mudancas:
-
-1. Timer continua contando corretamente mesmo com celular bloqueado
-2. Exercicios e blocos marcados como concluidos persistem entre sessoes
-3. Tempo de descanso e calculado e exibido corretamente no feedback
-4. Timer fica sempre visivel durante o treino
-5. Experiencia mobile otimizada para PWA
+1. Ao finalizar treino, o dia aparece como concluido no historico imediatamente
+2. Exercicios marcados persistem mesmo ao navegar entre secoes ou bloquear tela
+3. Timer continua contando corretamente apos background (ja implementado)
+4. Sincronizacao resiliente com retry automatico
+5. Sem race conditions entre estado local e dados do servidor

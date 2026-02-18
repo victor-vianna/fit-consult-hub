@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +52,7 @@ import {
   Activity,
   ClipboardList,
   ClipboardCheck,
+  MessageSquare,
 } from "lucide-react";
 import { DocumentViewer } from "@/components/DocumentViewer";
 import { format } from "date-fns";
@@ -67,6 +68,8 @@ import { AvaliacaoHub } from "@/components/avaliacao/AvaliacaoHub";
 import { AnamneseVisualizacao } from "@/components/AnamneseVisualizacao";
 import { CheckinsDashboard } from "@/components/CheckinsDashboard";
 import { PlanilhaStatusCard } from "@/components/PlanilhaStatusCard";
+import { ChatPanel } from "@/components/chat/ChatPanel";
+import { useChatMessages } from "@/hooks/useChatMessages";
 
 interface Material {
   id: string;
@@ -92,6 +95,7 @@ interface Aluno {
 export default function AlunoDetalhes() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { toast } = useToast();
   const [aluno, setAluno] = useState<Aluno | null>(null);
@@ -102,9 +106,17 @@ export default function AlunoDetalhes() {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const { settings: personalSettings } = usePersonalSettings(user?.id);
-  const [activeTab, setActiveTab] = useState("geral");
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "geral");
   const [refreshKey, setRefreshKey] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+
+  // Chat não lidas badge
+  const chatHook = useChatMessages({
+    personalId: user?.id || "",
+    alunoId: id || "",
+    currentUserId: user?.id || "",
+  });
+  const chatNaoLidas = chatHook.naoLidas;
 
   useEffect(() => {
     const checkMobile = () => {
@@ -513,7 +525,7 @@ export default function AlunoDetalhes() {
                 className={`${
                   isMobile
                     ? "inline-flex w-auto min-w-full gap-2"
-                    : "grid grid-cols-8 w-full"
+                    : "grid grid-cols-9 w-full"
                 } bg-muted/50 p-1 h-auto`}
               >
                 <TabsTrigger
@@ -592,6 +604,22 @@ export default function AlunoDetalhes() {
                     className={`${isMobile ? "h-5 w-5" : "h-4 w-4 mr-2"}`}
                   />
                   {!isMobile && "Feedbacks Semanais"}
+                </TabsTrigger>
+                <TabsTrigger
+                  value="chat"
+                  className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
+                    isMobile ? "flex-shrink-0 px-6 py-3" : "py-3"
+                  } relative`}
+                >
+                  <MessageSquare
+                    className={`${isMobile ? "h-5 w-5" : "h-4 w-4 mr-2"}`}
+                  />
+                  {!isMobile && "Chat"}
+                  {chatNaoLidas > 0 && (
+                    <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center">
+                      {chatNaoLidas > 9 ? "9+" : chatNaoLidas}
+                    </span>
+                  )}
                 </TabsTrigger>
                 <TabsTrigger
                   value="financeiro"
@@ -955,6 +983,18 @@ export default function AlunoDetalhes() {
                   personalId={user.id}
                   themeColor={personalSettings?.theme_color}
                   studentName={aluno.nome}
+                />
+              )}
+            </TabsContent>
+
+            {/* Aba Chat */}
+            <TabsContent value="chat" className="space-y-6">
+              {user && id && (
+                <ChatPanel
+                  personalId={user.id}
+                  alunoId={id}
+                  currentUserId={user.id}
+                  themeColor={personalSettings?.theme_color}
                 />
               )}
             </TabsContent>

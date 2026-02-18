@@ -24,6 +24,7 @@ import {
   Home,
   Calendar,
   Library,
+  MessageSquare,
 } from "lucide-react";
 import { StudentSubscriptionView } from "@/components/StudentSubscriptionView";
 import { DocumentViewer } from "@/components/DocumentViewer";
@@ -41,6 +42,8 @@ import Biblioteca from "./Biblioteca";
 import { AppLayout } from "@/components/AppLayout";
 import ExercisesLibrary from "@/components/ExercisesLibrary";
 import { PlanilhaStatusCard } from "@/components/PlanilhaStatusCard";
+import { ChatPanel } from "@/components/chat/ChatPanel";
+import { useChatNaoLidas } from "@/hooks/useChatMessages";
 
 interface Material {
   id: string;
@@ -62,6 +65,7 @@ export default function AreaAluno() {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const chatNaoLidas = useChatNaoLidas(user?.id || "");
 
   // Buscar configurações do personal
   const { settings: personalSettings } = usePersonalSettings(
@@ -178,6 +182,12 @@ export default function AreaAluno() {
             title="Biblioteca"
             icon={Library}
             onClick={() => setActiveSection("biblioteca")}
+          />
+          <ActionCard
+            title="Chat"
+            icon={MessageSquare}
+            onClick={() => setActiveSection("chat")}
+            badge={chatNaoLidas > 0 ? chatNaoLidas : undefined}
           />
         </div>
 
@@ -495,6 +505,20 @@ export default function AreaAluno() {
 
             {/* ✅ Importe e use o componente de exercícios aqui */}
             <ExercisesLibrary />
+          </div>
+        );
+
+      case "chat":
+        return (
+          <div className="space-y-6 animate-fade-in">
+            {profile?.personal_id && user && (
+              <ChatPanel
+                personalId={profile.personal_id}
+                alunoId={user.id}
+                currentUserId={user.id}
+                themeColor={personalSettings?.theme_color}
+              />
+            )}
           </div>
         );
 

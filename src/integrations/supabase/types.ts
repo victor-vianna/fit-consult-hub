@@ -1072,6 +1072,39 @@ export type Database = {
           },
         ]
       }
+      mensagens_chat: {
+        Row: {
+          conteudo: string
+          conversa_key: string
+          created_at: string | null
+          destinatario_id: string
+          id: string
+          lida: boolean | null
+          remetente_id: string
+          tipo: string
+        }
+        Insert: {
+          conteudo: string
+          conversa_key: string
+          created_at?: string | null
+          destinatario_id: string
+          id?: string
+          lida?: boolean | null
+          remetente_id: string
+          tipo?: string
+        }
+        Update: {
+          conteudo?: string
+          conversa_key?: string
+          created_at?: string | null
+          destinatario_id?: string
+          id?: string
+          lida?: boolean | null
+          remetente_id?: string
+          tipo?: string
+        }
+        Relationships: []
+      }
       modelo_pastas: {
         Row: {
           caminho: string | null

@@ -23,6 +23,7 @@ import {
   FolderInput,
   Folder,
   BookTemplate,
+  Clock,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -238,6 +239,12 @@ function ModeloCard({
             <span className="flex items-center gap-1">
               <Blocks className="h-4 w-4" />
               {totalBlocos}
+            </span>
+          )}
+          {modelo.duracao_total_minutos && (
+            <span className="flex items-center gap-1">
+              <Clock className="h-4 w-4" />
+              {modelo.duracao_total_minutos}min
             </span>
           )}
         </div>

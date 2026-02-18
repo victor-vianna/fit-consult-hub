@@ -3,6 +3,7 @@ import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -29,11 +30,17 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Folder,
   FolderOpen,
   FolderPlus,
   ChevronRight,
-  ChevronLeft,
   Home,
   MoreVertical,
   Edit,
@@ -45,13 +52,29 @@ import { cn } from "@/lib/utils";
 import type { ModeloPasta } from "@/hooks/useModeloPastas";
 import type { ModeloTreino } from "@/hooks/useModelosTreino";
 
+const CORES_PREDEFINIDAS = [
+  { label: "Azul", value: "#3b82f6" },
+  { label: "Rosa", value: "#ec4899" },
+  { label: "Verde", value: "#22c55e" },
+  { label: "Roxo", value: "#a855f7" },
+  { label: "Laranja", value: "#f97316" },
+  { label: "Vermelho", value: "#ef4444" },
+];
+
+const TAGS_OPCOES = [
+  { label: "Nenhuma", value: "" },
+  { label: "Masculino", value: "masculino" },
+  { label: "Feminino", value: "feminino" },
+];
+
 interface FolderExplorerProps {
   pastas: ModeloPasta[];
   modelos: ModeloTreino[];
   currentFolderId: string | null;
+  tagFilter?: string;
   onNavigate: (folderId: string | null) => void;
-  onCreateFolder: (dados: { nome: string; cor?: string; parent_id?: string | null }) => Promise<unknown>;
-  onRenameFolder: (pastaId: string, novoNome: string) => Promise<unknown>;
+  onCreateFolder: (dados: { nome: string; cor?: string; parent_id?: string | null; tag?: string | null }) => Promise<unknown>;
+  onRenameFolder: (pastaId: string, dados: Partial<{ nome: string; cor: string; tag: string | null }>) => Promise<unknown>;
   onDeleteFolder: (pastaId: string) => Promise<unknown>;
   isCreating?: boolean;
   className?: string;
@@ -61,6 +84,7 @@ export function FolderExplorer({
   pastas,
   modelos,
   currentFolderId,
+  tagFilter,
   onNavigate,
   onCreateFolder,
   onRenameFolder,
@@ -69,28 +93,46 @@ export function FolderExplorer({
   className,
 }: FolderExplorerProps) {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [renameDialog, setRenameDialog] = useState<{ id: string; nome: string } | null>(null);
+  const [editDialog, setEditDialog] = useState<{ id: string; nome: string; cor: string; tag: string | null } | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState("");
+  const [newFolderCor, setNewFolderCor] = useState("#3b82f6");
+  const [newFolderTag, setNewFolderTag] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Contar modelos por pasta
-  const modelosPorPasta = useMemo(() => {
+  // Count total models in a folder + all subfolders recursively
+  const contarModelosTotais = useMemo(() => {
     const counts: Record<string, number> = {};
-    modelos.forEach((m) => {
-      if (m.pasta_id) {
-        counts[m.pasta_id] = (counts[m.pasta_id] || 0) + 1;
-      }
-    });
-    return counts;
-  }, [modelos]);
+    
+    const getDescendantIds = (pastaId: string): string[] => {
+      const children = pastas.filter(p => p.parent_id === pastaId);
+      const ids = [pastaId];
+      children.forEach(child => {
+        ids.push(...getDescendantIds(child.id));
+      });
+      return ids;
+    };
 
-  // Obter subpastas da pasta atual
+    pastas.forEach(pasta => {
+      const allIds = getDescendantIds(pasta.id);
+      counts[pasta.id] = modelos.filter(m => m.pasta_id && allIds.includes(m.pasta_id)).length;
+    });
+
+    return counts;
+  }, [pastas, modelos]);
+
+  // Obter subpastas da pasta atual, filtradas por tag se necessário
   const subpastas = useMemo(() => {
-    return pastas
+    let subs = pastas
       .filter((p) => p.parent_id === currentFolderId)
       .sort((a, b) => a.ordem - b.ordem);
-  }, [pastas, currentFolderId]);
+    
+    if (tagFilter) {
+      subs = subs.filter(p => p.tag === tagFilter);
+    }
+
+    return subs;
+  }, [pastas, currentFolderId, tagFilter]);
 
   // Obter pasta atual e ancestrais para breadcrumb
   const { currentFolder, breadcrumb } = useMemo(() => {
@@ -121,16 +163,24 @@ export function FolderExplorer({
     if (!newFolderName.trim()) return;
     await onCreateFolder({
       nome: newFolderName.trim(),
+      cor: newFolderCor,
       parent_id: currentFolderId,
+      tag: newFolderTag || null,
     });
     setNewFolderName("");
+    setNewFolderCor("#3b82f6");
+    setNewFolderTag("");
     setCreateDialogOpen(false);
   };
 
-  const handleRenameFolder = async () => {
-    if (!renameDialog || !renameDialog.nome.trim()) return;
-    await onRenameFolder(renameDialog.id, renameDialog.nome.trim());
-    setRenameDialog(null);
+  const handleEditFolder = async () => {
+    if (!editDialog || !editDialog.nome.trim()) return;
+    await onRenameFolder(editDialog.id, {
+      nome: editDialog.nome.trim(),
+      cor: editDialog.cor,
+      tag: editDialog.tag,
+    });
+    setEditDialog(null);
   };
 
   const handleDeleteFolder = async () => {
@@ -183,6 +233,11 @@ export function FolderExplorer({
             >
               <Folder className="h-3.5 w-3.5" style={{ color: folder.cor }} />
               <span className="max-w-[120px] truncate">{folder.nome}</span>
+              {folder.tag && (
+                <Badge variant="outline" className="text-[9px] h-4 px-1 ml-0.5">
+                  {folder.tag === "masculino" ? "M" : "F"}
+                </Badge>
+              )}
             </Button>
           </div>
         ))}
@@ -203,8 +258,7 @@ export function FolderExplorer({
 
         {/* Subfolders */}
         {subpastas.map((pasta) => {
-          const modelCount = modelosPorPasta[pasta.id] || 0;
-          const subfolderCount = pastas.filter((p) => p.parent_id === pasta.id).length;
+          const totalModelos = contarModelosTotais[pasta.id] || 0;
 
           return (
             <div
@@ -217,18 +271,23 @@ export function FolderExplorer({
                   className="h-10 w-10"
                   style={{ color: pasta.cor }}
                 />
-                {(modelCount > 0 || subfolderCount > 0) && (
+                {totalModelos > 0 && (
                   <Badge
                     variant="secondary"
                     className="absolute -top-1 -right-3 h-5 min-w-[20px] text-[10px] px-1"
                   >
-                    {modelCount + subfolderCount}
+                    {totalModelos}
                   </Badge>
                 )}
               </div>
               <span className="text-xs font-medium text-center line-clamp-2 max-w-full">
                 {pasta.nome}
               </span>
+              {pasta.tag && (
+                <Badge variant="outline" className="text-[9px] h-4 px-1">
+                  {pasta.tag === "masculino" ? "♂ Masc" : "♀ Fem"}
+                </Badge>
+              )}
 
               {/* Folder actions */}
               <DropdownMenu>
@@ -244,10 +303,10 @@ export function FolderExplorer({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                   <DropdownMenuItem
-                    onClick={() => setRenameDialog({ id: pasta.id, nome: pasta.nome })}
+                    onClick={() => setEditDialog({ id: pasta.id, nome: pasta.nome, cor: pasta.cor, tag: pasta.tag || null })}
                   >
                     <Edit className="h-4 w-4 mr-2" />
-                    Renomear
+                    Editar
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -293,13 +352,50 @@ export function FolderExplorer({
                 : "Criar pasta na raiz"}
             </DialogDescription>
           </DialogHeader>
-          <Input
-            placeholder="Nome da pasta..."
-            value={newFolderName}
-            onChange={(e) => setNewFolderName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleCreateFolder()}
-            autoFocus
-          />
+          <div className="space-y-4">
+            <div>
+              <Label className="text-xs">Nome</Label>
+              <Input
+                placeholder="Nome da pasta..."
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleCreateFolder()}
+                autoFocus
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Cor</Label>
+              <div className="flex gap-2 mt-1">
+                {CORES_PREDEFINIDAS.map((cor) => (
+                  <button
+                    key={cor.value}
+                    className={cn(
+                      "w-8 h-8 rounded-full border-2 transition-all",
+                      newFolderCor === cor.value ? "border-foreground scale-110" : "border-transparent"
+                    )}
+                    style={{ backgroundColor: cor.value }}
+                    onClick={() => setNewFolderCor(cor.value)}
+                    title={cor.label}
+                  />
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Tag (opcional)</Label>
+              <Select value={newFolderTag} onValueChange={setNewFolderTag}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Nenhuma" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TAGS_OPCOES.map((t) => (
+                    <SelectItem key={t.value} value={t.value || "none"}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
               Cancelar
@@ -312,25 +408,65 @@ export function FolderExplorer({
         </DialogContent>
       </Dialog>
 
-      {/* Rename Folder Dialog */}
-      <Dialog open={!!renameDialog} onOpenChange={(open) => !open && setRenameDialog(null)}>
+      {/* Edit Folder Dialog */}
+      <Dialog open={!!editDialog} onOpenChange={(open) => !open && setEditDialog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Renomear Pasta</DialogTitle>
+            <DialogTitle>Editar Pasta</DialogTitle>
           </DialogHeader>
-          <Input
-            value={renameDialog?.nome || ""}
-            onChange={(e) =>
-              renameDialog && setRenameDialog({ ...renameDialog, nome: e.target.value })
-            }
-            onKeyDown={(e) => e.key === "Enter" && handleRenameFolder()}
-            autoFocus
-          />
+          <div className="space-y-4">
+            <div>
+              <Label className="text-xs">Nome</Label>
+              <Input
+                value={editDialog?.nome || ""}
+                onChange={(e) =>
+                  editDialog && setEditDialog({ ...editDialog, nome: e.target.value })
+                }
+                onKeyDown={(e) => e.key === "Enter" && handleEditFolder()}
+                autoFocus
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Cor</Label>
+              <div className="flex gap-2 mt-1">
+                {CORES_PREDEFINIDAS.map((cor) => (
+                  <button
+                    key={cor.value}
+                    className={cn(
+                      "w-8 h-8 rounded-full border-2 transition-all",
+                      editDialog?.cor === cor.value ? "border-foreground scale-110" : "border-transparent"
+                    )}
+                    style={{ backgroundColor: cor.value }}
+                    onClick={() => editDialog && setEditDialog({ ...editDialog, cor: cor.value })}
+                    title={cor.label}
+                  />
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Tag</Label>
+              <Select
+                value={editDialog?.tag || "none"}
+                onValueChange={(v) => editDialog && setEditDialog({ ...editDialog, tag: v === "none" ? null : v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Nenhuma" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TAGS_OPCOES.map((t) => (
+                    <SelectItem key={t.value || "none"} value={t.value || "none"}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRenameDialog(null)}>
+            <Button variant="outline" onClick={() => setEditDialog(null)}>
               Cancelar
             </Button>
-            <Button onClick={handleRenameFolder}>Salvar</Button>
+            <Button onClick={handleEditFolder}>Salvar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

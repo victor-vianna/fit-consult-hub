@@ -1,58 +1,96 @@
 
 
-# Integracao de Alertas e Notificacoes no Dashboard do Personal
+# Fase 5 -- Financeiro e Gestao
 
-## Problema Identificado
+## Resumo
 
-O `NotificacoesDropdown` (sino de notificacoes) so existe no header generico do `AppLayout`, que fica escondido atras do header customizado da pagina Personal. Resultado: o personal **nao ve** o sino de notificacoes nem badges de mensagens nao lidas.
-
-Alem disso, o dashboard nao mostra um indicador visual de mensagens de chat pendentes.
+Expandir o dashboard financeiro para 12 meses de historico, adicionar comparacao ano-a-ano, e implementar logica de parcelamento para que a receita reflita o valor real recebido mes a mes.
 
 ---
 
-## O Que Ja Funciona
+## 1. Alteracao no Banco de Dados
 
-- `AlertasModal` ja tem botoes contextuais (Ver perfil, Mensagem, Ver treinos, Ver financeiro, Ver feedback, Responder) com navegacao por query params -- **isso ja esta implementado**.
-- `NotificacoesDropdown` ja suporta tipos como `nova_mensagem`, `treino_concluido`, `feedback_semanal` com navegacao ao clicar.
-- `useChatNaoLidas` ja existe como hook para contar mensagens de chat nao lidas.
+Adicionar coluna `parcelas` na tabela `subscriptions` para registrar em quantas vezes o plano foi vendido:
+
+```text
+ALTER TABLE public.subscriptions
+  ADD COLUMN parcelas INTEGER NOT NULL DEFAULT 1;
+```
+
+Isso permite que ao registrar um pagamento, o sistema saiba dividir o valor total em parcelas e agendar os recebimentos futuros.
 
 ---
 
-## O Que Falta Implementar
+## 2. Alteracoes no Hook `useFinancialDashboard.ts`
 
-### 1. Adicionar NotificacoesDropdown no header Desktop do Personal
+### 2.1 Expandir para 12 meses
+- Buscar `payment_history` dos ultimos 13 meses (12 + mesmo mes do ano anterior para comparacao).
+- Gerar array de 12 meses ao inves de 6.
 
-No arquivo `src/pages/Personal.tsx`, na secao de header desktop (ao lado de PersonalSettingsDialog, ThemeToggle e botao Sair), adicionar o componente `NotificacoesDropdown` passando o `user.id`.
+### 2.2 Comparacao ano-a-ano
+- Para cada mes, calcular tambem a receita do mesmo mes no ano anterior.
+- Adicionar campo `receitaAnoAnterior` no tipo `MonthlyRevenue`.
+- Adicionar metrica `receitaMesmoMesAnoAnterior` e `comparacaoAnual` ao `FinancialMetrics`.
 
-### 2. Adicionar NotificacoesDropdown no header Mobile do Personal
+### 2.3 Receita real (payment_history como fonte)
+- A receita mensal ja e calculada a partir de `payment_history`, que registra o valor efetivamente recebido. Portanto, se um plano trimestral de R$300 e pago em 3x de R$100, cada parcela gera um registro separado em `payment_history` com valor R$100.
+- Nenhuma mudanca de logica e necessaria aqui -- o calculo ja esta correto desde que os pagamentos sejam registrados corretamente.
 
-No arquivo `src/components/mobile/MobileHeaderPersonal.tsx`, adicionar o sino de notificacoes ao lado do ThemeToggle e PersonalSettingsDialog. Requer receber `userId` como nova prop (vindo do `user?.id` em Personal.tsx).
+---
 
-### 3. Card de Mensagens Nao Lidas no Dashboard
+## 3. Alteracoes no Hook `useSubscriptions.ts`
 
-No `PersonalDashboardCards.tsx`, adicionar um card "Mensagens" na grid de stats (ao lado de "Treinos Hoje", "Treinos na Semana", "Alertas"). Esse card usa o hook `useChatNaoLidas` para exibir o total de mensagens de chat nao lidas, e ao clicar navega para `/alunos` (ou abre uma lista de conversas pendentes).
+### Funcao `registerPayment` com suporte a parcelas
 
-### 4. Remover header duplicado do AppLayout para Personal
+Atualizar para aceitar `parcelas` como parametro opcional:
+- Se `parcelas > 1`, criar multiplos registros em `payment_history`, um para cada parcela, com datas mensais sequenciais e valor dividido.
+- Exemplo: plano trimestral R$300 em 3x gera 3 registros de R$100 nos meses 1, 2 e 3.
 
-O `AppLayout` renderiza um header com `NotificacoesDropdown` que fica duplicado/escondido quando a pagina Personal tem seu proprio header. Ajustar para que o header do AppLayout nao renderize quando a pagina ja tem header proprio (ou simplesmente esconder via CSS quando dentro do layout do Personal).
+---
+
+## 4. Alteracoes no Componente `FinancialDashboard.tsx`
+
+### 4.1 Grafico de 12 meses
+- Titulo: "Receita dos Ultimos 12 Meses"
+- Linha principal: receita do mes atual
+- Linha secundaria (tracejada, cor mais clara): receita do mesmo mes no ano anterior
+- Legenda clara indicando "Este ano" e "Ano anterior"
+
+### 4.2 Card de comparacao anual
+- Substituir o card "Mes Anterior" por "vs Ano Anterior"
+- Mostrar valor do mesmo mes do ano passado
+- Percentual de variacao (positivo/negativo)
+
+### 4.3 Layout simplificado
+- Manter os 4 cards de metricas (Receita do Mes, Previsao Mensal, Inadimplencia, vs Ano Anterior)
+- Grafico de linha com 12 meses + comparacao ano anterior
+- Grafico de barras com numero de pagamentos (12 meses)
+- Lista de inadimplentes (sem mudanca)
+- Resumo geral (sem mudanca)
 
 ---
 
 ## Detalhes Tecnicos
 
+### Migracao SQL
+
+```text
+ALTER TABLE public.subscriptions
+  ADD COLUMN parcelas INTEGER NOT NULL DEFAULT 1;
+```
+
 ### Arquivos a modificar
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/pages/Personal.tsx` | Importar e renderizar `NotificacoesDropdown` no header desktop |
-| `src/components/mobile/MobileHeaderPersonal.tsx` | Adicionar prop `userId` e renderizar `NotificacoesDropdown` |
-| `src/components/dashboard/PersonalDashboardCards.tsx` | Adicionar card "Mensagens" com `useChatNaoLidas` |
-| `src/components/AppLayout.tsx` | Esconder header generico quando envolvendo Personal (opcional, evitar duplicacao) |
+| `src/hooks/useFinancialDashboard.ts` | Expandir para 12 meses, adicionar comparacao anual, novo tipo MonthlyRevenue |
+| `src/hooks/useSubscriptions.ts` | Suporte a parcelas no registerPayment |
+| `src/components/FinancialDashboard.tsx` | Grafico 12 meses com 2 linhas, card comparacao anual |
 
 ### Ordem de implementacao
 
-1. Integrar `NotificacoesDropdown` no header desktop (Personal.tsx)
-2. Integrar `NotificacoesDropdown` no header mobile (MobileHeaderPersonal.tsx)
-3. Adicionar card de mensagens no dashboard (PersonalDashboardCards.tsx)
-4. Remover/ocultar header duplicado no AppLayout
+1. Migracao SQL (coluna parcelas)
+2. Atualizar `useFinancialDashboard.ts` (12 meses + comparacao anual)
+3. Atualizar `useSubscriptions.ts` (registro de parcelas)
+4. Atualizar `FinancialDashboard.tsx` (nova UI)
 

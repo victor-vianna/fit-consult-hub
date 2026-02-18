@@ -1,46 +1,53 @@
 
-# FASE 2 -- Organizacao e Produtividade
+
+# FASE 3 -- Avaliacao e Evolucao do Aluno
 
 ## Resumo
 
-Duas implementacoes focadas em melhorar a edicao de modelos de treino e a organizacao da biblioteca de modelos.
+Reorganizar completamente a aba de Avaliacao no perfil do aluno, criando secoes distintas com navegacao por sub-abas, e adicionar funcionalidades de fotos com linha do tempo, edicao de data e organizacao por pastas.
 
 ---
 
-## 1. Edicao de Modelos de Treino
+## 1. Reorganizar Area de Avaliacao
 
-### 1a. Editar nome do modelo
-Ja implementado no `ModeloVisualizacaoModal.tsx` -- o personal pode clicar no icone de editar e alterar nome, descricao e categoria. Nenhuma alteracao necessaria.
+### Estado atual
+A aba "Avaliacao" no `AlunoDetalhes.tsx` renderiza o `AvaliacaoFisicaManager.tsx` como um unico bloco monolitico que mistura medidas corporais, composicao corporal e fotos em um so lugar.
 
-### 1b. Editar duracao total do treino
-- Adicionar coluna `duracao_total_minutos` (integer, nullable) na tabela `treino_modelos`.
-- Atualizar `ModeloVisualizacaoModal.tsx` para exibir e permitir editar a duracao estimada (campo numerico com sufixo "min").
-- Atualizar `useModelosTreino.ts` para incluir `duracao_total_minutos` no tipo `ModeloTreino` e na mutation `atualizarModelo`.
-- Exibir a duracao tambem no `ModeloGrid.tsx` (card do modelo).
+### Nova estrutura com sub-abas
+Dentro da aba "Avaliacao" existente, criar sub-abas internas:
 
-### 1c. Multiplos links de demonstracao por exercicio
-- Atualmente, `treino_modelo_exercicios` tem apenas um campo `link_video` (text).
-- Adicionar coluna `links_demonstracao` (JSONB, nullable) na tabela `treino_modelo_exercicios` para armazenar um array de links com label: `[{ "label": "Angulo frontal", "url": "https://..." }]`.
-- Manter `link_video` para compatibilidade e migracao.
-- Atualizar `ModeloVisualizacaoModal.tsx` para exibir multiplos links quando disponiveis e permitir editar/adicionar links no modo edicao.
-- Atualizar `useModelosTreino.ts` (`ModeloTreinoExercicio`) com o novo campo.
-- Ao salvar/aplicar modelo, copiar os links para o exercicio do treino do aluno.
+| Sub-aba | Conteudo |
+|---------|----------|
+| Fotos | Galeria organizada por pastas (frente, costas, lateral) com linha do tempo visual |
+| Evolucao | Graficos de evolucao de peso, gordura, medidas ao longo do tempo (usando Recharts) |
+| Composicao Corporal | Peso, altura, IMC, % gordura, massa magra |
+| Avaliacao Fisica | Circunferencias (todas as medidas existentes) |
+| Flexibilidade | Novos campos: teste de sentar-e-alcancar, ombro, quadril, tornozelo |
+| Postural | Novos campos: observacoes posturais, desvios, fotos posturais |
+| Triagem | Novos campos: PAR-Q, historico de lesoes, restricoes, liberacao medica |
+
+### Implementacao
+- Substituir o `AvaliacaoFisicaManager` monolitico por um componente wrapper `AvaliacaoHub.tsx` que usa `Tabs` interno para as 7 secoes.
+- Extrair logica existente em sub-componentes menores dentro de `src/components/avaliacao/`.
 
 ---
 
-## 2. Organizacao da Biblioteca de Modelos (Masculino/Feminino)
+## 2. Fotos de Avaliacao
 
-### Abordagem: Pastas pre-definidas + cor
-O sistema ja possui pastas hierarquicas com cores customizaveis. A melhor abordagem e:
+### 2a. Permitir editar data das fotos
+- Adicionar coluna `data_foto` (date, nullable) na tabela `fotos_evolucao` para registrar quando a foto foi tirada (independente do `created_at`).
+- No formulario de upload, adicionar campo de data.
+- Permitir editar a data depois do upload.
 
-- Adicionar opcao de **cor da pasta** no dialog de criacao e edicao (color picker com cores pre-definidas: azul, rosa, verde, roxo, laranja, vermelho).
-- Adicionar um campo **icone/tag** opcional na pasta para marcar como "Masculino" ou "Feminino" (campo `tag` na tabela `modelo_pastas`).
-- No `FolderExplorer`, exibir a tag visualmente (icone ou badge ao lado do nome da pasta).
-- Adicionar **filtro rapido** no topo da biblioteca: "Todos", "Masculino", "Feminino" -- filtra pastas pela tag.
+### 2b. Linha do tempo visual
+- Criar componente `FotoTimeline.tsx` que agrupa fotos por data (usando `data_foto` ou `created_at` como fallback).
+- Cada ponto na timeline mostra as fotos daquele dia, organizadas por tipo (frente, costas, lateral).
+- Permitir comparacao lado-a-lado entre duas datas selecionadas.
 
-### Melhorias de navegacao
-- Exibir o **caminho completo** da pasta no card do modelo quando em busca global (ja implementado parcialmente no `ModeloGrid`).
-- Adicionar **contador de modelos totais** (incluindo subpastas) no badge de cada pasta no `FolderExplorer`.
+### 2c. Pastas por tipo de foto
+- Ja existe o campo `tipo_foto` (frente, costas, lado_direito, lado_esquerdo, outro).
+- Criar visualizacao em pastas/abas que filtra por tipo.
+- Adicionar contagem de fotos por tipo.
 
 ---
 
@@ -49,34 +56,67 @@ O sistema ja possui pastas hierarquicas com cores customizaveis. A melhor aborda
 ### Migracao SQL
 
 ```text
--- 1. Duracao total no modelo
-ALTER TABLE public.treino_modelos 
-ADD COLUMN duracao_total_minutos INTEGER;
+-- 1. Data da foto (independente do created_at)
+ALTER TABLE public.fotos_evolucao 
+ADD COLUMN data_foto DATE;
 
--- 2. Links multiplos por exercicio do modelo
-ALTER TABLE public.treino_modelo_exercicios 
-ADD COLUMN links_demonstracao JSONB;
+-- 2. Campos de flexibilidade na avaliacao
+ALTER TABLE public.avaliacoes_fisicas 
+ADD COLUMN flexibilidade_sentar_alcancar NUMERIC,
+ADD COLUMN flexibilidade_ombro TEXT,
+ADD COLUMN flexibilidade_quadril TEXT,
+ADD COLUMN flexibilidade_tornozelo TEXT;
 
--- 3. Tag para pastas (Masculino/Feminino/custom)
-ALTER TABLE public.modelo_pastas 
-ADD COLUMN tag TEXT;
+-- 3. Campos posturais
+ALTER TABLE public.avaliacoes_fisicas 
+ADD COLUMN postural_observacoes TEXT,
+ADD COLUMN postural_desvios JSONB;
+
+-- 4. Campos de triagem
+ALTER TABLE public.avaliacoes_fisicas 
+ADD COLUMN triagem_parq JSONB,
+ADD COLUMN triagem_historico_lesoes TEXT,
+ADD COLUMN triagem_restricoes TEXT,
+ADD COLUMN triagem_liberacao_medica BOOLEAN DEFAULT false,
+ADD COLUMN triagem_observacoes TEXT;
+
+-- 5. Permitir fotos independentes de avaliacao (tornar avaliacao_id nullable)
+ALTER TABLE public.fotos_evolucao 
+ALTER COLUMN avaliacao_id DROP NOT NULL;
+
+-- 6. RLS para update de fotos (editar data)
+CREATE POLICY "Personais podem atualizar fotos" ON public.fotos_evolucao
+FOR UPDATE USING (personal_id = auth.uid());
 ```
+
+### Novos arquivos
+
+| Arquivo | Descricao |
+|---------|-----------|
+| `src/components/avaliacao/AvaliacaoHub.tsx` | Wrapper com sub-abas (Fotos, Evolucao, Composicao, etc.) |
+| `src/components/avaliacao/FotosSection.tsx` | Galeria com pastas por tipo e upload |
+| `src/components/avaliacao/FotoTimeline.tsx` | Linha do tempo visual de fotos |
+| `src/components/avaliacao/EvolucaoSection.tsx` | Graficos de evolucao (Recharts) |
+| `src/components/avaliacao/ComposicaoCorporalSection.tsx` | Peso, altura, IMC, gordura |
+| `src/components/avaliacao/AvaliacaoFisicaSection.tsx` | Circunferencias |
+| `src/components/avaliacao/FlexibilidadeSection.tsx` | Campos de flexibilidade |
+| `src/components/avaliacao/PosturalSection.tsx` | Observacoes posturais |
+| `src/components/avaliacao/TriagemSection.tsx` | PAR-Q e triagem |
 
 ### Arquivos a modificar
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/hooks/useModelosTreino.ts` | Adicionar `duracao_total_minutos` e `links_demonstracao` aos tipos e mutations |
-| `src/hooks/useModeloPastas.ts` | Adicionar `tag` ao tipo `ModeloPasta` |
-| `src/components/ModeloVisualizacaoModal.tsx` | Campo de duracao editavel, exibir/editar multiplos links por exercicio |
-| `src/components/modelos/ModeloGrid.tsx` | Exibir duracao no card do modelo |
-| `src/components/modelos/FolderExplorer.tsx` | Color picker na criacao de pasta, exibir tag, filtro rapido Masc/Fem |
-| `src/components/ModelosTreinoList.tsx` | Filtro por tag (Masculino/Feminino/Todos) |
-| `src/hooks/useAplicarModelo.ts` | Copiar `links_demonstracao` ao aplicar modelo |
+| `src/pages/AlunoDetalhes.tsx` | Substituir `AvaliacaoFisicaManager` por `AvaliacaoHub` |
+| `src/components/AvaliacaoFisicaManager.tsx` | Refatorar -- extrair logica para sub-componentes |
 
 ### Ordem de implementacao
 
-1. Migracao SQL (3 colunas novas)
-2. Duracao total do modelo (tipo + modal + card)
-3. Multiplos links de demonstracao (tipo + modal + aplicacao)
-4. Tags e cores nas pastas (tipo + explorer + filtro)
+1. Migracao SQL (novas colunas + RLS)
+2. Criar `AvaliacaoHub.tsx` com sub-abas e mover conteudo existente
+3. Criar `FotosSection.tsx` com upload, edicao de data e galeria por tipo
+4. Criar `FotoTimeline.tsx` com linha do tempo e comparacao lado-a-lado
+5. Criar `EvolucaoSection.tsx` com graficos Recharts
+6. Criar secoes de Flexibilidade, Postural e Triagem
+7. Atualizar `AlunoDetalhes.tsx` para usar o novo hub
+

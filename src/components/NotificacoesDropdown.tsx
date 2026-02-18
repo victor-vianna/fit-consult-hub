@@ -39,6 +39,7 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
       case "novo_aluno":
         return "👤";
       case "mensagem":
+      case "nova_mensagem":
         return "💬";
       case "planilha_expira_7dias":
       case "planilha_expira_3dias":
@@ -58,7 +59,7 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
 
   // ✅ Verificar se é tipo de feedback e extrair dados do aluno
   const isFeedbackNotification = (tipo: string) => {
-    return ["feedback_semanal", "checkin_semanal", "treino_concluido"].includes(tipo);
+    return ["feedback_semanal", "checkin_semanal", "treino_concluido", "nova_mensagem"].includes(tipo);
   };
 
   // ✅ Navegar para o perfil do aluno ao clicar
@@ -71,7 +72,8 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
     // Se tiver aluno_id nos dados, navegar para o perfil
     const alunoId = notificacao.dados?.aluno_id || notificacao.dados?.profile_id;
     if (alunoId) {
-      navigate(`/alunos/${alunoId}`);
+      const tab = notificacao.tipo === "nova_mensagem" ? "?tab=chat" : "";
+      navigate(`/alunos/${alunoId}${tab}`);
     }
   };
 

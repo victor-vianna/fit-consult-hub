@@ -7,6 +7,7 @@ import {
   Library,
   CreditCard,
   Calendar,
+  MessageSquare,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -31,6 +32,7 @@ const items = [
   { title: "Materiais", icon: FileText, value: "materiais" },
   { title: "Biblioteca", icon: Library, value: "biblioteca" },
   { title: "Meu Plano", icon: CreditCard, value: "plano" },
+  { title: "Chat", icon: MessageSquare, value: "chat" },
 ];
 
 interface AppSidebarAlunoProps {

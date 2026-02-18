@@ -80,9 +80,9 @@ export function AlertasModal({
 }: AlertasModalProps) {
   const navigate = useNavigate();
 
-  const handleAlunoClick = (alunoId: string) => {
+  const handleAlunoClick = (alunoId: string, tab?: string) => {
     onOpenChange(false);
-    navigate(`/alunos/${alunoId}`);
+    navigate(`/alunos/${alunoId}${tab ? `?tab=${tab}` : ""}`);
   };
 
   const handleDescartar = async (e: React.MouseEvent, tipoAlerta: string, referenciaId: string) => {
@@ -168,30 +168,38 @@ export function AlertasModal({
                   {filteredInativos.map((aluno) => (
                     <div
                       key={aluno.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-orange-500/10 cursor-pointer hover:bg-orange-500/20 transition-colors"
-                      onClick={() => handleAlunoClick(aluno.id)}
+                      className="p-3 rounded-lg bg-orange-500/10"
                     >
-                      <div>
-                        <p className="font-medium text-sm">{aluno.nome}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {aluno.ultimo_treino
-                            ? `Último treino: ${format(parseISO(aluno.ultimo_treino), "dd/MM/yyyy", { locale: ptBR })}`
-                            : "Nunca treinou"}
-                        </p>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-sm">{aluno.nome}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {aluno.ultimo_treino
+                              ? `Último treino: ${format(parseISO(aluno.ultimo_treino), "dd/MM/yyyy", { locale: ptBR })}`
+                              : "Nunca treinou"}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-orange-600 border-orange-600">
+                            {aluno.dias_inativo === 999 ? "Novo" : `${aluno.dias_inativo} dias`}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 shrink-0"
+                            onClick={(e) => handleDescartar(e, "inativo", aluno.id)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-orange-600 border-orange-600">
-                          {aluno.dias_inativo === 999 ? "Novo" : `${aluno.dias_inativo} dias`}
-                        </Badge>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 shrink-0"
-                          onClick={(e) => handleDescartar(e, "inativo", aluno.id)}
-                        >
-                          <X className="h-3 w-3" />
+                      <div className="flex gap-2 mt-2">
+                        <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => handleAlunoClick(aluno.id)}>
+                          Ver perfil
                         </Button>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => handleAlunoClick(aluno.id, "chat")}>
+                          <MessageSquare className="h-3 w-3 mr-1" /> Mensagem
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -212,31 +220,36 @@ export function AlertasModal({
                   {filteredPlanilhas.map((planilha) => (
                     <div
                       key={planilha.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-blue-500/10 cursor-pointer hover:bg-blue-500/20 transition-colors"
-                      onClick={() => handleAlunoClick(planilha.aluno_id)}
+                      className="p-3 rounded-lg bg-blue-500/10"
                     >
-                      <div>
-                        <p className="font-medium text-sm">{planilha.aluno_nome}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {planilha.nome_planilha} • Expira em {format(parseISO(planilha.data_fim), "dd/MM", { locale: ptBR })}
-                        </p>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-sm">{planilha.aluno_nome}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {planilha.nome_planilha} • Expira em {format(parseISO(planilha.data_fim), "dd/MM", { locale: ptBR })}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge 
+                            variant={planilha.dias_para_expirar <= 3 ? "destructive" : "outline"}
+                            className={cn(planilha.dias_para_expirar <= 3 ? "" : "text-blue-600 border-blue-600")}
+                          >
+                            {planilha.dias_para_expirar === 0 ? "Hoje" : `${planilha.dias_para_expirar}d`}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 shrink-0"
+                            onClick={(e) => handleDescartar(e, "planilha", planilha.id)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge 
-                          variant={planilha.dias_para_expirar <= 3 ? "destructive" : "outline"}
-                          className={cn(planilha.dias_para_expirar <= 3 ? "" : "text-blue-600 border-blue-600")}
-                        >
-                          {planilha.dias_para_expirar === 0 ? "Hoje" : `${planilha.dias_para_expirar}d`}
-                        </Badge>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 shrink-0"
-                          onClick={(e) => handleDescartar(e, "planilha", planilha.id)}
-                        >
-                          <X className="h-3 w-3" />
+                      <div className="flex gap-2 mt-2">
+                        <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => handleAlunoClick(planilha.aluno_id, "treinos")}>
+                          Ver treinos
                         </Button>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </div>
                     </div>
                   ))}
@@ -257,31 +270,36 @@ export function AlertasModal({
                   {filteredVencimentos.map((venc) => (
                     <div
                       key={venc.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-yellow-500/10 cursor-pointer hover:bg-yellow-500/20 transition-colors"
-                      onClick={() => handleAlunoClick(venc.aluno_id)}
+                      className="p-3 rounded-lg bg-yellow-500/10"
                     >
-                      <div>
-                        <p className="font-medium text-sm">{venc.aluno_nome}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {venc.plano} • Vence em {format(parseISO(venc.data_expiracao), "dd/MM", { locale: ptBR })}
-                        </p>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-sm">{venc.aluno_nome}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {venc.plano} • Vence em {format(parseISO(venc.data_expiracao), "dd/MM", { locale: ptBR })}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge 
+                            variant={venc.dias_para_vencer <= 3 ? "destructive" : "outline"}
+                            className={cn(venc.dias_para_vencer <= 3 ? "" : "text-yellow-600 border-yellow-600")}
+                          >
+                            {venc.dias_para_vencer === 0 ? "Hoje" : `${venc.dias_para_vencer}d`}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 shrink-0"
+                            onClick={(e) => handleDescartar(e, "vencimento", venc.id)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge 
-                          variant={venc.dias_para_vencer <= 3 ? "destructive" : "outline"}
-                          className={cn(venc.dias_para_vencer <= 3 ? "" : "text-yellow-600 border-yellow-600")}
-                        >
-                          {venc.dias_para_vencer === 0 ? "Hoje" : `${venc.dias_para_vencer}d`}
-                        </Badge>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 shrink-0"
-                          onClick={(e) => handleDescartar(e, "vencimento", venc.id)}
-                        >
-                          <X className="h-3 w-3" />
+                      <div className="flex gap-2 mt-2">
+                        <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => handleAlunoClick(venc.aluno_id, "financeiro")}>
+                          Ver financeiro
                         </Button>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </div>
                     </div>
                   ))}
@@ -302,34 +320,42 @@ export function AlertasModal({
                   {filteredFeedbacks.map((feedback) => (
                     <div
                       key={feedback.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-purple-500/10 cursor-pointer hover:bg-purple-500/20 transition-colors"
-                      onClick={() => handleAlunoClick(feedback.aluno_id)}
+                      className="p-3 rounded-lg bg-purple-500/10"
                     >
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm">{feedback.aluno_nome}</p>
-                        {feedback.comentario ? (
-                          <p className="text-xs text-muted-foreground truncate">
-                            "{feedback.comentario}"
-                          </p>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">
-                            Feedback semanal • {format(parseISO(feedback.data), "dd/MM", { locale: ptBR })}
-                          </p>
-                        )}
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm">{feedback.aluno_nome}</p>
+                          {feedback.comentario ? (
+                            <p className="text-xs text-muted-foreground truncate">
+                              "{feedback.comentario}"
+                            </p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              Feedback semanal • {format(parseISO(feedback.data), "dd/MM", { locale: ptBR })}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-purple-600 border-purple-600">
+                            Novo
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 shrink-0"
+                            onClick={(e) => handleDescartar(e, "feedback", feedback.id)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-purple-600 border-purple-600">
-                          Novo
-                        </Badge>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 shrink-0"
-                          onClick={(e) => handleDescartar(e, "feedback", feedback.id)}
-                        >
-                          <X className="h-3 w-3" />
+                      <div className="flex gap-2 mt-2">
+                        <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => handleAlunoClick(feedback.aluno_id, "checkins")}>
+                          Ver feedback
                         </Button>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => handleAlunoClick(feedback.aluno_id, "chat")}>
+                          <MessageSquare className="h-3 w-3 mr-1" /> Responder
+                        </Button>
                       </div>
                     </div>
                   ))}

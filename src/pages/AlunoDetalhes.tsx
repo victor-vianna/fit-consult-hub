@@ -63,7 +63,7 @@ import { SubscriptionManager } from "@/components/SubscriptionManager";
 import { CalendarioTreinosMensal } from "@/components/CalendarioTreinosMensal";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { AppLayout } from "@/components/AppLayout";
-import { AvaliacaoFisicaManager } from "@/components/AvaliacaoFisicaManager";
+import { AvaliacaoHub } from "@/components/avaliacao/AvaliacaoHub";
 import { AnamneseVisualizacao } from "@/components/AnamneseVisualizacao";
 import { CheckinsDashboard } from "@/components/CheckinsDashboard";
 import { PlanilhaStatusCard } from "@/components/PlanilhaStatusCard";
@@ -929,7 +929,7 @@ export default function AlunoDetalhes() {
             {/* Aba Avaliação Física */}
             <TabsContent value="avaliacao" className="space-y-6">
               {user && (
-                <AvaliacaoFisicaManager
+                <AvaliacaoHub
                   profileId={id!}
                   personalId={user.id}
                   themeColor={personalSettings?.theme_color}

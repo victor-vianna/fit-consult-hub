@@ -82,7 +82,7 @@ export function AlertasModal({
 
   const handleAlunoClick = (alunoId: string, tab?: string) => {
     onOpenChange(false);
-    navigate(`/alunos/${alunoId}${tab ? `?tab=${tab}` : ""}`);
+    navigate(`/aluno/${alunoId}${tab ? `?tab=${tab}` : ""}`);
   };
 
   const handleDescartar = async (e: React.MouseEvent, tipoAlerta: string, referenciaId: string) => {

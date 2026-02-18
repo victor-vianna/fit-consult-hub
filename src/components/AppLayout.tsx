@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAnamneseCheckin } from "@/hooks/useAnamneseCheckin";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
-import { NotificacoesDropdown } from "@/components/NotificacoesDropdown";
+
 import { CheckinObrigatorioModal } from "@/components/CheckinObrigatorioModal";
 import { AnamneseObrigatoriaModal } from "./AnamneseObrigatorioModal";
 
@@ -39,10 +39,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header fixo com notificações */}
-      <header className="border-b bg-background h-16 flex items-center justify-end px-6">
-        {user && <NotificacoesDropdown userId={user.id} />}
-      </header>
+      {/* Header removido - cada página gerencia seu próprio header com NotificacoesDropdown */}
 
       {/* Conteúdo principal */}
       <main className="flex-1 overflow-auto">{children}</main>

@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { Users, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { NotificacoesDropdown } from "@/components/NotificacoesDropdown";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebarPersonal } from "@/components/AppSidebarPersonal";
 import { PersonalSettingsDialog } from "@/components/PersonalSettingsDialog";
@@ -168,7 +169,7 @@ export default function Personal() {
   if (isMobile) {
     return <AppLayout>
         <div className="flex flex-col min-h-screen bg-background">
-          <MobileHeaderPersonal onMenuClick={() => setMenuOpen(true)} personalId={user?.id} personalSettings={personalSettings} profileName={profile?.nome} />
+          <MobileHeaderPersonal onMenuClick={() => setMenuOpen(true)} personalId={user?.id} personalSettings={personalSettings} profileName={profile?.nome} userId={user?.id} />
 
           <main className="flex-1 overflow-auto pb-20 px-4 pt-4 space-y-4">
             {/* Dashboard Cards para Mobile (já inclui o card Meus Alunos) */}
@@ -219,6 +220,7 @@ export default function Personal() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {user?.id && <NotificacoesDropdown userId={user.id} />}
                   {user?.id && <PersonalSettingsDialog personalId={user.id} />}
                   <ThemeToggle />
                   <Button variant="outline" onClick={signOut}>

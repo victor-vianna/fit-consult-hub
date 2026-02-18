@@ -33,7 +33,7 @@ export function TreinosHojeModal({
 
   const handleAlunoClick = (alunoId: string) => {
     onOpenChange(false);
-    navigate(`/alunos/${alunoId}`);
+    navigate(`/aluno/${alunoId}`);
   };
 
   return (

@@ -609,7 +609,7 @@ export function PersonalDashboardCards({
                     <div
                       key={treino.id}
                       className="flex items-center justify-between p-2 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
-                      onClick={() => navigate(`/alunos/${treino.aluno_id}`)}
+                      onClick={() => navigate(`/aluno/${treino.aluno_id}`)}
                     >
                       <div>
                         <p className="font-medium text-sm">{treino.aluno_nome}</p>
@@ -668,7 +668,7 @@ export function PersonalDashboardCards({
                       className="flex items-center justify-between p-2 rounded-lg bg-orange-500/10 cursor-pointer hover:bg-orange-500/20 transition-colors"
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate(`/alunos/${aluno.id}`);
+                        navigate(`/aluno/${aluno.id}`);
                       }}
                     >
                       <div>
@@ -724,7 +724,7 @@ export function PersonalDashboardCards({
                       className="flex items-center justify-between p-2 rounded-lg bg-purple-500/10 cursor-pointer hover:bg-purple-500/20 transition-colors"
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate(`/alunos/${feedback.aluno_id}`);
+                        navigate(`/aluno/${feedback.aluno_id}`);
                       }}
                     >
                       <div className="flex-1 min-w-0">

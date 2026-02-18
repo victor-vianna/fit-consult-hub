@@ -105,7 +105,7 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
     }
 
     const diaNome = diasSemana[treino.dia - 1] || `Dia ${treino.dia}`;
-    const titulo = treino.nome_treino ? `${diaNome} — ${treino.nome_treino}` : diaNome;
+    const titulo = treino.nome_treino ? `${diaNome} - ${treino.nome_treino}` : diaNome;
 
     doc.setFontSize(13);
     doc.setTextColor(rgb[0], rgb[1], rgb[2]);
@@ -143,7 +143,7 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
       (grupo.exercicios || [])
         .sort((a: any, b: any) => (a.ordem_no_grupo || 0) - (b.ordem_no_grupo || 0))
         .forEach((ex: any, idx: number) => {
-          const prefix = idx === 0 ? `[${tipoLabel}] ` : "↳ ";
+          const prefix = idx === 0 ? `[${tipoLabel}] ` : "> ";
           tableData.push([
             prefix + ex.nome,
             ex.series ? String(ex.series) : "-",
@@ -186,30 +186,41 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
       y = (doc as any).lastAutoTable.finalY + 4;
     }
 
-    // Blocks
-    blocos.forEach((bloco: any) => {
-      if (y > doc.internal.pageSize.getHeight() - 20) {
-        doc.addPage();
-        y = 15;
-      }
-      doc.setFontSize(9);
-      doc.setTextColor(40, 40, 40);
-      doc.setFont("helvetica", "bold");
-      const blocoText = `📋 ${bloco.nome}${bloco.duracao_estimada_minutos ? ` (${bloco.duracao_estimada_minutos} min)` : ""}`;
-      doc.text(blocoText, 14, y);
-      y += 4;
-      if (bloco.descricao) {
-        doc.setFont("helvetica", "normal");
-        doc.text(bloco.descricao, 16, y);
-        y += 4;
-      }
-    });
+    // Blocks - render as a simple table to avoid encoding issues
+    if (blocos.length > 0) {
+      const blocosData = blocos.map((bloco: any) => {
+        const parts = [bloco.nome];
+        if (bloco.duracao_estimada_minutos) parts.push(`${bloco.duracao_estimada_minutos} min`);
+        if (bloco.descricao) parts.push(bloco.descricao);
+        return [bloco.tipo?.toUpperCase() || "BLOCO", parts.join(" - ")];
+      });
+
+      autoTable(doc, {
+        startY: y,
+        head: [["Tipo", "Descricao"]],
+        body: blocosData,
+        theme: "plain",
+        headStyles: {
+          fillColor: [240, 240, 240],
+          textColor: [60, 60, 60],
+          fontSize: 8,
+          fontStyle: "bold",
+        },
+        bodyStyles: {
+          fontSize: 8,
+          textColor: [40, 40, 40],
+        },
+        margin: { left: 14, right: 14 },
+      });
+
+      y = (doc as any).lastAutoTable.finalY + 4;
+    }
 
     y += 6;
   });
 
   // Footer
-  const footerText = `Gerado por ${personalName} — ${new Date().toLocaleDateString("pt-BR")}`;
+  const footerText = `Gerado por ${personalName} - ${new Date().toLocaleDateString("pt-BR")}`;
   doc.setFontSize(8);
   doc.setTextColor(150, 150, 150);
   doc.setFont("helvetica", "normal");

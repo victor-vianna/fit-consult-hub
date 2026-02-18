@@ -11,11 +11,10 @@ export interface ModeloPasta {
   ordem: number;
   created_at: string;
   updated_at: string;
-  // Novos campos para hierarquia
   parent_id: string | null;
   nivel: number;
   caminho: string | null;
-  // Campo calculado para UI
+  tag?: string | null;
   subpastas?: ModeloPasta[];
 }
 
@@ -57,7 +56,7 @@ export function useModeloPastas({
 
   // Criar nova pasta (agora com suporte a parent_id)
   const criarPastaMutation = useMutation({
-    mutationFn: async (dados: { nome: string; cor?: string; parent_id?: string | null }) => {
+    mutationFn: async (dados: { nome: string; cor?: string; parent_id?: string | null; tag?: string | null }) => {
       // Calcular próxima ordem baseada no parent
       const pastasDoMesmoNivel = pastas.filter(p => p.parent_id === (dados.parent_id || null));
       const maxOrdem = pastasDoMesmoNivel.length > 0 
@@ -72,6 +71,7 @@ export function useModeloPastas({
           cor: dados.cor || "#3b82f6",
           ordem: maxOrdem + 1,
           parent_id: dados.parent_id || null,
+          tag: dados.tag || null,
         })
         .select()
         .single();
@@ -124,7 +124,7 @@ export function useModeloPastas({
       dados,
     }: {
       pastaId: string;
-      dados: Partial<Pick<ModeloPasta, "nome" | "cor" | "ordem">>;
+      dados: Partial<Pick<ModeloPasta, "nome" | "cor" | "ordem" | "tag">>;
     }) => {
       const { error } = await supabase
         .from("modelo_pastas")
@@ -197,11 +197,11 @@ export function useModeloPastas({
     pastasHierarquicas,
     loading,
     error,
-    criarPasta: (dados: { nome: string; cor?: string; parent_id?: string | null }) =>
+    criarPasta: (dados: { nome: string; cor?: string; parent_id?: string | null; tag?: string | null }) =>
       criarPastaMutation.mutateAsync(dados),
     atualizarPasta: (
       pastaId: string,
-      dados: Partial<Pick<ModeloPasta, "nome" | "cor" | "ordem">>
+      dados: Partial<Pick<ModeloPasta, "nome" | "cor" | "ordem" | "tag">>
     ) => atualizarPastaMutation.mutateAsync({ pastaId, dados }),
     deletarPasta: (pastaId: string) => deletarPastaMutation.mutateAsync(pastaId),
     moverModeloParaPasta: (modeloId: string, pastaId: string | null) =>

@@ -23,8 +23,12 @@ import {
   Loader2,
   Calendar,
   Clock,
+  Link as LinkIcon,
+  Plus,
+  Trash2,
+  ExternalLink,
 } from "lucide-react";
-import type { ModeloTreino } from "@/hooks/useModelosTreino";
+import type { ModeloTreino, LinkDemonstracao } from "@/hooks/useModelosTreino";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -35,7 +39,7 @@ interface ModeloVisualizacaoModalProps {
   onAplicar: (modelo: ModeloTreino) => void;
   onAtualizar: (
     modeloId: string,
-    dados: { nome?: string; descricao?: string; categoria?: string }
+    dados: { nome?: string; descricao?: string; categoria?: string; duracao_total_minutos?: number | null }
   ) => Promise<unknown>;
   isAtualizando?: boolean;
 }
@@ -52,6 +56,7 @@ export function ModeloVisualizacaoModal({
   const [nome, setNome] = useState("");
   const [descricao, setDescricao] = useState("");
   const [categoria, setCategoria] = useState("");
+  const [duracao, setDuracao] = useState<string>("");
 
   // Sincronizar estado com modelo
   const handleOpenChange = (isOpen: boolean) => {
@@ -59,6 +64,7 @@ export function ModeloVisualizacaoModal({
       setNome(modelo.nome);
       setDescricao(modelo.descricao || "");
       setCategoria(modelo.categoria || "");
+      setDuracao(modelo.duracao_total_minutos?.toString() || "");
       setEditando(false);
     }
     onOpenChange(isOpen);
@@ -67,10 +73,13 @@ export function ModeloVisualizacaoModal({
   const handleSalvar = async () => {
     if (!modelo) return;
     
+    const duracaoNum = duracao.trim() ? parseInt(duracao) : null;
+    
     await onAtualizar(modelo.id, {
       nome: nome.trim(),
       descricao: descricao.trim() || undefined,
       categoria: categoria.trim() || undefined,
+      duracao_total_minutos: duracaoNum,
     });
     
     setEditando(false);
@@ -81,6 +90,7 @@ export function ModeloVisualizacaoModal({
       setNome(modelo.nome);
       setDescricao(modelo.descricao || "");
       setCategoria(modelo.categoria || "");
+      setDuracao(modelo.duracao_total_minutos?.toString() || "");
     }
     setEditando(false);
   };
@@ -136,15 +146,29 @@ export function ModeloVisualizacaoModal({
                   rows={2}
                 />
               </div>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">
-                  Categoria
-                </label>
-                <Input
-                  value={categoria}
-                  onChange={(e) => setCategoria(e.target.value)}
-                  placeholder="Ex: Hipertrofia, Força, Cardio..."
-                />
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="text-xs text-muted-foreground mb-1 block">
+                    Categoria
+                  </label>
+                  <Input
+                    value={categoria}
+                    onChange={(e) => setCategoria(e.target.value)}
+                    placeholder="Ex: Hipertrofia, Força..."
+                  />
+                </div>
+                <div className="w-32">
+                  <label className="text-xs text-muted-foreground mb-1 block">
+                    Duração (min)
+                  </label>
+                  <Input
+                    type="number"
+                    value={duracao}
+                    onChange={(e) => setDuracao(e.target.value)}
+                    placeholder="60"
+                    min={1}
+                  />
+                </div>
               </div>
             </div>
           ) : (
@@ -155,6 +179,12 @@ export function ModeloVisualizacaoModal({
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 {modelo.categoria && (
                   <Badge variant="secondary">{modelo.categoria}</Badge>
+                )}
+                {modelo.duracao_total_minutos && (
+                  <Badge variant="outline" className="gap-1">
+                    <Clock className="h-3 w-3" />
+                    {modelo.duracao_total_minutos} min
+                  </Badge>
                 )}
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
@@ -233,29 +263,51 @@ export function ModeloVisualizacaoModal({
                   Exercícios
                 </h4>
                 <div className="space-y-2">
-                  {modelo.exercicios.map((ex, idx) => (
-                    <div
-                      key={ex.id || idx}
-                      className="flex items-center gap-3 p-3 rounded-lg border bg-card"
-                    >
-                      <Badge variant="outline" className="shrink-0">
-                        {idx + 1}
-                      </Badge>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{ex.nome}</p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>{ex.series}x{ex.repeticoes}</span>
-                          {ex.carga && <span>• {ex.carga}</span>}
-                          <span>• {ex.descanso}s descanso</span>
+                  {modelo.exercicios.map((ex, idx) => {
+                    const links = ex.links_demonstracao || (ex.link_video ? [{ label: "Vídeo", url: ex.link_video }] : []);
+                    
+                    return (
+                      <div
+                        key={ex.id || idx}
+                        className="flex items-start gap-3 p-3 rounded-lg border bg-card"
+                      >
+                        <Badge variant="outline" className="shrink-0 mt-0.5">
+                          {idx + 1}
+                        </Badge>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{ex.nome}</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>{ex.series}x{ex.repeticoes}</span>
+                            {ex.carga && <span>• {ex.carga}</span>}
+                            <span>• {ex.descanso}s descanso</span>
+                          </div>
+                          {ex.observacoes && (
+                            <p className="text-xs text-muted-foreground mt-1 italic">
+                              {ex.observacoes}
+                            </p>
+                          )}
+                          {/* Links de demonstração */}
+                          {links.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-1.5">
+                              {links.map((link, linkIdx) => (
+                                <a
+                                  key={linkIdx}
+                                  href={link.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                  {link.label}
+                                </a>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                        {ex.observacoes && (
-                          <p className="text-xs text-muted-foreground mt-1 italic">
-                            {ex.observacoes}
-                          </p>
-                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

@@ -1047,6 +1047,7 @@ export type Database = {
           ordem: number | null
           parent_id: string | null
           personal_id: string
+          tag: string | null
           updated_at: string | null
         }
         Insert: {
@@ -1059,6 +1060,7 @@ export type Database = {
           ordem?: number | null
           parent_id?: string | null
           personal_id: string
+          tag?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -1071,6 +1073,7 @@ export type Database = {
           ordem?: number | null
           parent_id?: string | null
           personal_id?: string
+          tag?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -1776,6 +1779,7 @@ export type Database = {
           grupo_id: string | null
           id: string
           link_video: string | null
+          links_demonstracao: Json | null
           modelo_id: string
           nome: string
           observacoes: string | null
@@ -1794,6 +1798,7 @@ export type Database = {
           grupo_id?: string | null
           id?: string
           link_video?: string | null
+          links_demonstracao?: Json | null
           modelo_id: string
           nome: string
           observacoes?: string | null
@@ -1812,6 +1817,7 @@ export type Database = {
           grupo_id?: string | null
           id?: string
           link_video?: string | null
+          links_demonstracao?: Json | null
           modelo_id?: string
           nome?: string
           observacoes?: string | null
@@ -1850,6 +1856,7 @@ export type Database = {
           categoria: string | null
           created_at: string | null
           descricao: string | null
+          duracao_total_minutos: number | null
           id: string
           nome: string
           pasta_id: string | null
@@ -1860,6 +1867,7 @@ export type Database = {
           categoria?: string | null
           created_at?: string | null
           descricao?: string | null
+          duracao_total_minutos?: number | null
           id?: string
           nome: string
           pasta_id?: string | null
@@ -1870,6 +1878,7 @@ export type Database = {
           categoria?: string | null
           created_at?: string | null
           descricao?: string | null
+          duracao_total_minutos?: number | null
           id?: string
           nome?: string
           pasta_id?: string | null

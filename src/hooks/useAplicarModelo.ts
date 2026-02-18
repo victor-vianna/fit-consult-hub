@@ -190,7 +190,7 @@ export function useAplicarModelo() {
             return {
               treino_semanal_id: treinoId,
               nome: ex.nome,
-              link_video: ex.link_video,
+              link_video: ex.links_demonstracao?.[0]?.url || ex.link_video,
               series: ex.series,
               repeticoes: ex.repeticoes,
               descanso: ex.descanso,

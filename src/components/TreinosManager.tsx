@@ -1600,8 +1600,12 @@ export function TreinosManager({
             onCriarPasta={criarPasta}
             isCriandoPasta={false}
             onDeletarPasta={deletarPasta}
-            onRenomearPasta={async (pastaId, nome) => {
-              await atualizarPasta(pastaId, { nome });
+            onRenomearPasta={async (pastaId, dados) => {
+              if (typeof dados === "string") {
+                await atualizarPasta(pastaId, { nome: dados });
+              } else {
+                await atualizarPasta(pastaId, dados as any);
+              }
             }}
             onMoverModelo={moverModeloParaPasta}
             onAtualizarModelo={atualizarModelo}

@@ -3,10 +3,16 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+export interface LinkDemonstracao {
+  label: string;
+  url: string;
+}
+
 export interface ModeloTreinoExercicio {
   id?: string;
   nome: string;
   link_video?: string | null;
+  links_demonstracao?: LinkDemonstracao[] | null;
   series: number;
   repeticoes: string;
   descanso: number;
@@ -41,6 +47,7 @@ export interface ModeloTreino {
   descricao?: string | null;
   categoria?: string | null;
   pasta_id?: string | null;
+  duracao_total_minutos?: number | null;
   created_at: string;
   updated_at: string;
   exercicios?: ModeloTreinoExercicio[];
@@ -121,7 +128,10 @@ export function useModelosTreino({
 
           return {
             ...modelo,
-            exercicios: exerciciosData.data || [],
+            exercicios: (exerciciosData.data || []).map((ex: any) => ({
+              ...ex,
+              links_demonstracao: ex.links_demonstracao as LinkDemonstracao[] | null,
+            })),
             blocos: blocosTipados,
           } as ModeloTreino;
         })
@@ -268,14 +278,14 @@ export function useModelosTreino({
     },
   });
 
-  // ✏️ Atualizar modelo (nome, descrição, categoria)
+  // ✏️ Atualizar modelo (nome, descrição, categoria, duração)
   const atualizarModeloMutation = useMutation({
     mutationFn: async ({
       modeloId,
       dados,
     }: {
       modeloId: string;
-      dados: Partial<Pick<ModeloTreino, "nome" | "descricao" | "categoria">>;
+      dados: Partial<Pick<ModeloTreino, "nome" | "descricao" | "categoria" | "duracao_total_minutos">>;
     }) => {
       console.log("[useModelosTreino] Atualizando modelo:", modeloId);
 
@@ -310,7 +320,7 @@ export function useModelosTreino({
       deletarModeloMutation.mutateAsync(modeloId),
     atualizarModelo: (
       modeloId: string,
-      dados: Partial<Pick<ModeloTreino, "nome" | "descricao" | "categoria">>
+      dados: Partial<Pick<ModeloTreino, "nome" | "descricao" | "categoria" | "duracao_total_minutos">>
     ) => atualizarModeloMutation.mutateAsync({ modeloId, dados }),
     isCriando: criarModeloMutation.isPending,
     isDeletando: deletarModeloMutation.isPending,

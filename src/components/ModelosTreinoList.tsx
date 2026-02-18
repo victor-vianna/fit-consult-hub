@@ -11,7 +11,6 @@ import {
   BookTemplate,
   SortAsc,
   Calendar,
-  Folder,
   Search,
 } from "lucide-react";
 import {
@@ -31,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { ModeloTreino } from "@/hooks/useModelosTreino";
 import type { ModeloPasta } from "@/hooks/useModeloPastas";
 import { ModeloVisualizacaoModal } from "./ModeloVisualizacaoModal";
@@ -45,11 +45,11 @@ interface ModelosTreinoListProps {
   loading?: boolean;
   onAplicar: (modelo: ModeloTreino) => void;
   onDeletar: (modeloId: string) => Promise<void>;
-  onCriarPasta: (dados: { nome: string; cor?: string; parent_id?: string | null }) => Promise<unknown>;
+  onCriarPasta: (dados: { nome: string; cor?: string; parent_id?: string | null; tag?: string | null }) => Promise<unknown>;
   onDeletarPasta: (pastaId: string) => Promise<unknown>;
-  onRenomearPasta: (pastaId: string, nome: string) => Promise<unknown>;
+  onRenomearPasta: (pastaId: string, dados: Partial<{ nome: string; cor: string; tag: string | null }>) => Promise<unknown>;
   onMoverModelo: (modeloId: string, pastaId: string | null) => Promise<void>;
-  onAtualizarModelo: (modeloId: string, dados: { nome?: string; descricao?: string; categoria?: string }) => Promise<unknown>;
+  onAtualizarModelo: (modeloId: string, dados: { nome?: string; descricao?: string; categoria?: string; duracao_total_minutos?: number | null }) => Promise<unknown>;
   isAtualizando?: boolean;
   isCriandoPasta?: boolean;
 }
@@ -68,25 +68,17 @@ export function ModelosTreinoList({
   isAtualizando = false,
   isCriandoPasta = false,
 }: ModelosTreinoListProps) {
-  // Estado de navegação de pastas
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
-  
-  // Estado de busca
   const [searchQuery, setSearchQuery] = useState("");
-  
-  // Estado de ordenação (só para modelos, pastas sempre por ordem)
   const [ordenacao, setOrdenacao] = useState<OrdenacaoTipo>("recentes");
-  
-  // Estados de dialogs
+  const [tagFilter, setTagFilter] = useState<string>("");
   const [modeloDeletar, setModeloDeletar] = useState<string | null>(null);
   const [deletando, setDeletando] = useState(false);
   const [modeloVisualizando, setModeloVisualizando] = useState<ModeloTreino | null>(null);
 
-  // Filtrar modelos por busca (busca global)
+  // Filtrar modelos por busca
   const modelosFiltrados = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return modelos;
-    }
+    if (!searchQuery.trim()) return modelos;
     const query = searchQuery.toLowerCase();
     return modelos.filter(
       (m) =>
@@ -107,7 +99,6 @@ export function ModelosTreinoList({
     );
   }, [modelosFiltrados, ordenacao]);
 
-  // Se está buscando, mostrar resultados globais
   const isSearching = searchQuery.trim().length > 0;
 
   const handleConfirmarDelecao = async () => {
@@ -122,6 +113,11 @@ export function ModelosTreinoList({
       setDeletando(false);
     }
   };
+
+  // Check if any folder has a tag
+  const hasTaggedFolders = useMemo(() => {
+    return pastas.some(p => p.tag);
+  }, [pastas]);
 
   if (loading) {
     return (
@@ -141,7 +137,10 @@ export function ModelosTreinoList({
           currentFolderId={null}
           onNavigate={setCurrentFolderId}
           onCreateFolder={onCriarPasta}
-          onRenameFolder={onRenomearPasta}
+          onRenameFolder={(id, dados) => {
+            if (typeof dados === "string") return onRenomearPasta(id, { nome: dados });
+            return onRenomearPasta(id, dados);
+          }}
           onDeleteFolder={onDeletarPasta}
           isCreating={isCriandoPasta}
         />
@@ -166,7 +165,7 @@ export function ModelosTreinoList({
   return (
     <>
       <div className="space-y-4">
-        {/* Search and Sort Controls */}
+        {/* Search, Sort, and Tag Filter Controls */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           {/* Search */}
           <div className="relative flex-1">
@@ -178,6 +177,26 @@ export function ModelosTreinoList({
               className="pl-9"
             />
           </div>
+
+          {/* Tag filter */}
+          {hasTaggedFolders && (
+            <ToggleGroup
+              type="single"
+              value={tagFilter}
+              onValueChange={(v) => setTagFilter(v)}
+              className="border rounded-md"
+            >
+              <ToggleGroupItem value="" className="text-xs h-9 px-3">
+                Todos
+              </ToggleGroupItem>
+              <ToggleGroupItem value="masculino" className="text-xs h-9 px-3">
+                ♂ Masc
+              </ToggleGroupItem>
+              <ToggleGroupItem value="feminino" className="text-xs h-9 px-3">
+                ♀ Fem
+              </ToggleGroupItem>
+            </ToggleGroup>
+          )}
 
           {/* Sort */}
           <div className="flex items-center gap-2">
@@ -210,9 +229,13 @@ export function ModelosTreinoList({
             pastas={pastas}
             modelos={modelos}
             currentFolderId={currentFolderId}
+            tagFilter={tagFilter}
             onNavigate={setCurrentFolderId}
             onCreateFolder={onCriarPasta}
-            onRenameFolder={onRenomearPasta}
+            onRenameFolder={(id, dados) => {
+              if (typeof dados === "string") return onRenomearPasta(id, { nome: dados });
+              return onRenomearPasta(id, dados);
+            }}
             onDeleteFolder={onDeletarPasta}
             isCreating={isCriandoPasta}
           />

@@ -1,122 +1,82 @@
 
-# FASE 1 -- Estabilidade e Base do Produto
+# FASE 2 -- Organizacao e Produtividade
 
 ## Resumo
 
-Quatro implementacoes focadas em estabilidade, retencao e seguranca juridica basica para o sistema FitConsult Hub.
+Duas implementacoes focadas em melhorar a edicao de modelos de treino e a organizacao da biblioteca de modelos.
 
 ---
 
-## 1. Permitir 2 treinos separados no mesmo dia
+## 1. Edicao de Modelos de Treino
 
-### Situacao atual
-O backend ja suporta multiplos treinos por dia -- a tabela `treinos_semanais` possui as colunas `nome_treino` e `ordem_no_dia`, e o hook `useTreinos` ja tem as mutations `criarTreinoNoDia`, `renomearTreino` e `deletarTreino`. O componente `MultiplosTreinosDia` ja existe.
+### 1a. Editar nome do modelo
+Ja implementado no `ModeloVisualizacaoModal.tsx` -- o personal pode clicar no icone de editar e alterar nome, descricao e categoria. Nenhuma alteracao necessaria.
 
-### O que falta
-- Na visao do **aluno** (`TreinosManager` com `readOnly=true`), quando ha multiplos treinos no mesmo dia, a UI precisa exibir cada treino separadamente com seu proprio botao de iniciar/cronometro.
-- Cada treino precisa gerar sua propria sessao em `treino_sessoes` para historico independente.
-- Na visao do **personal** (TreinosManager com `readOnly=false`), validar que o fluxo de criar segundo treino no dia funciona corretamente via o componente `MultiplosTreinosDia`.
+### 1b. Editar duracao total do treino
+- Adicionar coluna `duracao_total_minutos` (integer, nullable) na tabela `treino_modelos`.
+- Atualizar `ModeloVisualizacaoModal.tsx` para exibir e permitir editar a duracao estimada (campo numerico com sufixo "min").
+- Atualizar `useModelosTreino.ts` para incluir `duracao_total_minutos` no tipo `ModeloTreino` e na mutation `atualizarModelo`.
+- Exibir a duracao tambem no `ModeloGrid.tsx` (card do modelo).
 
-### Alteracoes
-- **`src/components/TreinosManager.tsx`**: Quando `readOnly=true` e um dia tem mais de 1 treino, renderizar cards separados para cada treino com nome visivel (ex: "Treino A", "Treino B"). Cada card abre seu proprio `WorkoutDayView` com cronometro independente.
-- **`src/components/WorkoutDayView.tsx`**: Receber `nome_treino` como prop e exibir no header para diferenciar treinos do mesmo dia.
-- **`src/components/CalendarioSemanal.tsx`**: Indicar visualmente quando um dia tem mais de 1 treino (ex: badge "2 treinos").
-
----
-
-## 2. Obrigar refazer anamnese a cada 6 meses
-
-### Situacao atual
-O hook `useAnamneseCheckin` verifica se a anamnese existe, mas nao valida a data. A anamnese tem `created_at` no banco.
-
-### Alteracoes
-- **`src/hooks/useAnamneseCheckin.ts`**: Apos verificar que a anamnese existe, calcular se `created_at` e mais antigo que 180 dias (6 meses). Se sim, tratar como `anamnesePreenchida = false` e `mostrarModalAnamnese = true`, bloqueando acesso aos treinos.
-- **`src/components/AnamneseObrigatorioModal.tsx`**: Adicionar mensagem diferenciada quando e renovacao ("Sua anamnese esta desatualizada. Atualize para continuar treinando.") vs primeira vez.
-- **`src/components/AnamneseInicialForm.tsx`**: Quando for renovacao (ja existe anamnese anterior), pre-preencher os campos com os dados anteriores para facilitar a atualizacao. Isso ja acontece via `checkExistingAnamnese`.
-
-### Logica
-```text
-Se anamnese existe E created_at > 180 dias atras:
-  -> anamnesePreenchida = false
-  -> mostrarModalAnamnese = true (com mensagem de renovacao)
-  -> podeAcessarTreinos = false
-```
+### 1c. Multiplos links de demonstracao por exercicio
+- Atualmente, `treino_modelo_exercicios` tem apenas um campo `link_video` (text).
+- Adicionar coluna `links_demonstracao` (JSONB, nullable) na tabela `treino_modelo_exercicios` para armazenar um array de links com label: `[{ "label": "Angulo frontal", "url": "https://..." }]`.
+- Manter `link_video` para compatibilidade e migracao.
+- Atualizar `ModeloVisualizacaoModal.tsx` para exibir multiplos links quando disponiveis e permitir editar/adicionar links no modo edicao.
+- Atualizar `useModelosTreino.ts` (`ModeloTreinoExercicio`) com o novo campo.
+- Ao salvar/aplicar modelo, copiar os links para o exercicio do treino do aluno.
 
 ---
 
-## 3. Termo de Consentimento na Anamnese
+## 2. Organizacao da Biblioteca de Modelos (Masculino/Feminino)
 
-### Alteracoes
-- **`src/components/AnamneseInicialForm.tsx`**: Na ultima etapa (step 6), adicionar um checkbox obrigatorio com o texto: "Declaro que as informacoes fornecidas sao verdadeiras e assumo total responsabilidade pelos dados informados."
-- Adicionar estado `termoAceito` (boolean, default false).
-- Na validacao do step 6 (`validateStep`), verificar que `termoAceito === true`. Se nao, mostrar toast de erro.
-- O botao "Concluir" fica desabilitado visualmente enquanto o checkbox nao estiver marcado.
-- Nao requer alteracao no banco de dados -- e apenas uma validacao no frontend.
+### Abordagem: Pastas pre-definidas + cor
+O sistema ja possui pastas hierarquicas com cores customizaveis. A melhor abordagem e:
 
----
+- Adicionar opcao de **cor da pasta** no dialog de criacao e edicao (color picker com cores pre-definidas: azul, rosa, verde, roxo, laranja, vermelho).
+- Adicionar um campo **icone/tag** opcional na pasta para marcar como "Masculino" ou "Feminino" (campo `tag` na tabela `modelo_pastas`).
+- No `FolderExplorer`, exibir a tag visualmente (icone ou badge ao lado do nome da pasta).
+- Adicionar **filtro rapido** no topo da biblioteca: "Todos", "Masculino", "Feminino" -- filtra pastas pela tag.
 
-## 4. Melhorar Central de Alertas
-
-### 4a. Alerta "Aluno nunca treinou"
-Ja implementado parcialmente em `PersonalDashboardCards.tsx` -- alunos com `dias_inativo === 999` ja aparecem como "Novo" na tab Inativos.
-
-### 4b. Alerta "Aluno esta ha X dias sem treinar"
-Ja implementado -- `fetchAlunosInativos` calcula `dias_inativo` e filtra > 7 dias.
-
-### 4c. Permitir excluir alertas manualmente
-- **Banco de dados**: Criar tabela `alertas_descartados` com colunas: `id`, `personal_id`, `tipo_alerta` (text), `referencia_id` (uuid -- id do aluno/planilha/etc), `descartado_em` (timestamptz), `expira_em` (timestamptz, 10 dias apos).
-- **RLS**: Personal pode gerenciar seus proprios descartes.
-- **`src/components/dashboard/AlertasModal.tsx`**: Adicionar botao "X" (descartar) em cada alerta. Ao clicar, insere registro em `alertas_descartados`.
-- **`src/components/dashboard/PersonalDashboardCards.tsx`**: Na hora de montar as listas de alertas, filtrar os que foram descartados (verificar `alertas_descartados` onde `expira_em > now()`).
-
-### 4d. Alertas desaparecem apos 10 dias
-- Ao descartar, calcular `expira_em = now() + 10 dias`.
-- O filtro na query ja ignora alertas descartados enquanto `expira_em > now()`. Apos 10 dias, o alerta reaparece automaticamente se a condicao ainda for verdadeira (ex: aluno continua inativo).
+### Melhorias de navegacao
+- Exibir o **caminho completo** da pasta no card do modelo quando em busca global (ja implementado parcialmente no `ModeloGrid`).
+- Adicionar **contador de modelos totais** (incluindo subpastas) no badge de cada pasta no `FolderExplorer`.
 
 ---
 
 ## Detalhes Tecnicos
 
-### Migracao SQL necessaria
+### Migracao SQL
 
 ```text
-CREATE TABLE public.alertas_descartados (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  personal_id UUID NOT NULL,
-  tipo_alerta TEXT NOT NULL,
-  referencia_id UUID NOT NULL,
-  descartado_em TIMESTAMPTZ DEFAULT now(),
-  expira_em TIMESTAMPTZ NOT NULL
-);
+-- 1. Duracao total no modelo
+ALTER TABLE public.treino_modelos 
+ADD COLUMN duracao_total_minutos INTEGER;
 
-ALTER TABLE public.alertas_descartados ENABLE ROW LEVEL SECURITY;
+-- 2. Links multiplos por exercicio do modelo
+ALTER TABLE public.treino_modelo_exercicios 
+ADD COLUMN links_demonstracao JSONB;
 
-CREATE POLICY "Personal gerencia seus descartes"
-  ON public.alertas_descartados
-  FOR ALL
-  USING (personal_id = auth.uid())
-  WITH CHECK (personal_id = auth.uid());
-
-CREATE INDEX idx_alertas_descartados_personal 
-  ON public.alertas_descartados(personal_id, tipo_alerta, referencia_id);
+-- 3. Tag para pastas (Masculino/Feminino/custom)
+ALTER TABLE public.modelo_pastas 
+ADD COLUMN tag TEXT;
 ```
 
 ### Arquivos a modificar
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/hooks/useAnamneseCheckin.ts` | Logica de 180 dias para renovacao |
-| `src/components/AnamneseInicialForm.tsx` | Checkbox de termo na etapa 6 |
-| `src/components/AnamneseObrigatorioModal.tsx` | Mensagem diferenciada para renovacao |
-| `src/components/TreinosManager.tsx` | Renderizar treinos separados para o aluno |
-| `src/components/WorkoutDayView.tsx` | Exibir nome do treino no header |
-| `src/components/CalendarioSemanal.tsx` | Badge visual para dias com 2+ treinos |
-| `src/components/dashboard/AlertasModal.tsx` | Botao de descartar alerta |
-| `src/components/dashboard/PersonalDashboardCards.tsx` | Filtrar alertas descartados |
+| `src/hooks/useModelosTreino.ts` | Adicionar `duracao_total_minutos` e `links_demonstracao` aos tipos e mutations |
+| `src/hooks/useModeloPastas.ts` | Adicionar `tag` ao tipo `ModeloPasta` |
+| `src/components/ModeloVisualizacaoModal.tsx` | Campo de duracao editavel, exibir/editar multiplos links por exercicio |
+| `src/components/modelos/ModeloGrid.tsx` | Exibir duracao no card do modelo |
+| `src/components/modelos/FolderExplorer.tsx` | Color picker na criacao de pasta, exibir tag, filtro rapido Masc/Fem |
+| `src/components/ModelosTreinoList.tsx` | Filtro por tag (Masculino/Feminino/Todos) |
+| `src/hooks/useAplicarModelo.ts` | Copiar `links_demonstracao` ao aplicar modelo |
 
 ### Ordem de implementacao
 
-1. Migracao SQL (tabela `alertas_descartados`)
-2. Anamnese: renovacao 6 meses + termo de consentimento
-3. Multiplos treinos: ajustes na visao do aluno
-4. Central de alertas: descartar + expiracao 10 dias
+1. Migracao SQL (3 colunas novas)
+2. Duracao total do modelo (tipo + modal + card)
+3. Multiplos links de demonstracao (tipo + modal + aplicacao)
+4. Tags e cores nas pastas (tipo + explorer + filtro)

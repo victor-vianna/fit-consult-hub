@@ -17,6 +17,7 @@ interface AnamneseCheckinStatus {
   podeAcessarTreinos: boolean;
   mostrarModalAnamnese: boolean;
   mostrarModalCheckin: boolean;
+  isRenovacao: boolean;
   loading: boolean;
   error: string | null;
   refresh: () => void;
@@ -32,10 +33,11 @@ export function useAnamneseCheckin(
   const [podeAcessarTreinos, setPodeAcessarTreinos] = useState(true);
   const [mostrarModalAnamnese, setMostrarModalAnamnese] = useState(false);
   const [mostrarModalCheckin, setMostrarModalCheckin] = useState(false);
+  const [isRenovacao, setIsRenovacao] = useState(false);
   const [checkinModalDismissed, setCheckinModalDismissed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
+  
   const dismissCheckinModal = useCallback(() => {
     setCheckinModalDismissed(true);
     setMostrarModalCheckin(false);
@@ -69,10 +71,23 @@ export function useAnamneseCheckin(
       }
 
       const anamneseExists = !!anamnese;
-      setAnamnesePreenchida(anamneseExists);
 
-      // Se não tem anamnese, já retorna bloqueado
-      if (!anamneseExists) {
+      // Verificar se anamnese expirou (mais de 180 dias / 6 meses)
+      let anamneseExpirada = false;
+      if (anamneseExists && anamnese.created_at) {
+        const dataAnamnese = new Date(anamnese.created_at);
+        const hoje = new Date();
+        const diasDesdeAnamnese = Math.floor(
+          (hoje.getTime() - dataAnamnese.getTime()) / (1000 * 60 * 60 * 24)
+        );
+        anamneseExpirada = diasDesdeAnamnese >= 180;
+      }
+
+      setIsRenovacao(anamneseExpirada);
+      setAnamnesePreenchida(anamneseExists && !anamneseExpirada);
+
+      // Se não tem anamnese OU expirou, bloqueia
+      if (!anamneseExists || anamneseExpirada) {
         setCheckinSemanalFeito(false);
         setPodeAcessarTreinos(false);
         setMostrarModalAnamnese(true);
@@ -167,6 +182,7 @@ export function useAnamneseCheckin(
     podeAcessarTreinos,
     mostrarModalAnamnese,
     mostrarModalCheckin,
+    isRenovacao,
     loading,
     error,
     refresh: verificarStatus,

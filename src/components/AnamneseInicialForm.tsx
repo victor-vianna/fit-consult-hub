@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -188,7 +189,15 @@ export function AnamneseInicialForm({
         return true;
 
       case 6:
-        // Etapa 6: não há campos obrigatórios específicos
+        // Etapa 6: termo de consentimento obrigatório
+        if (!formValues.termoAceito) {
+          toast({
+            title: "Termo obrigatório",
+            description: "Você precisa aceitar o termo de responsabilidade para continuar.",
+            variant: "destructive",
+          });
+          return false;
+        }
         return true;
 
       default:
@@ -902,6 +911,26 @@ export function AnamneseInicialForm({
                 onChange={handleChange}
               />
             </div>
+
+            {/* Termo de Consentimento */}
+            <div className="border-2 border-primary/30 rounded-lg p-4 bg-primary/5 mt-6">
+              <div className="flex items-start space-x-3">
+                <Checkbox
+                  id="termoAceito"
+                  checked={formValues.termoAceito === true}
+                  onCheckedChange={(checked) =>
+                    setFormValues((prev) => ({ ...prev, termoAceito: checked === true }))
+                  }
+                  className="mt-1"
+                />
+                <label
+                  htmlFor="termoAceito"
+                  className="text-sm leading-relaxed cursor-pointer"
+                >
+                  <strong>Declaro que as informações fornecidas são verdadeiras</strong> e assumo total responsabilidade pelos dados informados. Autorizo o uso dessas informações para elaboração do meu programa de treinamento personalizado.
+                </label>
+              </div>
+            </div>
           </div>
         );
 
@@ -963,8 +992,9 @@ export function AnamneseInicialForm({
             {step === totalSteps && (
               <Button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !formValues.termoAceito}
                 style={{ backgroundColor: themeColor || "hsl(var(--primary))" }}
+                className={!formValues.termoAceito ? "opacity-50" : ""}
               >
                 {loading ? "Salvando..." : "✅ Concluir"}
               </Button>

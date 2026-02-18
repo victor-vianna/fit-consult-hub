@@ -73,7 +73,7 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
     const alunoId = notificacao.dados?.aluno_id || notificacao.dados?.profile_id;
     if (alunoId) {
       const tab = notificacao.tipo === "nova_mensagem" ? "?tab=chat" : "";
-      navigate(`/alunos/${alunoId}${tab}`);
+      navigate(`/aluno/${alunoId}${tab}`);
     }
   };
 

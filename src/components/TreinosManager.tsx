@@ -68,8 +68,17 @@ import { useBlocoTemplates } from "@/hooks/useBlocoTemplates";
 import { SalvarComoModeloDialog } from "@/components/SalvarComoModeloDialog";
 import { AplicarModeloDialog } from "@/components/AplicarModeloDialog";
 import { ModelosTreinoList } from "@/components/ModelosTreinoList";
-import { BookTemplate, FileDown } from "lucide-react";
+import { BookTemplate, FileDown, Download } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { exportTreinoWord } from "@/utils/exportTreinoWord";
+import { exportTreinoPDF } from "@/utils/exportTreinoPDF";
+import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 
 import {
   DndContext,
@@ -169,6 +178,9 @@ export function TreinosManager({
     },
     enabled: !!profileId,
   });
+
+  // Buscar configurações do personal para exportação
+  const { settings: personalSettings } = usePersonalSettings(personalId);
 
   const isAluno = user?.id === profileId;
   const isPersonal = user?.id === personalId;
@@ -946,14 +958,62 @@ export function TreinosManager({
             </Button>
           </div>
 
-          {/* Controle de Semana Ativa */}
-          {isPersonal && !readOnly && alunoProfile && (
-            <SemanaTreinoAtiva
-              profileId={profileId}
-              personalId={personalId}
-              alunoNome={alunoProfile.nome}
-            />
-          )}
+          <div className="flex items-center gap-2">
+            {/* Exportar Treino */}
+            {isPersonal && alunoProfile && personalSettings && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Download className="h-4 w-4" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => {
+                      exportTreinoWord({
+                        treinos,
+                        gruposPorTreino,
+                        blocosPorTreino,
+                        alunoNome: alunoProfile.nome,
+                        semanaLabel: formatarSemana(),
+                        personalSettings,
+                      });
+                      toast.success("Exportando Word...");
+                    }}
+                  >
+                    <FileDown className="h-4 w-4 mr-2" />
+                    Exportar Word (.docx)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      exportTreinoPDF({
+                        treinos,
+                        gruposPorTreino,
+                        blocosPorTreino,
+                        alunoNome: alunoProfile.nome,
+                        semanaLabel: formatarSemana(),
+                        personalSettings,
+                      });
+                      toast.success("Exportando PDF...");
+                    }}
+                  >
+                    <FileDown className="h-4 w-4 mr-2" />
+                    Exportar PDF
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            {/* Controle de Semana Ativa */}
+            {isPersonal && !readOnly && alunoProfile && (
+              <SemanaTreinoAtiva
+                profileId={profileId}
+                personalId={personalId}
+                alunoNome={alunoProfile.nome}
+              />
+            )}
+          </div>
         </div>
       </div>
 

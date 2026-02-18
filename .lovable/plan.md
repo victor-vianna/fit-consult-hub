@@ -1,181 +1,58 @@
 
 
-# FASE 4 -- Comunicacao e Retencao
+# Integracao de Alertas e Notificacoes no Dashboard do Personal
 
-## Resumo
+## Problema Identificado
 
-Implementar um sistema de chat interno entre personal e aluno, com historico salvo por aluno, e integrar alertas clicaveis que levem diretamente ao chat, perfil do aluno ou historico de treino.
+O `NotificacoesDropdown` (sino de notificacoes) so existe no header generico do `AppLayout`, que fica escondido atras do header customizado da pagina Personal. Resultado: o personal **nao ve** o sino de notificacoes nem badges de mensagens nao lidas.
 
----
-
-## 1. Chat Interno na Plataforma
-
-### Estrutura do banco de dados
-
-Nova tabela `mensagens_chat` para armazenar as mensagens:
-
-```text
-CREATE TABLE public.mensagens_chat (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  conversa_key TEXT NOT NULL,  -- formato: personal_id::aluno_id
-  remetente_id UUID NOT NULL,
-  destinatario_id UUID NOT NULL,
-  conteudo TEXT NOT NULL,
-  tipo TEXT NOT NULL DEFAULT 'texto',  -- texto, video (futuro), imagem (futuro)
-  lida BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Indices para performance
-CREATE INDEX idx_mensagens_conversa ON public.mensagens_chat(conversa_key, created_at DESC);
-CREATE INDEX idx_mensagens_destinatario ON public.mensagens_chat(destinatario_id, lida);
-
--- RLS
-ALTER TABLE public.mensagens_chat ENABLE ROW LEVEL SECURITY;
-
--- Participantes da conversa podem ver mensagens
-CREATE POLICY "Participantes podem ver mensagens"
-  ON public.mensagens_chat FOR SELECT
-  USING (remetente_id = auth.uid() OR destinatario_id = auth.uid());
-
--- Usuarios autenticados podem enviar mensagens
-CREATE POLICY "Usuarios podem enviar mensagens"
-  ON public.mensagens_chat FOR INSERT
-  WITH CHECK (remetente_id = auth.uid());
-
--- Destinatario pode marcar como lida
-CREATE POLICY "Destinatario pode atualizar lida"
-  ON public.mensagens_chat FOR UPDATE
-  USING (destinatario_id = auth.uid());
-
--- Remetente pode deletar suas mensagens
-CREATE POLICY "Remetente pode deletar"
-  ON public.mensagens_chat FOR DELETE
-  USING (remetente_id = auth.uid());
-```
-
-A coluna `tipo` prepara a estrutura para mensagens em video no futuro, sem necessidade de migracao adicional.
-
-### Hook `useChatMessages.ts`
-
-- Carregar mensagens por `conversa_key` com paginacao (scroll infinito).
-- Enviar nova mensagem (insert).
-- Marcar mensagens como lidas ao abrir conversa.
-- Contar mensagens nao lidas para badge.
-- **Realtime**: Escutar inserts via `postgres_changes` no canal da conversa para mensagens instantaneas.
-
-### Componente `ChatPanel.tsx`
-
-Interface simples dentro do perfil do aluno (`AlunoDetalhes.tsx`):
-
-- Nova aba "Chat" (icone `MessageSquare`) no TabsList existente (sera a 9a aba, entre "Feedbacks Semanais" e "Financeiro").
-- Area de mensagens com scroll, bolhas de chat alinhadas (remetente a direita, destinatario a esquerda).
-- Campo de input na parte inferior com botao de enviar.
-- Indicador de mensagens nao lidas no trigger da aba.
-- Timestamps relativos nas mensagens.
-
-### Componente `ChatPanelAluno.tsx`
-
-Interface equivalente na area do aluno (`AreaAluno.tsx`):
-
-- Nova secao "Chat" no menu lateral / bottom navigation do aluno.
-- Mesma interface de chat, mas conectada ao personal do aluno.
-- Badge de nao lidas no icone de navegacao.
+Alem disso, o dashboard nao mostra um indicador visual de mensagens de chat pendentes.
 
 ---
 
-## 2. Integracao com Alertas
+## O Que Ja Funciona
 
-### Alertas clicaveis com destinos multiplos
+- `AlertasModal` ja tem botoes contextuais (Ver perfil, Mensagem, Ver treinos, Ver financeiro, Ver feedback, Responder) com navegacao por query params -- **isso ja esta implementado**.
+- `NotificacoesDropdown` ja suporta tipos como `nova_mensagem`, `treino_concluido`, `feedback_semanal` com navegacao ao clicar.
+- `useChatNaoLidas` ja existe como hook para contar mensagens de chat nao lidas.
 
-Atualizar o `AlertasModal.tsx` para que cada alerta tenha acoes contextuais:
+---
 
-- **Aluno inativo**: Botoes "Ver perfil" e "Enviar mensagem" (abre perfil na aba chat).
-- **Planilha expirando**: Botoes "Ver treinos" (abre perfil na aba treinos).
-- **Vencimento assinatura**: Botoes "Ver financeiro" (abre perfil na aba financeiro).
-- **Feedback pendente**: Botoes "Ver feedback" (abre perfil na aba checkins) e "Responder" (abre perfil na aba chat).
+## O Que Falta Implementar
 
-A navegacao usara query params para indicar a aba destino: `/aluno/{id}?tab=chat`, `/aluno/{id}?tab=treinos`, etc.
+### 1. Adicionar NotificacoesDropdown no header Desktop do Personal
 
-### Notificacao ao receber mensagem
+No arquivo `src/pages/Personal.tsx`, na secao de header desktop (ao lado de PersonalSettingsDialog, ThemeToggle e botao Sair), adicionar o componente `NotificacoesDropdown` passando o `user.id`.
 
-Ao enviar uma mensagem no chat, criar automaticamente uma notificacao na tabela `notificacoes` existente para o destinatario:
+### 2. Adicionar NotificacoesDropdown no header Mobile do Personal
 
-- Tipo: `nova_mensagem`.
-- Titulo: "Nova mensagem de {nome}".
-- Dados: `{ aluno_id, profile_id }` para navegacao.
+No arquivo `src/components/mobile/MobileHeaderPersonal.tsx`, adicionar o sino de notificacoes ao lado do ThemeToggle e PersonalSettingsDialog. Requer receber `userId` como nova prop (vindo do `user?.id` em Personal.tsx).
 
-O `NotificacoesDropdown` ja suporta tipos customizados e clique para navegar ao perfil do aluno.
+### 3. Card de Mensagens Nao Lidas no Dashboard
 
-### Badge de mensagens no dashboard
+No `PersonalDashboardCards.tsx`, adicionar um card "Mensagens" na grid de stats (ao lado de "Treinos Hoje", "Treinos na Semana", "Alertas"). Esse card usa o hook `useChatNaoLidas` para exibir o total de mensagens de chat nao lidas, e ao clicar navega para `/alunos` (ou abre uma lista de conversas pendentes).
 
-No `PersonalDashboardCards.tsx`, adicionar consulta de mensagens nao lidas totais e exibir badge no card de alertas ou como card separado de "Mensagens pendentes".
+### 4. Remover header duplicado do AppLayout para Personal
+
+O `AppLayout` renderiza um header com `NotificacoesDropdown` que fica duplicado/escondido quando a pagina Personal tem seu proprio header. Ajustar para que o header do AppLayout nao renderize quando a pagina ja tem header proprio (ou simplesmente esconder via CSS quando dentro do layout do Personal).
 
 ---
 
 ## Detalhes Tecnicos
 
-### Migracao SQL
-
-```text
--- Tabela de mensagens
-CREATE TABLE public.mensagens_chat (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  conversa_key TEXT NOT NULL,
-  remetente_id UUID NOT NULL,
-  destinatario_id UUID NOT NULL,
-  conteudo TEXT NOT NULL,
-  tipo TEXT NOT NULL DEFAULT 'texto',
-  lida BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE INDEX idx_mensagens_conversa ON public.mensagens_chat(conversa_key, created_at DESC);
-CREATE INDEX idx_mensagens_destinatario ON public.mensagens_chat(destinatario_id, lida);
-
-ALTER TABLE public.mensagens_chat ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Participantes podem ver mensagens"
-  ON public.mensagens_chat FOR SELECT
-  USING (remetente_id = auth.uid() OR destinatario_id = auth.uid());
-
-CREATE POLICY "Usuarios podem enviar mensagens"
-  ON public.mensagens_chat FOR INSERT
-  WITH CHECK (remetente_id = auth.uid());
-
-CREATE POLICY "Destinatario pode atualizar lida"
-  ON public.mensagens_chat FOR UPDATE
-  USING (destinatario_id = auth.uid());
-
-CREATE POLICY "Remetente pode deletar"
-  ON public.mensagens_chat FOR DELETE
-  USING (remetente_id = auth.uid());
-```
-
-### Novos arquivos
-
-| Arquivo | Descricao |
-|---------|-----------|
-| `src/hooks/useChatMessages.ts` | Hook com CRUD, realtime e contagem de nao lidas |
-| `src/components/chat/ChatPanel.tsx` | Interface de chat reutilizavel (personal e aluno) |
-
 ### Arquivos a modificar
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/pages/AlunoDetalhes.tsx` | Adicionar aba "Chat" com `ChatPanel`, ler `?tab=` da URL para aba inicial |
-| `src/pages/AreaAluno.tsx` | Adicionar secao "Chat" com `ChatPanel` para o aluno |
-| `src/components/dashboard/AlertasModal.tsx` | Botoes de acao contextual com navegacao por query param |
-| `src/components/NotificacoesDropdown.tsx` | Suporte ao tipo `nova_mensagem` no icone |
-| `src/hooks/useNotificacoes.ts` | (sem mudanca necessaria, ja generico) |
+| `src/pages/Personal.tsx` | Importar e renderizar `NotificacoesDropdown` no header desktop |
+| `src/components/mobile/MobileHeaderPersonal.tsx` | Adicionar prop `userId` e renderizar `NotificacoesDropdown` |
+| `src/components/dashboard/PersonalDashboardCards.tsx` | Adicionar card "Mensagens" com `useChatNaoLidas` |
+| `src/components/AppLayout.tsx` | Esconder header generico quando envolvendo Personal (opcional, evitar duplicacao) |
 
 ### Ordem de implementacao
 
-1. Migracao SQL (tabela + indices + RLS)
-2. Hook `useChatMessages.ts` (CRUD + realtime)
-3. Componente `ChatPanel.tsx` (interface de chat)
-4. Integrar chat no `AlunoDetalhes.tsx` (nova aba + leitura de query param)
-5. Integrar chat no `AreaAluno.tsx` (nova secao para o aluno)
-6. Atualizar `AlertasModal.tsx` com acoes contextuais e navegacao
-7. Criar notificacao automatica ao enviar mensagem
+1. Integrar `NotificacoesDropdown` no header desktop (Personal.tsx)
+2. Integrar `NotificacoesDropdown` no header mobile (MobileHeaderPersonal.tsx)
+3. Adicionar card de mensagens no dashboard (PersonalDashboardCards.tsx)
+4. Remover/ocultar header duplicado no AppLayout
 

@@ -1,53 +1,115 @@
 
 
-# FASE 3 -- Avaliacao e Evolucao do Aluno
+# FASE 4 -- Comunicacao e Retencao
 
 ## Resumo
 
-Reorganizar completamente a aba de Avaliacao no perfil do aluno, criando secoes distintas com navegacao por sub-abas, e adicionar funcionalidades de fotos com linha do tempo, edicao de data e organizacao por pastas.
+Implementar um sistema de chat interno entre personal e aluno, com historico salvo por aluno, e integrar alertas clicaveis que levem diretamente ao chat, perfil do aluno ou historico de treino.
 
 ---
 
-## 1. Reorganizar Area de Avaliacao
+## 1. Chat Interno na Plataforma
 
-### Estado atual
-A aba "Avaliacao" no `AlunoDetalhes.tsx` renderiza o `AvaliacaoFisicaManager.tsx` como um unico bloco monolitico que mistura medidas corporais, composicao corporal e fotos em um so lugar.
+### Estrutura do banco de dados
 
-### Nova estrutura com sub-abas
-Dentro da aba "Avaliacao" existente, criar sub-abas internas:
+Nova tabela `mensagens_chat` para armazenar as mensagens:
 
-| Sub-aba | Conteudo |
-|---------|----------|
-| Fotos | Galeria organizada por pastas (frente, costas, lateral) com linha do tempo visual |
-| Evolucao | Graficos de evolucao de peso, gordura, medidas ao longo do tempo (usando Recharts) |
-| Composicao Corporal | Peso, altura, IMC, % gordura, massa magra |
-| Avaliacao Fisica | Circunferencias (todas as medidas existentes) |
-| Flexibilidade | Novos campos: teste de sentar-e-alcancar, ombro, quadril, tornozelo |
-| Postural | Novos campos: observacoes posturais, desvios, fotos posturais |
-| Triagem | Novos campos: PAR-Q, historico de lesoes, restricoes, liberacao medica |
+```text
+CREATE TABLE public.mensagens_chat (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversa_key TEXT NOT NULL,  -- formato: personal_id::aluno_id
+  remetente_id UUID NOT NULL,
+  destinatario_id UUID NOT NULL,
+  conteudo TEXT NOT NULL,
+  tipo TEXT NOT NULL DEFAULT 'texto',  -- texto, video (futuro), imagem (futuro)
+  lida BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 
-### Implementacao
-- Substituir o `AvaliacaoFisicaManager` monolitico por um componente wrapper `AvaliacaoHub.tsx` que usa `Tabs` interno para as 7 secoes.
-- Extrair logica existente em sub-componentes menores dentro de `src/components/avaliacao/`.
+-- Indices para performance
+CREATE INDEX idx_mensagens_conversa ON public.mensagens_chat(conversa_key, created_at DESC);
+CREATE INDEX idx_mensagens_destinatario ON public.mensagens_chat(destinatario_id, lida);
+
+-- RLS
+ALTER TABLE public.mensagens_chat ENABLE ROW LEVEL SECURITY;
+
+-- Participantes da conversa podem ver mensagens
+CREATE POLICY "Participantes podem ver mensagens"
+  ON public.mensagens_chat FOR SELECT
+  USING (remetente_id = auth.uid() OR destinatario_id = auth.uid());
+
+-- Usuarios autenticados podem enviar mensagens
+CREATE POLICY "Usuarios podem enviar mensagens"
+  ON public.mensagens_chat FOR INSERT
+  WITH CHECK (remetente_id = auth.uid());
+
+-- Destinatario pode marcar como lida
+CREATE POLICY "Destinatario pode atualizar lida"
+  ON public.mensagens_chat FOR UPDATE
+  USING (destinatario_id = auth.uid());
+
+-- Remetente pode deletar suas mensagens
+CREATE POLICY "Remetente pode deletar"
+  ON public.mensagens_chat FOR DELETE
+  USING (remetente_id = auth.uid());
+```
+
+A coluna `tipo` prepara a estrutura para mensagens em video no futuro, sem necessidade de migracao adicional.
+
+### Hook `useChatMessages.ts`
+
+- Carregar mensagens por `conversa_key` com paginacao (scroll infinito).
+- Enviar nova mensagem (insert).
+- Marcar mensagens como lidas ao abrir conversa.
+- Contar mensagens nao lidas para badge.
+- **Realtime**: Escutar inserts via `postgres_changes` no canal da conversa para mensagens instantaneas.
+
+### Componente `ChatPanel.tsx`
+
+Interface simples dentro do perfil do aluno (`AlunoDetalhes.tsx`):
+
+- Nova aba "Chat" (icone `MessageSquare`) no TabsList existente (sera a 9a aba, entre "Feedbacks Semanais" e "Financeiro").
+- Area de mensagens com scroll, bolhas de chat alinhadas (remetente a direita, destinatario a esquerda).
+- Campo de input na parte inferior com botao de enviar.
+- Indicador de mensagens nao lidas no trigger da aba.
+- Timestamps relativos nas mensagens.
+
+### Componente `ChatPanelAluno.tsx`
+
+Interface equivalente na area do aluno (`AreaAluno.tsx`):
+
+- Nova secao "Chat" no menu lateral / bottom navigation do aluno.
+- Mesma interface de chat, mas conectada ao personal do aluno.
+- Badge de nao lidas no icone de navegacao.
 
 ---
 
-## 2. Fotos de Avaliacao
+## 2. Integracao com Alertas
 
-### 2a. Permitir editar data das fotos
-- Adicionar coluna `data_foto` (date, nullable) na tabela `fotos_evolucao` para registrar quando a foto foi tirada (independente do `created_at`).
-- No formulario de upload, adicionar campo de data.
-- Permitir editar a data depois do upload.
+### Alertas clicaveis com destinos multiplos
 
-### 2b. Linha do tempo visual
-- Criar componente `FotoTimeline.tsx` que agrupa fotos por data (usando `data_foto` ou `created_at` como fallback).
-- Cada ponto na timeline mostra as fotos daquele dia, organizadas por tipo (frente, costas, lateral).
-- Permitir comparacao lado-a-lado entre duas datas selecionadas.
+Atualizar o `AlertasModal.tsx` para que cada alerta tenha acoes contextuais:
 
-### 2c. Pastas por tipo de foto
-- Ja existe o campo `tipo_foto` (frente, costas, lado_direito, lado_esquerdo, outro).
-- Criar visualizacao em pastas/abas que filtra por tipo.
-- Adicionar contagem de fotos por tipo.
+- **Aluno inativo**: Botoes "Ver perfil" e "Enviar mensagem" (abre perfil na aba chat).
+- **Planilha expirando**: Botoes "Ver treinos" (abre perfil na aba treinos).
+- **Vencimento assinatura**: Botoes "Ver financeiro" (abre perfil na aba financeiro).
+- **Feedback pendente**: Botoes "Ver feedback" (abre perfil na aba checkins) e "Responder" (abre perfil na aba chat).
+
+A navegacao usara query params para indicar a aba destino: `/aluno/{id}?tab=chat`, `/aluno/{id}?tab=treinos`, etc.
+
+### Notificacao ao receber mensagem
+
+Ao enviar uma mensagem no chat, criar automaticamente uma notificacao na tabela `notificacoes` existente para o destinatario:
+
+- Tipo: `nova_mensagem`.
+- Titulo: "Nova mensagem de {nome}".
+- Dados: `{ aluno_id, profile_id }` para navegacao.
+
+O `NotificacoesDropdown` ja suporta tipos customizados e clique para navegar ao perfil do aluno.
+
+### Badge de mensagens no dashboard
+
+No `PersonalDashboardCards.tsx`, adicionar consulta de mensagens nao lidas totais e exibir badge no card de alertas ou como card separado de "Mensagens pendentes".
 
 ---
 
@@ -56,67 +118,64 @@ Dentro da aba "Avaliacao" existente, criar sub-abas internas:
 ### Migracao SQL
 
 ```text
--- 1. Data da foto (independente do created_at)
-ALTER TABLE public.fotos_evolucao 
-ADD COLUMN data_foto DATE;
+-- Tabela de mensagens
+CREATE TABLE public.mensagens_chat (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversa_key TEXT NOT NULL,
+  remetente_id UUID NOT NULL,
+  destinatario_id UUID NOT NULL,
+  conteudo TEXT NOT NULL,
+  tipo TEXT NOT NULL DEFAULT 'texto',
+  lida BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 
--- 2. Campos de flexibilidade na avaliacao
-ALTER TABLE public.avaliacoes_fisicas 
-ADD COLUMN flexibilidade_sentar_alcancar NUMERIC,
-ADD COLUMN flexibilidade_ombro TEXT,
-ADD COLUMN flexibilidade_quadril TEXT,
-ADD COLUMN flexibilidade_tornozelo TEXT;
+CREATE INDEX idx_mensagens_conversa ON public.mensagens_chat(conversa_key, created_at DESC);
+CREATE INDEX idx_mensagens_destinatario ON public.mensagens_chat(destinatario_id, lida);
 
--- 3. Campos posturais
-ALTER TABLE public.avaliacoes_fisicas 
-ADD COLUMN postural_observacoes TEXT,
-ADD COLUMN postural_desvios JSONB;
+ALTER TABLE public.mensagens_chat ENABLE ROW LEVEL SECURITY;
 
--- 4. Campos de triagem
-ALTER TABLE public.avaliacoes_fisicas 
-ADD COLUMN triagem_parq JSONB,
-ADD COLUMN triagem_historico_lesoes TEXT,
-ADD COLUMN triagem_restricoes TEXT,
-ADD COLUMN triagem_liberacao_medica BOOLEAN DEFAULT false,
-ADD COLUMN triagem_observacoes TEXT;
+CREATE POLICY "Participantes podem ver mensagens"
+  ON public.mensagens_chat FOR SELECT
+  USING (remetente_id = auth.uid() OR destinatario_id = auth.uid());
 
--- 5. Permitir fotos independentes de avaliacao (tornar avaliacao_id nullable)
-ALTER TABLE public.fotos_evolucao 
-ALTER COLUMN avaliacao_id DROP NOT NULL;
+CREATE POLICY "Usuarios podem enviar mensagens"
+  ON public.mensagens_chat FOR INSERT
+  WITH CHECK (remetente_id = auth.uid());
 
--- 6. RLS para update de fotos (editar data)
-CREATE POLICY "Personais podem atualizar fotos" ON public.fotos_evolucao
-FOR UPDATE USING (personal_id = auth.uid());
+CREATE POLICY "Destinatario pode atualizar lida"
+  ON public.mensagens_chat FOR UPDATE
+  USING (destinatario_id = auth.uid());
+
+CREATE POLICY "Remetente pode deletar"
+  ON public.mensagens_chat FOR DELETE
+  USING (remetente_id = auth.uid());
 ```
 
 ### Novos arquivos
 
 | Arquivo | Descricao |
 |---------|-----------|
-| `src/components/avaliacao/AvaliacaoHub.tsx` | Wrapper com sub-abas (Fotos, Evolucao, Composicao, etc.) |
-| `src/components/avaliacao/FotosSection.tsx` | Galeria com pastas por tipo e upload |
-| `src/components/avaliacao/FotoTimeline.tsx` | Linha do tempo visual de fotos |
-| `src/components/avaliacao/EvolucaoSection.tsx` | Graficos de evolucao (Recharts) |
-| `src/components/avaliacao/ComposicaoCorporalSection.tsx` | Peso, altura, IMC, gordura |
-| `src/components/avaliacao/AvaliacaoFisicaSection.tsx` | Circunferencias |
-| `src/components/avaliacao/FlexibilidadeSection.tsx` | Campos de flexibilidade |
-| `src/components/avaliacao/PosturalSection.tsx` | Observacoes posturais |
-| `src/components/avaliacao/TriagemSection.tsx` | PAR-Q e triagem |
+| `src/hooks/useChatMessages.ts` | Hook com CRUD, realtime e contagem de nao lidas |
+| `src/components/chat/ChatPanel.tsx` | Interface de chat reutilizavel (personal e aluno) |
 
 ### Arquivos a modificar
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/pages/AlunoDetalhes.tsx` | Substituir `AvaliacaoFisicaManager` por `AvaliacaoHub` |
-| `src/components/AvaliacaoFisicaManager.tsx` | Refatorar -- extrair logica para sub-componentes |
+| `src/pages/AlunoDetalhes.tsx` | Adicionar aba "Chat" com `ChatPanel`, ler `?tab=` da URL para aba inicial |
+| `src/pages/AreaAluno.tsx` | Adicionar secao "Chat" com `ChatPanel` para o aluno |
+| `src/components/dashboard/AlertasModal.tsx` | Botoes de acao contextual com navegacao por query param |
+| `src/components/NotificacoesDropdown.tsx` | Suporte ao tipo `nova_mensagem` no icone |
+| `src/hooks/useNotificacoes.ts` | (sem mudanca necessaria, ja generico) |
 
 ### Ordem de implementacao
 
-1. Migracao SQL (novas colunas + RLS)
-2. Criar `AvaliacaoHub.tsx` com sub-abas e mover conteudo existente
-3. Criar `FotosSection.tsx` com upload, edicao de data e galeria por tipo
-4. Criar `FotoTimeline.tsx` com linha do tempo e comparacao lado-a-lado
-5. Criar `EvolucaoSection.tsx` com graficos Recharts
-6. Criar secoes de Flexibilidade, Postural e Triagem
-7. Atualizar `AlunoDetalhes.tsx` para usar o novo hub
+1. Migracao SQL (tabela + indices + RLS)
+2. Hook `useChatMessages.ts` (CRUD + realtime)
+3. Componente `ChatPanel.tsx` (interface de chat)
+4. Integrar chat no `AlunoDetalhes.tsx` (nova aba + leitura de query param)
+5. Integrar chat no `AreaAluno.tsx` (nova secao para o aluno)
+6. Atualizar `AlertasModal.tsx` com acoes contextuais e navegacao
+7. Criar notificacao automatica ao enviar mensagem
 

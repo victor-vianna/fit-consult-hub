@@ -199,9 +199,12 @@ export function PersonalDashboardCards({
 
     if (!alunos) return;
 
-    // Para cada aluno, buscar último treino FINALIZADO
+    // Para cada aluno, buscar último treino considerando AMBAS as fontes:
+    // 1. treino_sessoes (timer finalizado)
+    // 2. treinos_semanais (marcado como concluído)
     const alunosComUltimoTreino = await Promise.all(
       alunos.map(async (aluno) => {
+        // Fonte 1: última sessão finalizada pelo timer
         const { data: ultimaSessao } = await supabase
           .from("treino_sessoes")
           .select("fim")
@@ -212,15 +215,36 @@ export function PersonalDashboardCards({
           .limit(1)
           .maybeSingle();
 
-        const ultimoTreino = ultimaSessao?.fim || null;
-        const diasInativo = ultimoTreino
-          ? differenceInDays(new Date(), parseISO(ultimoTreino))
-          : 999; // Se nunca treinou, considera muito inativo
+        // Fonte 2: último treino semanal marcado como concluído
+        const { data: ultimoTreinoConcluido } = await supabase
+          .from("treinos_semanais")
+          .select("updated_at")
+          .eq("profile_id", aluno.id)
+          .eq("concluido", true)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        // Pegar a data mais recente entre as duas fontes
+        const dataSessao = ultimaSessao?.fim ? parseISO(ultimaSessao.fim) : null;
+        const dataTreino = ultimoTreinoConcluido?.updated_at ? parseISO(ultimoTreinoConcluido.updated_at) : null;
+
+        let ultimaAtividade: Date | null = null;
+        if (dataSessao && dataTreino) {
+          ultimaAtividade = dataSessao > dataTreino ? dataSessao : dataTreino;
+        } else {
+          ultimaAtividade = dataSessao || dataTreino;
+        }
+
+        const ultimoTreinoStr = ultimaAtividade ? ultimaAtividade.toISOString() : null;
+        const diasInativo = ultimaAtividade
+          ? differenceInDays(new Date(), ultimaAtividade)
+          : 999;
 
         return {
           id: aluno.id,
           nome: aluno.nome,
-          ultimo_treino: ultimoTreino,
+          ultimo_treino: ultimoTreinoStr,
           dias_inativo: diasInativo,
         };
       })

@@ -1,96 +1,105 @@
 
-
-# Fase 5 -- Financeiro e Gestao
+# Fase 6 -- Exportacao e Profissionalizacao
 
 ## Resumo
 
-Expandir o dashboard financeiro para 12 meses de historico, adicionar comparacao ano-a-ano, e implementar logica de parcelamento para que a receita reflita o valor real recebido mes a mes.
+Adicionar botoes de exportacao de treino semanal do aluno em dois formatos: **Word (.docx)** e **PDF**, com layout profissional compativel com papel timbrado. A exportacao usara os dados do personal (logo, nome) e do aluno para gerar um documento organizado.
 
 ---
 
-## 1. Alteracao no Banco de Dados
+## Bibliotecas Necessarias
 
-Adicionar coluna `parcelas` na tabela `subscriptions` para registrar em quantas vezes o plano foi vendido:
-
-```text
-ALTER TABLE public.subscriptions
-  ADD COLUMN parcelas INTEGER NOT NULL DEFAULT 1;
-```
-
-Isso permite que ao registrar um pagamento, o sistema saiba dividir o valor total em parcelas e agendar os recebimentos futuros.
+- **docx** (npm): Gera arquivos `.docx` (Word 2007+) no navegador. Permite controle total de formatacao, tabelas, cabecalhos e rodapes.
+- **file-saver**: Para disparar o download do arquivo gerado.
+- **jspdf** + **jspdf-autotable**: Gera PDFs no navegador com suporte a tabelas formatadas.
 
 ---
 
-## 2. Alteracoes no Hook `useFinancialDashboard.ts`
+## Estrutura do Documento Exportado
 
-### 2.1 Expandir para 12 meses
-- Buscar `payment_history` dos ultimos 13 meses (12 + mesmo mes do ano anterior para comparacao).
-- Gerar array de 12 meses ao inves de 6.
+O documento (tanto Word quanto PDF) tera:
 
-### 2.2 Comparacao ano-a-ano
-- Para cada mes, calcular tambem a receita do mesmo mes no ano anterior.
-- Adicionar campo `receitaAnoAnterior` no tipo `MonthlyRevenue`.
-- Adicionar metrica `receitaMesmoMesAnoAnterior` e `comparacaoAnual` ao `FinancialMetrics`.
+1. **Cabecalho/Papel Timbrado**
+   - Logo do personal (se configurado em `personal_settings.logo_url`)
+   - Nome do personal/studio (`display_name`)
+   - Linha separadora com cor do tema (`theme_color`)
 
-### 2.3 Receita real (payment_history como fonte)
-- A receita mensal ja e calculada a partir de `payment_history`, que registra o valor efetivamente recebido. Portanto, se um plano trimestral de R$300 e pago em 3x de R$100, cada parcela gera um registro separado em `payment_history` com valor R$100.
-- Nenhuma mudanca de logica e necessaria aqui -- o calculo ja esta correto desde que os pagamentos sejam registrados corretamente.
+2. **Informacoes do Aluno**
+   - Nome do aluno
+   - Semana de referencia (ex: "10/02 - 16/02/2026")
+
+3. **Treinos por Dia**
+   - Para cada dia da semana com conteudo:
+     - Titulo do dia (ex: "Segunda-feira - Treino A")
+     - Descricao (se houver)
+     - Tabela de exercicios com colunas: Exercicio | Series | Repeticoes | Carga | Descanso | Observacoes
+     - Exercicios agrupados (bi-set, tri-set) indicados visualmente
+     - Blocos de treino (cardio, alongamento) listados separadamente
+
+4. **Rodape**
+   - "Gerado por [nome do personal]" + data de geracao
 
 ---
 
-## 3. Alteracoes no Hook `useSubscriptions.ts`
+## Arquivos a Criar
 
-### Funcao `registerPayment` com suporte a parcelas
+| Arquivo | Descricao |
+|---------|-----------|
+| `src/utils/exportTreinoWord.ts` | Funcao que recebe dados do treino, aluno e personal e gera um .docx usando a lib `docx` |
+| `src/utils/exportTreinoPDF.ts` | Funcao que recebe os mesmos dados e gera um .pdf usando `jspdf` + `jspdf-autotable` |
 
-Atualizar para aceitar `parcelas` como parametro opcional:
-- Se `parcelas > 1`, criar multiplos registros em `payment_history`, um para cada parcela, com datas mensais sequenciais e valor dividido.
-- Exemplo: plano trimestral R$300 em 3x gera 3 registros de R$100 nos meses 1, 2 e 3.
+## Arquivos a Modificar
 
----
-
-## 4. Alteracoes no Componente `FinancialDashboard.tsx`
-
-### 4.1 Grafico de 12 meses
-- Titulo: "Receita dos Ultimos 12 Meses"
-- Linha principal: receita do mes atual
-- Linha secundaria (tracejada, cor mais clara): receita do mesmo mes no ano anterior
-- Legenda clara indicando "Este ano" e "Ano anterior"
-
-### 4.2 Card de comparacao anual
-- Substituir o card "Mes Anterior" por "vs Ano Anterior"
-- Mostrar valor do mesmo mes do ano passado
-- Percentual de variacao (positivo/negativo)
-
-### 4.3 Layout simplificado
-- Manter os 4 cards de metricas (Receita do Mes, Previsao Mensal, Inadimplencia, vs Ano Anterior)
-- Grafico de linha com 12 meses + comparacao ano anterior
-- Grafico de barras com numero de pagamentos (12 meses)
-- Lista de inadimplentes (sem mudanca)
-- Resumo geral (sem mudanca)
+| Arquivo | Mudanca |
+|---------|---------|
+| `src/components/TreinosManager.tsx` | Adicionar botoes "Exportar Word" e "Exportar PDF" no header da aba de treinos, ao lado da navegacao de semanas |
 
 ---
 
 ## Detalhes Tecnicos
 
-### Migracao SQL
+### Funcao `exportTreinoWord`
 
 ```text
-ALTER TABLE public.subscriptions
-  ADD COLUMN parcelas INTEGER NOT NULL DEFAULT 1;
+Parametros:
+  - treinos: TreinoDia[]
+  - gruposPorTreino: Record<string, GrupoExercicios[]>
+  - blocosPorTreino: Record<string, BlocoTreino[]>
+  - alunoNome: string
+  - semanaLabel: string
+  - personalSettings: PersonalSettings
+
+Gera um Document do docx com:
+  - Header com logo + nome do personal
+  - Secao de info do aluno
+  - Para cada dia: titulo + tabela de exercicios
+  - Footer com data de geracao
+
+Usa Packer.toBlob() + saveAs() para download
 ```
 
-### Arquivos a modificar
+### Funcao `exportTreinoPDF`
 
-| Arquivo | Mudanca |
-|---------|---------|
-| `src/hooks/useFinancialDashboard.ts` | Expandir para 12 meses, adicionar comparacao anual, novo tipo MonthlyRevenue |
-| `src/hooks/useSubscriptions.ts` | Suporte a parcelas no registerPayment |
-| `src/components/FinancialDashboard.tsx` | Grafico 12 meses com 2 linhas, card comparacao anual |
+```text
+Mesmos parametros.
+Usa jsPDF com:
+  - addImage para logo
+  - autoTable para tabelas formatadas
+  - Cores do tema do personal
+  - Download automatico via doc.save()
+```
+
+### Integracao no TreinosManager
+
+Adicionar um `DropdownMenu` com icone de download contendo duas opcoes:
+- "Exportar Word (.docx)"
+- "Exportar PDF"
+
+Ambos chamam as funcoes utilitarias passando os dados ja disponiveis no componente (treinos, grupos, blocos, alunoProfile, personalSettings).
 
 ### Ordem de implementacao
 
-1. Migracao SQL (coluna parcelas)
-2. Atualizar `useFinancialDashboard.ts` (12 meses + comparacao anual)
-3. Atualizar `useSubscriptions.ts` (registro de parcelas)
-4. Atualizar `FinancialDashboard.tsx` (nova UI)
-
+1. Instalar dependencias (`docx`, `file-saver`, `jspdf`, `jspdf-autotable`)
+2. Criar `exportTreinoWord.ts`
+3. Criar `exportTreinoPDF.ts`
+4. Integrar botoes no `TreinosManager.tsx`

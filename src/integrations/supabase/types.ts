@@ -351,6 +351,10 @@ export type Database = {
           coxa_esquerda: number | null
           created_at: string | null
           data_avaliacao: string
+          flexibilidade_ombro: string | null
+          flexibilidade_quadril: string | null
+          flexibilidade_sentar_alcancar: number | null
+          flexibilidade_tornozelo: string | null
           id: string
           imc: number | null
           massa_magra: number | null
@@ -363,9 +367,16 @@ export type Database = {
           personal_id: string
           pescoco: number | null
           peso: number | null
+          postural_desvios: Json | null
+          postural_observacoes: string | null
           profile_id: string
           quadril: number | null
           torax: number | null
+          triagem_historico_lesoes: string | null
+          triagem_liberacao_medica: boolean | null
+          triagem_observacoes: string | null
+          triagem_parq: Json | null
+          triagem_restricoes: string | null
           updated_at: string | null
         }
         Insert: {
@@ -380,6 +391,10 @@ export type Database = {
           coxa_esquerda?: number | null
           created_at?: string | null
           data_avaliacao?: string
+          flexibilidade_ombro?: string | null
+          flexibilidade_quadril?: string | null
+          flexibilidade_sentar_alcancar?: number | null
+          flexibilidade_tornozelo?: string | null
           id?: string
           imc?: number | null
           massa_magra?: number | null
@@ -392,9 +407,16 @@ export type Database = {
           personal_id: string
           pescoco?: number | null
           peso?: number | null
+          postural_desvios?: Json | null
+          postural_observacoes?: string | null
           profile_id: string
           quadril?: number | null
           torax?: number | null
+          triagem_historico_lesoes?: string | null
+          triagem_liberacao_medica?: boolean | null
+          triagem_observacoes?: string | null
+          triagem_parq?: Json | null
+          triagem_restricoes?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -409,6 +431,10 @@ export type Database = {
           coxa_esquerda?: number | null
           created_at?: string | null
           data_avaliacao?: string
+          flexibilidade_ombro?: string | null
+          flexibilidade_quadril?: string | null
+          flexibilidade_sentar_alcancar?: number | null
+          flexibilidade_tornozelo?: string | null
           id?: string
           imc?: number | null
           massa_magra?: number | null
@@ -421,9 +447,16 @@ export type Database = {
           personal_id?: string
           pescoco?: number | null
           peso?: number | null
+          postural_desvios?: Json | null
+          postural_observacoes?: string | null
           profile_id?: string
           quadril?: number | null
           torax?: number | null
+          triagem_historico_lesoes?: string | null
+          triagem_liberacao_medica?: boolean | null
+          triagem_observacoes?: string | null
+          triagem_parq?: Json | null
+          triagem_restricoes?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -901,8 +934,9 @@ export type Database = {
       }
       fotos_evolucao: {
         Row: {
-          avaliacao_id: string
+          avaliacao_id: string | null
           created_at: string | null
+          data_foto: string | null
           descricao: string | null
           foto_nome: string
           foto_url: string
@@ -912,8 +946,9 @@ export type Database = {
           tipo_foto: string
         }
         Insert: {
-          avaliacao_id: string
+          avaliacao_id?: string | null
           created_at?: string | null
+          data_foto?: string | null
           descricao?: string | null
           foto_nome: string
           foto_url: string
@@ -923,8 +958,9 @@ export type Database = {
           tipo_foto: string
         }
         Update: {
-          avaliacao_id?: string
+          avaliacao_id?: string | null
           created_at?: string | null
+          data_foto?: string | null
           descricao?: string | null
           foto_nome?: string
           foto_url?: string

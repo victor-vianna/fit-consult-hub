@@ -415,7 +415,7 @@ export function TreinosManager({
         await editarExercicio(exercicioEditando.id!, payload);
         setExercicioEditando(null);
       } else if (selectedDia !== null) {
-        await adicionarExercicio(selectedDia, payload);
+        await adicionarExercicio(selectedDia, payload, selectedTreinoId);
       }
 
       await new Promise((resolve) => setTimeout(resolve, 300));
@@ -491,6 +491,15 @@ export function TreinosManager({
    * @returns O ID do treino (existente ou recém-criado)
    */
   const criarTreinoSeNecessario = async (dia: number): Promise<string> => {
+    // ✅ Se há um treino selecionado, usar ele diretamente
+    if (selectedTreinoId) {
+      const treinoSelecionado = treinos.find((t) => t.treinoId === selectedTreinoId);
+      if (treinoSelecionado && treinoSelecionado.dia === dia) {
+        console.log(`[TreinosManager] Usando treino selecionado: ${selectedTreinoId}`);
+        return selectedTreinoId;
+      }
+    }
+
     const treino = treinos.find((t) => t.dia === dia);
 
     // Se já existe o treinoId, retorna ele
@@ -633,14 +642,16 @@ export function TreinosManager({
 
       if (blocoEditando) {
         // Se está editando, o treino já deve existir
-        const treino = treinos.find((t) => t.dia === selectedDia);
+        const treino = selectedTreinoId 
+          ? treinos.find((t) => t.treinoId === selectedTreinoId)
+          : treinos.find((t) => t.dia === selectedDia);
         if (!treino?.treinoId) {
           toast.error("Treino não encontrado para edição");
           return;
         }
         treinoId = treino.treinoId;
       } else {
-        // Se está criando novo, cria o treino se necessário
+        // Se está criando novo, cria o treino se necessário (já usa selectedTreinoId internamente)
         treinoId = await criarTreinoSeNecessario(selectedDia);
       }
 

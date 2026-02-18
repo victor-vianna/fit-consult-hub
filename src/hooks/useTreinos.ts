@@ -340,13 +340,16 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
     mutationFn: async ({
       dia,
       exercicio,
+      treinoIdAlvo,
     }: {
       dia: number;
       exercicio: Partial<Exercicio>;
+      treinoIdAlvo?: string | null;
     }) => {
       console.log(
         `[useTreinos] Adicionando exercício para dia ${dia}:`,
-        exercicio.nome
+        exercicio.nome,
+        treinoIdAlvo ? `(treino alvo: ${treinoIdAlvo})` : ''
       );
 
       // ✅ Validar dia antes de processar
@@ -355,8 +358,9 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
       const validated = exercicioSchema.parse(exercicio);
       const cargaDb = cargaForInsert((exercicio as Partial<Exercicio>).carga);
 
-      const treinoId = await criarTreinoSeNecessario(diaValido);
-      const treino = treinos.find((t) => t.dia === diaValido);
+      // ✅ Usar treinoId alvo se fornecido, senão criar/encontrar
+      const treinoId = treinoIdAlvo || await criarTreinoSeNecessario(diaValido);
+      const treino = treinos.find((t) => t.treinoId === treinoId) || treinos.find((t) => t.dia === diaValido);
       const proximaOrdem = treino ? treino.exercicios.length : 0;
 
       const { data, error } = await supabase
@@ -782,8 +786,8 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
     isSemanaAtual,
     semanaAtivaData,
     // Mutations
-    adicionarExercicio: (dia: number, exercicio: Partial<Exercicio>) =>
-      adicionarExercicioMutation.mutateAsync({ dia, exercicio }),
+    adicionarExercicio: (dia: number, exercicio: Partial<Exercicio>, treinoIdAlvo?: string | null) =>
+      adicionarExercicioMutation.mutateAsync({ dia, exercicio, treinoIdAlvo }),
     editarExercicio: (exercicioId: string, dados: Partial<Exercicio>) =>
       editarExercicioMutation.mutateAsync({ exercicioId, dados }),
     removerExercicio: (exercicioId: string) =>

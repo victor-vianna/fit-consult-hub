@@ -24,6 +24,7 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { TreinosHojeModal } from "./TreinosHojeModal";
 import { AlertasModal } from "./AlertasModal";
+import { useChatNaoLidas } from "@/hooks/useChatMessages";
 
 interface PersonalDashboardCardsProps {
   personalId: string;
@@ -85,6 +86,7 @@ export function PersonalDashboardCards({
   themeColor,
 }: PersonalDashboardCardsProps) {
   const navigate = useNavigate();
+  const mensagensNaoLidas = useChatNaoLidas(personalId);
   const [treinosAndamento, setTreinosAndamento] = useState<TreinoEmAndamento[]>([]);
   const [alunosInativos, setAlunosInativos] = useState<AlunoInativo[]>([]);
   const [vencimentosProximos, setVencimentosProximos] = useState<VencimentoProximo[]>([]);
@@ -501,8 +503,8 @@ export function PersonalDashboardCards({
         </CardContent>
       </Card>
 
-      {/* Stats Cards - Interativos (sem duplicação do card de alunos) */}
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* Stats Cards - Interativos */}
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
         {/* Treinos Hoje - INTERATIVO - Mostra apenas treinos finalizados */}
         <Card 
           className="cursor-pointer hover:shadow-md transition-shadow"
@@ -551,6 +553,29 @@ export function PersonalDashboardCards({
             <div className="text-2xl font-bold">{totalAlertas}</div>
             <p className="text-xs text-muted-foreground">
               requerem atenção
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Mensagens - NOVO */}
+        <Card 
+          className={cn(
+            "cursor-pointer hover:shadow-md transition-shadow",
+            mensagensNaoLidas > 0 && "border-blue-500/50"
+          )}
+          onClick={() => navigate("/alunos")}
+        >
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Mensagens</CardTitle>
+            <MessageSquare className={cn(
+              "h-4 w-4",
+              mensagensNaoLidas > 0 ? "text-blue-500" : "text-muted-foreground"
+            )} />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{mensagensNaoLidas}</div>
+            <p className="text-xs text-muted-foreground">
+              não lidas
             </p>
           </CardContent>
         </Card>

@@ -2,6 +2,7 @@ import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { PersonalSettingsDialog } from "@/components/PersonalSettingsDialog";
+import { NotificacoesDropdown } from "@/components/NotificacoesDropdown";
 
 interface MobileHeaderPersonalProps {
   onMenuClick: () => void;
@@ -12,6 +13,7 @@ interface MobileHeaderPersonalProps {
     theme_color?: string;
   };
   profileName?: string;
+  userId?: string;
 }
 
 export function MobileHeaderPersonal({
@@ -19,6 +21,7 @@ export function MobileHeaderPersonal({
   personalId,
   personalSettings,
   profileName,
+  userId,
 }: MobileHeaderPersonalProps) {
   return (
     <header
@@ -68,6 +71,7 @@ export function MobileHeaderPersonal({
         </div>
 
         <div className="flex items-center gap-2">
+          {userId && <NotificacoesDropdown userId={userId} />}
           {personalId && <PersonalSettingsDialog personalId={personalId} />}
           <ThemeToggle />
         </div>

@@ -23,35 +23,23 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
+  Legend,
 } from "recharts";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useMemo, useEffect } from "react";
+import { useMemo } from "react";
 
 export function FinancialDashboard() {
   const { user } = useAuth();
-
-  // ✅ Garantir que userId seja estável
   const userId = useMemo(() => user?.id || "", [user?.id]);
 
-  // ✅ Só chamar o hook quando userId estiver disponível
   const { metrics, monthlyRevenue, inadimplentesList, loading } =
     useFinancialDashboard(userId);
 
-  // ✅ Debug: verificar se há loop
-  useEffect(() => {
-    console.log("FinancialDashboard renderizado", { userId, loading });
-  }, [userId, loading]);
-
-  // ✅ Não renderizar se não houver userId
   if (!userId) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <p className="text-muted-foreground">
-            Carregando informações do usuário...
-          </p>
-        </div>
+        <p className="text-muted-foreground">Carregando informações do usuário...</p>
       </div>
     );
   }
@@ -61,9 +49,7 @@ export function FinancialDashboard() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">
-            Carregando dados financeiros...
-          </p>
+          <p className="mt-4 text-muted-foreground">Carregando dados financeiros...</p>
         </div>
       </div>
     );
@@ -78,21 +64,18 @@ export function FinancialDashboard() {
 
   return (
     <div className="space-y-6 animate-fade-in p-2">
-      {/* Header */}
       <div>
         <h1 className="text-muted-foreground">
           Visão geral das suas finanças e pagamentos
         </h1>
       </div>
 
-      {/* Cards de Métricas Principais */}
+      {/* Cards de Métricas */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {/* Receita Mês Atual */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Receita do Mês
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Receita do Mês</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -115,9 +98,7 @@ export function FinancialDashboard() {
                   </span>
                 </>
               )}
-              <span className="text-muted-foreground ml-1">
-                vs mês anterior
-              </span>
+              <span className="text-muted-foreground ml-1">vs mês anterior</span>
             </div>
           </CardContent>
         </Card>
@@ -125,9 +106,7 @@ export function FinancialDashboard() {
         {/* Previsão de Receita */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Previsão Mensal
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Previsão Mensal</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -140,12 +119,10 @@ export function FinancialDashboard() {
           </CardContent>
         </Card>
 
-        {/* Taxa de Inadimplência */}
+        {/* Inadimplência */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Taxa de Inadimplência
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Taxa de Inadimplência</CardTitle>
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -158,53 +135,78 @@ export function FinancialDashboard() {
           </CardContent>
         </Card>
 
-        {/* Comparação Mês Anterior */}
+        {/* vs Ano Anterior */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Mês Anterior</CardTitle>
+            <CardTitle className="text-sm font-medium">vs Ano Anterior</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(metrics.receitaMesAnterior)}
+              {formatCurrency(metrics.receitaMesmoMesAnoAnterior)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Receita do mês passado
-            </p>
+            <div className="flex items-center text-xs mt-1">
+              {metrics.comparacaoAnual >= 0 ? (
+                <>
+                  <ArrowUpRight className="h-4 w-4 text-green-500 mr-1" />
+                  <span className="text-green-500">
+                    +{metrics.comparacaoAnual.toFixed(1)}%
+                  </span>
+                </>
+              ) : (
+                <>
+                  <ArrowDownRight className="h-4 w-4 text-red-500 mr-1" />
+                  <span className="text-red-500">
+                    {metrics.comparacaoAnual.toFixed(1)}%
+                  </span>
+                </>
+              )}
+              <span className="text-muted-foreground ml-1">mesmo mês</span>
+            </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Gráficos */}
       <div className="grid gap-4 md:grid-cols-2">
-        {/* Gráfico de Receita Mensal */}
+        {/* Gráfico de Receita 12 Meses */}
         <Card className="col-span-2 lg:col-span-1">
           <CardHeader>
-            <CardTitle>Receita dos Últimos 6 Meses</CardTitle>
+            <CardTitle>Receita dos Últimos 12 Meses</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={monthlyRevenue}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="mes" tick={{ fontSize: 12 }} tickMargin={10} />
-                <YAxis
-                  tick={{ fontSize: 12 }}
-                  tickFormatter={(value) => `R$ ${value}`}
-                />
+                <XAxis dataKey="mes" tick={{ fontSize: 11 }} tickMargin={10} angle={-30} />
+                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `R$ ${v}`} />
                 <Tooltip
-                  formatter={(value: number) => [
+                  formatter={(value: number, name: string) => [
                     formatCurrency(value),
-                    "Receita",
+                    name === "receita" ? "Este ano" : "Ano anterior",
                   ]}
-                  labelStyle={{ color: "#000" }}
+                />
+                <Legend
+                  formatter={(value) =>
+                    value === "receita" ? "Este ano" : "Ano anterior"
+                  }
                 />
                 <Line
                   type="monotone"
                   dataKey="receita"
-                  stroke="#f97316"
+                  stroke="hsl(var(--primary))"
                   strokeWidth={2}
-                  dot={{ fill: "#f97316", r: 4 }}
-                  activeDot={{ r: 6 }}
+                  dot={{ fill: "hsl(var(--primary))", r: 3 }}
+                  activeDot={{ r: 5 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="receitaAnoAnterior"
+                  stroke="hsl(var(--muted-foreground))"
+                  strokeWidth={1.5}
+                  strokeDasharray="5 5"
+                  dot={{ fill: "hsl(var(--muted-foreground))", r: 2 }}
+                  activeDot={{ r: 4 }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -220,24 +222,17 @@ export function FinancialDashboard() {
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={monthlyRevenue}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="mes" tick={{ fontSize: 12 }} tickMargin={10} />
+                <XAxis dataKey="mes" tick={{ fontSize: 11 }} tickMargin={10} angle={-30} />
                 <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip
-                  formatter={(value: number) => [value, "Pagamentos"]}
-                  labelStyle={{ color: "#000" }}
-                />
-                <Bar
-                  dataKey="pagamentos"
-                  fill="#f97316"
-                  radius={[8, 8, 0, 0]}
-                />
+                <Tooltip formatter={(value: number) => [value, "Pagamentos"]} />
+                <Bar dataKey="pagamentos" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
 
-      {/* Lista de Inadimplentes */}
+      {/* Inadimplentes */}
       {inadimplentesList.length > 0 && (
         <Card className="border-yellow-500/50">
           <CardHeader className="p-4 md:p-6">
@@ -265,9 +260,7 @@ export function FinancialDashboard() {
                     </p>
                     <p className="text-sm md:text-xs text-muted-foreground">
                       Valor: {formatCurrency(student.valor)} • Vencimento:{" "}
-                      {format(new Date(student.data_expiracao), "dd/MM/yyyy", {
-                        locale: ptBR,
-                      })}
+                      {format(new Date(student.data_expiracao), "dd/MM/yyyy", { locale: ptBR })}
                     </p>
                   </div>
                   <Button variant="outline" size="sm" className="h-10 md:h-9 w-full sm:w-auto">
@@ -293,9 +286,7 @@ export function FinancialDashboard() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Alunos Ativos</p>
-                <p className="text-2xl font-bold">
-                  {metrics.totalAlunosAtivos}
-                </p>
+                <p className="text-2xl font-bold">{metrics.totalAlunosAtivos}</p>
               </div>
             </div>
 
@@ -305,9 +296,7 @@ export function FinancialDashboard() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Inadimplentes</p>
-                <p className="text-2xl font-bold">
-                  {metrics.totalAlunosInadimplentes}
-                </p>
+                <p className="text-2xl font-bold">{metrics.totalAlunosInadimplentes}</p>
               </div>
             </div>
 

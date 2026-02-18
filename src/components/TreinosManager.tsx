@@ -147,6 +147,11 @@ export function TreinosManager({
     irParaProximaSemana,
     irParaSemanaAtual,
     isSemanaAtual,
+    // Múltiplos treinos por dia
+    criarTreinoNoDia,
+    renomearTreino,
+    deletarTreino,
+    treinosPorDia,
   } = useTreinos({ profileId, personalId });
 
   // Buscar nome do aluno
@@ -247,6 +252,7 @@ export function TreinosManager({
   const [exercicioEditando, setExercicioEditando] =
     useState<DialogExercicio | null>(null);
   const [descricaoEditando, setDescricaoEditando] = useState("");
+  const [selectedTreinoId, setSelectedTreinoId] = useState<string | null>(null);
   const [exercicioTemp, setExercicioTemp] =
     useState<Partial<DialogExercicio> | null>(null);
   const [loadingStates, setLoadingStates] = useState({
@@ -964,23 +970,28 @@ export function TreinosManager({
         <TabsContent value="treinos" className="space-y-6 mt-6">
           {/* Treinos Grid */}
           <div className="grid grid-cols-7 gap-2">
-            {treinos.map((treino: TreinoDia) => {
-              const diaInfo = diasSemana[treino.dia - 1];
-              const temExercicios = treino.exercicios.length > 0;
-              const treinoId = getTreinoId(treino);
-              const grupos = treinoId ? obterGruposDoTreino(treinoId) : [];
-              const blocos = treinoId ? obterBlocos(treinoId) : [];
-              const temConteudo =
-                temExercicios || blocos.length > 0 || grupos.length > 0;
-              const totalItens = calcularTotalItens(treino);
+            {diasSemana.map((diaInfo, index) => {
+              const dia = index + 1;
+              const treinosDoDiaArr = treinosPorDia(dia);
+              const totalItens = treinosDoDiaArr.reduce((sum, t) => sum + calcularTotalItens(t), 0);
+              const temConteudo = totalItens > 0;
+              const multiplosTreinos = treinosDoDiaArr.length > 1;
 
               return (
                 <button
-                  key={treino.dia}
-                  onClick={() => setSelectedDia(treino.dia)}
+                  key={dia}
+                  onClick={() => {
+                    setSelectedDia(dia);
+                    // Auto-selecionar o primeiro treino do dia
+                    if (treinosDoDiaArr.length > 0 && treinosDoDiaArr[0].treinoId) {
+                      setSelectedTreinoId(treinosDoDiaArr[0].treinoId);
+                    } else {
+                      setSelectedTreinoId(null);
+                    }
+                  }}
                   className={cn(
                     "relative flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary",
-                    selectedDia === treino.dia
+                    selectedDia === dia
                       ? "border-primary bg-primary/5"
                       : "border-border",
                     !temConteudo && "opacity-50"
@@ -994,6 +1005,11 @@ export function TreinosManager({
                       {totalItens}
                     </div>
                   )}
+                  {multiplosTreinos && (
+                    <Badge variant="secondary" className="text-[10px] px-1 py-0 mt-1">
+                      {treinosDoDiaArr.length} treinos
+                    </Badge>
+                  )}
                 </button>
               );
             })}
@@ -1002,7 +1018,11 @@ export function TreinosManager({
           {/* Conteúdo do dia selecionado */}
           {selectedDia !== null &&
             (() => {
-              const treino = treinos.find((t) => t.dia === selectedDia);
+              const treinosDoDiaArr = treinosPorDia(selectedDia);
+              // Se há múltiplos treinos, usar o selecionado; senão usar o primeiro
+              const treino = selectedTreinoId
+                ? treinosDoDiaArr.find((t) => t.treinoId === selectedTreinoId) || treinosDoDiaArr[0]
+                : treinosDoDiaArr[0] || treinos.find((t) => t.dia === selectedDia);
               if (!treino) return null;
 
               const progresso = calcularProgresso(treino);
@@ -1054,6 +1074,11 @@ export function TreinosManager({
                             <div className="flex-1">
                               <CardTitle className="text-lg font-semibold">
                                 {diaInfo.nome}
+                                {treino.nome_treino && treinosDoDiaArr.length > 1 && (
+                                  <span className="text-sm font-normal text-muted-foreground ml-2">
+                                    — {treino.nome_treino}
+                                  </span>
+                                )}
                               </CardTitle>
 
                               {treino.descricao && (
@@ -1236,6 +1261,62 @@ export function TreinosManager({
                         )}
                       </div>
                     </CardHeader>
+
+                    {/* Seletor de treinos múltiplos no mesmo dia */}
+                    {treinosDoDiaArr.length > 1 && (
+                      <div className="px-6 pb-3 flex items-center gap-2 flex-wrap">
+                        {treinosDoDiaArr
+                          .sort((a, b) => (a.ordem_no_dia || 1) - (b.ordem_no_dia || 1))
+                          .map((t) => (
+                            <Button
+                              key={t.treinoId}
+                              variant={selectedTreinoId === t.treinoId ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setSelectedTreinoId(t.treinoId)}
+                              className="text-xs"
+                            >
+                              {t.nome_treino || `Treino ${t.ordem_no_dia || 1}`}
+                              {t.concluido && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
+                            </Button>
+                          ))}
+                        {!readOnly && isPersonal && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs"
+                            onClick={() => {
+                              const nome = prompt("Nome do novo treino (ex: Cardio Tarde):");
+                              if (nome?.trim()) {
+                                criarTreinoNoDia(selectedDia, nome.trim());
+                              }
+                            }}
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Adicionar Treino
+                          </Button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Botão para criar segundo treino quando há apenas 1 */}
+                    {treinosDoDiaArr.length === 1 && !readOnly && isPersonal && treino.treinoId && (
+                      <div className="px-6 pb-3">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs text-muted-foreground"
+                          onClick={() => {
+                            const nome = prompt("Nome do novo treino (ex: Cardio Tarde):");
+                            if (nome?.trim()) {
+                              criarTreinoNoDia(selectedDia, nome.trim());
+                            }
+                          }}
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Adicionar treino ao dia
+                        </Button>
+                      </div>
+                    )}
 
                     <CollapsibleContent>
                       <CardContent className="pt-0">

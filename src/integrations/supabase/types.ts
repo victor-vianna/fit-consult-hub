@@ -68,6 +68,33 @@ export type Database = {
           },
         ]
       }
+      alertas_descartados: {
+        Row: {
+          descartado_em: string | null
+          expira_em: string
+          id: string
+          personal_id: string
+          referencia_id: string
+          tipo_alerta: string
+        }
+        Insert: {
+          descartado_em?: string | null
+          expira_em: string
+          id?: string
+          personal_id: string
+          referencia_id: string
+          tipo_alerta: string
+        }
+        Update: {
+          descartado_em?: string | null
+          expira_em?: string
+          id?: string
+          personal_id?: string
+          referencia_id?: string
+          tipo_alerta?: string
+        }
+        Relationships: []
+      }
       anamnese_inicial: {
         Row: {
           acompanhamento_nutricional: string | null

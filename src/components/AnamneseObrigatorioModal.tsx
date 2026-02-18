@@ -17,6 +17,7 @@ interface Props {
   themeColor?: string;
   open: boolean;
   onComplete: () => void;
+  isRenovacao?: boolean;
 }
 
 export function AnamneseObrigatoriaModal({
@@ -25,6 +26,7 @@ export function AnamneseObrigatoriaModal({
   themeColor,
   open,
   onComplete,
+  isRenovacao = false,
 }: Props) {
   const [personalName, setPersonalName] = useState<string>("");
 
@@ -69,10 +71,12 @@ export function AnamneseObrigatoriaModal({
             </div>
             <div>
               <DialogTitle className="text-2xl md:text-3xl">
-                Bem-vindo(a)! 👋
+                {isRenovacao ? "Hora de atualizar! 🔄" : "Bem-vindo(a)! 👋"}
               </DialogTitle>
               <DialogDescription className="text-base mt-1">
-                Antes de começar, precisamos conhecer você melhor
+                {isRenovacao
+                  ? "Sua anamnese está desatualizada (mais de 6 meses). Atualize para continuar treinando."
+                  : "Antes de começar, precisamos conhecer você melhor"}
               </DialogDescription>
             </div>
           </div>
@@ -82,25 +86,44 @@ export function AnamneseObrigatoriaModal({
           <AlertCircle className="h-5 w-5" style={{ color: themeColor }} />
           <AlertDescription className="ml-2">
             <p className="font-semibold mb-2">
-              📋 Por que preencher a Anamnese?
+              {isRenovacao ? "🔄 Por que atualizar a Anamnese?" : "📋 Por que preencher a Anamnese?"}
             </p>
             <ul className="space-y-1 text-sm">
-              <li>
-                ✅ <strong>Segurança:</strong> {personalName || "Seu personal"}{" "}
-                precisa conhecer seu histórico de saúde
-              </li>
-              <li>
-                ✅ <strong>Personalização:</strong> Seus treinos serão adaptados
-                aos seus objetivos
-              </li>
-              <li>
-                ✅ <strong>Resultados:</strong> Quanto mais detalhes, melhor
-                será seu acompanhamento
-              </li>
-              <li>
-                ✅ <strong>Obrigatório:</strong> Necessário para acessar seus
-                treinos
-              </li>
+              {isRenovacao ? (
+                <>
+                  <li>
+                    ✅ <strong>Atualização:</strong> Seus dados de saúde podem ter mudado nos últimos 6 meses
+                  </li>
+                  <li>
+                    ✅ <strong>Segurança:</strong> {personalName || "Seu personal"} precisa de informações atualizadas
+                  </li>
+                  <li>
+                    ✅ <strong>Evolução:</strong> Atualize seus objetivos e condições atuais
+                  </li>
+                  <li>
+                    ✅ <strong>Obrigatório:</strong> Necessário para continuar acessando seus treinos
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li>
+                    ✅ <strong>Segurança:</strong> {personalName || "Seu personal"}{" "}
+                    precisa conhecer seu histórico de saúde
+                  </li>
+                  <li>
+                    ✅ <strong>Personalização:</strong> Seus treinos serão adaptados
+                    aos seus objetivos
+                  </li>
+                  <li>
+                    ✅ <strong>Resultados:</strong> Quanto mais detalhes, melhor
+                    será seu acompanhamento
+                  </li>
+                  <li>
+                    ✅ <strong>Obrigatório:</strong> Necessário para acessar seus
+                    treinos
+                  </li>
+                </>
+              )}
             </ul>
           </AlertDescription>
         </Alert>

@@ -2,18 +2,22 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { 
   AlertTriangle, 
   Calendar, 
   CreditCard, 
   MessageSquare, 
   UserX,
-  ChevronRight
+  ChevronRight,
+  X
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface AlunoInativo {
   id: string;
@@ -56,6 +60,9 @@ interface AlertasModalProps {
   vencimentosProximos: VencimentoProximo[];
   planilhasExpirando: PlanilhaExpirando[];
   feedbacksPendentes: FeedbackPendente[];
+  personalId: string;
+  alertasDescartados: Set<string>;
+  onAlertaDescartado: (tipo: string, referenciaId: string) => void;
   themeColor?: string;
 }
 
@@ -66,6 +73,9 @@ export function AlertasModal({
   vencimentosProximos,
   planilhasExpirando,
   feedbacksPendentes,
+  personalId,
+  alertasDescartados,
+  onAlertaDescartado,
   themeColor,
 }: AlertasModalProps) {
   const navigate = useNavigate();
@@ -75,11 +85,41 @@ export function AlertasModal({
     navigate(`/alunos/${alunoId}`);
   };
 
+  const handleDescartar = async (e: React.MouseEvent, tipoAlerta: string, referenciaId: string) => {
+    e.stopPropagation();
+    try {
+      const expiraEm = new Date();
+      expiraEm.setDate(expiraEm.getDate() + 10);
+
+      const { error } = await supabase
+        .from("alertas_descartados")
+        .insert({
+          personal_id: personalId,
+          tipo_alerta: tipoAlerta,
+          referencia_id: referenciaId,
+          expira_em: expiraEm.toISOString(),
+        });
+
+      if (error) throw error;
+      onAlertaDescartado(tipoAlerta, referenciaId);
+      toast.success("Alerta descartado por 10 dias");
+    } catch (err) {
+      console.error("Erro ao descartar alerta:", err);
+      toast.error("Erro ao descartar alerta");
+    }
+  };
+
+  // Filter out dismissed alerts
+  const filteredInativos = alunosInativos.filter(a => !alertasDescartados.has(`inativo_${a.id}`));
+  const filteredPlanilhas = planilhasExpirando.filter(p => !alertasDescartados.has(`planilha_${p.id}`));
+  const filteredVencimentos = vencimentosProximos.filter(v => !alertasDescartados.has(`vencimento_${v.id}`));
+  const filteredFeedbacks = feedbacksPendentes.filter(f => !alertasDescartados.has(`feedback_${f.id}`));
+
   const totalAlertas = 
-    alunosInativos.length + 
-    vencimentosProximos.length + 
-    planilhasExpirando.length + 
-    feedbacksPendentes.length;
+    filteredInativos.length + 
+    filteredVencimentos.length + 
+    filteredPlanilhas.length + 
+    filteredFeedbacks.length;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -97,35 +137,35 @@ export function AlertasModal({
             <TabsTrigger value="inativos" className="text-xs">
               <UserX className="h-3 w-3 mr-1" />
               <span className="hidden sm:inline">Inativos</span>
-              <Badge variant="secondary" className="ml-1 h-5 px-1">{alunosInativos.length}</Badge>
+              <Badge variant="secondary" className="ml-1 h-5 px-1">{filteredInativos.length}</Badge>
             </TabsTrigger>
             <TabsTrigger value="planilhas" className="text-xs">
               <Calendar className="h-3 w-3 mr-1" />
               <span className="hidden sm:inline">Treinos</span>
-              <Badge variant="secondary" className="ml-1 h-5 px-1">{planilhasExpirando.length}</Badge>
+              <Badge variant="secondary" className="ml-1 h-5 px-1">{filteredPlanilhas.length}</Badge>
             </TabsTrigger>
             <TabsTrigger value="assinaturas" className="text-xs">
               <CreditCard className="h-3 w-3 mr-1" />
               <span className="hidden sm:inline">Pagtos</span>
-              <Badge variant="secondary" className="ml-1 h-5 px-1">{vencimentosProximos.length}</Badge>
+              <Badge variant="secondary" className="ml-1 h-5 px-1">{filteredVencimentos.length}</Badge>
             </TabsTrigger>
             <TabsTrigger value="feedbacks" className="text-xs">
               <MessageSquare className="h-3 w-3 mr-1" />
               <span className="hidden sm:inline">Feedbacks</span>
-              <Badge variant="secondary" className="ml-1 h-5 px-1">{feedbacksPendentes.length}</Badge>
+              <Badge variant="secondary" className="ml-1 h-5 px-1">{filteredFeedbacks.length}</Badge>
             </TabsTrigger>
           </TabsList>
 
           {/* Alunos Inativos */}
           <TabsContent value="inativos">
             <ScrollArea className="h-[300px]">
-              {alunosInativos.length === 0 ? (
+              {filteredInativos.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">
                   Todos os alunos estão treinando regularmente! 🎉
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {alunosInativos.map((aluno) => (
+                  {filteredInativos.map((aluno) => (
                     <div
                       key={aluno.id}
                       className="flex items-center justify-between p-3 rounded-lg bg-orange-500/10 cursor-pointer hover:bg-orange-500/20 transition-colors"
@@ -143,6 +183,14 @@ export function AlertasModal({
                         <Badge variant="outline" className="text-orange-600 border-orange-600">
                           {aluno.dias_inativo === 999 ? "Novo" : `${aluno.dias_inativo} dias`}
                         </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0"
+                          onClick={(e) => handleDescartar(e, "inativo", aluno.id)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </div>
                     </div>
@@ -155,13 +203,13 @@ export function AlertasModal({
           {/* Planilhas Expirando */}
           <TabsContent value="planilhas">
             <ScrollArea className="h-[300px]">
-              {planilhasExpirando.length === 0 ? (
+              {filteredPlanilhas.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">
                   Nenhuma planilha próxima de expirar
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {planilhasExpirando.map((planilha) => (
+                  {filteredPlanilhas.map((planilha) => (
                     <div
                       key={planilha.id}
                       className="flex items-center justify-between p-3 rounded-lg bg-blue-500/10 cursor-pointer hover:bg-blue-500/20 transition-colors"
@@ -180,6 +228,14 @@ export function AlertasModal({
                         >
                           {planilha.dias_para_expirar === 0 ? "Hoje" : `${planilha.dias_para_expirar}d`}
                         </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0"
+                          onClick={(e) => handleDescartar(e, "planilha", planilha.id)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </div>
                     </div>
@@ -192,13 +248,13 @@ export function AlertasModal({
           {/* Vencimentos de Assinatura */}
           <TabsContent value="assinaturas">
             <ScrollArea className="h-[300px]">
-              {vencimentosProximos.length === 0 ? (
+              {filteredVencimentos.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">
                   Nenhum vencimento nos próximos dias
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {vencimentosProximos.map((venc) => (
+                  {filteredVencimentos.map((venc) => (
                     <div
                       key={venc.id}
                       className="flex items-center justify-between p-3 rounded-lg bg-yellow-500/10 cursor-pointer hover:bg-yellow-500/20 transition-colors"
@@ -217,6 +273,14 @@ export function AlertasModal({
                         >
                           {venc.dias_para_vencer === 0 ? "Hoje" : `${venc.dias_para_vencer}d`}
                         </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0"
+                          onClick={(e) => handleDescartar(e, "vencimento", venc.id)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </div>
                     </div>
@@ -229,13 +293,13 @@ export function AlertasModal({
           {/* Feedbacks Pendentes */}
           <TabsContent value="feedbacks">
             <ScrollArea className="h-[300px]">
-              {feedbacksPendentes.length === 0 ? (
+              {filteredFeedbacks.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">
                   Nenhum feedback recente para revisar
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {feedbacksPendentes.map((feedback) => (
+                  {filteredFeedbacks.map((feedback) => (
                     <div
                       key={feedback.id}
                       className="flex items-center justify-between p-3 rounded-lg bg-purple-500/10 cursor-pointer hover:bg-purple-500/20 transition-colors"
@@ -257,6 +321,14 @@ export function AlertasModal({
                         <Badge variant="outline" className="text-purple-600 border-purple-600">
                           Novo
                         </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0"
+                          onClick={(e) => handleDescartar(e, "feedback", feedback.id)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </div>
                     </div>

@@ -363,17 +363,26 @@ export function WorkoutDayView({
       <Tabs defaultValue={String(primeiroDiaComConteudo)} className="w-full">
         <TabsList className="grid w-full grid-cols-7 h-auto p-1 bg-card/50 backdrop-blur-sm border shadow-lg rounded-xl">
           {diasSemana.map((dia, index) => {
-            const treino = localTreinos.find((t) => t.dia === index + 1);
-            const treinoId = treino ? getTreinoId(treino) : null;
-            const grupos = treinoId ? localGrupos[treinoId] ?? [] : [];
-            const blocos = treinoId ? localBlocos[treinoId] ?? [] : [];
+            const treinosDoDia = localTreinos.filter((t) => t.dia === index + 1);
+            
+            let totalItens = 0;
+            let progressoTotal = 0;
+            let treinoCount = 0;
+            
+            treinosDoDia.forEach((treino) => {
+              const treinoId = getTreinoId(treino);
+              const grupos = treinoId ? localGrupos[treinoId] ?? [] : [];
+              const blocos = treinoId ? localBlocos[treinoId] ?? [] : [];
+              totalItens += calcularTotalItens(treino, grupos, blocos);
+              const p = calcularProgresso(treino, grupos);
+              if (p > 0 || treino.exercicios.length > 0) {
+                progressoTotal += p;
+                treinoCount++;
+              }
+            });
 
-            // Total de itens agora inclui blocos
-            const totalItens = treino
-              ? calcularTotalItens(treino, grupos, blocos)
-              : 0;
             const temConteudo = totalItens > 0;
-            const progresso = treino ? calcularProgresso(treino, grupos) : 0;
+            const progresso = treinoCount > 0 ? Math.round(progressoTotal / treinoCount) : 0;
 
             return (
               <TabsTrigger
@@ -391,6 +400,11 @@ export function WorkoutDayView({
                     >
                       {totalItens}
                     </Badge>
+                    {treinosDoDia.length > 1 && (
+                      <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5">
+                        {treinosDoDia.length} treinos
+                      </Badge>
+                    )}
                     {progresso > 0 && (
                       <span className="text-[10px] font-bold opacity-80">
                         {progresso}%
@@ -403,92 +417,103 @@ export function WorkoutDayView({
           })}
         </TabsList>
 
-        {/* Conteúdo de cada dia */}
-        {localTreinos.map((treino) => {
-          const diaInfo = diasSemana[treino.dia - 1];
-          const treinoId = getTreinoId(treino);
-          const grupos = treinoId ? localGrupos[treinoId] ?? [] : [];
-          const blocos = treinoId ? localBlocos[treinoId] ?? [] : [];
-
-          const totalItens = calcularTotalItens(treino, grupos, blocos);
-          const temConteudo = totalItens > 0;
-          const progresso = calcularProgresso(treino, grupos);
-
-          // Separar blocos por posição
-          const blocosInicio = blocos.filter((b) => b.posicao === "inicio");
-          const blocosMeio = blocos.filter((b) => b.posicao === "meio");
-          const blocosFim = blocos.filter((b) => b.posicao === "fim");
-
-          // Exercícios isolados
-          const exerciciosIsolados = treino.exercicios.filter(
-            (ex) => !ex.grupo_id
-          );
-
-          const isDiaIniciado = treinosIniciados[treino.dia] || false;
+        {/* Conteúdo de cada dia - agrupado */}
+        {diasSemana.map((diaInfo, index) => {
+          const diaNr = index + 1;
+          const treinosDoDia = localTreinos.filter((t) => t.dia === diaNr);
 
           return (
             <TabsContent
-              key={treino.dia}
-              value={String(treino.dia)}
+              key={diaNr}
+              value={String(diaNr)}
               className="mt-6 space-y-6"
             >
-              <Card className="border-primary/30 shadow-xl bg-card/50 backdrop-blur-sm">
-                <CardContent className="p-4 sm:p-6 space-y-6">
-                  {/* Header do Dia */}
-                  <WorkoutDayHeader
-                    diaNome={diaInfo.nome}
-                    descricao={treino.descricao}
-                    totalExercicios={totalItens}
-                    totalGrupos={grupos.length}
-                    totalBlocos={blocos.length}
-                    progresso={progresso}
-                    onIniciarTreino={() => handleIniciarTreino(treino.dia, treinoId)}
-                    treinoIniciado={isDiaIniciado}
-                  />
+              {treinosDoDia.map((treino, treinoIndex) => {
+                const treinoId = getTreinoId(treino);
+                const grupos = treinoId ? localGrupos[treinoId] ?? [] : [];
+                const blocos = treinoId ? localBlocos[treinoId] ?? [] : [];
 
-                  {/* Cronômetro - apenas quando iniciado */}
-                  {isDiaIniciado && treinoId && (
-                    <WorkoutTimer
-                      treinoId={treinoId}
-                      profileId={profileId}
-                      personalId={personalId}
-                      readOnly={false}
-                      onWorkoutComplete={() => marcarTreinoFinalizado(treinoId, treino.dia)}
-                      onWorkoutCancel={() => marcarTreinoFinalizado(treinoId, treino.dia)}
-                    />
-                  )}
+                const totalItens = calcularTotalItens(treino, grupos, blocos);
+                const treinoTemConteudo = totalItens > 0;
+                const progresso = calcularProgresso(treino, grupos);
 
-                  {/* Conteúdo */}
-                  {!temConteudo ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
-                      <div className="p-5 bg-muted/50 rounded-full">
-                        <Dumbbell className="h-10 w-10 text-muted-foreground" />
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-lg font-semibold text-muted-foreground">
-                          Dia de Descanso
-                        </p>
-                        <p className="text-sm text-muted-foreground max-w-md px-4">
-                          Nenhum conteúdo programado para este dia.
-                          <br />
-                          Aproveite para recuperar!
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <WorkoutExerciseList
-                      exerciciosIsolados={exerciciosIsolados}
-                      grupos={grupos}
-                      blocosInicio={blocosInicio}
-                      blocosMeio={blocosMeio}
-                      blocosFim={blocosFim}
-                      onToggleExercicio={handleToggleExercicio}
-                      onToggleGrupo={handleToggleGrupo}
-                      onToggleBloco={handleToggleBloco}
-                    />
-                  )}
-                </CardContent>
-              </Card>
+                const blocosInicio = blocos.filter((b) => b.posicao === "inicio");
+                const blocosMeio = blocos.filter((b) => b.posicao === "meio");
+                const blocosFim = blocos.filter((b) => b.posicao === "fim");
+
+                const exerciciosIsolados = treino.exercicios.filter(
+                  (ex) => !ex.grupo_id
+                );
+
+                const isDiaIniciado = treinosIniciados[treino.dia] || false;
+                const hasMultiple = treinosDoDia.filter(t => {
+                  const tid = getTreinoId(t);
+                  const g = tid ? localGrupos[tid] ?? [] : [];
+                  const b = tid ? localBlocos[tid] ?? [] : [];
+                  return calcularTotalItens(t, g, b) > 0;
+                }).length > 1;
+
+                if (!treinoTemConteudo && treinosDoDia.length > 1) return null;
+
+                return (
+                  <Card key={treinoId || treinoIndex} className="border-primary/30 shadow-xl bg-card/50 backdrop-blur-sm">
+                    <CardContent className="p-4 sm:p-6 space-y-6">
+                      <WorkoutDayHeader
+                        diaNome={hasMultiple && treino.nome_treino 
+                          ? `${diaInfo.nome} — ${treino.nome_treino}` 
+                          : diaInfo.nome}
+                        descricao={treino.descricao}
+                        totalExercicios={totalItens}
+                        totalGrupos={grupos.length}
+                        totalBlocos={blocos.length}
+                        progresso={progresso}
+                        onIniciarTreino={() => handleIniciarTreino(treino.dia, treinoId)}
+                        treinoIniciado={isDiaIniciado}
+                      />
+
+                      {isDiaIniciado && treinoId && (
+                        <WorkoutTimer
+                          treinoId={treinoId}
+                          profileId={profileId}
+                          personalId={personalId}
+                          readOnly={false}
+                          onWorkoutComplete={() => marcarTreinoFinalizado(treinoId, treino.dia)}
+                          onWorkoutCancel={() => marcarTreinoFinalizado(treinoId, treino.dia)}
+                        />
+                      )}
+
+                      {!treinoTemConteudo ? (
+                        <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
+                          <div className="p-5 bg-muted/50 rounded-full">
+                            <Dumbbell className="h-10 w-10 text-muted-foreground" />
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-lg font-semibold text-muted-foreground">
+                              Dia de Descanso
+                            </p>
+                            <p className="text-sm text-muted-foreground max-w-md px-4">
+                              Nenhum conteúdo programado para este dia.
+                              <br />
+                              Aproveite para recuperar!
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <WorkoutExerciseList
+                          exerciciosIsolados={exerciciosIsolados}
+                          grupos={grupos}
+                          blocosInicio={blocosInicio}
+                          blocosMeio={blocosMeio}
+                          blocosFim={blocosFim}
+                          onToggleExercicio={handleToggleExercicio}
+                          onToggleGrupo={handleToggleGrupo}
+                          onToggleBloco={handleToggleBloco}
+                        />
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </TabsContent>
           );
         })}

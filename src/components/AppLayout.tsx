@@ -13,7 +13,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     profile?.personal_id
   );
 
-  const { mostrarModalAnamnese, mostrarModalCheckin, loading, refresh, dismissCheckinModal } =
+  const { mostrarModalAnamnese, mostrarModalCheckin, isRenovacao, loading, refresh, dismissCheckinModal } =
     useAnamneseCheckin(user?.id, profile?.personal_id);
 
   const handleAnamneseComplete = () => {
@@ -55,6 +55,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           themeColor={personalSettings?.theme_color}
           open={mostrarModalAnamnese}
           onComplete={handleAnamneseComplete}
+          isRenovacao={isRenovacao}
         />
       )}
 

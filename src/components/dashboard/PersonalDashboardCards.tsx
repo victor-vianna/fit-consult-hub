@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -99,6 +99,7 @@ export function PersonalDashboardCards({
     treinosSemana: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [alertasDescartados, setAlertasDescartados] = useState<Set<string>>(new Set());
   
   // Modal states
   const [treinosHojeModalOpen, setTreinosHojeModalOpen] = useState(false);
@@ -107,8 +108,37 @@ export function PersonalDashboardCards({
   useEffect(() => {
     if (personalId) {
       fetchDashboardData();
+      fetchAlertasDescartados();
     }
   }, [personalId]);
+
+  const fetchAlertasDescartados = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("alertas_descartados")
+        .select("tipo_alerta, referencia_id")
+        .eq("personal_id", personalId)
+        .gte("expira_em", new Date().toISOString());
+
+      if (error) throw error;
+      
+      const descartados = new Set<string>();
+      data?.forEach((d: any) => {
+        descartados.add(`${d.tipo_alerta}_${d.referencia_id}`);
+      });
+      setAlertasDescartados(descartados);
+    } catch (err) {
+      console.error("Erro ao buscar alertas descartados:", err);
+    }
+  };
+
+  const handleAlertaDescartado = useCallback((tipo: string, referenciaId: string) => {
+    setAlertasDescartados(prev => {
+      const next = new Set(prev);
+      next.add(`${tipo}_${referenciaId}`);
+      return next;
+    });
+  }, []);
 
   const fetchDashboardData = async () => {
     try {
@@ -708,6 +738,9 @@ export function PersonalDashboardCards({
         vencimentosProximos={vencimentosProximos}
         planilhasExpirando={planilhasExpirando}
         feedbacksPendentes={feedbacksPendentes}
+        personalId={personalId}
+        alertasDescartados={alertasDescartados}
+        onAlertaDescartado={handleAlertaDescartado}
         themeColor={themeColor}
       />
     </div>

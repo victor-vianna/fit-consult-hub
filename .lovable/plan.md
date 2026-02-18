@@ -1,105 +1,122 @@
 
+# FASE 1 -- Estabilidade e Base do Produto
 
-# Correcao do Cronometro de Treino (Mobile e Web)
+## Resumo
 
-## Problemas Identificados
-
-### 1. Layout sobrepondo no mobile
-O timer e os 3 botoes (pausar, finalizar, cancelar) estao todos na mesma linha horizontal (`flex items-center justify-between`). Em telas pequenas (~375px), nao ha espaco suficiente e os elementos se sobrepoem.
-
-### 2. Pause/Resume com resposta lenta
-O estado visual (`isPaused`, `isRunning`) so atualiza apos a chamada ao Supabase completar. No mobile com rede lenta, o botao parece nao funcionar.
+Quatro implementacoes focadas em estabilidade, retencao e seguranca juridica basica para o sistema FitConsult Hub.
 
 ---
 
-## Plano de Correcao
+## 1. Permitir 2 treinos separados no mesmo dia
 
-### Correcao 1: Layout do timer em duas linhas no mobile
+### Situacao atual
+O backend ja suporta multiplos treinos por dia -- a tabela `treinos_semanais` possui as colunas `nome_treino` e `ordem_no_dia`, e o hook `useTreinos` ja tem as mutations `criarTreinoNoDia`, `renomearTreino` e `deletarTreino`. O componente `MultiplosTreinosDia` ja existe.
 
-Reorganizar o sticky header para usar duas linhas em telas pequenas:
-- **Linha 1**: Icone do timer + tempo formatado (grande, centralizado)
-- **Linha 2**: Botoes de acao (Pausar/Retomar, Finalizar, Cancelar) distribuidos igualmente
+### O que falta
+- Na visao do **aluno** (`TreinosManager` com `readOnly=true`), quando ha multiplos treinos no mesmo dia, a UI precisa exibir cada treino separadamente com seu proprio botao de iniciar/cronometro.
+- Cada treino precisa gerar sua propria sessao em `treino_sessoes` para historico independente.
+- Na visao do **personal** (TreinosManager com `readOnly=false`), validar que o fluxo de criar segundo treino no dia funciona corretamente via o componente `MultiplosTreinosDia`.
 
-No desktop, manter tudo em uma linha como esta atualmente.
+### Alteracoes
+- **`src/components/TreinosManager.tsx`**: Quando `readOnly=true` e um dia tem mais de 1 treino, renderizar cards separados para cada treino com nome visivel (ex: "Treino A", "Treino B"). Cada card abre seu proprio `WorkoutDayView` com cronometro independente.
+- **`src/components/WorkoutDayView.tsx`**: Receber `nome_treino` como prop e exibir no header para diferenciar treinos do mesmo dia.
+- **`src/components/CalendarioSemanal.tsx`**: Indicar visualmente quando um dia tem mais de 1 treino (ex: badge "2 treinos").
 
-### Correcao 2: Atualizar estado antes da chamada async (otimista)
+---
 
-Na funcao `togglePause`, inverter a ordem: primeiro atualizar o estado local (`setIsPaused`, `setIsRunning`) e os refs dos timestamps, depois fazer a chamada ao Supabase. Se a chamada falhar, reverter o estado. Isso garante resposta visual imediata.
+## 2. Obrigar refazer anamnese a cada 6 meses
 
-### Correcao 3: Botoes com labels claros no mobile
+### Situacao atual
+O hook `useAnamneseCheckin` verifica se a anamnese existe, mas nao valida a data. A anamnese tem `created_at` no banco.
 
-Em vez de apenas icones, os botoes terao texto:
-- Botao de pause: mostra "Pausar" ou "Retomar" com o icone correspondente
-- Botao de finalizar: mantem "Finalizar" com check
-- Botao de cancelar: mantem apenas o X mas com touch target adequado (44x44px)
+### Alteracoes
+- **`src/hooks/useAnamneseCheckin.ts`**: Apos verificar que a anamnese existe, calcular se `created_at` e mais antigo que 180 dias (6 meses). Se sim, tratar como `anamnesePreenchida = false` e `mostrarModalAnamnese = true`, bloqueando acesso aos treinos.
+- **`src/components/AnamneseObrigatorioModal.tsx`**: Adicionar mensagem diferenciada quando e renovacao ("Sua anamnese esta desatualizada. Atualize para continuar treinando.") vs primeira vez.
+- **`src/components/AnamneseInicialForm.tsx`**: Quando for renovacao (ja existe anamnese anterior), pre-preencher os campos com os dados anteriores para facilitar a atualizacao. Isso ja acontece via `checkExistingAnamnese`.
+
+### Logica
+```text
+Se anamnese existe E created_at > 180 dias atras:
+  -> anamnesePreenchida = false
+  -> mostrarModalAnamnese = true (com mensagem de renovacao)
+  -> podeAcessarTreinos = false
+```
+
+---
+
+## 3. Termo de Consentimento na Anamnese
+
+### Alteracoes
+- **`src/components/AnamneseInicialForm.tsx`**: Na ultima etapa (step 6), adicionar um checkbox obrigatorio com o texto: "Declaro que as informacoes fornecidas sao verdadeiras e assumo total responsabilidade pelos dados informados."
+- Adicionar estado `termoAceito` (boolean, default false).
+- Na validacao do step 6 (`validateStep`), verificar que `termoAceito === true`. Se nao, mostrar toast de erro.
+- O botao "Concluir" fica desabilitado visualmente enquanto o checkbox nao estiver marcado.
+- Nao requer alteracao no banco de dados -- e apenas uma validacao no frontend.
+
+---
+
+## 4. Melhorar Central de Alertas
+
+### 4a. Alerta "Aluno nunca treinou"
+Ja implementado parcialmente em `PersonalDashboardCards.tsx` -- alunos com `dias_inativo === 999` ja aparecem como "Novo" na tab Inativos.
+
+### 4b. Alerta "Aluno esta ha X dias sem treinar"
+Ja implementado -- `fetchAlunosInativos` calcula `dias_inativo` e filtra > 7 dias.
+
+### 4c. Permitir excluir alertas manualmente
+- **Banco de dados**: Criar tabela `alertas_descartados` com colunas: `id`, `personal_id`, `tipo_alerta` (text), `referencia_id` (uuid -- id do aluno/planilha/etc), `descartado_em` (timestamptz), `expira_em` (timestamptz, 10 dias apos).
+- **RLS**: Personal pode gerenciar seus proprios descartes.
+- **`src/components/dashboard/AlertasModal.tsx`**: Adicionar botao "X" (descartar) em cada alerta. Ao clicar, insere registro em `alertas_descartados`.
+- **`src/components/dashboard/PersonalDashboardCards.tsx`**: Na hora de montar as listas de alertas, filtrar os que foram descartados (verificar `alertas_descartados` onde `expira_em > now()`).
+
+### 4d. Alertas desaparecem apos 10 dias
+- Ao descartar, calcular `expira_em = now() + 10 dias`.
+- O filtro na query ja ignora alertas descartados enquanto `expira_em > now()`. Apos 10 dias, o alerta reaparece automaticamente se a condicao ainda for verdadeira (ex: aluno continua inativo).
 
 ---
 
 ## Detalhes Tecnicos
 
-### Arquivo: `src/components/WorkoutTimer.tsx`
-
-Substituir o layout atual do sticky header por:
+### Migracao SQL necessaria
 
 ```text
-<div className="sticky top-0 z-40 ...">
-  {/* Linha 1: Timer */}
-  <div className="flex items-center justify-center py-2 gap-2">
-    <Timer icon />
-    <span className="text-2xl font-mono">{formattedTime}</span>
-    {isPaused && <span>Pausado</span>}
-  </div>
-  
-  {/* Linha 2: Botoes */}
-  <div className="flex items-center justify-center gap-3 pb-3">
-    <Button onClick={togglePause}>
-      {isPaused ? "Retomar" : "Pausar"}
-    </Button>
-    <Button onClick={finalizar}>Finalizar</Button>
-    <Button onClick={cancelar}>X</Button>
-  </div>
-</div>
+CREATE TABLE public.alertas_descartados (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  personal_id UUID NOT NULL,
+  tipo_alerta TEXT NOT NULL,
+  referencia_id UUID NOT NULL,
+  descartado_em TIMESTAMPTZ DEFAULT now(),
+  expira_em TIMESTAMPTZ NOT NULL
+);
+
+ALTER TABLE public.alertas_descartados ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Personal gerencia seus descartes"
+  ON public.alertas_descartados
+  FOR ALL
+  USING (personal_id = auth.uid())
+  WITH CHECK (personal_id = auth.uid());
+
+CREATE INDEX idx_alertas_descartados_personal 
+  ON public.alertas_descartados(personal_id, tipo_alerta, referencia_id);
 ```
 
-### Arquivo: `src/hooks/useWorkoutTimer.ts`
+### Arquivos a modificar
 
-Na funcao `togglePause` (linha 534), mover as atualizacoes de estado para ANTES da chamada Supabase:
+| Arquivo | Mudanca |
+|---------|---------|
+| `src/hooks/useAnamneseCheckin.ts` | Logica de 180 dias para renovacao |
+| `src/components/AnamneseInicialForm.tsx` | Checkbox de termo na etapa 6 |
+| `src/components/AnamneseObrigatorioModal.tsx` | Mensagem diferenciada para renovacao |
+| `src/components/TreinosManager.tsx` | Renderizar treinos separados para o aluno |
+| `src/components/WorkoutDayView.tsx` | Exibir nome do treino no header |
+| `src/components/CalendarioSemanal.tsx` | Badge visual para dias com 2+ treinos |
+| `src/components/dashboard/AlertasModal.tsx` | Botao de descartar alerta |
+| `src/components/dashboard/PersonalDashboardCards.tsx` | Filtrar alertas descartados |
 
-```text
-const togglePause = async () => {
-  const now = Date.now();
-  const vaiPausar = !isPaused;
-  
-  // Atualizar estado IMEDIATAMENTE (otimista)
-  if (vaiPausar) {
-    pausedTimestampRef.current = now;
-    setIsPaused(true);
-    setIsRunning(false);
-  } else {
-    const tempoPausado = pausedTimestampRef.current 
-      ? now - pausedTimestampRef.current : 0;
-    totalPausedMsRef.current += tempoPausado;
-    pausedTimestampRef.current = null;
-    setIsPaused(false);
-    setIsRunning(true);
-  }
-  saveToStorage();
-  
-  // Persistir no banco (async, sem bloquear UI)
-  try {
-    await supabase.from("treino_sessoes").update({...}).eq("id", sessaoId);
-  } catch (err) {
-    // Reverter estado se falhar
-    toast.error("Erro ao pausar/retomar");
-  }
-};
-```
+### Ordem de implementacao
 
-### Resultado esperado
-
-1. Timer e botoes nunca se sobrepoem, mesmo em telas de 320px
-2. Pausar/Retomar responde instantaneamente ao toque
-3. Labels textuais claros ("Pausar" / "Retomar") em vez de apenas icones
-4. Touch targets de 44px minimo em todos os botoes
-5. Visual limpo e organizado em duas linhas
-
+1. Migracao SQL (tabela `alertas_descartados`)
+2. Anamnese: renovacao 6 meses + termo de consentimento
+3. Multiplos treinos: ajustes na visao do aluno
+4. Central de alertas: descartar + expiracao 10 dias

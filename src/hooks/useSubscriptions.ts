@@ -133,11 +133,14 @@ export function useSubscriptions(studentId?: string) {
       data_pagamento: string;
       metodo_pagamento?: string;
       observacoes?: string;
+      parcelas?: number;
     }
   ) => {
     try {
       const subscription = subscriptions.find((s) => s.id === subscriptionId);
       if (!subscription) throw new Error("Assinatura não encontrada");
+
+      const parcelas = paymentData.parcelas || 1;
 
       // Calcular nova data de expiração
       const dataExpiracao = new Date(paymentData.data_pagamento);
@@ -156,33 +159,45 @@ export function useSubscriptions(studentId?: string) {
           break;
       }
 
-      // Atualizar assinatura
+      // Atualizar assinatura (incluindo parcelas)
       await updateSubscription(subscriptionId, {
         status_pagamento: "pago",
         data_pagamento: paymentData.data_pagamento,
         data_expiracao: dataExpiracao.toISOString(),
       });
 
-      // Registrar no histórico
+      // Registrar no histórico - com suporte a parcelas
+      const valorParcela = paymentData.valor / parcelas;
+      const paymentRecords = [];
+
+      for (let i = 0; i < parcelas; i++) {
+        const dataParcela = new Date(paymentData.data_pagamento);
+        dataParcela.setMonth(dataParcela.getMonth() + i);
+
+        paymentRecords.push({
+          subscription_id: subscriptionId,
+          student_id: subscription.student_id,
+          personal_id: subscription.personal_id,
+          valor: Math.round(valorParcela * 100) / 100,
+          data_pagamento: dataParcela.toISOString(),
+          metodo_pagamento: paymentData.metodo_pagamento,
+          observacoes: parcelas > 1
+            ? `${paymentData.observacoes || ""} (Parcela ${i + 1}/${parcelas})`.trim()
+            : paymentData.observacoes,
+        });
+      }
+
       const { error: historyError } = await supabase
         .from("payment_history")
-        .insert([
-          {
-            subscription_id: subscriptionId,
-            student_id: subscription.student_id,
-            personal_id: subscription.personal_id,
-            valor: paymentData.valor,
-            data_pagamento: paymentData.data_pagamento,
-            metodo_pagamento: paymentData.metodo_pagamento,
-            observacoes: paymentData.observacoes,
-          },
-        ]);
+        .insert(paymentRecords);
 
       if (historyError) throw historyError;
 
       toast({
         title: "Sucesso",
-        description: "Pagamento registrado com sucesso",
+        description: parcelas > 1
+          ? `Pagamento registrado em ${parcelas}x de R$ ${valorParcela.toFixed(2)}`
+          : "Pagamento registrado com sucesso",
       });
     } catch (error: any) {
       console.error("Erro ao registrar pagamento:", error);

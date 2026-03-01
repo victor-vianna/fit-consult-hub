@@ -140,6 +140,7 @@ export type Database = {
           rotina_alimentar: string | null
           suplementos: string | null
           tempo_disponivel: string | null
+          termoAceito: boolean
           updated_at: string | null
         }
         Insert: {
@@ -186,6 +187,7 @@ export type Database = {
           rotina_alimentar?: string | null
           suplementos?: string | null
           tempo_disponivel?: string | null
+          termoAceito?: boolean
           updated_at?: string | null
         }
         Update: {
@@ -232,6 +234,7 @@ export type Database = {
           rotina_alimentar?: string | null
           suplementos?: string | null
           tempo_disponivel?: string | null
+          termoAceito?: boolean
           updated_at?: string | null
         }
         Relationships: [

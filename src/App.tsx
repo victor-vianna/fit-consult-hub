@@ -14,6 +14,7 @@ import NotFound from "./pages/NotFound";
 import AcessoSuspenso from "./pages/AcessoSuspenso";
 import Financeiro from "./pages/Financeiro";
 import Biblioteca from "./pages/Biblioteca";
+import ResetPassword from "./pages/ResetPassword";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import AlunosManager from "./pages/Alunos";
 
@@ -92,6 +93,7 @@ const App = () => (
               </AuthGuard>
             }
           />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/acesso-suspenso" element={<AcessoSuspenso />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

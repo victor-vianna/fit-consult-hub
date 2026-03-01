@@ -1,105 +1,84 @@
 
-# Fase 6 -- Exportacao e Profissionalizacao
+
+# Plano: Login Creation, Role-Based Signup, and Password Reset
 
 ## Resumo
 
-Adicionar botoes de exportacao de treino semanal do aluno em dois formatos: **Word (.docx)** e **PDF**, com layout profissional compativel com papel timbrado. A exportacao usara os dados do personal (logo, nome) e do aluno para gerar um documento organizado.
+Tres funcionalidades principais:
+1. **Pagina Auth**: Adicionar checkbox no cadastro para alternar entre criar Aluno ou Personal (Personal so visivel/permitido para admins logados)
+2. **Admin UsuariosManager**: Dialog funcional para criar usuarios (aluno ou personal) com chamada as edge functions existentes
+3. **Reset de senha**: Link "Esqueci minha senha" no login + pagina `/reset-password` para definir nova senha
 
 ---
 
-## Bibliotecas Necessarias
+## 1. Pagina Auth (`src/pages/Auth.tsx`)
 
-- **docx** (npm): Gera arquivos `.docx` (Word 2007+) no navegador. Permite controle total de formatacao, tabelas, cabecalhos e rodapes.
-- **file-saver**: Para disparar o download do arquivo gerado.
-- **jspdf** + **jspdf-autotable**: Gera PDFs no navegador com suporte a tabelas formatadas.
+### Cadastro com selecao de tipo
+- Adicionar estado `tipoUsuario` ("aluno" | "personal") com default "aluno"
+- Adicionar checkbox/switch visivel apenas se o usuario logado for admin
+- Problema: a pagina Auth normalmente e acessada por usuarios nao logados. Portanto:
+  - Verificar se ha sessao ativa ao carregar a pagina
+  - Se sessao ativa com role "admin", mostrar opcao de criar Personal
+  - Se sessao ativa com role "personal", cadastro cria aluno vinculado ao personal
+  - Se nao logado, cadastro publico cria aluno (sem personal_id -- cadastro autonomo via `supabase.auth.signUp`)
 
----
+### Fluxo de cadastro
+- **Aluno (sem login)**: `supabase.auth.signUp()` -- trigger `handle_new_user` cria profile + role aluno
+- **Aluno (personal logado)**: Chama edge function `create-aluno-user` passando `personal_id` do personal logado
+- **Personal (admin logado)**: Chama edge function `create-personal-user`
 
-## Estrutura do Documento Exportado
-
-O documento (tanto Word quanto PDF) tera:
-
-1. **Cabecalho/Papel Timbrado**
-   - Logo do personal (se configurado em `personal_settings.logo_url`)
-   - Nome do personal/studio (`display_name`)
-   - Linha separadora com cor do tema (`theme_color`)
-
-2. **Informacoes do Aluno**
-   - Nome do aluno
-   - Semana de referencia (ex: "10/02 - 16/02/2026")
-
-3. **Treinos por Dia**
-   - Para cada dia da semana com conteudo:
-     - Titulo do dia (ex: "Segunda-feira - Treino A")
-     - Descricao (se houver)
-     - Tabela de exercicios com colunas: Exercicio | Series | Repeticoes | Carga | Descanso | Observacoes
-     - Exercicios agrupados (bi-set, tri-set) indicados visualmente
-     - Blocos de treino (cardio, alongamento) listados separadamente
-
-4. **Rodape**
-   - "Gerado por [nome do personal]" + data de geracao
+### Link "Esqueci minha senha"
+- Abaixo do botao de login, adicionar link que chama `supabase.auth.resetPasswordForEmail(email, { redirectTo })`
 
 ---
 
-## Arquivos a Criar
+## 2. Pagina Reset Password (`src/pages/ResetPassword.tsx`) -- NOVO
+
+- Rota publica `/reset-password`
+- Detecta `type=recovery` no URL hash (Supabase redireciona com esse parametro)
+- Formulario com "Nova senha" + "Confirmar senha"
+- Chama `supabase.auth.updateUser({ password })`
+- Apos sucesso, redireciona para `/auth`
+
+---
+
+## 3. Admin UsuariosManager (`src/components/Admin/Sections/UsuariosManager.tsx`)
+
+### Dialog "Novo Usuario"
+- Formulario com: Nome, Email, Telefone, Senha, Tipo (aluno/personal)
+- Se tipo "aluno": campo adicional para selecionar o personal_id (dropdown dos personals existentes)
+- Se tipo "personal": sem campo extra
+- Chama a edge function correspondente (`create-aluno-user` ou `create-personal-user`)
+- Recarrega lista apos sucesso
+
+---
+
+## 4. Rota no App.tsx
+
+Adicionar:
+```
+<Route path="/reset-password" element={<ResetPassword />} />
+```
+
+---
+
+## Arquivos a criar
 
 | Arquivo | Descricao |
 |---------|-----------|
-| `src/utils/exportTreinoWord.ts` | Funcao que recebe dados do treino, aluno e personal e gera um .docx usando a lib `docx` |
-| `src/utils/exportTreinoPDF.ts` | Funcao que recebe os mesmos dados e gera um .pdf usando `jspdf` + `jspdf-autotable` |
+| `src/pages/ResetPassword.tsx` | Pagina para definir nova senha apos link de recuperacao |
 
-## Arquivos a Modificar
+## Arquivos a modificar
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/components/TreinosManager.tsx` | Adicionar botoes "Exportar Word" e "Exportar PDF" no header da aba de treinos, ao lado da navegacao de semanas |
+| `src/pages/Auth.tsx` | Checkbox tipo usuario, logica condicional de cadastro, link esqueci senha |
+| `src/components/Admin/Sections/UsuariosManager.tsx` | Dialog funcional para criar aluno/personal |
+| `src/App.tsx` | Rota `/reset-password` |
 
----
+## Ordem de implementacao
 
-## Detalhes Tecnicos
+1. Criar `ResetPassword.tsx` + rota no App
+2. Atualizar `Auth.tsx` (link esqueci senha + cadastro com tipo)
+3. Atualizar `UsuariosManager.tsx` (dialog criar usuario)
 
-### Funcao `exportTreinoWord`
-
-```text
-Parametros:
-  - treinos: TreinoDia[]
-  - gruposPorTreino: Record<string, GrupoExercicios[]>
-  - blocosPorTreino: Record<string, BlocoTreino[]>
-  - alunoNome: string
-  - semanaLabel: string
-  - personalSettings: PersonalSettings
-
-Gera um Document do docx com:
-  - Header com logo + nome do personal
-  - Secao de info do aluno
-  - Para cada dia: titulo + tabela de exercicios
-  - Footer com data de geracao
-
-Usa Packer.toBlob() + saveAs() para download
-```
-
-### Funcao `exportTreinoPDF`
-
-```text
-Mesmos parametros.
-Usa jsPDF com:
-  - addImage para logo
-  - autoTable para tabelas formatadas
-  - Cores do tema do personal
-  - Download automatico via doc.save()
-```
-
-### Integracao no TreinosManager
-
-Adicionar um `DropdownMenu` com icone de download contendo duas opcoes:
-- "Exportar Word (.docx)"
-- "Exportar PDF"
-
-Ambos chamam as funcoes utilitarias passando os dados ja disponiveis no componente (treinos, grupos, blocos, alunoProfile, personalSettings).
-
-### Ordem de implementacao
-
-1. Instalar dependencias (`docx`, `file-saver`, `jspdf`, `jspdf-autotable`)
-2. Criar `exportTreinoWord.ts`
-3. Criar `exportTreinoPDF.ts`
-4. Integrar botoes no `TreinosManager.tsx`

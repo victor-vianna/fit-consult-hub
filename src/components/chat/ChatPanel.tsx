@@ -87,15 +87,25 @@ export function ChatPanel({ personalId, alunoId, currentUserId, themeColor }: Ch
                   style={isMe ? { backgroundColor: themeColor || "hsl(var(--primary))" } : undefined}
                 >
                   <p className="text-sm whitespace-pre-wrap break-words">{msg.conteudo}</p>
-                  <p className={cn(
-                    "text-[10px] mt-1",
-                    isMe ? "text-white/70" : "text-muted-foreground"
+                  <div className={cn(
+                    "flex items-center gap-1 mt-1",
+                    isMe ? "justify-end" : ""
                   )}>
-                    {formatDistanceToNow(new Date(msg.created_at), {
-                      addSuffix: true,
-                      locale: ptBR,
-                    })}
-                  </p>
+                    <p className={cn(
+                      "text-[10px]",
+                      isMe ? "text-white/70" : "text-muted-foreground"
+                    )}>
+                      {formatDistanceToNow(new Date(msg.created_at), {
+                        addSuffix: true,
+                        locale: ptBR,
+                      })}
+                    </p>
+                    {isMe && (
+                      <span className={cn("text-[10px]", msg.lida ? "text-white/90" : "text-white/50")}>
+                        {msg.lida ? "✔✔" : "✔"}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             );

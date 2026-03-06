@@ -166,6 +166,31 @@ export function PersonalDashboardCards({
     });
   }, []);
 
+  // Navigate to specific conversation when clicking messages
+  const handleMensagensClick = async () => {
+    if (mensagensNaoLidas > 0) {
+      // Find the first unread message to identify which student sent it
+      const { data } = await supabase
+        .from("mensagens_chat")
+        .select("conversa_key, remetente_id")
+        .eq("destinatario_id", personalId)
+        .eq("lida", false)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (data && data.length > 0) {
+        // conversa_key format: personalId::alunoId
+        const parts = data[0].conversa_key.split("::");
+        const alunoId = parts[1];
+        if (alunoId) {
+          navigate(`/aluno/${alunoId}?tab=chat`);
+          return;
+        }
+      }
+    }
+    navigate("/alunos");
+  };
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -583,7 +608,7 @@ export function PersonalDashboardCards({
             <p className="text-xs text-muted-foreground">requerem atenção</p>
           </CardContent>
         </Card>
-        <Card className={cn("cursor-pointer hover:shadow-md transition-shadow", mensagensNaoLidas > 0 && "border-blue-500/50")} onClick={() => navigate("/alunos")}>
+        <Card className={cn("cursor-pointer hover:shadow-md transition-shadow", mensagensNaoLidas > 0 && "border-blue-500/50")} onClick={handleMensagensClick}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Mensagens</CardTitle>
             <MessageSquare className={cn("h-4 w-4", mensagensNaoLidas > 0 ? "text-blue-500" : "text-muted-foreground")} />

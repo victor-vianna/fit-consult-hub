@@ -18,6 +18,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import { format } from "date-fns";
+import { FeedbackReply } from "@/components/chat/FeedbackReply";
 
 interface Props {
   profileId: string;
@@ -622,6 +623,14 @@ export function CheckinsDashboard({
                   </CardContent>
                 </Card>
               )}
+              {/* Reply to feedback */}
+              <FeedbackReply
+                checkinId={selectedCheckin.id}
+                alunoId={profileId}
+                personalId={personalId}
+                alunoNome={studentName}
+                themeColor={themeColor}
+              />
             </>
           )}
         </div>

@@ -69,6 +69,7 @@ import { AnamneseVisualizacao } from "@/components/AnamneseVisualizacao";
 import { CheckinsDashboard } from "@/components/CheckinsDashboard";
 import { PlanilhaStatusCard } from "@/components/PlanilhaStatusCard";
 import { ChatPanel } from "@/components/chat/ChatPanel";
+import { BroadcastMessageDialog } from "@/components/chat/BroadcastMessageDialog";
 import { useChatMessages } from "@/hooks/useChatMessages";
 
 interface Material {
@@ -988,7 +989,15 @@ export default function AlunoDetalhes() {
             </TabsContent>
 
             {/* Aba Chat */}
-            <TabsContent value="chat" className="space-y-6">
+            <TabsContent value="chat" className="space-y-4">
+              {user && (
+                <div className="flex justify-end">
+                  <BroadcastMessageDialog
+                    personalId={user.id}
+                    themeColor={personalSettings?.theme_color}
+                  />
+                </div>
+              )}
               {user && id && (
                 <ChatPanel
                   personalId={user.id}

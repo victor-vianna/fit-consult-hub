@@ -126,6 +126,19 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
           }
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "mensagens_chat",
+          filter: `conversa_key=eq.${conversaKey}`,
+        },
+        (payload) => {
+          const updated = payload.new as ChatMessage;
+          setMensagens(prev => prev.map(m => m.id === updated.id ? { ...m, lida: updated.lida } : m));
+        }
+      )
       .subscribe();
 
     return () => {

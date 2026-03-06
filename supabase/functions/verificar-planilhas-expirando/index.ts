@@ -7,24 +7,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-interface Planilha {
-  id: string;
-  profile_id: string;
-  personal_id: string;
-  nome: string;
-  data_prevista_fim: string;
-  lembrete_enviado_7dias: boolean;
-  lembrete_enviado_3dias: boolean;
-  lembrete_enviado_expirou: boolean;
-}
-
-interface Profile {
-  id: string;
-  nome: string;
-}
-
 serve(async (req: Request) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -32,7 +15,6 @@ serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const hoje = new Date();
@@ -46,8 +28,6 @@ serve(async (req: Request) => {
     const em3diasStr = em3dias.toISOString().split("T")[0];
 
     console.log(`[verificar-planilhas] Executando verificação: ${hojeStr}`);
-    console.log(`[verificar-planilhas] Verificando expiração em 7 dias: ${em7diasStr}`);
-    console.log(`[verificar-planilhas] Verificando expiração em 3 dias: ${em3diasStr}`);
 
     // Buscar planilhas ativas
     const { data: planilhas, error: errorPlanilhas } = await supabase
@@ -62,6 +42,7 @@ serve(async (req: Request) => {
     console.log(`[verificar-planilhas] Encontradas ${planilhas?.length || 0} planilhas ativas`);
 
     const notificacoesParaCriar: any[] = [];
+    const mensagensParaCriar: any[] = [];
     const planilhasParaAtualizar: { id: string; updates: any }[] = [];
 
     for (const planilha of planilhas || []) {
@@ -76,11 +57,23 @@ serve(async (req: Request) => {
 
       const nomeAluno = aluno?.nome || "Aluno";
 
-      // Verificar se expirou (hoje ou antes)
+      // Helper to create a chat message from personal to student
+      const criarMensagemChat = (conteudo: string) => {
+        const ids = [planilha.personal_id, planilha.profile_id].sort();
+        const conversaKey = `${ids[0]}_${ids[1]}`;
+        mensagensParaCriar.push({
+          remetente_id: planilha.personal_id,
+          destinatario_id: planilha.profile_id,
+          conversa_key: conversaKey,
+          conteudo,
+          tipo: "texto",
+        });
+      };
+
+      // Verificar se expirou
       if (dataFim <= hojeStr && !planilha.lembrete_enviado_expirou) {
         console.log(`[verificar-planilhas] Planilha ${planilha.id} EXPIROU`);
-        
-        // Notificação para o personal
+
         notificacoesParaCriar.push({
           destinatario_id: planilha.personal_id,
           tipo: "planilha_expirou",
@@ -89,7 +82,6 @@ serve(async (req: Request) => {
           dados: { planilha_id: planilha.id, aluno_id: planilha.profile_id },
         });
 
-        // Notificação para o aluno
         notificacoesParaCriar.push({
           destinatario_id: planilha.profile_id,
           tipo: "planilha_aluno_fim",
@@ -97,6 +89,11 @@ serve(async (req: Request) => {
           mensagem: `A planilha "${planilha.nome}" finalizou. Em breve você receberá uma nova!`,
           dados: { planilha_id: planilha.id },
         });
+
+        // Enviar mensagem de chat para o aluno
+        criarMensagemChat(
+          `📋 Sua planilha "${planilha.nome}" chegou ao fim! Em breve prepararei sua próxima fase de treinos. Fique atento(a)! 💪`
+        );
 
         planilhasParaAtualizar.push({
           id: planilha.id,
@@ -106,7 +103,7 @@ serve(async (req: Request) => {
       // Verificar 3 dias antes
       else if (dataFim === em3diasStr && !planilha.lembrete_enviado_3dias) {
         console.log(`[verificar-planilhas] Planilha ${planilha.id} expira em 3 dias`);
-        
+
         notificacoesParaCriar.push({
           destinatario_id: planilha.personal_id,
           tipo: "planilha_expira_3dias",
@@ -114,6 +111,11 @@ serve(async (req: Request) => {
           mensagem: `A planilha de ${nomeAluno} expira em 3 dias. Prepare a próxima fase!`,
           dados: { planilha_id: planilha.id, aluno_id: planilha.profile_id },
         });
+
+        // Mensagem de renovação para o aluno
+        criarMensagemChat(
+          `⏰ Faltam apenas 3 dias para o fim da sua planilha "${planilha.nome}". Aproveite ao máximo esses últimos treinos! Em breve vou preparar sua próxima fase. 🔥`
+        );
 
         planilhasParaAtualizar.push({
           id: planilha.id,
@@ -123,8 +125,7 @@ serve(async (req: Request) => {
       // Verificar 7 dias antes
       else if (dataFim === em7diasStr && !planilha.lembrete_enviado_7dias) {
         console.log(`[verificar-planilhas] Planilha ${planilha.id} expira em 7 dias`);
-        
-        // Notificação para o personal
+
         notificacoesParaCriar.push({
           destinatario_id: planilha.personal_id,
           tipo: "planilha_expira_7dias",
@@ -133,7 +134,6 @@ serve(async (req: Request) => {
           dados: { planilha_id: planilha.id, aluno_id: planilha.profile_id },
         });
 
-        // Notificação para o aluno
         notificacoesParaCriar.push({
           destinatario_id: planilha.profile_id,
           tipo: "planilha_aluno_lembrete",
@@ -141,6 +141,11 @@ serve(async (req: Request) => {
           mensagem: `Faltam 7 dias para o fim da planilha "${planilha.nome}". Aproveite ao máximo!`,
           dados: { planilha_id: planilha.id },
         });
+
+        // Mensagem de renovação para o aluno
+        criarMensagemChat(
+          `📅 Sua planilha "${planilha.nome}" termina em 1 semana! Continue firme nos treinos, e em breve vou preparar sua próxima fase. 💪`
+        );
 
         planilhasParaAtualizar.push({
           id: planilha.id,
@@ -151,14 +156,24 @@ serve(async (req: Request) => {
 
     // Criar notificações
     if (notificacoesParaCriar.length > 0) {
-      console.log(`[verificar-planilhas] Criando ${notificacoesParaCriar.length} notificações`);
-      
       const { error: errorNotificacoes } = await supabase
         .from("notificacoes")
         .insert(notificacoesParaCriar);
 
       if (errorNotificacoes) {
         console.error(`[verificar-planilhas] Erro ao criar notificações:`, errorNotificacoes);
+      }
+    }
+
+    // Criar mensagens de chat
+    if (mensagensParaCriar.length > 0) {
+      console.log(`[verificar-planilhas] Enviando ${mensagensParaCriar.length} mensagens de chat`);
+      const { error: errorMensagens } = await supabase
+        .from("mensagens_chat")
+        .insert(mensagensParaCriar);
+
+      if (errorMensagens) {
+        console.error(`[verificar-planilhas] Erro ao criar mensagens:`, errorMensagens);
       }
     }
 
@@ -174,12 +189,13 @@ serve(async (req: Request) => {
       }
     }
 
-    console.log(`[verificar-planilhas] Concluído. Notificações: ${notificacoesParaCriar.length}, Atualizações: ${planilhasParaAtualizar.length}`);
+    console.log(`[verificar-planilhas] Concluído. Notificações: ${notificacoesParaCriar.length}, Mensagens: ${mensagensParaCriar.length}`);
 
     return new Response(
       JSON.stringify({
         success: true,
         notificacoes_criadas: notificacoesParaCriar.length,
+        mensagens_enviadas: mensagensParaCriar.length,
         planilhas_atualizadas: planilhasParaAtualizar.length,
       }),
       {

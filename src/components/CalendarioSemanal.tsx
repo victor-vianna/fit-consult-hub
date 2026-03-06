@@ -45,6 +45,17 @@ export function CalendarioSemanal({
     if (profileId) carregarTreinos();
   }, [profileId, semanaAtual]);
 
+  // ✅ Escutar evento de treino concluído para atualizar frequência
+  useEffect(() => {
+    const handleWorkoutCompleted = () => {
+      if (profileId) carregarTreinos();
+    };
+    window.addEventListener("workout-completed", handleWorkoutCompleted);
+    return () => {
+      window.removeEventListener("workout-completed", handleWorkoutCompleted);
+    };
+  }, [profileId]);
+
   const carregarTreinos = async () => {
     try {
       const semanaFormatada = format(semanaAtual, "yyyy-MM-dd");

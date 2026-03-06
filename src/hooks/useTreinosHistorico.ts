@@ -33,6 +33,17 @@ export function useTreinosHistorico(profileId: string, mes?: Date) {
     fetchTreinos();
   }, [profileId, mesAtual]);
 
+  // ✅ Escutar evento de treino concluído para atualizar histórico
+  useEffect(() => {
+    const handleWorkoutCompleted = () => {
+      fetchTreinos();
+    };
+    window.addEventListener("workout-completed", handleWorkoutCompleted);
+    return () => {
+      window.removeEventListener("workout-completed", handleWorkoutCompleted);
+    };
+  }, [profileId]);
+
   const fetchTreinos = async () => {
     try {
       setLoading(true);

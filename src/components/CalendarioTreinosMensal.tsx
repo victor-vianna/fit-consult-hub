@@ -55,9 +55,22 @@ export function CalendarioTreinosMensal({
     refetch();
   }, [profileId, mesAtual, refreshKey]);
 
+  // ✅ Escutar evento de treino concluído para atualizar calendário
+  useEffect(() => {
+    const handleWorkoutCompleted = () => {
+      refetch();
+    };
+    window.addEventListener("workout-completed", handleWorkoutCompleted);
+    return () => {
+      window.removeEventListener("workout-completed", handleWorkoutCompleted);
+    };
+  }, [refetch]);
+
   const getTreinosDoDia = (dia: Date) => {
     return treinos.filter((treino) => {
-      const dataTreino = addDays(parseISO(treino.semana), treino.dia_semana);
+      // dia_semana: 1=segunda, 7=domingo. semana já é segunda-feira.
+      // Offset = dia_semana - 1 (segunda = 0 dias após início da semana)
+      const dataTreino = addDays(parseISO(treino.semana), treino.dia_semana - 1);
       return isSameDay(dataTreino, dia);
     });
   };

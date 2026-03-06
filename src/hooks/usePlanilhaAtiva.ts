@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { differenceInDays, parseISO, format, addWeeks } from "date-fns";
 import { getPreviousWeekStart, getWeekStart } from "@/utils/weekUtils";
+import { PLANILHA_UI_STATUS, type PlanilhaUIStatus } from "@/constants/workoutStatus";
 
 interface Planilha {
   id: string;
@@ -123,13 +124,13 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
     return Math.max(0, diff);
   }, [planilha?.data_prevista_fim]);
 
-  const status = useMemo(() => {
-    if (!planilha) return "sem_planilha";
-    if (diasRestantes <= 0 && diasAposExpiracao > 7) return "bloqueada";
-    if (diasRestantes <= 0) return "expirada";
-    if (diasRestantes <= 3) return "critica";
-    if (diasRestantes <= 7) return "expirando";
-    return "ativa";
+  const status: PlanilhaUIStatus = useMemo(() => {
+    if (!planilha) return PLANILHA_UI_STATUS.SEM_PLANILHA;
+    if (diasRestantes <= 0 && diasAposExpiracao > 7) return PLANILHA_UI_STATUS.BLOQUEADA;
+    if (diasRestantes <= 0) return PLANILHA_UI_STATUS.EXPIRADA;
+    if (diasRestantes <= 3) return PLANILHA_UI_STATUS.CRITICA;
+    if (diasRestantes <= 7) return PLANILHA_UI_STATUS.EXPIRANDO;
+    return PLANILHA_UI_STATUS.ATIVA;
   }, [planilha, diasRestantes, diasAposExpiracao]);
 
   /**

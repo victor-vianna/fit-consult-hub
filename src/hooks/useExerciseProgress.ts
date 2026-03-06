@@ -2,6 +2,7 @@
 // Hook para persistir progresso de exercícios e blocos no PWA
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { WORKOUT_EVENTS, dispatchWorkoutEvent } from "@/constants/workoutStatus";
 
 const EXERCISE_PROGRESS_KEY = "pwa_exercise_progress";
 const BLOCK_PROGRESS_KEY = "pwa_block_progress";

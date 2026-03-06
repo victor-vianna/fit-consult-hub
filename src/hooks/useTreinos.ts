@@ -19,6 +19,7 @@ import {
 } from "@/utils/weekUtils";
 import { useExerciseProgress } from "@/hooks/useExerciseProgress";
 import { hidratarBlocoComTemplate } from "@/types/workoutBlocks";
+import { WORKOUT_EVENTS, dispatchWorkoutEvent } from "@/constants/workoutStatus";
 
 
 interface UseTreinosProps {
@@ -248,18 +249,17 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
     refetchOnReconnect: true,
   });
 
-  // 🔧 CORREÇÃO: Sync primeiro, refetch depois ao voltar do background
+  // 🔧 FIX: Improved sync ordering - wait for localStorage sync THEN refetch
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (document.visibilityState === "visible" && profileId && personalId) {
-        // Aguardar sync do useExerciseProgress (via evento)
-        // Delay para garantir que a sync do localStorage ocorreu
-        await new Promise(r => setTimeout(r, 800));
+        // Wait for useExerciseProgress sync to complete
+        await new Promise(r => setTimeout(r, 500));
         refetch();
       }
     };
 
-    // 🔧 Invalidar queries quando treino é finalizado
+    // 🔧 FIX: Listen to centralized event
     const handleWorkoutCompleted = () => {
       queryClient.invalidateQueries({
         queryKey: buildQueryKey(profileId, personalId, semanaParaBuscar),
@@ -270,10 +270,14 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("workout-completed", handleWorkoutCompleted);
+    window.addEventListener(WORKOUT_EVENTS.COMPLETED, handleWorkoutCompleted);
+    window.addEventListener(WORKOUT_EVENTS.PROGRESS_CHANGED, () => {
+      // Debounced refetch for exercise progress changes
+      setTimeout(() => refetch(), 300);
+    });
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("workout-completed", handleWorkoutCompleted);
+      window.removeEventListener(WORKOUT_EVENTS.COMPLETED, handleWorkoutCompleted);
     };
   }, [profileId, personalId, refetch, queryClient, semanaParaBuscar]);
 

@@ -1,7 +1,8 @@
 // hooks/useWorkoutSession.ts
 // Hook para gerenciar persistência de sessão de treino no PWA
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { ACTIVE_SESSION_STATUSES } from "@/constants/workoutStatus";
 
 const WORKOUT_STATE_KEY = "pwa_workout_state";
 
@@ -17,9 +18,16 @@ interface StoredWorkoutStates {
 }
 
 export function useWorkoutSession(profileId: string, personalId: string) {
+  // 🔧 FIX: Track by treinoId (not day) to support multiple workouts per day
   const [sessoesAtivas, setSessoesAtivas] = useState<Record<string, boolean>>({});
-  const [treinosIniciados, setTreinosIniciados] = useState<Record<number, boolean>>({});
+  const [treinosIniciados, setTreinosIniciados] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // 🔧 Carregar estado do banco e localStorage
   const carregarEstado = useCallback(async () => {
@@ -33,15 +41,15 @@ export function useWorkoutSession(profileId: string, personalId: string) {
       const storedStates = localStorage.getItem(WORKOUT_STATE_KEY);
       if (storedStates) {
         const states: StoredWorkoutStates = JSON.parse(storedStates);
-        const diasIniciados: Record<number, boolean> = {};
+        const iniciadosPorTreino: Record<string, boolean> = {};
         
         Object.values(states).forEach(state => {
           if (state.iniciado) {
-            diasIniciados[state.dia] = true;
+            iniciadosPorTreino[state.treinoId] = true;
           }
         });
         
-        setTreinosIniciados(diasIniciados);
+        if (mountedRef.current) setTreinosIniciados(iniciadosPorTreino);
       }
 
       // 2. Buscar sessões ativas no banco (em_andamento ou pausado)
@@ -49,16 +57,27 @@ export function useWorkoutSession(profileId: string, personalId: string) {
         .from("treino_sessoes")
         .select("id, treino_semanal_id, status")
         .eq("profile_id", profileId)
-        .in("status", ["em_andamento", "pausado"]);
+        .in("status", ACTIVE_SESSION_STATUSES as unknown as string[]);
+
+      if (!mountedRef.current) return;
 
       if (sessoesDB && sessoesDB.length > 0) {
         const ativas: Record<string, boolean> = {};
+        const iniciadosPorTreino: Record<string, boolean> = {};
+        
         sessoesDB.forEach(sessao => {
           ativas[sessao.treino_semanal_id] = true;
+          iniciadosPorTreino[sessao.treino_semanal_id] = true;
         });
+        
         setSessoesAtivas(ativas);
-
-        // Sincronizar com treinosIniciados
+        setTreinosIniciados(prev => ({ ...prev, ...iniciadosPorTreino }));
+        
+        // Atualizar localStorage com dados do banco
+        const currentStored = localStorage.getItem(WORKOUT_STATE_KEY);
+        const states: StoredWorkoutStates = currentStored ? JSON.parse(currentStored) : {};
+        
+        // Fetch dia_semana for these treinos
         const treinoIds = sessoesDB.map(s => s.treino_semanal_id);
         const { data: treinosData } = await supabase
           .from("treinos_semanais")
@@ -66,16 +85,6 @@ export function useWorkoutSession(profileId: string, personalId: string) {
           .in("id", treinoIds);
 
         if (treinosData) {
-          const diasAtivos: Record<number, boolean> = {};
-          treinosData.forEach(treino => {
-            diasAtivos[treino.dia_semana] = true;
-          });
-          setTreinosIniciados(prev => ({ ...prev, ...diasAtivos }));
-          
-          // Atualizar localStorage com dados do banco
-          const storedStates = localStorage.getItem(WORKOUT_STATE_KEY);
-          const states: StoredWorkoutStates = storedStates ? JSON.parse(storedStates) : {};
-          
           treinosData.forEach(treino => {
             states[treino.id] = {
               treinoId: treino.id,
@@ -84,28 +93,25 @@ export function useWorkoutSession(profileId: string, personalId: string) {
               timestamp: Date.now(),
             };
           });
-          
           localStorage.setItem(WORKOUT_STATE_KEY, JSON.stringify(states));
         }
       } else {
-        // Não há sessões ativas no banco - limpar localStorage de treinos não ativos
-        const storedStates = localStorage.getItem(WORKOUT_STATE_KEY);
-        if (storedStates) {
-          const states: StoredWorkoutStates = JSON.parse(storedStates);
+        // Não há sessões ativas no banco - limpar localStorage
+        const currentStored = localStorage.getItem(WORKOUT_STATE_KEY);
+        if (currentStored) {
+          const states: StoredWorkoutStates = JSON.parse(currentStored);
           const treinoIds = Object.keys(states);
           
-          // Verificar quais realmente não existem mais
           if (treinoIds.length > 0) {
             const { data: verificar } = await supabase
               .from("treino_sessoes")
               .select("treino_semanal_id")
               .eq("profile_id", profileId)
               .in("treino_semanal_id", treinoIds)
-              .in("status", ["em_andamento", "pausado"]);
+              .in("status", ACTIVE_SESSION_STATUSES as unknown as string[]);
               
             const ativosNoBanco = new Set(verificar?.map(s => s.treino_semanal_id) || []);
             
-            // Remover estados de treinos que não estão mais ativos
             let atualizado = false;
             Object.keys(states).forEach(treinoId => {
               if (!ativosNoBanco.has(treinoId)) {
@@ -117,14 +123,15 @@ export function useWorkoutSession(profileId: string, personalId: string) {
             if (atualizado) {
               localStorage.setItem(WORKOUT_STATE_KEY, JSON.stringify(states));
               
-              // Atualizar state local
-              const diasIniciados: Record<number, boolean> = {};
-              Object.values(states).forEach(state => {
-                if (state.iniciado) {
-                  diasIniciados[state.dia] = true;
-                }
-              });
-              setTreinosIniciados(diasIniciados);
+              if (mountedRef.current) {
+                const iniciadosPorTreino: Record<string, boolean> = {};
+                Object.values(states).forEach(state => {
+                  if (state.iniciado) {
+                    iniciadosPorTreino[state.treinoId] = true;
+                  }
+                });
+                setTreinosIniciados(iniciadosPorTreino);
+              }
             }
           }
         }
@@ -132,7 +139,7 @@ export function useWorkoutSession(profileId: string, personalId: string) {
     } catch (error) {
       console.error("[useWorkoutSession] Erro ao carregar estado:", error);
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current) setIsLoading(false);
     }
   }, [profileId]);
 
@@ -142,12 +149,10 @@ export function useWorkoutSession(profileId: string, personalId: string) {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        // 🔧 Refetch ao voltar - sincronizar com banco
         carregarEstado();
       }
     };
 
-    // 🔧 iOS PWA: usar focus como fallback
     const handleFocus = () => {
       carregarEstado();
     };
@@ -168,12 +173,7 @@ export function useWorkoutSession(profileId: string, personalId: string) {
       const states: StoredWorkoutStates = storedStates ? JSON.parse(storedStates) : {};
       
       if (iniciado) {
-        states[treinoId] = {
-          treinoId,
-          dia,
-          iniciado,
-          timestamp: Date.now(),
-        };
+        states[treinoId] = { treinoId, dia, iniciado, timestamp: Date.now() };
       } else {
         delete states[treinoId];
       }
@@ -184,18 +184,18 @@ export function useWorkoutSession(profileId: string, personalId: string) {
     }
   }, []);
 
-  // Marcar treino como iniciado
+  // 🔧 FIX: marcarTreinoIniciado tracks by treinoId
   const marcarTreinoIniciado = useCallback((treinoId: string, dia: number) => {
-    setTreinosIniciados(prev => ({ ...prev, [dia]: true }));
+    setTreinosIniciados(prev => ({ ...prev, [treinoId]: true }));
     setSessoesAtivas(prev => ({ ...prev, [treinoId]: true }));
     persistirEstado(treinoId, dia, true);
   }, [persistirEstado]);
 
-  // Marcar treino como finalizado/cancelado
+  // 🔧 FIX: marcarTreinoFinalizado tracks by treinoId
   const marcarTreinoFinalizado = useCallback((treinoId: string, dia: number) => {
     setTreinosIniciados(prev => {
       const next = { ...prev };
-      delete next[dia];
+      delete next[treinoId];
       return next;
     });
     setSessoesAtivas(prev => {
@@ -213,13 +213,12 @@ export function useWorkoutSession(profileId: string, personalId: string) {
     // Primeiro verifica cache local
     if (sessoesAtivas[treinoId]) return true;
 
-    // Depois verifica no banco
     try {
       const { data } = await supabase
         .from("treino_sessoes")
         .select("id")
         .eq("treino_semanal_id", treinoId)
-        .in("status", ["em_andamento", "pausado"])
+        .in("status", ACTIVE_SESSION_STATUSES as unknown as string[])
         .limit(1)
         .maybeSingle();
 
@@ -255,10 +254,15 @@ export function useWorkoutSession(profileId: string, personalId: string) {
     }
   }, []);
 
-  // Limpar estados antigos ao montar
   useEffect(() => {
     limparEstadosAntigos();
   }, [limparEstadosAntigos]);
+
+  // 🔧 COMPAT: Helper to check by treinoId (primary) or day (legacy fallback)
+  const isTreinoIniciado = useCallback((treinoId: string | null): boolean => {
+    if (!treinoId) return false;
+    return !!treinosIniciados[treinoId];
+  }, [treinosIniciados]);
 
   return {
     treinosIniciados,
@@ -267,5 +271,6 @@ export function useWorkoutSession(profileId: string, personalId: string) {
     marcarTreinoIniciado,
     marcarTreinoFinalizado,
     verificarSessaoAtiva,
+    isTreinoIniciado,
   };
 }

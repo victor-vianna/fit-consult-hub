@@ -77,7 +77,7 @@ export default function AreaAluno() {
     personalId: profile?.personal_id,
   });
 
-  const isBloqueado = planilhaStatus === "bloqueada";
+  const isBloqueado = planilhaStatus === "bloqueada" as string;
   const secoesBloqueadas = ["treinos", "historico"];
 
   // Buscar configurações do personal

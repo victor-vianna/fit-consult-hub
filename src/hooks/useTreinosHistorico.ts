@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfMonth, endOfMonth, format } from "date-fns";
+import { WORKOUT_EVENTS } from "@/constants/workoutStatus";
 
 interface TreinoSemanal {
   id: string;
@@ -34,14 +35,16 @@ export function useTreinosHistorico(profileId: string, mes?: Date) {
     fetchTreinos();
   }, [profileId, mesAtual]);
 
-  // ✅ Escutar evento de treino concluído para atualizar histórico
+  // ✅ Listen for centralized workout events
   useEffect(() => {
     const handleWorkoutCompleted = () => {
       fetchTreinos();
     };
-    window.addEventListener("workout-completed", handleWorkoutCompleted);
+    window.addEventListener(WORKOUT_EVENTS.COMPLETED, handleWorkoutCompleted);
+    window.addEventListener(WORKOUT_EVENTS.PROGRESS_CHANGED, handleWorkoutCompleted);
     return () => {
-      window.removeEventListener("workout-completed", handleWorkoutCompleted);
+      window.removeEventListener(WORKOUT_EVENTS.COMPLETED, handleWorkoutCompleted);
+      window.removeEventListener(WORKOUT_EVENTS.PROGRESS_CHANGED, handleWorkoutCompleted);
     };
   }, [profileId]);
 

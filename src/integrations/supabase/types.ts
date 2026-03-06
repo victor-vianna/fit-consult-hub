@@ -1403,6 +1403,10 @@ export type Database = {
       }
       planilhas_treino: {
         Row: {
+          ciclo_genero: string | null
+          ciclo_modalidade: string | null
+          ciclo_nivel: string | null
+          ciclo_numero: number | null
           created_at: string | null
           data_inicio: string
           data_prevista_fim: string | null
@@ -1419,6 +1423,10 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          ciclo_genero?: string | null
+          ciclo_modalidade?: string | null
+          ciclo_nivel?: string | null
+          ciclo_numero?: number | null
           created_at?: string | null
           data_inicio?: string
           data_prevista_fim?: string | null
@@ -1435,6 +1443,10 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          ciclo_genero?: string | null
+          ciclo_modalidade?: string | null
+          ciclo_nivel?: string | null
+          ciclo_numero?: number | null
           created_at?: string | null
           data_inicio?: string
           data_prevista_fim?: string | null

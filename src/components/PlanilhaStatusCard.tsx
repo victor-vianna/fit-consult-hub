@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { usePlanilhaAtiva } from "@/hooks/usePlanilhaAtiva";
+import { CicloTreinoFields } from "@/components/CicloTreinoFields";
 import { cn } from "@/lib/utils";
 
 interface PlanilhaStatusCardProps {
@@ -276,6 +277,19 @@ export function PlanilhaStatusCard({
               <span>{planilha.duracao_semanas} semanas</span>
             </div>
           </div>
+
+          {/* Ciclo de Treino (somente personal) */}
+          {variant === "personal" && (
+            <CicloTreinoFields
+              planilhaId={planilha.id}
+              initialValues={{
+                ciclo_genero: (planilha as any).ciclo_genero,
+                ciclo_modalidade: (planilha as any).ciclo_modalidade,
+                ciclo_nivel: (planilha as any).ciclo_nivel,
+                ciclo_numero: (planilha as any).ciclo_numero,
+              }}
+            />
+          )}
 
           {/* Ações (somente personal) */}
           {variant === "personal" && (

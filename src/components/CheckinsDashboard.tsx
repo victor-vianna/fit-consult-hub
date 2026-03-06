@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { FeedbackReply } from "@/components/chat/FeedbackReply";
+import { FeedbackEvolucaoChart } from "@/components/FeedbackEvolucaoChart";
 
 interface Props {
   profileId: string;
@@ -234,6 +235,14 @@ export function CheckinsDashboard({
 
   return (
     <div className="space-y-6">
+      {/* Evolução dos Feedbacks */}
+      <FeedbackEvolucaoChart
+        profileId={profileId}
+        personalId={personalId}
+        themeColor={themeColor}
+        studentName={studentName}
+      />
+
       <Card className="border-2 shadow-lg">
         <div
           className="h-2"

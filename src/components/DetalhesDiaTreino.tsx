@@ -148,6 +148,12 @@ export function DetalhesDiaTreino({
                     {treino.concluido ? "Concluído" : "Pendente"}
                   </Badge>
                 </div>
+                {/* Duração do treino se disponível */}
+                {treino.duracao_segundos && treino.duracao_segundos > 0 && (
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    ⏱️ Duração: {Math.floor(treino.duracao_segundos / 60)}min {treino.duracao_segundos % 60}s
+                  </p>
+                )}
               </div>
 
               <Button

@@ -130,6 +130,16 @@ export function WorkoutCompletionScreen({
           <p className="text-lg sm:text-xl text-muted-foreground mt-2">
             Você concluiu seu treino!
           </p>
+          {/* Confirmação de progresso salvo */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.4 }}
+            className="flex items-center justify-center gap-2 mt-3 text-sm text-green-600 dark:text-green-400"
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            <span>Progresso salvo com sucesso!</span>
+          </motion.div>
         </motion.div>
 
         {/* Card principal de conclusão */}

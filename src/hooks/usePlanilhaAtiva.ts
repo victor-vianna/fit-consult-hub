@@ -115,13 +115,22 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
     return Math.min(100, Math.round((diasDecorridos / diasTotais) * 100));
   }, [diasDecorridos, diasTotais]);
 
+  const diasAposExpiracao = useMemo(() => {
+    if (!planilha?.data_prevista_fim) return 0;
+    const hoje = new Date();
+    const fim = parseISO(planilha.data_prevista_fim);
+    const diff = differenceInDays(hoje, fim);
+    return Math.max(0, diff);
+  }, [planilha?.data_prevista_fim]);
+
   const status = useMemo(() => {
     if (!planilha) return "sem_planilha";
+    if (diasRestantes <= 0 && diasAposExpiracao > 7) return "bloqueada";
     if (diasRestantes <= 0) return "expirada";
     if (diasRestantes <= 3) return "critica";
     if (diasRestantes <= 7) return "expirando";
     return "ativa";
-  }, [planilha, diasRestantes]);
+  }, [planilha, diasRestantes, diasAposExpiracao]);
 
   /**
    * Replica os treinos da semana base para as demais semanas da planilha
@@ -687,6 +696,7 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
     diasRestantes,
     diasTotais,
     diasDecorridos,
+    diasAposExpiracao,
     percentualConcluido,
     status,
     criarPlanilha: criarPlanilhaMutation.mutate,

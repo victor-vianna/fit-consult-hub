@@ -10,6 +10,8 @@ import {
   Calendar,
   ArrowUpRight,
   ArrowDownRight,
+  BarChart3,
+  Receipt,
 } from "lucide-react";
 import { useFinancialDashboard } from "@/hooks/useFinancialDashboard";
 import { useAuth } from "@/hooks/useAuth";
@@ -29,11 +31,33 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useMemo } from "react";
 
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+
+function ComparisonBadge({ value, label }: { value: number; label: string }) {
+  return (
+    <div className="flex items-center text-xs mt-1">
+      {value >= 0 ? (
+        <>
+          <ArrowUpRight className="h-4 w-4 text-green-500 mr-1" />
+          <span className="text-green-500">+{value.toFixed(1)}%</span>
+        </>
+      ) : (
+        <>
+          <ArrowDownRight className="h-4 w-4 text-red-500 mr-1" />
+          <span className="text-red-500">{value.toFixed(1)}%</span>
+        </>
+      )}
+      <span className="text-muted-foreground ml-1">{label}</span>
+    </div>
+  );
+}
+
 export function FinancialDashboard() {
   const { user } = useAuth();
   const userId = useMemo(() => user?.id || "", [user?.id]);
 
-  const { metrics, monthlyRevenue, inadimplentesList, loading } =
+  const { metrics, monthlyRevenue, inadimplentesList, paymentDetails, loading } =
     useFinancialDashboard(userId);
 
   if (!userId) {
@@ -48,19 +72,12 @@ export function FinancialDashboard() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
           <p className="mt-4 text-muted-foreground">Carregando dados financeiros...</p>
         </div>
       </div>
     );
   }
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(value);
-  };
 
   return (
     <div className="space-y-6 animate-fade-in p-2">
@@ -70,8 +87,8 @@ export function FinancialDashboard() {
         </h1>
       </div>
 
-      {/* Cards de Métricas */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Cards principais */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {/* Receita Mês Atual */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -79,100 +96,84 @@ export function FinancialDashboard() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(metrics.receitaMesAtual)}
-            </div>
-            <div className="flex items-center text-xs mt-1">
-              {metrics.comparacaoPercentual >= 0 ? (
-                <>
-                  <ArrowUpRight className="h-4 w-4 text-green-500 mr-1" />
-                  <span className="text-green-500">
-                    +{metrics.comparacaoPercentual.toFixed(1)}%
-                  </span>
-                </>
-              ) : (
-                <>
-                  <ArrowDownRight className="h-4 w-4 text-red-500 mr-1" />
-                  <span className="text-red-500">
-                    {metrics.comparacaoPercentual.toFixed(1)}%
-                  </span>
-                </>
-              )}
-              <span className="text-muted-foreground ml-1">vs mês anterior</span>
-            </div>
+            <div className="text-2xl font-bold">{formatCurrency(metrics.receitaMesAtual)}</div>
+            <ComparisonBadge value={metrics.comparacaoPercentual} label="vs mês anterior" />
           </CardContent>
         </Card>
 
-        {/* Previsão de Receita */}
+        {/* Receita Mês Passado */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Mês Passado</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(metrics.receitaMesAnterior)}</div>
+            <p className="text-xs text-muted-foreground mt-1">Comparação direta</p>
+          </CardContent>
+        </Card>
+
+        {/* Receita Últimos 12 Meses */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Últimos 12 Meses</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(metrics.receitaUltimos12Meses)}</div>
+            <ComparisonBadge value={metrics.crescimentoAnual12Meses} label="vs 12 meses ant." />
+          </CardContent>
+        </Card>
+
+        {/* Previsão */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Previsão Mensal</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(metrics.previsaoReceita)}
-            </div>
+            <div className="text-2xl font-bold">{formatCurrency(metrics.previsaoReceita)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Baseado em {metrics.totalAlunosAtivos} assinaturas ativas
+              {metrics.totalAlunosAtivos} assinaturas ativas
             </p>
           </CardContent>
         </Card>
 
-        {/* Inadimplência */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Taxa de Inadimplência</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {metrics.taxaInadimplencia.toFixed(1)}%
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {metrics.totalAlunosInadimplentes} aluno(s) inadimplente(s)
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* vs Ano Anterior */}
+        {/* vs Ano Anterior (mesmo mês) */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">vs Ano Anterior</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(metrics.receitaMesmoMesAnoAnterior)}
-            </div>
-            <div className="flex items-center text-xs mt-1">
-              {metrics.comparacaoAnual >= 0 ? (
-                <>
-                  <ArrowUpRight className="h-4 w-4 text-green-500 mr-1" />
-                  <span className="text-green-500">
-                    +{metrics.comparacaoAnual.toFixed(1)}%
-                  </span>
-                </>
-              ) : (
-                <>
-                  <ArrowDownRight className="h-4 w-4 text-red-500 mr-1" />
-                  <span className="text-red-500">
-                    {metrics.comparacaoAnual.toFixed(1)}%
-                  </span>
-                </>
-              )}
-              <span className="text-muted-foreground ml-1">mesmo mês</span>
-            </div>
+            <div className="text-2xl font-bold">{formatCurrency(metrics.receitaMesmoMesAnoAnterior)}</div>
+            <ComparisonBadge value={metrics.comparacaoAnual} label="mesmo mês" />
+          </CardContent>
+        </Card>
+
+        {/* Inadimplência */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Inadimplência</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics.taxaInadimplencia.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {metrics.totalAlunosInadimplentes} inadimplente(s)
+            </p>
           </CardContent>
         </Card>
       </div>
 
       {/* Gráficos */}
       <div className="grid gap-4 md:grid-cols-2">
-        {/* Gráfico de Receita 12 Meses */}
         <Card className="col-span-2 lg:col-span-1">
           <CardHeader>
-            <CardTitle>Receita dos Últimos 12 Meses</CardTitle>
+            <CardTitle className="text-lg">Receita Mensal (Fluxo de Caixa)</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Baseado nas parcelas efetivamente recebidas em cada mês
+            </p>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -186,11 +187,7 @@ export function FinancialDashboard() {
                     name === "receita" ? "Este ano" : "Ano anterior",
                   ]}
                 />
-                <Legend
-                  formatter={(value) =>
-                    value === "receita" ? "Este ano" : "Ano anterior"
-                  }
-                />
+                <Legend formatter={(value) => (value === "receita" ? "Este ano" : "Ano anterior")} />
                 <Line
                   type="monotone"
                   dataKey="receita"
@@ -213,10 +210,9 @@ export function FinancialDashboard() {
           </CardContent>
         </Card>
 
-        {/* Gráfico de Pagamentos */}
         <Card className="col-span-2 lg:col-span-1">
           <CardHeader>
-            <CardTitle>Número de Pagamentos</CardTitle>
+            <CardTitle className="text-lg">Número de Pagamentos</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -231,6 +227,72 @@ export function FinancialDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Tabela de pagamentos com detalhes de parcelas */}
+      {paymentDetails.length > 0 && (
+        <Card>
+          <CardHeader className="p-4 md:p-6">
+            <div className="flex items-center gap-2">
+              <Receipt className="h-5 w-5 text-primary" />
+              <CardTitle className="text-lg md:text-xl">Histórico de Pagamentos</CardTitle>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Detalhamento de parcelas e pagamentos recebidos
+            </p>
+          </CardHeader>
+          <CardContent className="p-4 md:p-6 pt-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-muted-foreground">
+                    <th className="text-left py-3 px-2 font-medium">Aluno</th>
+                    <th className="text-left py-3 px-2 font-medium">Plano</th>
+                    <th className="text-right py-3 px-2 font-medium">Valor Total</th>
+                    <th className="text-center py-3 px-2 font-medium">Parcela</th>
+                    <th className="text-right py-3 px-2 font-medium">Valor Parcela</th>
+                    <th className="text-center py-3 px-2 font-medium">Data</th>
+                    <th className="text-center py-3 px-2 font-medium">Método</th>
+                    <th className="text-center py-3 px-2 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paymentDetails.map((p) => (
+                    <tr key={p.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
+                      <td className="py-3 px-2 font-medium">{p.studentName}</td>
+                      <td className="py-3 px-2">{p.plano}</td>
+                      <td className="py-3 px-2 text-right">{formatCurrency(p.valorTotal)}</td>
+                      <td className="py-3 px-2 text-center">
+                        <Badge variant="outline" className="text-xs">
+                          {p.parcelaAtual}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-2 text-right font-medium">
+                        {formatCurrency(p.valorParcela)}
+                      </td>
+                      <td className="py-3 px-2 text-center text-muted-foreground">
+                        {format(new Date(p.dataPagamento), "dd/MM/yyyy", { locale: ptBR })}
+                      </td>
+                      <td className="py-3 px-2 text-center capitalize">{p.metodo}</td>
+                      <td className="py-3 px-2 text-center">
+                        <Badge
+                          variant={p.status === "pago" ? "default" : "secondary"}
+                          className={
+                            p.status === "pago"
+                              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                              : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                          }
+                        >
+                          {p.status === "pago" ? "Pago" : "Pendente"}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Inadimplentes */}
       {inadimplentesList.length > 0 && (
@@ -255,9 +317,7 @@ export function FinancialDashboard() {
                         {student.diasAtraso} dias de atraso
                       </Badge>
                     </div>
-                    <p className="text-sm md:text-xs text-muted-foreground truncate">
-                      {student.email}
-                    </p>
+                    <p className="text-sm md:text-xs text-muted-foreground truncate">{student.email}</p>
                     <p className="text-sm md:text-xs text-muted-foreground">
                       Valor: {formatCurrency(student.valor)} • Vencimento:{" "}
                       {format(new Date(student.data_expiracao), "dd/MM/yyyy", { locale: ptBR })}
@@ -289,7 +349,6 @@ export function FinancialDashboard() {
                 <p className="text-2xl font-bold">{metrics.totalAlunosAtivos}</p>
               </div>
             </div>
-
             <div className="flex items-center gap-3">
               <div className="p-3 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg">
                 <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
@@ -299,7 +358,6 @@ export function FinancialDashboard() {
                 <p className="text-2xl font-bold">{metrics.totalAlunosInadimplentes}</p>
               </div>
             </div>
-
             <div className="flex items-center gap-3">
               <div className="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
                 <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400" />

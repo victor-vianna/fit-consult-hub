@@ -16,6 +16,7 @@ import {
 import { saveAs } from "file-saver";
 import type { TreinoDia } from "@/types/treino";
 import type { PersonalSettings } from "@/hooks/usePersonalSettings";
+import { organizeForExport } from "./exportOrganizer";
 
 const diasSemana = [
   "Segunda-feira",
@@ -192,67 +193,90 @@ export async function exportTreinoWord(params: ExportTreinoParams) {
       );
     }
 
-    // Exercise table
-    const rows: TableRow[] = [createHeaderRow(themeColor)];
+    // Organize into sections
+    const sections = organizeForExport(exerciciosIsolados, grupos, blocos);
 
-    // Isolated exercises
-    exerciciosIsolados
-      .sort((a, b) => a.ordem - b.ordem)
-      .forEach((ex) => rows.push(createExerciseRow(ex)));
-
-    // Groups
-    grupos.forEach((grupo: any) => {
-      const tipoLabel = grupo.tipo_agrupamento || "Grupo";
-      (grupo.exercicios || [])
-        .sort((a: any, b: any) => (a.ordem_no_grupo || 0) - (b.ordem_no_grupo || 0))
-        .forEach((ex: any, idx: number) => {
-          const prefix = idx === 0 ? `[${tipoLabel}]` : "↳";
-          rows.push(createExerciseRow(ex, prefix));
-        });
-    });
-
-    if (rows.length > 1) {
-      children.push(
-        new Table({
-          rows,
-          width: { size: 100, type: WidthType.PERCENTAGE },
-        })
-      );
-    }
-
-    // Blocks
-    blocos.forEach((bloco: any) => {
+    for (const section of sections) {
+      // Section label
       children.push(
         new Paragraph({
           children: [
             new TextRun({
-              text: `📋 ${bloco.nome}`,
+              text: section.label.toUpperCase(),
               bold: true,
               size: 20,
-              font: "Calibri",
-            }),
-            new TextRun({
-              text: bloco.duracao_estimada_minutos
-                ? ` (${bloco.duracao_estimada_minutos} min)`
-                : "",
-              size: 18,
+              color: hexToRgb(themeColor),
               font: "Calibri",
             }),
           ],
-          spacing: { before: 100, after: 50 },
+          border: {
+            bottom: {
+              style: BorderStyle.SINGLE,
+              size: 2,
+              color: hexToRgb(themeColor),
+            },
+          },
+          spacing: { before: 150, after: 80 },
         })
       );
-      if (bloco.descricao) {
-        children.push(
-          new Paragraph({
-            children: [
-              new TextRun({ text: bloco.descricao, size: 18, font: "Calibri" }),
-            ],
-            spacing: { after: 50 },
-          })
-        );
+
+      if (section.type === "exercicios") {
+        // Exercise table
+        const rows: TableRow[] = [createHeaderRow(themeColor)];
+
+        section.items.forEach((ex) => rows.push(createExerciseRow(ex)));
+
+        // Groups
+        grupos.forEach((grupo: any) => {
+          const tipoLabel = grupo.tipo_agrupamento || "Grupo";
+          (grupo.exercicios || [])
+            .sort((a: any, b: any) => (a.ordem_no_grupo || 0) - (b.ordem_no_grupo || 0))
+            .forEach((ex: any, idx: number) => {
+              const prefix = idx === 0 ? `[${tipoLabel}]` : "→";
+              rows.push(createExerciseRow(ex, prefix));
+            });
+        });
+
+        if (rows.length > 1) {
+          children.push(
+            new Table({
+              rows,
+              width: { size: 100, type: WidthType.PERCENTAGE },
+            })
+          );
+        }
+      } else {
+        // Blocks
+        section.items.forEach((bloco: any) => {
+          const parts: string[] = [bloco.nome];
+          if (bloco.duracao_estimada_minutos) parts.push(`${bloco.duracao_estimada_minutos} min`);
+
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `• ${parts.join(" — ")}`,
+                  bold: true,
+                  size: 20,
+                  font: "Calibri",
+                }),
+              ],
+              spacing: { before: 40, after: 30 },
+            })
+          );
+          if (bloco.descricao) {
+            children.push(
+              new Paragraph({
+                children: [
+                  new TextRun({ text: `  ${bloco.descricao}`, size: 18, font: "Calibri" }),
+                ],
+                spacing: { after: 30 },
+              })
+            );
+          }
+        });
       }
-    });
+    }
 
     children.push(new Paragraph({ spacing: { after: 200 } }));
   });

@@ -79,6 +79,7 @@ import {
 import { exportTreinoWord } from "@/utils/exportTreinoWord";
 import { exportTreinoPDF } from "@/utils/exportTreinoPDF";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
+import { ExportTreinoDialog } from "@/components/ExportTreinoDialog";
 
 import {
   DndContext,
@@ -282,6 +283,7 @@ export function TreinosManager({
   const [modeloParaAplicar, setModeloParaAplicar] = useState<any>(null);
   const [limparTreinoDialogOpen, setLimparTreinoDialogOpen] = useState(false);
   const [treinoParaLimpar, setTreinoParaLimpar] = useState<{ treinoId: string; diaNome: string } | null>(null);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   // DnD sensors
   const sensors = useSensors(
@@ -961,48 +963,43 @@ export function TreinosManager({
           <div className="flex items-center gap-2">
             {/* Exportar Treino */}
             {isPersonal && alunoProfile && personalSettings && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <Download className="h-4 w-4" />
-                    Exportar
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onClick={() => {
-                      exportTreinoWord({
-                        treinos,
-                        gruposPorTreino,
-                        blocosPorTreino,
-                        alunoNome: alunoProfile.nome,
-                        semanaLabel: formatarSemana(),
-                        personalSettings,
-                      });
-                      toast.success("Exportando Word...");
-                    }}
-                  >
-                    <FileDown className="h-4 w-4 mr-2" />
-                    Exportar Word (.docx)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      exportTreinoPDF({
-                        treinos,
-                        gruposPorTreino,
-                        blocosPorTreino,
-                        alunoNome: alunoProfile.nome,
-                        semanaLabel: formatarSemana(),
-                        personalSettings,
-                      });
-                      toast.success("Exportando PDF...");
-                    }}
-                  >
-                    <FileDown className="h-4 w-4 mr-2" />
-                    Exportar PDF
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => setExportDialogOpen(true)}
+                >
+                  <Download className="h-4 w-4" />
+                  Exportar
+                </Button>
+                <ExportTreinoDialog
+                  open={exportDialogOpen}
+                  onOpenChange={setExportDialogOpen}
+                  defaultNome={alunoProfile.nome}
+                  semanaLabel={formatarSemana()}
+                  onExportWord={(nome) => {
+                    exportTreinoWord({
+                      treinos,
+                      gruposPorTreino,
+                      blocosPorTreino,
+                      alunoNome: nome,
+                      semanaLabel: formatarSemana(),
+                      personalSettings,
+                    });
+                  }}
+                  onExportPDF={(nome) => {
+                    exportTreinoPDF({
+                      treinos,
+                      gruposPorTreino,
+                      blocosPorTreino,
+                      alunoNome: nome,
+                      semanaLabel: formatarSemana(),
+                      personalSettings,
+                    });
+                  }}
+                />
+              </>
             )}
 
             {/* Controle de Semana Ativa */}

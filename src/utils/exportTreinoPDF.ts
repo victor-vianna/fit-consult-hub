@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { TreinoDia } from "@/types/treino";
 import type { PersonalSettings } from "@/hooks/usePersonalSettings";
+import { organizeForExport } from "./exportOrganizer";
 
 const diasSemana = [
   "Segunda-feira",
@@ -52,7 +53,6 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
       doc.text(personalName, 38, y + 13);
       y += 25;
     } catch {
-      // fallback without logo
       doc.setFontSize(20);
       doc.setTextColor(rgb[0], rgb[1], rgb[2]);
       doc.setFont("helvetica", "bold");
@@ -122,30 +122,37 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
       y += 2;
     }
 
-    // Build table data
-    const tableData: string[][] = [];
+    // Organize sections
+    const sections = organizeForExport(exerciciosIsolados, grupos, blocos);
 
-    exerciciosIsolados
-      .sort((a, b) => a.ordem - b.ordem)
-      .forEach((ex) => {
-        tableData.push([
-          ex.nome,
-          ex.series ? String(ex.series) : "-",
-          ex.repeticoes || "-",
-          ex.carga || "-",
-          ex.descanso ? `${ex.descanso}s` : "-",
-          ex.observacoes || "-",
-        ]);
-      });
+    for (const section of sections) {
+      // Check page space
+      if (y > doc.internal.pageSize.getHeight() - 30) {
+        doc.addPage();
+        y = 15;
+      }
 
-    grupos.forEach((grupo: any) => {
-      const tipoLabel = grupo.tipo_agrupamento || "Grupo";
-      (grupo.exercicios || [])
-        .sort((a: any, b: any) => (a.ordem_no_grupo || 0) - (b.ordem_no_grupo || 0))
-        .forEach((ex: any, idx: number) => {
-          const prefix = idx === 0 ? `[${tipoLabel}] ` : "> ";
+      // Section label
+      y += 4;
+      doc.setFontSize(10);
+      doc.setTextColor(rgb[0], rgb[1], rgb[2]);
+      doc.setFont("helvetica", "bold");
+      doc.text(section.label.toUpperCase(), 14, y);
+      y += 1;
+
+      // Thin colored line under section label
+      doc.setDrawColor(rgb[0], rgb[1], rgb[2]);
+      doc.setLineWidth(0.3);
+      doc.line(14, y, 70, y);
+      y += 2;
+
+      if (section.type === "exercicios") {
+        // Exercise table
+        const tableData: string[][] = [];
+
+        section.items.forEach((ex) => {
           tableData.push([
-            prefix + ex.nome,
+            ex.nome,
             ex.series ? String(ex.series) : "-",
             ex.repeticoes || "-",
             ex.carga || "-",
@@ -153,67 +160,73 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
             ex.observacoes || "-",
           ]);
         });
-    });
 
-    if (tableData.length > 0) {
-      autoTable(doc, {
-        startY: y + 2,
-        head: [["Exercício", "Séries", "Reps", "Carga", "Descanso", "Obs."]],
-        body: tableData,
-        theme: "grid",
-        headStyles: {
-          fillColor: rgb,
-          textColor: [255, 255, 255],
-          fontSize: 8,
-          fontStyle: "bold",
-          halign: "center",
-        },
-        bodyStyles: {
-          fontSize: 8,
-          textColor: [40, 40, 40],
-        },
-        columnStyles: {
-          0: { halign: "left", cellWidth: "auto" },
-          1: { halign: "center", cellWidth: 15 },
-          2: { halign: "center", cellWidth: 18 },
-          3: { halign: "center", cellWidth: 18 },
-          4: { halign: "center", cellWidth: 18 },
-          5: { halign: "left", cellWidth: 30 },
-        },
-        margin: { left: 14, right: 14 },
-      });
+        // Groups
+        grupos.forEach((grupo: any) => {
+          const tipoLabel = grupo.tipo_agrupamento || "Grupo";
+          (grupo.exercicios || [])
+            .sort((a: any, b: any) => (a.ordem_no_grupo || 0) - (b.ordem_no_grupo || 0))
+            .forEach((ex: any, idx: number) => {
+              const prefix = idx === 0 ? `[${tipoLabel}] ` : "> ";
+              tableData.push([
+                prefix + ex.nome,
+                ex.series ? String(ex.series) : "-",
+                ex.repeticoes || "-",
+                ex.carga || "-",
+                ex.descanso ? `${ex.descanso}s` : "-",
+                ex.observacoes || "-",
+              ]);
+            });
+        });
 
-      y = (doc as any).lastAutoTable.finalY + 4;
-    }
+        if (tableData.length > 0) {
+          autoTable(doc, {
+            startY: y + 1,
+            head: [["Exercicio", "Series", "Reps", "Carga", "Descanso", "Obs."]],
+            body: tableData,
+            theme: "grid",
+            headStyles: {
+              fillColor: rgb,
+              textColor: [255, 255, 255],
+              fontSize: 8,
+              fontStyle: "bold",
+              halign: "center",
+            },
+            bodyStyles: { fontSize: 8, textColor: [40, 40, 40] },
+            columnStyles: {
+              0: { halign: "left", cellWidth: "auto" },
+              1: { halign: "center", cellWidth: 15 },
+              2: { halign: "center", cellWidth: 18 },
+              3: { halign: "center", cellWidth: 18 },
+              4: { halign: "center", cellWidth: 18 },
+              5: { halign: "left", cellWidth: 30 },
+            },
+            margin: { left: 14, right: 14 },
+          });
+          y = (doc as any).lastAutoTable.finalY + 2;
+        }
+      } else {
+        // Blocks rendered as a compact table
+        const blocosData = section.items.map((bloco: any) => {
+          const parts = [bloco.nome];
+          if (bloco.duracao_estimada_minutos) parts.push(`${bloco.duracao_estimada_minutos} min`);
+          if (bloco.descricao) parts.push(bloco.descricao);
+          return [parts.join(" - ")];
+        });
 
-    // Blocks - render as a simple table to avoid encoding issues
-    if (blocos.length > 0) {
-      const blocosData = blocos.map((bloco: any) => {
-        const parts = [bloco.nome];
-        if (bloco.duracao_estimada_minutos) parts.push(`${bloco.duracao_estimada_minutos} min`);
-        if (bloco.descricao) parts.push(bloco.descricao);
-        return [bloco.tipo?.toUpperCase() || "BLOCO", parts.join(" - ")];
-      });
-
-      autoTable(doc, {
-        startY: y,
-        head: [["Tipo", "Descricao"]],
-        body: blocosData,
-        theme: "plain",
-        headStyles: {
-          fillColor: [240, 240, 240],
-          textColor: [60, 60, 60],
-          fontSize: 8,
-          fontStyle: "bold",
-        },
-        bodyStyles: {
-          fontSize: 8,
-          textColor: [40, 40, 40],
-        },
-        margin: { left: 14, right: 14 },
-      });
-
-      y = (doc as any).lastAutoTable.finalY + 4;
+        autoTable(doc, {
+          startY: y + 1,
+          body: blocosData,
+          theme: "plain",
+          bodyStyles: {
+            fontSize: 8,
+            textColor: [40, 40, 40],
+            cellPadding: 2,
+          },
+          margin: { left: 16, right: 14 },
+        });
+        y = (doc as any).lastAutoTable.finalY + 2;
+      }
     }
 
     y += 6;

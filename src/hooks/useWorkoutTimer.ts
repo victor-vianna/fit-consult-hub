@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { SESSION_STATUS, ACTIVE_SESSION_STATUSES, WORKOUT_EVENTS, dispatchWorkoutEvent } from "@/constants/workoutStatus";
 
 // 🔧 Key única por treino para evitar conflitos
 const getStorageKey = (treinoId: string) => `workout_timer_${treinoId}`;
@@ -108,29 +109,39 @@ export function useWorkoutTimer({
     return Math.max(0, Math.floor(elapsed / 1000));
   }, []);
 
-  // 🔧 Salvar no localStorage com key única por treino
-  // Usa refs para evitar stale closures em chamadas rápidas (ex: togglePause)
+  // 🔧 FIX: Use refs for ALL values in saveToStorage to prevent stale closures
+  const sessaoIdRef = useRef<string | null>(null);
+  const tempoDescansoTotalRef = useRef(0);
+  const isRestingRef = useRef(false);
+  const restTypeRef = useRef<"serie" | "exercicio" | null>(null);
+
+  // Keep refs in sync with state
+  useEffect(() => { sessaoIdRef.current = sessaoId; }, [sessaoId]);
+  useEffect(() => { tempoDescansoTotalRef.current = tempoDescansoTotal; }, [tempoDescansoTotal]);
+  useEffect(() => { isRestingRef.current = isResting; }, [isResting]);
+  useEffect(() => { restTypeRef.current = restType; }, [restType]);
+
   const saveToStorage = useCallback(() => {
-    if (!sessaoId || !treinoId) return;
+    if (!sessaoIdRef.current || !treinoId) return;
     
     const session: StoredSession = {
-      sessaoId,
+      sessaoId: sessaoIdRef.current,
       treinoId,
       startTimestamp: startTimestampRef.current,
       isPaused: isPausedRef.current,
       pausedTimestamp: pausedTimestampRef.current || undefined,
       totalPausedMs: totalPausedMsRef.current,
-      tempoDescansoTotal,
-      restStartTimestamp: isResting ? restStartTimestampRef.current : undefined,
-      restType: restType || undefined,
+      tempoDescansoTotal: tempoDescansoTotalRef.current,
+      restStartTimestamp: isRestingRef.current ? restStartTimestampRef.current : undefined,
+      restType: restTypeRef.current || undefined,
     };
     
     localStorage.setItem(getStorageKey(treinoId), JSON.stringify(session));
-  }, [sessaoId, treinoId, tempoDescansoTotal, isResting, restType]);
+  }, [treinoId]);
 
-  // 🔧 Persistir no banco
+  // 🔧 Persistir no banco - uses ref to avoid stale sessaoId
   const persistirTempo = useCallback(async () => {
-    if (!sessaoId) return;
+    if (!sessaoIdRef.current) return;
     
     const tempoAtual = calculateElapsedTime();
     const pausasTotalSegundos = Math.floor(totalPausedMsRef.current / 1000);
@@ -140,16 +151,16 @@ export function useWorkoutTimer({
         .from("treino_sessoes")
         .update({
           duracao_segundos: tempoAtual,
-          tempo_descanso_total: tempoDescansoTotal,
+          tempo_descanso_total: tempoDescansoTotalRef.current,
           tempo_pausado_total: pausasTotalSegundos,
         })
-        .eq("id", sessaoId);
+        .eq("id", sessaoIdRef.current);
 
       saveToStorage();
     } catch (err) {
       console.error("[useWorkoutTimer] Erro ao persistir tempo:", err);
     }
-  }, [sessaoId, tempoDescansoTotal, calculateElapsedTime, saveToStorage]);
+  }, [calculateElapsedTime, saveToStorage]);
 
   // 🔧 Restaurar sessão ativa ao montar
   useEffect(() => {
@@ -822,17 +833,10 @@ export function useWorkoutTimer({
       setCompletionData(dadosConclusao);
       setShowCompletionScreen(true);
 
-      // 🔧 CORREÇÃO: Invalidar queries de treinos e histórico
-      // Importa queryClient via window para não acoplar ao React Query context
-      try {
-        const { QueryClient } = await import("@tanstack/react-query");
-        // Dispara evento customizado para que componentes pai invalidem queries
-        window.dispatchEvent(new CustomEvent("workout-completed", { 
-          detail: { treinoId, profileId, personalId } 
-        }));
-      } catch (e) {
-        console.warn("[useWorkoutTimer] Não foi possível disparar evento de invalidação:", e);
-      }
+      // 🔧 FIX: Dispatch centralized events for cross-component sync
+      dispatchWorkoutEvent(WORKOUT_EVENTS.COMPLETED, { treinoId, profileId, personalId });
+      dispatchWorkoutEvent(WORKOUT_EVENTS.DASHBOARD_REFRESH, { personalId });
+
 
       // Limpar estado
       localStorage.removeItem(getStorageKey(treinoId));

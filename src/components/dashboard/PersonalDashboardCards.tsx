@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -131,10 +131,52 @@ export function PersonalDashboardCards({
 
   const isCardVisible = (id: string) => cardConfig.find((c) => c.id === id)?.visible ?? true;
 
+  // 🔧 FIX: Fetch on mount + listen for cross-component events + periodic polling
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     if (personalId) {
       fetchDashboardData();
       fetchAlertasDescartados();
+
+      // 🔧 Listen for workout completion events from students
+      const handleDashboardRefresh = () => {
+        fetchDashboardData();
+      };
+
+      window.addEventListener("dashboard-refresh", handleDashboardRefresh);
+      window.addEventListener("workout-completed", handleDashboardRefresh);
+
+      // 🔧 Periodic polling every 60s to catch real-time updates
+      pollingRef.current = setInterval(() => {
+        fetchDashboardData();
+      }, 60000);
+
+      // 🔧 Supabase realtime: Listen for workout session completions
+      const channel = supabase
+        .channel(`dashboard-${personalId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "treino_sessoes",
+            filter: `personal_id=eq.${personalId}`,
+          },
+          (payload) => {
+            if (payload.new && (payload.new as any).status === "concluido") {
+              fetchDashboardData();
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        window.removeEventListener("dashboard-refresh", handleDashboardRefresh);
+        window.removeEventListener("workout-completed", handleDashboardRefresh);
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        supabase.removeChannel(channel);
+      };
     }
   }, [personalId]);
 

@@ -63,7 +63,7 @@ export function WorkoutDayView({
 
   // 🔧 Hook de persistência de sessão PWA
   const { 
-    treinosIniciados, 
+    isTreinoIniciado, 
     marcarTreinoIniciado, 
     marcarTreinoFinalizado,
     isLoading: isLoadingSession 
@@ -445,7 +445,7 @@ export function WorkoutDayView({
                   (ex) => !ex.grupo_id
                 );
 
-                const isDiaIniciado = treinosIniciados[treino.dia] || false;
+                const isDiaIniciado = isTreinoIniciado(treinoId);
                 const hasMultiple = treinosDoDia.filter(t => {
                   const tid = getTreinoId(t);
                   const g = tid ? localGrupos[tid] ?? [] : [];

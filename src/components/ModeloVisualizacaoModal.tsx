@@ -256,61 +256,86 @@ export function ModeloVisualizacaoModal({
             )}
 
             {/* Exercícios */}
-            {modelo.exercicios && modelo.exercicios.length > 0 && (
-              <div className="space-y-2">
-                <h4 className="text-sm font-semibold flex items-center gap-2">
-                  <Dumbbell className="h-4 w-4" />
-                  Exercícios
-                </h4>
-                <div className="space-y-2">
-                  {modelo.exercicios.map((ex, idx) => {
-                    const links = ex.links_demonstracao || (ex.link_video ? [{ label: "Vídeo", url: ex.link_video }] : []);
-                    
-                    return (
-                      <div
-                        key={ex.id || idx}
-                        className="flex items-start gap-3 p-3 rounded-lg border bg-card"
-                      >
-                        <Badge variant="outline" className="shrink-0 mt-0.5">
-                          {idx + 1}
-                        </Badge>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{ex.nome}</p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>{ex.series}x{ex.repeticoes}</span>
-                            {ex.carga && <span>• {ex.carga}</span>}
-                            <span>• {ex.descanso}s descanso</span>
-                          </div>
-                          {ex.observacoes && (
-                            <p className="text-xs text-muted-foreground mt-1 italic">
-                              {ex.observacoes}
-                            </p>
-                          )}
-                          {/* Links de demonstração */}
-                          {links.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mt-1.5">
-                              {links.map((link, linkIdx) => (
-                                <a
-                                  key={linkIdx}
-                                  href={link.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <ExternalLink className="h-3 w-3" />
-                                  {link.label}
-                                </a>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+            {modelo.exercicios && modelo.exercicios.length > 0 && (() => {
+              // Agrupar exercícios: isolados + grupos
+              const isolados = modelo.exercicios!.filter(ex => !ex.grupo_id);
+              const gruposMap = new Map<string, typeof modelo.exercicios>();
+              modelo.exercicios!.filter(ex => ex.grupo_id).forEach(ex => {
+                const key = ex.grupo_id!;
+                if (!gruposMap.has(key)) gruposMap.set(key, []);
+                gruposMap.get(key)!.push(ex);
+              });
+
+              // Ordenar itens por ordem
+              const items: { type: "isolado" | "grupo"; ordem: number; exercicio?: typeof isolados[0]; grupoId?: string; exercicios?: typeof isolados; tipoAgrupamento?: string }[] = [];
+              isolados.forEach(ex => items.push({ type: "isolado", ordem: ex.ordem, exercicio: ex }));
+              gruposMap.forEach((exs, grupoId) => {
+                const sorted = exs.sort((a, b) => (a.ordem_no_grupo || 0) - (b.ordem_no_grupo || 0));
+                items.push({ type: "grupo", ordem: Math.min(...exs.map(e => e.ordem)), grupoId, exercicios: sorted, tipoAgrupamento: exs[0]?.tipo_agrupamento || "super_set" });
+              });
+              items.sort((a, b) => a.ordem - b.ordem);
+
+              const renderExercicio = (ex: typeof isolados[0], idx: number) => {
+                const links = ex.links_demonstracao || (ex.link_video ? [{ label: "Vídeo", url: ex.link_video }] : []);
+                return (
+                  <div key={ex.id || idx} className="flex items-start gap-3 p-3 rounded-lg border bg-card">
+                    <Badge variant="outline" className="shrink-0 mt-0.5">{idx + 1}</Badge>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{ex.nome}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>{ex.series}x{ex.repeticoes}</span>
+                        {ex.carga && <span>• {ex.carga}</span>}
+                        <span>• {ex.descanso}s descanso</span>
                       </div>
-                    );
-                  })}
+                      {ex.observacoes && <p className="text-xs text-muted-foreground mt-1 italic">{ex.observacoes}</p>}
+                      {links.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-1.5">
+                          {links.map((link, linkIdx) => (
+                            <a key={linkIdx} href={link.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+                              <ExternalLink className="h-3 w-3" />{link.label}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              };
+
+              let globalIdx = 0;
+              return (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <Dumbbell className="h-4 w-4" />
+                    Exercícios ({totalExercicios})
+                  </h4>
+                  <div className="space-y-2">
+                    {items.map((item, i) => {
+                      if (item.type === "isolado" && item.exercicio) {
+                        globalIdx++;
+                        return renderExercicio(item.exercicio, globalIdx);
+                      }
+                      if (item.type === "grupo" && item.exercicios) {
+                        const label = item.tipoAgrupamento === "bi_set" ? "Bi-Set" : item.tipoAgrupamento === "tri_set" ? "Tri-Set" : item.tipoAgrupamento === "drop_set" ? "Drop-Set" : "Super-Set";
+                        return (
+                          <div key={item.grupoId} className="border-2 border-primary/20 rounded-lg p-2 space-y-2">
+                            <Badge variant="secondary" className="text-xs">{label}</Badge>
+                            {item.exercicios.map(ex => {
+                              globalIdx++;
+                              return renderExercicio(ex, globalIdx);
+                            })}
+                            {item.exercicios[0]?.descanso_entre_grupos && (
+                              <p className="text-xs text-muted-foreground text-center">Descanso entre grupos: {item.exercicios[0].descanso_entre_grupos}s</p>
+                            )}
+                          </div>
+                        );
+                      }
+                      return null;
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {totalExercicios === 0 && totalBlocos === 0 && (
               <div className="text-center py-8 text-muted-foreground">

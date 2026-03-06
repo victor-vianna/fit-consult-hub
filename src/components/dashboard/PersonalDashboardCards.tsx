@@ -233,7 +233,7 @@ export function PersonalDashboardCards({
           .from("treino_sessoes")
           .select("fim")
           .eq("profile_id", aluno.id)
-          .eq("status", "finalizado")
+          .eq("status", "concluido")
           .not("fim", "is", null)
           .order("fim", { ascending: false })
           .limit(1)
@@ -400,9 +400,9 @@ export function PersonalDashboardCards({
       alunos.map(async (aluno) => {
         const { data: sessaoHoje } = await supabase
           .from("treino_sessoes")
-          .select("id, fim, inicio")
+          .select("id, fim, inicio, duracao_segundos")
           .eq("profile_id", aluno.id)
-          .eq("status", "finalizado")
+          .eq("status", "concluido")
           .gte("fim", hoje.toISOString())
           .order("fim", { ascending: false })
           .limit(1)
@@ -454,7 +454,7 @@ export function PersonalDashboardCards({
       .from("treino_sessoes")
       .select("*", { count: "exact", head: true })
       .eq("personal_id", personalId)
-      .eq("status", "finalizado")
+      .eq("status", "concluido")
       .gte("fim", hoje.toISOString());
 
     // Treinos finalizados na semana
@@ -465,7 +465,7 @@ export function PersonalDashboardCards({
       .from("treino_sessoes")
       .select("*", { count: "exact", head: true })
       .eq("personal_id", personalId)
-      .eq("status", "finalizado")
+      .eq("status", "concluido")
       .gte("fim", inicioSemana.toISOString());
 
     setStats({

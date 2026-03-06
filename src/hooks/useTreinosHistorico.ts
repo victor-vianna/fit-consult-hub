@@ -14,6 +14,7 @@ interface TreinoSemanal {
   descricao: string | null;
   created_at: string;
   updated_at: string;
+  duracao_segundos?: number | null;
 }
 
 export function useTreinosHistorico(profileId: string, mes?: Date) {
@@ -59,11 +60,33 @@ export function useTreinosHistorico(profileId: string, mes?: Date) {
 
       if (error) throw error;
 
-      setTreinos(data || []);
+      // Buscar duração das sessões para treinos concluídos
+      const treinoIds = (data || []).filter(t => t.concluido).map(t => t.id);
+      let sessoesDuracao: Record<string, number> = {};
+      
+      if (treinoIds.length > 0) {
+        const { data: sessoes } = await supabase
+          .from("treino_sessoes")
+          .select("treino_semanal_id, duracao_segundos")
+          .in("treino_semanal_id", treinoIds)
+          .eq("status", "concluido")
+          .not("duracao_segundos", "is", null);
+        
+        (sessoes || []).forEach((s: any) => {
+          sessoesDuracao[s.treino_semanal_id] = s.duracao_segundos;
+        });
+      }
+
+      const treinosComDuracao = (data || []).map(t => ({
+        ...t,
+        duracao_segundos: sessoesDuracao[t.id] || null,
+      }));
+
+      setTreinos(treinosComDuracao);
 
       // Calcular estatísticas
-      const total = data?.length || 0;
-      const concluidos = data?.filter((t) => t.concluido).length || 0;
+      const total = treinosComDuracao?.length || 0;
+      const concluidos = treinosComDuracao?.filter((t) => t.concluido).length || 0;
       const percentual = total > 0 ? Math.round((concluidos / total) * 100) : 0;
 
       setStats({ total, concluidos, percentual });

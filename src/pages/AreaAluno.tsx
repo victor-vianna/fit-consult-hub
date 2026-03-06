@@ -25,7 +25,9 @@ import {
   Calendar,
   Library,
   MessageSquare,
+  Activity,
 } from "lucide-react";
+import { AvaliacaoAlunoSection } from "@/components/avaliacao/AvaliacaoAlunoSection";
 import { StudentSubscriptionView } from "@/components/StudentSubscriptionView";
 import { DocumentViewer } from "@/components/DocumentViewer";
 import { format } from "date-fns";
@@ -162,6 +164,11 @@ export default function AreaAluno() {
             title="Histórico"
             icon={Calendar}
             onClick={() => setActiveSection("historico")}
+          />
+          <ActionCard
+            title="Avaliação"
+            icon={Activity}
+            onClick={() => setActiveSection("avaliacao")}
           />
           <ActionCard
             title="Materiais"
@@ -505,6 +512,19 @@ export default function AreaAluno() {
 
             {/* ✅ Importe e use o componente de exercícios aqui */}
             <ExercisesLibrary />
+          </div>
+        );
+
+      case "avaliacao":
+        return (
+          <div className="space-y-6 animate-fade-in">
+            {profile?.personal_id && (
+              <AvaliacaoAlunoSection
+                profileId={user!.id}
+                personalId={profile.personal_id}
+                themeColor={personalSettings?.theme_color}
+              />
+            )}
           </div>
         );
 

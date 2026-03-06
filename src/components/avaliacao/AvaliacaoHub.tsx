@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Camera, TrendingUp, Weight, Ruler, Accessibility, Eye, ShieldCheck } from "lucide-react";
+import { Camera, TrendingUp, Weight, Ruler, Accessibility, Eye } from "lucide-react";
 import { FotosSection } from "./FotosSection";
 import { EvolucaoSection } from "./EvolucaoSection";
 import { ComposicaoCorporalSection } from "./ComposicaoCorporalSection";
 import { AvaliacaoFisicaSection } from "./AvaliacaoFisicaSection";
 import { FlexibilidadeSection } from "./FlexibilidadeSection";
 import { PosturalSection } from "./PosturalSection";
-import { TriagemSection } from "./TriagemSection";
 
 interface Props {
   profileId: string;
@@ -50,10 +49,6 @@ export function AvaliacaoHub({ profileId, personalId, themeColor }: Props) {
               <Eye className="h-4 w-4" />
               <span className="hidden sm:inline">Postural</span>
             </TabsTrigger>
-            <TabsTrigger value="triagem" className="flex-shrink-0 px-3 py-2 text-xs sm:text-sm gap-1.5">
-              <ShieldCheck className="h-4 w-4" />
-              <span className="hidden sm:inline">Triagem</span>
-            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -74,9 +69,6 @@ export function AvaliacaoHub({ profileId, personalId, themeColor }: Props) {
         </TabsContent>
         <TabsContent value="postural">
           <PosturalSection profileId={profileId} personalId={personalId} themeColor={themeColor} />
-        </TabsContent>
-        <TabsContent value="triagem">
-          <TriagemSection profileId={profileId} personalId={personalId} themeColor={themeColor} />
         </TabsContent>
       </Tabs>
     </div>

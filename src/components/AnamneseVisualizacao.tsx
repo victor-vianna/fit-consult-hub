@@ -10,6 +10,7 @@ import {
   FileText,
   Edit,
   CheckCircle2,
+  ShieldCheck,
 } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -20,6 +21,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { AnamneseInicialForm } from "./AnamneseInicialForm";
+import { TriagemSection } from "./avaliacao/TriagemSection";
 
 interface Props {
   profileId: string;
@@ -525,6 +527,19 @@ export function AnamneseVisualizacao({
           </CardContent>
         </Card>
       )}
+
+      {/* Triagem - pertence ao contexto da anamnese */}
+      <div className="pt-4">
+        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+          <ShieldCheck className="h-5 w-5" />
+          Triagem de Saúde
+        </h2>
+        <TriagemSection
+          profileId={profileId}
+          personalId={personalId}
+          themeColor={themeColor}
+        />
+      </div>
     </div>
   );
 }

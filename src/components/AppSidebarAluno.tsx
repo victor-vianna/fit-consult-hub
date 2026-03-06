@@ -8,6 +8,7 @@ import {
   CreditCard,
   Calendar,
   MessageSquare,
+  Activity,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -25,10 +26,9 @@ import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 
 const items = [
   { title: "Início", icon: Home, value: "inicio" },
-  // { title: "Consultoria", icon: BookOpen, value: "consultoria" },
-  // { title: "Diretrizes", icon: ListChecks, value: "diretrizes" },
   { title: "Treinos", icon: Dumbbell, value: "treinos" },
   { title: "Histórico", icon: Calendar, value: "historico" },
+  { title: "Avaliação", icon: Activity, value: "avaliacao" },
   { title: "Materiais", icon: FileText, value: "materiais" },
   { title: "Biblioteca", icon: Library, value: "biblioteca" },
   { title: "Meu Plano", icon: CreditCard, value: "plano" },

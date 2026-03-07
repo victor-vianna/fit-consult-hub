@@ -109,70 +109,130 @@ export function WorkoutTimer({
     );
   }
 
-  // Timer fixo no topo - duas linhas no mobile
+  // Timer fixo no topo - fixed no viewport
   return (
     <>
+      {/* Spacer para compensar a barra fixed */}
+      <div className="h-[88px] sm:h-[72px]" />
+
+      {/* Barra fixed no topo do viewport */}
       <div
         className={cn(
-          "sticky top-0 z-40 -mx-4 sm:-mx-6 px-4 sm:px-6",
-          "bg-card/95 backdrop-blur-lg border-b shadow-md",
+          "fixed top-0 left-0 right-0 z-50",
+          "bg-background/90 backdrop-blur-xl border-b shadow-lg",
           "transition-colors duration-200",
           isPaused && "border-b-warning/50"
         )}
       >
-        {/* Linha 1: Timer centralizado */}
-        <div className="flex items-center justify-center py-2 gap-2">
-          <div className="relative">
-            <Timer className={cn(
-              "h-5 w-5",
-              isPaused ? "text-warning" : "text-primary"
-            )} />
-            {!isPaused && (
-              <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-primary animate-pulse" />
-            )}
+        {/* Mobile: duas linhas compactas */}
+        <div className="sm:hidden">
+          <div className="flex items-center justify-between px-4 py-2">
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Timer className={cn(
+                  "h-4 w-4",
+                  isPaused ? "text-warning" : "text-primary"
+                )} />
+                {!isPaused && (
+                  <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-primary animate-pulse" />
+                )}
+              </div>
+              <span className={cn(
+                "text-xl font-bold font-mono tabular-nums",
+                isPaused ? "text-warning" : "text-primary"
+              )}>
+                {formattedTime}
+              </span>
+              {isPaused && (
+                <span className="text-[10px] text-warning font-medium">Pausado</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={togglePause}
+                className={cn(
+                  "h-9 w-9 p-0",
+                  isPaused
+                    ? "border-primary text-primary hover:bg-primary/10"
+                    : "border-warning text-warning hover:bg-warning/10"
+                )}
+              >
+                {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setShowFinalizarDialog(true)}
+                className="h-9 px-3 shadow-sm"
+              >
+                <Check className="h-4 w-4 mr-1" />
+                <span className="text-xs">Finalizar</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowCancelarDialog(true)}
+                className="h-9 w-9 p-0 text-muted-foreground hover:text-destructive"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-          <span className={cn(
-            "text-2xl font-bold font-mono tabular-nums",
-            isPaused ? "text-warning" : "text-primary"
-          )}>
-            {formattedTime}
-          </span>
-          {isPaused && (
-            <span className="text-xs text-warning font-medium">Pausado</span>
-          )}
         </div>
 
-        {/* Linha 2: Botões distribuídos */}
-        <div className="flex items-center justify-center gap-3 pb-3">
+        {/* Desktop: linha única */}
+        <div className="hidden sm:flex items-center justify-center gap-4 px-6 py-3">
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Timer className={cn(
+                "h-5 w-5",
+                isPaused ? "text-warning" : "text-primary"
+              )} />
+              {!isPaused && (
+                <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-primary animate-pulse" />
+              )}
+            </div>
+            <span className={cn(
+              "text-2xl font-bold font-mono tabular-nums",
+              isPaused ? "text-warning" : "text-primary"
+            )}>
+              {formattedTime}
+            </span>
+            {isPaused && (
+              <span className="text-xs text-warning font-medium">Pausado</span>
+            )}
+          </div>
+
           <Button
             size="sm"
             variant="outline"
             onClick={togglePause}
             className={cn(
-              "h-11 min-w-[44px] px-4",
+              "h-10 px-4",
               isPaused
                 ? "border-primary text-primary hover:bg-primary/10"
                 : "border-warning text-warning hover:bg-warning/10"
             )}
           >
             {isPaused ? <Play className="h-4 w-4 mr-1.5" /> : <Pause className="h-4 w-4 mr-1.5" />}
-            <span className="text-sm">{isPaused ? "Retomar" : "Pausar"}</span>
+            {isPaused ? "Retomar" : "Pausar"}
           </Button>
 
           <Button
             size="sm"
             onClick={() => setShowFinalizarDialog(true)}
-            className="h-11 min-w-[44px] px-4 shadow-sm"
+            className="h-10 px-4 shadow-sm"
           >
             <Check className="h-4 w-4 mr-1.5" />
-            <span className="text-sm">Finalizar</span>
+            Finalizar
           </Button>
 
           <Button
             size="sm"
             variant="ghost"
             onClick={() => setShowCancelarDialog(true)}
-            className="h-11 w-11 p-0 text-muted-foreground hover:text-destructive"
+            className="h-10 w-10 p-0 text-muted-foreground hover:text-destructive"
           >
             <X className="h-5 w-5" />
           </Button>

@@ -562,6 +562,7 @@ function TreinoCard({
             readOnly={false}
             progresso={progresso}
             finalizarRef={finalizarRef}
+            onWorkoutStart={() => marcarTreinoIniciado(treinoId, treino.dia)}
             onWorkoutComplete={() => marcarTreinoFinalizado(treinoId, treino.dia)}
             onWorkoutCancel={() => marcarTreinoFinalizado(treinoId, treino.dia)}
           />

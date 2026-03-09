@@ -25,6 +25,7 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { TreinosHojeModal } from "./TreinosHojeModal";
 import { AlertasModal } from "./AlertasModal";
+import { FeedbackDetailModal } from "./FeedbackDetailModal";
 import { useChatNaoLidas } from "@/hooks/useChatMessages";
 import {
   DashboardCustomizeDialog,

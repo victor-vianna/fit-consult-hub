@@ -120,11 +120,32 @@ export function WorkoutBlockCard({
   return (
     <Card
       className={cn(
-        "group hover:shadow-md transition-all",
+        "group hover:shadow-md transition-all duration-300",
         corClass,
         bloco.concluido && "opacity-75"
       )}
     >
+      {/* Minimized view when completed */}
+      {bloco.concluido && readOnly ? (
+        <CardContent className="p-0">
+          <div className="flex items-center gap-3 px-3 py-2.5">
+            <button
+              onClick={handleToggleBloco}
+              className="shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center"
+            >
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+            </button>
+            <span className="text-lg mr-1">{tipoConfig.icon}</span>
+            <p className="flex-1 min-w-0 text-xs text-muted-foreground line-through truncate">
+              {bloco.nome}
+            </p>
+            <Badge variant="default" className="text-[10px] bg-green-600 shrink-0">
+              ✓
+            </Badge>
+          </div>
+        </CardContent>
+      ) : (
+      <>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 flex-1">
@@ -472,6 +493,8 @@ export function WorkoutBlockCard({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </>
+      )}
     </Card>
   );
 }

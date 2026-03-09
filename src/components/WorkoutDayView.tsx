@@ -475,6 +475,7 @@ export function WorkoutDayView({
                     treinoTemConteudo={treinoTemConteudo}
                     profileId={profileId}
                     personalId={personalId}
+                    marcarTreinoIniciado={marcarTreinoIniciado}
                     marcarTreinoFinalizado={marcarTreinoFinalizado}
                     handleToggleExercicio={handleToggleExercicio}
                     handleToggleGrupo={handleToggleGrupo}
@@ -508,6 +509,7 @@ function TreinoCard({
   treinoTemConteudo,
   profileId,
   personalId,
+  marcarTreinoIniciado,
   marcarTreinoFinalizado,
   handleToggleExercicio,
   handleToggleGrupo,
@@ -529,6 +531,7 @@ function TreinoCard({
   treinoTemConteudo: boolean;
   profileId: string;
   personalId: string;
+  marcarTreinoIniciado: (treinoId: string, dia: number) => void;
   marcarTreinoFinalizado: (treinoId: string, dia: number) => void;
   handleToggleExercicio: (id: string, concluido: boolean) => Promise<any>;
   handleToggleGrupo: (grupoId: string, concluido: boolean) => Promise<void>;
@@ -562,6 +565,7 @@ function TreinoCard({
             readOnly={false}
             progresso={progresso}
             finalizarRef={finalizarRef}
+            onWorkoutStart={() => marcarTreinoIniciado(treinoId, treino.dia)}
             onWorkoutComplete={() => marcarTreinoFinalizado(treinoId, treino.dia)}
             onWorkoutCancel={() => marcarTreinoFinalizado(treinoId, treino.dia)}
           />

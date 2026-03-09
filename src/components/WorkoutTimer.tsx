@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, Check, X, Timer, Loader2, ChevronUp } from "lucide-react";
+import { Play, Pause, Check, X, Timer, Loader2 } from "lucide-react";
 import { useWorkoutTimer } from "@/hooks/useWorkoutTimer";
 import { WorkoutCompletionScreen } from "./WorkoutCompletionScreen";
 import {
@@ -14,7 +14,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
 interface WorkoutTimerProps {
@@ -24,7 +23,6 @@ interface WorkoutTimerProps {
   readOnly?: boolean;
   onWorkoutComplete?: () => void;
   onWorkoutCancel?: () => void;
-  /** Progress percentage 0-100 from parent */
   progresso?: number;
 }
 
@@ -40,7 +38,6 @@ export function WorkoutTimer({
   const [showFinalizarDialog, setShowFinalizarDialog] = useState(false);
   const [showCancelarDialog, setShowCancelarDialog] = useState(false);
   const [isFinalizando, setIsFinalizando] = useState(false);
-  const [expanded, setExpanded] = useState(false);
 
   const {
     isRunning,
@@ -58,7 +55,6 @@ export function WorkoutTimer({
 
   if (readOnly) return null;
 
-  // Completion screen (full overlay)
   if (showCompletionScreen && completionData) {
     return (
       <WorkoutCompletionScreen
@@ -99,150 +95,119 @@ export function WorkoutTimer({
 
   const isActive = isRunning || isPaused;
 
-  // Start button (inline, before workout begins)
+  // Start button (inline)
   if (!isActive) {
     return (
-      <Button
-        onClick={iniciar}
-        size="lg"
-        className="w-full shadow-lg"
-      >
+      <Button onClick={iniciar} size="lg" className="w-full shadow-lg">
         <Play className="h-5 w-5 mr-2" />
         Iniciar Treino
       </Button>
     );
   }
 
-  // ── Active workout: bottom sticky bar ──
+  // Active workout: fixed bottom bar above BottomNavigation
+  // NO spacer here — parent handles padding via `pb-` class
   return (
     <>
-      {/* Bottom bar – sits above BottomNavigation (bottom ~70px) */}
       <div
         className={cn(
           "fixed left-0 right-0 z-40",
-          // Above the safe-area bottom nav (~68px)
-          "bottom-[68px] sm:bottom-0",
-          "transition-all duration-300 ease-out"
+          "bottom-[68px] sm:bottom-0"
         )}
       >
-        {/* Progress strip along the top edge */}
-        <div className="h-1 bg-muted/50">
-          <div
-            className="h-full bg-primary transition-all duration-500 ease-out"
-            style={{ width: `${progresso}%` }}
-          />
-        </div>
+        {/* Thin progress bar */}
+        {progresso > 0 && (
+          <div className="h-[3px] bg-muted/30">
+            <div
+              className="h-full bg-primary transition-all duration-500"
+              style={{ width: `${progresso}%` }}
+            />
+          </div>
+        )}
 
-        {/* Main bar */}
+        {/* Compact single-row bar */}
         <div
           className={cn(
-            "bg-card/95 backdrop-blur-xl border-t shadow-[0_-4px_20px_rgba(0,0,0,0.08)]",
-            "dark:shadow-[0_-4px_20px_rgba(0,0,0,0.3)]",
-            isPaused && "border-t-warning/40"
+            "bg-card border-t shadow-[0_-2px_12px_rgba(0,0,0,0.08)]",
+            "dark:shadow-[0_-2px_12px_rgba(0,0,0,0.25)]",
+            isPaused && "border-t-warning/50"
           )}
         >
-          {/* Compact row – always visible */}
-          <div className="flex items-center justify-between px-4 py-2.5">
-            {/* Left: timer + status */}
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="flex items-center gap-2.5 min-w-0 active:opacity-70 transition-opacity"
-            >
+          <div className="flex items-center justify-between px-3 py-2">
+            {/* Timer display */}
+            <div className="flex items-center gap-2">
               <div className="relative flex-shrink-0">
                 <Timer
                   className={cn(
-                    "h-5 w-5",
+                    "h-4 w-4",
                     isPaused ? "text-warning" : "text-primary"
                   )}
                 />
                 {!isPaused && (
-                  <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-primary animate-pulse" />
+                  <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                 )}
               </div>
               <span
                 className={cn(
-                  "text-xl font-bold font-mono tabular-nums tracking-tight",
+                  "text-lg font-bold font-mono tabular-nums",
                   isPaused ? "text-warning" : "text-foreground"
                 )}
               >
                 {formattedTime}
               </span>
               {isPaused && (
-                <span className="text-[10px] font-semibold text-warning bg-warning/10 px-1.5 py-0.5 rounded">
+                <span className="text-[9px] font-bold text-warning bg-warning/10 px-1.5 py-0.5 rounded">
                   PAUSADO
                 </span>
               )}
-              <ChevronUp
-                className={cn(
-                  "h-4 w-4 text-muted-foreground transition-transform duration-200",
-                  expanded && "rotate-180"
-                )}
-              />
-            </button>
+            </div>
 
-            {/* Right: quick actions */}
-            <div className="flex items-center gap-2">
+            {/* Actions */}
+            <div className="flex items-center gap-1.5">
+              {/* Cancel — small ghost icon */}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowCancelarDialog(true)}
+                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+
+              {/* Pause/Resume */}
               <Button
                 size="sm"
                 variant="outline"
                 onClick={togglePause}
                 className={cn(
-                  "h-9 w-9 p-0 rounded-full",
+                  "h-8 w-8 p-0",
                   isPaused
-                    ? "border-primary text-primary hover:bg-primary/10"
-                    : "border-warning text-warning hover:bg-warning/10"
+                    ? "border-primary/50 text-primary"
+                    : "border-warning/50 text-warning"
                 )}
               >
                 {isPaused ? (
-                  <Play className="h-4 w-4" />
+                  <Play className="h-3.5 w-3.5" />
                 ) : (
-                  <Pause className="h-4 w-4" />
+                  <Pause className="h-3.5 w-3.5" />
                 )}
               </Button>
+
+              {/* Finalizar */}
               <Button
                 size="sm"
                 onClick={() => setShowFinalizarDialog(true)}
-                className="h-9 px-3.5 rounded-full shadow-sm"
+                className="h-8 px-3 text-xs font-semibold"
               >
-                <Check className="h-4 w-4 mr-1" />
-                <span className="text-xs font-semibold">Finalizar</span>
+                <Check className="h-3.5 w-3.5 mr-1" />
+                Finalizar
               </Button>
             </div>
           </div>
-
-          {/* Expanded panel – shows more info + cancel */}
-          {expanded && (
-            <div className="px-4 pb-3 pt-1 border-t border-border/50 animate-in slide-in-from-bottom-2 duration-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {progresso > 0 && (
-                    <div className="flex items-center gap-2">
-                      <Progress value={progresso} className="w-20 h-2" />
-                      <span className="text-xs text-muted-foreground font-medium">
-                        {progresso}%
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setShowCancelarDialog(true)}
-                  className="h-8 px-3 text-xs text-muted-foreground hover:text-destructive"
-                >
-                  <X className="h-3.5 w-3.5 mr-1" />
-                  Cancelar treino
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Spacer to prevent content from hiding behind the bar */}
-      <div className="h-[56px] sm:h-[52px]" />
-
-      {/* Dialog: Finalizar */}
+      {/* Dialogs */}
       <AlertDialog open={showFinalizarDialog} onOpenChange={setShowFinalizarDialog}>
         <AlertDialogContent className="max-w-[90vw] sm:max-w-md">
           <AlertDialogHeader>
@@ -288,7 +253,6 @@ export function WorkoutTimer({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Dialog: Cancelar */}
       <AlertDialog open={showCancelarDialog} onOpenChange={setShowCancelarDialog}>
         <AlertDialogContent className="max-w-[90vw] sm:max-w-md">
           <AlertDialogHeader>

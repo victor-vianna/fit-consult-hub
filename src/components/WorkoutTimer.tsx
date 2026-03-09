@@ -35,6 +35,7 @@ export function WorkoutTimer({
   onWorkoutComplete,
   onWorkoutCancel,
   progresso = 0,
+  finalizarRef,
 }: WorkoutTimerProps) {
   const [showFinalizarDialog, setShowFinalizarDialog] = useState(false);
   const [showCancelarDialog, setShowCancelarDialog] = useState(false);

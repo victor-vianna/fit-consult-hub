@@ -475,6 +475,7 @@ export function WorkoutDayView({
                     treinoTemConteudo={treinoTemConteudo}
                     profileId={profileId}
                     personalId={personalId}
+                    marcarTreinoIniciado={marcarTreinoIniciado}
                     marcarTreinoFinalizado={marcarTreinoFinalizado}
                     handleToggleExercicio={handleToggleExercicio}
                     handleToggleGrupo={handleToggleGrupo}

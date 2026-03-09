@@ -103,7 +103,7 @@ export function CompactExerciseCard({
             >
               <CheckCircle2 className="h-5 w-5 text-green-600" />
             </button>
-            <p className="flex-1 min-w-0 text-sm text-muted-foreground line-through truncate">
+            <p className="flex-1 min-w-0 text-xs text-muted-foreground line-through truncate">
               {exercicio.nome}
             </p>
           </div>

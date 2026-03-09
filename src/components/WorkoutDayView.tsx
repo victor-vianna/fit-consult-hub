@@ -477,6 +477,7 @@ export function WorkoutDayView({
                           profileId={profileId}
                           personalId={personalId}
                           readOnly={false}
+                          progresso={progresso}
                           onWorkoutComplete={() => marcarTreinoFinalizado(treinoId, treino.dia)}
                           onWorkoutCancel={() => marcarTreinoFinalizado(treinoId, treino.dia)}
                         />

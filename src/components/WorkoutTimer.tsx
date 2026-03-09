@@ -23,6 +23,7 @@ interface WorkoutTimerProps {
   readOnly?: boolean;
   onWorkoutComplete?: () => void;
   onWorkoutCancel?: () => void;
+  onWorkoutStart?: () => void;
   progresso?: number;
   finalizarRef?: React.MutableRefObject<(() => void) | null>;
 }

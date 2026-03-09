@@ -55,6 +55,17 @@ export function WorkoutTimer({
     fecharTelaConclusao,
   } = useWorkoutTimer({ treinoId, profileId, personalId });
 
+  // Expose finalizar trigger via ref
+  useEffect(() => {
+    if (finalizarRef) {
+      if (isRunning || isPaused) {
+        finalizarRef.current = () => setShowFinalizarDialog(true);
+      } else {
+        finalizarRef.current = null;
+      }
+    }
+  }, [finalizarRef, isRunning, isPaused]);
+
   if (readOnly) return null;
 
   if (showCompletionScreen && completionData) {

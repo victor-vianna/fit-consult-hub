@@ -71,7 +71,7 @@ export function WorkoutDayHeader({
         )}
 
         {progresso === 100 && (
-          <Badge variant="default" className="bg-green-600 text-xs">
+          <Badge variant="default" className="bg-primary text-xs">
             ✓ Treino Completo!
           </Badge>
         )}

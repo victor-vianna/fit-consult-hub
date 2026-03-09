@@ -333,6 +333,8 @@ export function WorkoutDayView({
 
   return (
     <div className="space-y-4 sm:space-y-6 pb-20">
+
+    <div className="space-y-4 sm:space-y-6 pb-20">
       {/* Header Principal */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">

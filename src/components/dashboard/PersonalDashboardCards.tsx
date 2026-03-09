@@ -256,8 +256,7 @@ export function PersonalDashboardCards({
     }
   };
 
-  const fetchTreinosEmAndamento = async () => {
-    // Buscar sessões com status ativo
+  const fetchTreinosEmAndamento = async (): Promise<Set<string>> => {
     const { data } = await supabase
       .from("treino_sessoes")
       .select(`
@@ -272,15 +271,18 @@ export function PersonalDashboardCards({
       .order("inicio", { ascending: false })
       .limit(20);
 
+    const idsAtivos = new Set<string>();
+
     if (data) {
       const agora = new Date();
-      // Filtrar sessões fantasma: se iniciou há mais de 12h, provavelmente foi abandonada
       const LIMITE_HORAS = 12;
       const sessoesValidas = data.filter((t: any) => {
         if (!t.inicio) return false;
         const horasDecorridas = (agora.getTime() - parseISO(t.inicio).getTime()) / (1000 * 60 * 60);
         return horasDecorridas <= LIMITE_HORAS;
       });
+
+      sessoesValidas.forEach((t: any) => idsAtivos.add(t.profile_id));
 
       setTreinosAndamento(
         sessoesValidas.map((t: any) => ({
@@ -292,6 +294,8 @@ export function PersonalDashboardCards({
         }))
       );
     }
+
+    return idsAtivos;
   };
 
   const fetchAlunosInativos = async () => {

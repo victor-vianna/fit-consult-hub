@@ -14,9 +14,11 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Layers, Save } from "lucide-react";
+import { useModeloPastas } from "@/hooks/useModeloPastas";
 
 interface CicloTreinoFieldsProps {
   planilhaId: string;
+  personalId: string;
   initialValues?: {
     ciclo_genero?: string | null;
     ciclo_modalidade?: string | null;
@@ -28,16 +30,6 @@ interface CicloTreinoFieldsProps {
 }
 
 const GENEROS = ["Masculino", "Feminino", "Unissex"];
-const MODALIDADES = [
-  "Musculação",
-  "Calistenia",
-  "Funcional",
-  "CrossFit",
-  "Pilates",
-  "HIIT",
-  "Aeróbico",
-  "Outro",
-];
 const NIVEIS = ["Iniciante", "Intermediário", "Avançado"];
 
 export function CicloTreinoFields({

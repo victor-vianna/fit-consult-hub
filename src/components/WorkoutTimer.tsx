@@ -112,7 +112,7 @@ export function WorkoutTimer({
             <br />
             Aperte <span className="font-semibold">INICIAR</span> para começar o treino.
           </p>
-          <Button onClick={iniciar} size="lg" className="w-full h-12 text-base font-semibold shadow-lg">
+          <Button onClick={() => { iniciar(); onWorkoutStart?.(); }} size="lg" className="w-full h-12 text-base font-semibold shadow-lg">
             <Play className="h-5 w-5 mr-2" />
             Iniciar Treino
           </Button>

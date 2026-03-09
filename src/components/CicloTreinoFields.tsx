@@ -34,6 +34,7 @@ const NIVEIS = ["Iniciante", "Intermediário", "Avançado"];
 
 export function CicloTreinoFields({
   planilhaId,
+  personalId,
   initialValues,
   themeColor,
   onSaved,

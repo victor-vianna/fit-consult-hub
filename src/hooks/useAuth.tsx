@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -12,7 +12,7 @@ export type Profile = {
   email: string | null;
   personal_id?: string | null;
   is_active?: boolean;
-  [key: string]: any; // para evitar erros caso existam mais colunas
+  [key: string]: any;
 };
 
 export const useAuth = () => {
@@ -22,10 +22,60 @@ export const useAuth = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const initializedRef = useRef(false);
+
+  const initializeUserData = useCallback(async (userId: string) => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+    setLoading(true);
+    try {
+      const [roleResult, profileResult] = await Promise.all([
+        supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", userId)
+          .single(),
+        supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", userId)
+          .single(),
+      ]);
+
+      if (roleResult.error) {
+        console.error("Erro ao buscar role:", roleResult.error);
+        setRole(null);
+      } else {
+        setRole(roleResult.data.role as UserRole);
+      }
+
+      if (profileResult.error) {
+        console.error("Erro ao buscar profile:", profileResult.error);
+        setProfile(null);
+      } else {
+        setProfile(profileResult.data);
+      }
+    } catch (error) {
+      console.error("Erro ao inicializar dados do usuário:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let initialized = false;
+    // Load initial session first
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
 
+      if (session?.user) {
+        initializeUserData(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    // Then listen for changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
@@ -33,74 +83,27 @@ export const useAuth = () => {
       setSession(session);
       setUser(session?.user ?? null);
 
-      // Ignora o evento INITIAL_SESSION para evitar loops
-      if (event === "INITIAL_SESSION") return;
-
-      if (session?.user && !initialized) {
-        initialized = true;
+      if (event === "SIGNED_IN" && session?.user) {
+        // Reset initialized flag on new sign-in to reload data
+        initializedRef.current = false;
         initializeUserData(session.user.id);
-      } else if (!session?.user) {
+      } else if (event === "SIGNED_OUT") {
+        initializedRef.current = false;
         setRole(null);
         setProfile(null);
         setLoading(false);
-      }
-    });
-
-    // Carregar sessão inicial apenas uma vez
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-
-      if (session?.user && !initialized) {
-        initialized = true;
-        initializeUserData(session.user.id);
-      } else {
-        setLoading(false);
+      } else if (event === "TOKEN_REFRESHED" && session?.user) {
+        // Session was refreshed (e.g. returning to app), ensure data is loaded
+        if (!initializedRef.current) {
+          initializeUserData(session.user.id);
+        }
       }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [initializeUserData]);
 
-  const initializeUserData = async (userId: string) => {
-    setLoading(true);
-    await Promise.all([fetchUserRole(userId), fetchUserProfile(userId)]);
-    setLoading(false);
-  };
-
-  const fetchUserRole = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userId)
-        .single();
-
-      if (error) throw error;
-      setRole(data.role as UserRole);
-    } catch (error) {
-      console.error("Erro ao buscar role:", error);
-      setRole(null);
-    }
-  };
-
-  const fetchUserProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
-
-      if (error) throw error;
-      setProfile(data);
-    } catch (error) {
-      console.error("Erro ao buscar profile:", error);
-      setProfile(null);
-    }
-  };
-
-  // 🔁 Listener de mudanças no perfil do aluno
+  // Listener for student profile changes (blocked status)
   useEffect(() => {
     if (user && role === "aluno") {
       const channel = supabase
@@ -118,11 +121,9 @@ export const useAuth = () => {
               console.log("Aluno foi bloqueado, redirecionando...");
               window.location.href = "/acesso-suspenso";
             }
-
             setProfile(payload.new as Profile);
           }
         )
-
         .subscribe();
 
       return () => {
@@ -131,17 +132,35 @@ export const useAuth = () => {
     }
   }, [user, role]);
 
+  // Re-initialize on visibility change (returning from background on mobile)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        // Check if session is still valid when returning to app
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session?.user) {
+            setSession(session);
+            setUser(session.user);
+            if (!initializedRef.current || !role) {
+              initializeUserData(session.user.id);
+            }
+          }
+        });
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [role, initializeUserData]);
+
   const signOut = async () => {
     console.log("🔵 Iniciando logout...");
 
     try {
-      const keys = Object.keys(localStorage);
-      keys.forEach((key) => {
-        if (key.includes("supabase") || key.includes("sb-")) {
-          localStorage.removeItem(key);
-        }
-      });
+      // Call supabase signOut first - this properly clears the session
+      await supabase.auth.signOut();
 
+      initializedRef.current = false;
       setUser(null);
       setSession(null);
       setRole(null);
@@ -152,6 +171,14 @@ export const useAuth = () => {
       toast.success("Logout realizado com sucesso!");
     } catch (error) {
       console.error("Erro no logout:", error);
+      // Even if signOut fails, clear local state
+      initializedRef.current = false;
+      setUser(null);
+      setSession(null);
+      setRole(null);
+      setProfile(null);
+      setLoading(false);
+      navigate("/auth", { replace: true });
       toast.error("Erro ao fazer logout");
     }
   };

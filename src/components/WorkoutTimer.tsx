@@ -130,10 +130,10 @@ export function WorkoutTimer({
               <div className="relative flex-shrink-0">
                 <div
                   className={cn(
-                    "w-2 h-2 rounded-full",
+                    "w-2 h-2 rounded-full animate-pulse",
                     isPaused
-                      ? "bg-warning animate-pulse"
-                      : "bg-emerald-500 animate-pulse"
+                      ? "bg-warning"
+                      : "bg-primary"
                   )}
                 />
               </div>

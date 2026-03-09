@@ -474,11 +474,11 @@ export function WorkoutDayView({
                         totalGrupos={grupos.length}
                         totalBlocos={blocos.length}
                         progresso={progresso}
-                        onIniciarTreino={() => handleIniciarTreino(treino.dia, treinoId)}
                         treinoIniciado={isDiaIniciado}
                       />
 
-                      {isDiaIniciado && treinoId && (
+                      {/* Timer inline — mostra botão de iniciar ou cronômetro ativo */}
+                      {treinoId && (
                         <WorkoutTimer
                           treinoId={treinoId}
                           profileId={profileId}

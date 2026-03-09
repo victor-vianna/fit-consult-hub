@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, Check, X, Timer, Loader2 } from "lucide-react";
+import { Play, Pause, Check, X, Timer, Loader2, ChevronUp } from "lucide-react";
 import { useWorkoutTimer } from "@/hooks/useWorkoutTimer";
 import { WorkoutCompletionScreen } from "./WorkoutCompletionScreen";
 import {
@@ -69,15 +69,7 @@ export function WorkoutTimer({
   }
 
   if (isLoading) {
-    return (
-      <div className="w-full p-3 bg-card border rounded-xl">
-        <div className="flex items-center justify-center gap-3">
-          <Skeleton className="h-5 w-5 rounded-full" />
-          <Skeleton className="h-6 w-28" />
-          <Skeleton className="h-9 w-20" />
-        </div>
-      </div>
-    );
+    return null; // Don't show skeleton for the fixed bar — let it appear naturally
   }
 
   const handleFinalizar = async () => {
@@ -95,7 +87,7 @@ export function WorkoutTimer({
 
   const isActive = isRunning || isPaused;
 
-  // Start button (inline)
+  // Start button — rendered inline in the workout card
   if (!isActive) {
     return (
       <Button onClick={iniciar} size="lg" className="w-full shadow-lg">
@@ -105,129 +97,131 @@ export function WorkoutTimer({
     );
   }
 
-  // Active workout: fixed bottom bar above BottomNavigation
-  // NO spacer here — parent handles padding via `pb-` class
+  // ─── Active Workout: MFIT-style bottom bar ───
   return (
     <>
+      {/* Fixed bottom bar — sits above BottomNavigation (68px) */}
       <div
         className={cn(
           "fixed left-0 right-0 z-40",
-          "bottom-[68px] sm:bottom-0"
+          "bottom-[68px] sm:bottom-0",
+          "safe-area-bottom"
         )}
       >
-        {/* Thin progress bar */}
-        {progresso > 0 && (
-          <div className="h-[3px] bg-muted/30">
-            <div
-              className="h-full bg-primary transition-all duration-500"
-              style={{ width: `${progresso}%` }}
-            />
-          </div>
-        )}
+        {/* Progress line — thin accent at top */}
+        <div className="h-[2px] bg-border">
+          <div
+            className="h-full bg-primary transition-all duration-700 ease-out"
+            style={{ width: `${Math.max(progresso, 2)}%` }}
+          />
+        </div>
 
-        {/* Compact single-row bar */}
+        {/* Main bar */}
         <div
           className={cn(
-            "bg-card border-t shadow-[0_-2px_12px_rgba(0,0,0,0.08)]",
-            "dark:shadow-[0_-2px_12px_rgba(0,0,0,0.25)]",
-            isPaused && "border-t-warning/50"
+            "bg-card/95 backdrop-blur-md border-t",
+            "transition-colors duration-300",
+            isPaused && "bg-warning/5"
           )}
         >
-          <div className="flex items-center justify-between px-3 py-2">
-            {/* Timer display */}
-            <div className="flex items-center gap-2">
+          <div className="flex items-center h-12 px-3 gap-2">
+            {/* Left: Timer */}
+            <div className="flex items-center gap-2 min-w-0 flex-1">
               <div className="relative flex-shrink-0">
-                <Timer
+                <div
                   className={cn(
-                    "h-4 w-4",
-                    isPaused ? "text-warning" : "text-primary"
+                    "w-2 h-2 rounded-full animate-pulse",
+                    isPaused
+                      ? "bg-warning"
+                      : "bg-primary"
                   )}
                 />
-                {!isPaused && (
-                  <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                )}
               </div>
               <span
                 className={cn(
-                  "text-lg font-bold font-mono tabular-nums",
+                  "text-base font-bold font-mono tabular-nums tracking-tight",
                   isPaused ? "text-warning" : "text-foreground"
                 )}
               >
                 {formattedTime}
               </span>
               {isPaused && (
-                <span className="text-[9px] font-bold text-warning bg-warning/10 px-1.5 py-0.5 rounded">
-                  PAUSADO
+                <span className="text-[10px] font-semibold text-warning uppercase tracking-wider">
+                  pausado
+                </span>
+              )}
+              {!isPaused && progresso > 0 && (
+                <span className="text-[10px] font-medium text-muted-foreground">
+                  {progresso}%
                 </span>
               )}
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-1.5">
-              {/* Cancel — small ghost icon */}
-              <Button
-                size="sm"
-                variant="ghost"
+            {/* Right: Controls */}
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {/* Cancel */}
+              <button
                 onClick={() => setShowCancelarDialog(true)}
-                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                className="h-8 w-8 flex items-center justify-center rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                aria-label="Cancelar treino"
               >
                 <X className="h-4 w-4" />
-              </Button>
+              </button>
 
-              {/* Pause/Resume */}
-              <Button
-                size="sm"
-                variant="outline"
+              {/* Pause / Resume */}
+              <button
                 onClick={togglePause}
                 className={cn(
-                  "h-8 w-8 p-0",
+                  "h-8 w-8 flex items-center justify-center rounded-full transition-colors",
                   isPaused
-                    ? "border-primary/50 text-primary"
-                    : "border-warning/50 text-warning"
+                    ? "bg-primary/10 text-primary hover:bg-primary/20"
+                    : "bg-warning/10 text-warning hover:bg-warning/20"
                 )}
+                aria-label={isPaused ? "Retomar" : "Pausar"}
               >
                 {isPaused ? (
                   <Play className="h-3.5 w-3.5" />
                 ) : (
                   <Pause className="h-3.5 w-3.5" />
                 )}
-              </Button>
+              </button>
 
-              {/* Finalizar */}
-              <Button
-                size="sm"
+              {/* Finish */}
+              <button
                 onClick={() => setShowFinalizarDialog(true)}
-                className="h-8 px-3 text-xs font-semibold"
+                className="h-8 px-3 flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors"
               >
-                <Check className="h-3.5 w-3.5 mr-1" />
-                Finalizar
-              </Button>
+                <Check className="h-3.5 w-3.5" />
+                <span>Finalizar</span>
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Dialogs */}
+      {/* ── Dialogs ── */}
       <AlertDialog open={showFinalizarDialog} onOpenChange={setShowFinalizarDialog}>
-        <AlertDialogContent className="max-w-[90vw] sm:max-w-md">
+        <AlertDialogContent className="max-w-[90vw] sm:max-w-md rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <Check className="h-5 w-5 text-primary" />
               Finalizar treino?
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>Seu treino será marcado como concluído.</p>
-              <div className="bg-muted p-3 rounded-lg space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span>Tempo total:</span>
-                  <span className="font-medium">{formattedTime}</span>
-                </div>
-                {progresso > 0 && (
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>Seu treino será marcado como concluído.</p>
+                <div className="bg-muted/50 p-3 rounded-xl space-y-1.5 text-sm">
                   <div className="flex justify-between">
-                    <span>Progresso:</span>
-                    <span className="font-medium">{progresso}%</span>
+                    <span className="text-muted-foreground">Tempo total</span>
+                    <span className="font-semibold font-mono">{formattedTime}</span>
                   </div>
-                )}
+                  {progresso > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Progresso</span>
+                      <span className="font-semibold">{progresso}%</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -254,7 +248,7 @@ export function WorkoutTimer({
       </AlertDialog>
 
       <AlertDialog open={showCancelarDialog} onOpenChange={setShowCancelarDialog}>
-        <AlertDialogContent className="max-w-[90vw] sm:max-w-md">
+        <AlertDialogContent className="max-w-[90vw] sm:max-w-md rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <X className="h-5 w-5 text-destructive" />

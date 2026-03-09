@@ -90,112 +90,93 @@ export function WorkoutTimer({
   // Start button — rendered inline in the workout card
   if (!isActive) {
     return (
-      <Button onClick={iniciar} size="lg" className="w-full shadow-lg">
-        <Play className="h-5 w-5 mr-2" />
-        Iniciar Treino
-      </Button>
+      <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 sm:p-6">
+        <div className="text-center space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Você está no <span className="font-semibold">modo visualização</span>.
+            <br />
+            Aperte <span className="font-semibold">INICIAR</span> para começar o treino.
+          </p>
+          <Button onClick={iniciar} size="lg" className="w-full h-12 text-base font-semibold shadow-lg">
+            <Play className="h-5 w-5 mr-2" />
+            Iniciar Treino
+          </Button>
+        </div>
+      </div>
     );
   }
 
-  // ─── Active Workout: MFIT-style bottom bar ───
+  // ─── Active Workout: MFIT-style inline card ───
   return (
     <>
-      {/* Fixed bottom bar — sits above BottomNavigation (68px) */}
-      <div
-        className={cn(
-          "fixed left-0 right-0 z-40",
-          "bottom-[68px] sm:bottom-0",
-          "safe-area-bottom"
-        )}
-      >
-        {/* Progress line — thin accent at top */}
-        <div className="h-[2px] bg-border">
+      {/* Inline Timer Card */}
+      <div className="bg-card border rounded-2xl overflow-hidden shadow-sm">
+        {/* Progress bar */}
+        <div className="h-1 bg-muted">
           <div
             className="h-full bg-primary transition-all duration-700 ease-out"
             style={{ width: `${Math.max(progresso, 2)}%` }}
           />
         </div>
 
-        {/* Main bar */}
-        <div
-          className={cn(
-            "bg-card/95 backdrop-blur-md border-t",
-            "transition-colors duration-300",
-            isPaused && "bg-warning/5"
-          )}
-        >
-          <div className="flex items-center h-12 px-3 gap-2">
-            {/* Left: Timer */}
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <div className="relative flex-shrink-0">
-                <div
-                  className={cn(
-                    "w-2 h-2 rounded-full animate-pulse",
-                    isPaused
-                      ? "bg-warning"
-                      : "bg-primary"
-                  )}
-                />
-              </div>
-              <span
-                className={cn(
-                  "text-base font-bold font-mono tabular-nums tracking-tight",
-                  isPaused ? "text-warning" : "text-foreground"
-                )}
-              >
-                {formattedTime}
-              </span>
-              {isPaused && (
-                <span className="text-[10px] font-semibold text-warning uppercase tracking-wider">
-                  pausado
-                </span>
+        {/* Timer Display */}
+        <div className="p-4 sm:p-5">
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <Timer className={cn("h-5 w-5", isPaused ? "text-warning" : "text-primary")} />
+            <span
+              className={cn(
+                "text-3xl sm:text-4xl font-bold font-mono tabular-nums",
+                isPaused ? "text-warning" : "text-foreground"
               )}
-              {!isPaused && progresso > 0 && (
-                <span className="text-[10px] font-medium text-muted-foreground">
-                  {progresso}%
-                </span>
-              )}
-            </div>
-
-            {/* Right: Controls */}
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              {/* Cancel */}
-              <button
-                onClick={() => setShowCancelarDialog(true)}
-                className="h-8 w-8 flex items-center justify-center rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                aria-label="Cancelar treino"
-              >
-                <X className="h-4 w-4" />
-              </button>
-
-              {/* Pause / Resume */}
-              <button
-                onClick={togglePause}
-                className={cn(
-                  "h-8 w-8 flex items-center justify-center rounded-full transition-colors",
-                  isPaused
-                    ? "bg-primary/10 text-primary hover:bg-primary/20"
-                    : "bg-warning/10 text-warning hover:bg-warning/20"
-                )}
-                aria-label={isPaused ? "Retomar" : "Pausar"}
-              >
-                {isPaused ? (
-                  <Play className="h-3.5 w-3.5" />
-                ) : (
-                  <Pause className="h-3.5 w-3.5" />
-                )}
-              </button>
-
-              {/* Finish */}
-              <button
-                onClick={() => setShowFinalizarDialog(true)}
-                className="h-8 px-3 flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors"
-              >
-                <Check className="h-3.5 w-3.5" />
-                <span>Finalizar</span>
-              </button>
-            </div>
+            >
+              {formattedTime}
+            </span>
           </div>
+
+          {isPaused && (
+            <p className="text-center text-sm font-medium text-warning mb-3">
+              Treino pausado
+            </p>
+          )}
+
+          {/* Action Buttons */}
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              onClick={togglePause}
+              variant={isPaused ? "default" : "outline"}
+              size="lg"
+              className="h-11"
+            >
+              {isPaused ? (
+                <>
+                  <Play className="h-4 w-4 mr-2" />
+                  Retomar
+                </>
+              ) : (
+                <>
+                  <Pause className="h-4 w-4 mr-2" />
+                  Pausar
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={() => setShowFinalizarDialog(true)}
+              variant="default"
+              size="lg"
+              className="h-11"
+            >
+              <Check className="h-4 w-4 mr-2" />
+              Finalizar
+            </Button>
+          </div>
+
+          {/* Cancel link */}
+          <button
+            onClick={() => setShowCancelarDialog(true)}
+            className="w-full mt-3 text-sm text-muted-foreground hover:text-destructive transition-colors"
+          >
+            Cancelar treino
+          </button>
         </div>
       </div>
 

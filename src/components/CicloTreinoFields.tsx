@@ -14,9 +14,11 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Layers, Save } from "lucide-react";
+import { useModeloPastas } from "@/hooks/useModeloPastas";
 
 interface CicloTreinoFieldsProps {
   planilhaId: string;
+  personalId: string;
   initialValues?: {
     ciclo_genero?: string | null;
     ciclo_modalidade?: string | null;
@@ -28,20 +30,11 @@ interface CicloTreinoFieldsProps {
 }
 
 const GENEROS = ["Masculino", "Feminino", "Unissex"];
-const MODALIDADES = [
-  "Musculação",
-  "Calistenia",
-  "Funcional",
-  "CrossFit",
-  "Pilates",
-  "HIIT",
-  "Aeróbico",
-  "Outro",
-];
 const NIVEIS = ["Iniciante", "Intermediário", "Avançado"];
 
 export function CicloTreinoFields({
   planilhaId,
+  personalId,
   initialValues,
   themeColor,
   onSaved,
@@ -52,6 +45,14 @@ export function CicloTreinoFields({
   const [modalidade, setModalidade] = useState(initialValues?.ciclo_modalidade || "");
   const [nivel, setNivel] = useState(initialValues?.ciclo_nivel || "");
   const [numero, setNumero] = useState(initialValues?.ciclo_numero?.toString() || "");
+
+  const { pastas, loading: loadingPastas } = useModeloPastas({
+    personalId,
+    enabled: !!personalId,
+  });
+
+  // Get only root-level folders as workout type options
+  const pastaRaiz = pastas.filter((p) => !p.parent_id);
 
   const cicloLabel = [genero, modalidade, nivel, numero ? `Ciclo ${numero}` : ""]
     .filter(Boolean)
@@ -114,15 +115,18 @@ export function CicloTreinoFields({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Modalidade</Label>
+            <Label className="text-xs">Tipo de Treino</Label>
             <Select value={modalidade} onValueChange={setModalidade}>
               <SelectTrigger className="h-9">
-                <SelectValue placeholder="Selecionar" />
+                <SelectValue placeholder={loadingPastas ? "Carregando..." : "Selecionar"} />
               </SelectTrigger>
               <SelectContent>
-                {MODALIDADES.map((m) => (
-                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                {pastaRaiz.map((p) => (
+                  <SelectItem key={p.id} value={p.nome}>{p.nome}</SelectItem>
                 ))}
+                {pastaRaiz.length === 0 && !loadingPastas && (
+                  <SelectItem value="_empty" disabled>Nenhuma pasta criada</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>

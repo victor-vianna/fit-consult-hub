@@ -282,6 +282,7 @@ export function PlanilhaStatusCard({
           {variant === "personal" && (
             <CicloTreinoFields
               planilhaId={planilha.id}
+              personalId={personalId}
               initialValues={{
                 ciclo_genero: (planilha as any).ciclo_genero,
                 ciclo_modalidade: (planilha as any).ciclo_modalidade,

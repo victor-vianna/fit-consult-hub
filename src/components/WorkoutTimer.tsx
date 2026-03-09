@@ -35,6 +35,7 @@ export function WorkoutTimer({
   readOnly = false,
   onWorkoutComplete,
   onWorkoutCancel,
+  onWorkoutStart,
   progresso = 0,
   finalizarRef,
 }: WorkoutTimerProps) {

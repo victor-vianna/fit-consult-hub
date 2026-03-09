@@ -308,9 +308,6 @@ export function PersonalDashboardCards({
 
     if (!alunos) return;
 
-    // IDs de alunos com treino em andamento agora (não devem ser considerados inativos)
-    const alunosComTreinoAtivo = new Set(treinosAndamento.map(t => t.aluno_id));
-
     // Para cada aluno, buscar último treino considerando AMBAS as fontes:
     // 1. treino_sessoes (timer finalizado)
     // 2. treinos_semanais (marcado como concluído) — filtrado por personal_id

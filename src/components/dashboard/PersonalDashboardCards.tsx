@@ -239,10 +239,10 @@ export function PersonalDashboardCards({
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      // Fetch treinos em andamento primeiro (alunos inativos depende disso)
-      await fetchTreinosEmAndamento();
+      // Fetch treinos em andamento primeiro — retorna IDs para excluir de inativos
+      const idsEmAndamento = await fetchTreinosEmAndamento();
       await Promise.all([
-        fetchAlunosInativos(),
+        fetchAlunosInativos(idsEmAndamento),
         fetchVencimentosProximos(),
         fetchPlanilhasExpirando(),
         fetchFeedbacksPendentes(),

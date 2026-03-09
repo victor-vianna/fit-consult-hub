@@ -136,7 +136,7 @@ export function CompactExerciseCard({
 
               {/* Nome + Info Rápida */}
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm md:text-xs break-words leading-tight">
+                <p className="font-semibold text-base break-words leading-tight">
                   {exercicio.nome}
                 </p>
                 <div className="flex items-center gap-2 text-sm md:text-xs text-muted-foreground mt-0.5">

@@ -298,7 +298,7 @@ export function PersonalDashboardCards({
     return idsAtivos;
   };
 
-  const fetchAlunosInativos = async () => {
+  const fetchAlunosInativos = async (alunosComTreinoAtivo: Set<string>) => {
     // Buscar alunos ativos do personal
     const { data: alunos } = await supabase
       .from("profiles")

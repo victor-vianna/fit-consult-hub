@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Play, Pause, Check, X, Timer, Loader2, ChevronUp } from "lucide-react";
 import { useWorkoutTimer } from "@/hooks/useWorkoutTimer";
@@ -24,6 +24,7 @@ interface WorkoutTimerProps {
   onWorkoutComplete?: () => void;
   onWorkoutCancel?: () => void;
   progresso?: number;
+  finalizarRef?: React.MutableRefObject<(() => void) | null>;
 }
 
 export function WorkoutTimer({
@@ -34,6 +35,7 @@ export function WorkoutTimer({
   onWorkoutComplete,
   onWorkoutCancel,
   progresso = 0,
+  finalizarRef,
 }: WorkoutTimerProps) {
   const [showFinalizarDialog, setShowFinalizarDialog] = useState(false);
   const [showCancelarDialog, setShowCancelarDialog] = useState(false);
@@ -52,6 +54,17 @@ export function WorkoutTimer({
     cancelar,
     fecharTelaConclusao,
   } = useWorkoutTimer({ treinoId, profileId, personalId });
+
+  // Expose finalizar trigger via ref
+  useEffect(() => {
+    if (finalizarRef) {
+      if (isRunning || isPaused) {
+        finalizarRef.current = () => setShowFinalizarDialog(true);
+      } else {
+        finalizarRef.current = null;
+      }
+    }
+  }, [finalizarRef, isRunning, isPaused]);
 
   if (readOnly) return null;
 

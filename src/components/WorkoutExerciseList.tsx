@@ -1,8 +1,10 @@
 // components/WorkoutExerciseList.tsx
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import { CompactExerciseCard } from "./CompactExerciseCard";
 import { CompactGroupCard } from "./CompactGroupCard";
 import { WorkoutBlockCard } from "./WorkoutBlockCard";
+import { CheckCircle, Trophy } from "lucide-react";
 import type { BlocoTreino } from "@/types/workoutBlocks";
 import type { GrupoExercicio } from "@/hooks/useExerciseGroups";
 
@@ -30,6 +32,8 @@ interface WorkoutExerciseListProps {
   onToggleExercicio: (id: string, concluido: boolean) => Promise<any>;
   onToggleGrupo?: (grupoId: string, concluido: boolean) => Promise<void>;
   onToggleBloco?: (blocoId: string, concluido: boolean) => Promise<void>;
+  isWorkoutActive?: boolean;
+  onFinalizarTreino?: () => void;
 }
 
 export function WorkoutExerciseList({
@@ -41,6 +45,8 @@ export function WorkoutExerciseList({
   onToggleExercicio,
   onToggleGrupo,
   onToggleBloco,
+  isWorkoutActive,
+  onFinalizarTreino,
 }: WorkoutExerciseListProps) {
   return (
     <div className="space-y-4">
@@ -125,6 +131,21 @@ export function WorkoutExerciseList({
               onToggleConcluido={onToggleBloco}
             />
           ))}
+        </div>
+      )}
+
+      {/* Botão Finalizar Treino */}
+      {isWorkoutActive && onFinalizarTreino && (
+        <div className="mt-6 pt-4 border-t border-border/50">
+          <Button
+            onClick={onFinalizarTreino}
+            size="lg"
+            className="w-full h-14 text-base font-semibold shadow-lg gap-2"
+          >
+            <Trophy className="h-5 w-5" />
+            Finalizar Treino
+            <CheckCircle className="h-5 w-5" />
+          </Button>
         </div>
       )}
     </div>

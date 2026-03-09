@@ -1,5 +1,5 @@
 // components/WorkoutDayView.tsx
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -457,63 +457,29 @@ export function WorkoutDayView({
                 if (!treinoTemConteudo && treinosDoDia.length > 1) return null;
 
                 return (
-                  <Card key={treinoId || treinoIndex} className="border-primary/30 shadow-xl bg-card/50 backdrop-blur-sm">
-                    <CardContent className="p-4 sm:p-6 space-y-6">
-                      <WorkoutDayHeader
-                        diaNome={hasMultiple && treino.nome_treino 
-                          ? `${diaInfo.nome} — ${treino.nome_treino}` 
-                          : diaInfo.nome}
-                        descricao={treino.descricao}
-                        totalExercicios={totalItens}
-                        totalGrupos={grupos.length}
-                        totalBlocos={blocos.length}
-                        progresso={progresso}
-                        treinoIniciado={isDiaIniciado}
-                      />
-
-                      {/* Timer inline — mostra botão de iniciar ou cronômetro ativo */}
-                      {treinoId && (
-                        <WorkoutTimer
-                          treinoId={treinoId}
-                          profileId={profileId}
-                          personalId={personalId}
-                          readOnly={false}
-                          progresso={progresso}
-                          onWorkoutComplete={() => marcarTreinoFinalizado(treinoId, treino.dia)}
-                          onWorkoutCancel={() => marcarTreinoFinalizado(treinoId, treino.dia)}
-                        />
-                      )}
-
-                      {!treinoTemConteudo ? (
-                        <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
-                          <div className="p-5 bg-muted/50 rounded-full">
-                            <Dumbbell className="h-10 w-10 text-muted-foreground" />
-                          </div>
-                          <div className="space-y-2">
-                            <p className="text-lg font-semibold text-muted-foreground">
-                              Dia de Descanso
-                            </p>
-                            <p className="text-sm text-muted-foreground max-w-md px-4">
-                              Nenhum conteúdo programado para este dia.
-                              <br />
-                              Aproveite para recuperar!
-                            </p>
-                          </div>
-                        </div>
-                      ) : (
-                        <WorkoutExerciseList
-                          exerciciosIsolados={exerciciosIsolados}
-                          grupos={grupos}
-                          blocosInicio={blocosInicio}
-                          blocosMeio={blocosMeio}
-                          blocosFim={blocosFim}
-                          onToggleExercicio={handleToggleExercicio}
-                          onToggleGrupo={handleToggleGrupo}
-                          onToggleBloco={handleToggleBloco}
-                        />
-                      )}
-                    </CardContent>
-                  </Card>
+                  <TreinoCard
+                    key={treinoId || treinoIndex}
+                    treino={treino}
+                    treinoId={treinoId}
+                    diaInfo={diaInfo}
+                    hasMultiple={hasMultiple}
+                    totalItens={totalItens}
+                    grupos={grupos}
+                    blocos={blocos}
+                    blocosInicio={blocosInicio}
+                    blocosMeio={blocosMeio}
+                    blocosFim={blocosFim}
+                    exerciciosIsolados={exerciciosIsolados}
+                    progresso={progresso}
+                    isDiaIniciado={isDiaIniciado}
+                    treinoTemConteudo={treinoTemConteudo}
+                    profileId={profileId}
+                    personalId={personalId}
+                    marcarTreinoFinalizado={marcarTreinoFinalizado}
+                    handleToggleExercicio={handleToggleExercicio}
+                    handleToggleGrupo={handleToggleGrupo}
+                    handleToggleBloco={handleToggleBloco}
+                  />
                 );
               })}
             </TabsContent>
@@ -521,6 +487,118 @@ export function WorkoutDayView({
         })}
       </Tabs>
     </div>
+  );
+}
+
+// Sub-component that manages its own finalizarRef
+function TreinoCard({
+  treino,
+  treinoId,
+  diaInfo,
+  hasMultiple,
+  totalItens,
+  grupos,
+  blocos,
+  blocosInicio,
+  blocosMeio,
+  blocosFim,
+  exerciciosIsolados,
+  progresso,
+  isDiaIniciado,
+  treinoTemConteudo,
+  profileId,
+  personalId,
+  marcarTreinoFinalizado,
+  handleToggleExercicio,
+  handleToggleGrupo,
+  handleToggleBloco,
+}: {
+  treino: TreinoDia;
+  treinoId: string | null;
+  diaInfo: { nome: string; abrev: string };
+  hasMultiple: boolean;
+  totalItens: number;
+  grupos: GrupoExercicio[];
+  blocos: BlocoTreino[];
+  blocosInicio: BlocoTreino[];
+  blocosMeio: BlocoTreino[];
+  blocosFim: BlocoTreino[];
+  exerciciosIsolados: any[];
+  progresso: number;
+  isDiaIniciado: boolean;
+  treinoTemConteudo: boolean;
+  profileId: string;
+  personalId: string;
+  marcarTreinoFinalizado: (treinoId: string, dia: number) => void;
+  handleToggleExercicio: (id: string, concluido: boolean) => Promise<any>;
+  handleToggleGrupo: (grupoId: string, concluido: boolean) => Promise<void>;
+  handleToggleBloco: (blocoId: string, concluido: boolean) => Promise<void>;
+}) {
+  const finalizarRef = useRef<(() => void) | null>(null);
+
+  const isWorkoutActive = isDiaIniciado && !!treinoId;
+
+  return (
+    <Card className="border-primary/30 shadow-xl bg-card/50 backdrop-blur-sm">
+      <CardContent className="p-4 sm:p-6 space-y-6">
+        <WorkoutDayHeader
+          diaNome={hasMultiple && treino.nome_treino 
+            ? `${diaInfo.nome} — ${treino.nome_treino}` 
+            : diaInfo.nome}
+          descricao={treino.descricao}
+          totalExercicios={totalItens}
+          totalGrupos={grupos.length}
+          totalBlocos={blocos.length}
+          progresso={progresso}
+          treinoIniciado={isDiaIniciado}
+        />
+
+        {/* Timer inline */}
+        {treinoId && (
+          <WorkoutTimer
+            treinoId={treinoId}
+            profileId={profileId}
+            personalId={personalId}
+            readOnly={false}
+            progresso={progresso}
+            finalizarRef={finalizarRef}
+            onWorkoutComplete={() => marcarTreinoFinalizado(treinoId, treino.dia)}
+            onWorkoutCancel={() => marcarTreinoFinalizado(treinoId, treino.dia)}
+          />
+        )}
+
+        {!treinoTemConteudo ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
+            <div className="p-5 bg-muted/50 rounded-full">
+              <Dumbbell className="h-10 w-10 text-muted-foreground" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-lg font-semibold text-muted-foreground">
+                Dia de Descanso
+              </p>
+              <p className="text-sm text-muted-foreground max-w-md px-4">
+                Nenhum conteúdo programado para este dia.
+                <br />
+                Aproveite para recuperar!
+              </p>
+            </div>
+          </div>
+        ) : (
+          <WorkoutExerciseList
+            exerciciosIsolados={exerciciosIsolados}
+            grupos={grupos}
+            blocosInicio={blocosInicio}
+            blocosMeio={blocosMeio}
+            blocosFim={blocosFim}
+            onToggleExercicio={handleToggleExercicio}
+            onToggleGrupo={handleToggleGrupo}
+            onToggleBloco={handleToggleBloco}
+            isWorkoutActive={isWorkoutActive}
+            onFinalizarTreino={() => finalizarRef.current?.()}
+          />
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

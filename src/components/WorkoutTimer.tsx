@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Play, Pause, Check, X, Timer, Loader2, ChevronUp } from "lucide-react";
 import { useWorkoutTimer } from "@/hooks/useWorkoutTimer";

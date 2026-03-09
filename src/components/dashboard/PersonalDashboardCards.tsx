@@ -744,7 +744,7 @@ export function PersonalDashboardCards({
       </Card>
     ),
     "feedbacks-recentes": (
-      <Card className="col-span-1 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setAlertasModalOpen(true)}>
+      <Card className="col-span-1">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -766,7 +766,14 @@ export function PersonalDashboardCards({
             ) : (
               <div className="space-y-3">
                 {feedbacksPendentes.slice(0, 5).map((feedback) => (
-                  <div key={feedback.id} className="flex items-center justify-between p-2 rounded-lg bg-purple-500/10 cursor-pointer hover:bg-purple-500/20 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(`/aluno/${feedback.aluno_id}`); }}>
+                  <div
+                    key={feedback.id}
+                    className="flex items-center justify-between p-2 rounded-lg bg-purple-500/10 cursor-pointer hover:bg-purple-500/20 transition-colors"
+                    onClick={() => {
+                      setSelectedFeedback(feedback);
+                      setFeedbackModalOpen(true);
+                    }}
+                  >
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm">{feedback.aluno_nome}</p>
                       {feedback.comentario && (

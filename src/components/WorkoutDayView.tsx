@@ -480,9 +480,8 @@ export function WorkoutDayView({
                     handleToggleGrupo={handleToggleGrupo}
                     handleToggleBloco={handleToggleBloco}
                   />
-                    </CardContent>
-                  </Card>
                 );
+              })}
               })}
             </TabsContent>
           );

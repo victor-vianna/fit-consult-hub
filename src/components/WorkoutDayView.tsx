@@ -1,5 +1,6 @@
 // components/WorkoutDayView.tsx
 import { useState, useEffect, useCallback } from "react";
+import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";

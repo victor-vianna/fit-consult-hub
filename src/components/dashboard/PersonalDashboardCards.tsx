@@ -25,6 +25,7 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { TreinosHojeModal } from "./TreinosHojeModal";
 import { AlertasModal } from "./AlertasModal";
+import { FeedbackDetailModal } from "./FeedbackDetailModal";
 import { useChatNaoLidas } from "@/hooks/useChatMessages";
 import {
   DashboardCustomizeDialog,
@@ -113,6 +114,8 @@ export function PersonalDashboardCards({
   const [treinosHojeModalOpen, setTreinosHojeModalOpen] = useState(false);
   const [alertasModalOpen, setAlertasModalOpen] = useState(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [selectedFeedback, setSelectedFeedback] = useState<FeedbackPendente | null>(null);
 
   // Dashboard card customization
   const [cardConfig, setCardConfig] = useState<DashboardCardConfig[]>(() => {
@@ -741,7 +744,7 @@ export function PersonalDashboardCards({
       </Card>
     ),
     "feedbacks-recentes": (
-      <Card className="col-span-1 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setAlertasModalOpen(true)}>
+      <Card className="col-span-1">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -763,7 +766,14 @@ export function PersonalDashboardCards({
             ) : (
               <div className="space-y-3">
                 {feedbacksPendentes.slice(0, 5).map((feedback) => (
-                  <div key={feedback.id} className="flex items-center justify-between p-2 rounded-lg bg-purple-500/10 cursor-pointer hover:bg-purple-500/20 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(`/aluno/${feedback.aluno_id}`); }}>
+                  <div
+                    key={feedback.id}
+                    className="flex items-center justify-between p-2 rounded-lg bg-purple-500/10 cursor-pointer hover:bg-purple-500/20 transition-colors"
+                    onClick={() => {
+                      setSelectedFeedback(feedback);
+                      setFeedbackModalOpen(true);
+                    }}
+                  >
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm">{feedback.aluno_nome}</p>
                       {feedback.comentario && (
@@ -845,6 +855,16 @@ export function PersonalDashboardCards({
         onOpenChange={setCustomizeOpen}
         cards={cardConfig}
         onSave={handleSaveCardConfig}
+      />
+
+      <FeedbackDetailModal
+        open={feedbackModalOpen}
+        onOpenChange={setFeedbackModalOpen}
+        feedbackId={selectedFeedback?.id || null}
+        alunoId={selectedFeedback?.aluno_id || ""}
+        alunoNome={selectedFeedback?.aluno_nome || ""}
+        personalId={personalId}
+        themeColor={themeColor}
       />
     </div>
   );

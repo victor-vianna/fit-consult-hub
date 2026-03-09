@@ -114,6 +114,8 @@ export function PersonalDashboardCards({
   const [treinosHojeModalOpen, setTreinosHojeModalOpen] = useState(false);
   const [alertasModalOpen, setAlertasModalOpen] = useState(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [selectedFeedback, setSelectedFeedback] = useState<FeedbackPendente | null>(null);
 
   // Dashboard card customization
   const [cardConfig, setCardConfig] = useState<DashboardCardConfig[]>(() => {

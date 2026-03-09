@@ -330,8 +330,14 @@ export function WorkoutDayView({
       return t.exercicios.length > 0 || grupos.length > 0 || blocos.length > 0;
     })?.dia || 1;
 
+  // Check if any workout is currently active (for extra bottom padding)
+  const anyTreinoAtivo = localTreinos.some((t) => {
+    const tid = getTreinoId(t);
+    return tid ? isTreinoIniciado(tid) : false;
+  });
+
   return (
-    <div className="space-y-4 sm:space-y-6 pb-20">
+    <div className={cn("space-y-4 sm:space-y-6", anyTreinoAtivo ? "pb-36" : "pb-20")}>
       {/* Header Principal */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">

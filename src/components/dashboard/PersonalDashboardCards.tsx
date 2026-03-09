@@ -239,8 +239,9 @@ export function PersonalDashboardCards({
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      // Fetch treinos em andamento primeiro (alunos inativos depende disso)
+      await fetchTreinosEmAndamento();
       await Promise.all([
-        fetchTreinosEmAndamento(),
         fetchAlunosInativos(),
         fetchVencimentosProximos(),
         fetchPlanilhasExpirando(),

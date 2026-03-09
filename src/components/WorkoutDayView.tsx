@@ -481,8 +481,7 @@ export function WorkoutDayView({
                     handleToggleBloco={handleToggleBloco}
                   />
                 );
-              })}
-              })}
+            })}
             </TabsContent>
           );
         })}

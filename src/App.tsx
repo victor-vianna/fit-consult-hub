@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthGuard } from "./components/AuthGuard";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { InstallPWAPrompt } from "./components/InstallPWAPrompt";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
@@ -21,87 +22,90 @@ import AlunosManager from "./pages/Alunos";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // Dados ficam "frescos" por 5 minutos
-      refetchOnWindowFocus: false, // Não recarregar ao focar janela
-      retry: 1, // Tentar 1 vez em caso de erro
+      staleTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry: 1,
     },
   },
 });
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <InstallPWAPrompt />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/auth" element={<Auth />} />
-          <Route
-            path="/admin"
-            element={
-              <AuthGuard allowedRoles={["admin"]}>
-                <Admin />
-              </AuthGuard>
-            }
-          />
-          <Route
-            path="/"
-            element={
-              <AuthGuard allowedRoles={["personal"]}>
-                <Personal />
-              </AuthGuard>
-            }
-          />
-          <Route
-            path="/aluno/:id"
-            element={
-              <AuthGuard allowedRoles={["personal"]}>
-                <AlunoDetalhes />
-              </AuthGuard>
-            }
-          />
-          <Route
-            path="/aluno"
-            element={
-              <AuthGuard allowedRoles={["aluno"]}>
-                <AreaAluno />
-              </AuthGuard>
-            }
-          />
-          <Route
-            path="/biblioteca"
-            element={
-              <AuthGuard allowedRoles={["personal", "admin", "aluno"]}>
-                <Biblioteca />
-              </AuthGuard>
-            }
-          />
-          <Route
-            path="/financeiro"
-            element={
-              <AuthGuard allowedRoles={["personal"]}>
-                <Financeiro />
-              </AuthGuard>
-            }
-          />
-          <Route
-            path="/alunos"
-            element={
-              <AuthGuard allowedRoles={["personal"]}>
-                <AlunosManager />
-              </AuthGuard>
-            }
-          />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/acesso-suspenso" element={<AcessoSuspenso />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-    {/* ✅ Devtools para debug (apenas em dev) */}
-    <ReactQueryDevtools initialIsOpen={false} />
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <InstallPWAPrompt />
+        <BrowserRouter>
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route
+                path="/admin"
+                element={
+                  <AuthGuard allowedRoles={["admin"]}>
+                    <Admin />
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/"
+                element={
+                  <AuthGuard allowedRoles={["personal"]}>
+                    <Personal />
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/aluno/:id"
+                element={
+                  <AuthGuard allowedRoles={["personal"]}>
+                    <AlunoDetalhes />
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/aluno"
+                element={
+                  <AuthGuard allowedRoles={["aluno"]}>
+                    <AreaAluno />
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/biblioteca"
+                element={
+                  <AuthGuard allowedRoles={["personal", "admin", "aluno"]}>
+                    <Biblioteca />
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/financeiro"
+                element={
+                  <AuthGuard allowedRoles={["personal"]}>
+                    <Financeiro />
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/alunos"
+                element={
+                  <AuthGuard allowedRoles={["personal"]}>
+                    <AlunosManager />
+                  </AuthGuard>
+                }
+              />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/acesso-suspenso" element={<AcessoSuspenso />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </ErrorBoundary>
+        </BrowserRouter>
+      </TooltipProvider>
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

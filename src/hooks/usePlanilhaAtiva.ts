@@ -334,21 +334,26 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
           nome: dados.nome || "Planilha de Treino",
           duracao_semanas: duracaoSemanas,
           data_inicio: dataInicio,
-          observacoes: dados.observacoes,
+          observacoes: dados.observacoes || null,
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      // Replicar treinos da semana atual para as demais semanas
-      const semanaBase = getWeekStart(parseISO(dataInicio));
-      await replicarTreinosParaSemanasRestantes(
-        dados.profileId,
-        dados.personalId,
-        semanaBase,
-        duracaoSemanas
-      );
+      // Replicar treinos em background - não bloqueia a criação
+      try {
+        const semanaBase = getWeekStart(parseISO(dataInicio));
+        await replicarTreinosParaSemanasRestantes(
+          dados.profileId,
+          dados.personalId,
+          semanaBase,
+          duracaoSemanas
+        );
+      } catch (replicationError) {
+        console.error("[usePlanilhaAtiva] Erro na replicação (não-fatal):", replicationError);
+        // Planilha foi criada com sucesso, replicação pode ser feita depois via "Sincronizar"
+      }
 
       return data;
     },
@@ -356,11 +361,11 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
       queryClient.invalidateQueries({ queryKey: ["planilha-ativa"] });
       queryClient.invalidateQueries({ queryKey: ["planilhas-historico"] });
       queryClient.invalidateQueries({ queryKey: ["treinos"] });
-      toast.success("Planilha criada e treinos replicados com sucesso!");
+      toast.success("Planilha criada com sucesso!");
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Erro ao criar planilha:", error);
-      toast.error("Erro ao criar planilha");
+      toast.error("Erro ao criar planilha: " + (error?.message || "Erro desconhecido"));
     },
   });
 

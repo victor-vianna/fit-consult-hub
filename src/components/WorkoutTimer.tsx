@@ -24,6 +24,7 @@ interface WorkoutTimerProps {
   onWorkoutComplete?: () => void;
   onWorkoutCancel?: () => void;
   progresso?: number;
+  finalizarRef?: React.MutableRefObject<(() => void) | null>;
 }
 
 export function WorkoutTimer({

@@ -856,6 +856,16 @@ export function PersonalDashboardCards({
         cards={cardConfig}
         onSave={handleSaveCardConfig}
       />
+
+      <FeedbackDetailModal
+        open={feedbackModalOpen}
+        onOpenChange={setFeedbackModalOpen}
+        feedbackId={selectedFeedback?.id || null}
+        alunoId={selectedFeedback?.aluno_id || ""}
+        alunoNome={selectedFeedback?.aluno_nome || ""}
+        personalId={personalId}
+        themeColor={themeColor}
+      />
     </div>
   );
 }

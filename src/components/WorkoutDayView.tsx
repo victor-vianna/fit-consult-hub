@@ -508,6 +508,7 @@ function TreinoCard({
   treinoTemConteudo,
   profileId,
   personalId,
+  marcarTreinoIniciado,
   marcarTreinoFinalizado,
   handleToggleExercicio,
   handleToggleGrupo,
@@ -529,6 +530,7 @@ function TreinoCard({
   treinoTemConteudo: boolean;
   profileId: string;
   personalId: string;
+  marcarTreinoIniciado: (treinoId: string, dia: number) => void;
   marcarTreinoFinalizado: (treinoId: string, dia: number) => void;
   handleToggleExercicio: (id: string, concluido: boolean) => Promise<any>;
   handleToggleGrupo: (grupoId: string, concluido: boolean) => Promise<void>;

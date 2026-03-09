@@ -493,6 +493,8 @@ export function WorkoutBlockCard({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </>
+      )}
     </Card>
   );
 }

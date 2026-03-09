@@ -115,15 +115,18 @@ export function CicloTreinoFields({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Modalidade</Label>
+            <Label className="text-xs">Tipo de Treino</Label>
             <Select value={modalidade} onValueChange={setModalidade}>
               <SelectTrigger className="h-9">
-                <SelectValue placeholder="Selecionar" />
+                <SelectValue placeholder={loadingPastas ? "Carregando..." : "Selecionar"} />
               </SelectTrigger>
               <SelectContent>
-                {MODALIDADES.map((m) => (
-                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                {pastaRaiz.map((p) => (
+                  <SelectItem key={p.id} value={p.nome}>{p.nome}</SelectItem>
                 ))}
+                {pastaRaiz.length === 0 && !loadingPastas && (
+                  <SelectItem value="_empty" disabled>Nenhuma pasta criada</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>

@@ -46,6 +46,14 @@ export function CicloTreinoFields({
   const [nivel, setNivel] = useState(initialValues?.ciclo_nivel || "");
   const [numero, setNumero] = useState(initialValues?.ciclo_numero?.toString() || "");
 
+  const { pastas, loading: loadingPastas } = useModeloPastas({
+    personalId,
+    enabled: !!personalId,
+  });
+
+  // Get only root-level folders as workout type options
+  const pastaRaiz = pastas.filter((p) => !p.parent_id);
+
   const cicloLabel = [genero, modalidade, nivel, numero ? `Ciclo ${numero}` : ""]
     .filter(Boolean)
     .join(" > ");

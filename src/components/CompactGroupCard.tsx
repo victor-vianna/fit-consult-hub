@@ -44,6 +44,7 @@ export function CompactGroupCard({
   index,
   onToggleConcluido,
   onToggleGrupoConcluido,
+  profileId,
 }: CompactGroupCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [localExercicios, setLocalExercicios] = useState(grupo.exercicios);

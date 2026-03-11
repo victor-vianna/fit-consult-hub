@@ -165,6 +165,17 @@ export function CompactExerciseCard({
                     </span>
                   )}
                 </div>
+                {/* Referência de peso anterior */}
+                {ultimoPeso && !exercicio.peso_executado && (
+                  <WeightHistoryBadge
+                    ultimoPeso={ultimoPeso}
+                    ultimaData={ultimaData}
+                    historico={historico}
+                    exercicioNome={exercicio.nome}
+                    loading={loadingHistory}
+                    compact
+                  />
+                )}
               </div>
 
               {/* Botão Expandir */}

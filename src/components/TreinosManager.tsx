@@ -1772,16 +1772,6 @@ export function TreinosManager({
           onSelect={handleExerciseSelect}
         />
 
-        {/* DIALOG DE AGRUPAMENTO */}
-        <ExerciseGroupDialog
-          open={groupDialogOpen}
-          onOpenChange={setGroupDialogOpen}
-          onSave={handleSaveGroup}
-          diaNome={
-            selectedDia !== null ? diasSemana[selectedDia - 1].nome : undefined
-          }
-        />
-
         {/* DIALOG DE BLOCOS */}
         <WorkoutBlockDialog
           open={blockDialogOpen}

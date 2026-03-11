@@ -43,6 +43,7 @@ export function CompactExerciseCard({
   exercicio,
   index,
   onToggleConcluido,
+  profileId,
 }: CompactExerciseCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [localConcluido, setLocalConcluido] = useState(

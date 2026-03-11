@@ -15,7 +15,9 @@ import {
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { InlinePesoInput } from "@/components/InlinePesoInput";
+import { WeightHistoryBadge } from "@/components/WeightHistoryBadge";
 import { useExerciseLibrary } from "@/hooks/useExerciseLibrary";
+import { useWeightHistory } from "@/hooks/useWeightHistory";
 import { supabase } from "@/integrations/supabase/client";
 
 interface CompactExerciseCardProps {
@@ -34,6 +36,7 @@ interface CompactExerciseCardProps {
   };
   index: number;
   onToggleConcluido?: (id: string, concluido: boolean) => Promise<any>;
+  profileId?: string;
 }
 
 export function CompactExerciseCard({

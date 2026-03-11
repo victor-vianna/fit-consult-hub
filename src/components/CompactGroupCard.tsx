@@ -36,6 +36,7 @@ interface CompactGroupCardProps {
     grupoId: string,
     concluido: boolean
   ) => Promise<void>;
+  profileId?: string;
 }
 
 export function CompactGroupCard({

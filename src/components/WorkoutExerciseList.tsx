@@ -93,6 +93,7 @@ export function WorkoutExerciseList({
             exercicio={exercicio}
             index={index}
             onToggleConcluido={onToggleExercicio}
+            profileId={profileId}
           />
         ))}
       </div>

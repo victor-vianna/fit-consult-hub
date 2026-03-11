@@ -14,7 +14,8 @@ type TipoAgrupamento =
   | "bi-set"
   | "tri-set"
   | "drop-set"
-  | "superset";
+  | "superset"
+  | "circuito";
 
 export interface ExercicioInput {
   id?: string;

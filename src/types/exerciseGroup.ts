@@ -6,7 +6,8 @@ export type TipoAgrupamento =
   | "bi-set"
   | "tri-set"
   | "drop-set"
-  | "superset";
+  | "superset"
+  | "circuito";
 
 export interface ExercicioAgrupado {
   id: string;
@@ -80,5 +81,12 @@ export const TIPOS_AGRUPAMENTO: Record<TipoAgrupamento, TipoAgrupamentoConfig> =
       max_exercicios: 2,
       icon: "⚡",
       exemplo: "Bíceps + Tríceps",
+    },
+    circuito: {
+      label: "Circuito",
+      descricao: "4 ou mais exercícios em sequência contínua",
+      max_exercicios: 10,
+      icon: "🔁",
+      exemplo: "Agachamento + Flexão + Abdominal + Burpee",
     },
   };

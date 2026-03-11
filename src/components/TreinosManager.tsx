@@ -1695,6 +1695,31 @@ export function TreinosManager({
           }}
           exercicio={(exercicioEditando ?? exercicioTemp ?? null) as any}
           onSave={handleSaveExercicio}
+          onSaveGroup={async (result) => {
+            if (selectedDia === null) return;
+            try {
+              setLoadingStates((prev) => ({ ...prev, adicionando: true }));
+              const treinoId = await criarTreinoSeNecessario(selectedDia);
+              await criarGrupo(treinoId, {
+                tipo: result.tipoAgrupamento as any,
+                exercicios: result.exercicios.map((ex) => ({
+                  nome: ex.nome,
+                  link_video: ex.link_video || null,
+                  series: ex.series,
+                  repeticoes: ex.repeticoes,
+                  descanso: ex.descanso,
+                  carga: ex.carga || null,
+                  observacoes: ex.observacoes || null,
+                })),
+                descanso_entre_grupos: result.descansoEntreGrupos,
+              });
+              setExercicioDialogOpen(false);
+            } catch (error) {
+              console.error("[TreinosManager] Erro ao criar grupo:", error);
+            } finally {
+              setLoadingStates((prev) => ({ ...prev, adicionando: false }));
+            }
+          }}
           diaNome={
             selectedDia !== null ? diasSemana[selectedDia - 1].nome : undefined
           }
@@ -1745,16 +1770,6 @@ export function TreinosManager({
           open={pickerOpen}
           onClose={() => setPickerOpen(false)}
           onSelect={handleExerciseSelect}
-        />
-
-        {/* DIALOG DE AGRUPAMENTO */}
-        <ExerciseGroupDialog
-          open={groupDialogOpen}
-          onOpenChange={setGroupDialogOpen}
-          onSave={handleSaveGroup}
-          diaNome={
-            selectedDia !== null ? diasSemana[selectedDia - 1].nome : undefined
-          }
         />
 
         {/* DIALOG DE BLOCOS */}

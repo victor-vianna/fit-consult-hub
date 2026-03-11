@@ -665,6 +665,10 @@ export default function AlunoDetalhes() {
                 personalId={user!.id}
                 readOnly={false}
               />
+              <WeightProgressionPanel
+                profileId={id!}
+                themeColor={personalSettings?.theme_color}
+              />
             </TabsContent>
 
             {/* Aba Histórico */}

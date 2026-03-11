@@ -599,6 +599,7 @@ function TreinoCard({
             onToggleBloco={handleToggleBloco}
             isWorkoutActive={isWorkoutActive}
             onFinalizarTreino={() => finalizarRef.current?.()}
+            profileId={profileId}
           />
         )}
       </CardContent>

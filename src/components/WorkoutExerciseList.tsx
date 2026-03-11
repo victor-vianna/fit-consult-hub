@@ -82,6 +82,7 @@ export function WorkoutExerciseList({
             index={idx}
             onToggleConcluido={onToggleExercicio}
             onToggleGrupoConcluido={onToggleGrupo}
+            profileId={profileId}
           />
         ))}
 

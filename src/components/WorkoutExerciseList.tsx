@@ -48,6 +48,7 @@ export function WorkoutExerciseList({
   onToggleBloco,
   isWorkoutActive,
   onFinalizarTreino,
+  profileId,
 }: WorkoutExerciseListProps) {
   return (
     <div className="space-y-4">

@@ -151,19 +151,12 @@ export function CompactExerciseCard({
                     <Dumbbell className="h-3 w-3" />
                     {exercicio.series || 3}x{exercicio.repeticoes || "12"}
                   </span>
-                  {exercicio.carga && (
-                    <InlinePesoInput
-                      exercicioId={exercicio.id}
-                      pesoRecomendado={exercicio.carga}
-                      pesoExecutado={exercicio.peso_executado || null}
-                      onSave={handleSavePeso}
-                    />
-                  )}
-                  {!exercicio.carga && exercicio.peso_executado && (
-                    <span className="font-mono font-semibold text-blue-600">
-                      {exercicio.peso_executado}kg
-                    </span>
-                  )}
+                  <InlinePesoInput
+                    exercicioId={exercicio.id}
+                    pesoRecomendado={exercicio.carga || null}
+                    pesoExecutado={exercicio.peso_executado || null}
+                    onSave={handleSavePeso}
+                  />
                 </div>
                 {/* Referência de peso anterior */}
                 {ultimoPeso && !exercicio.peso_executado && (

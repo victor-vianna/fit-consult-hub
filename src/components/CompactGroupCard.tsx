@@ -36,6 +36,7 @@ interface CompactGroupCardProps {
     grupoId: string,
     concluido: boolean
   ) => Promise<void>;
+  profileId?: string;
 }
 
 export function CompactGroupCard({
@@ -43,6 +44,7 @@ export function CompactGroupCard({
   index,
   onToggleConcluido,
   onToggleGrupoConcluido,
+  profileId,
 }: CompactGroupCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [localExercicios, setLocalExercicios] = useState(grupo.exercicios);
@@ -192,6 +194,7 @@ export function CompactGroupCard({
                     exercicio={exercicio}
                     index={idx}
                     onToggleConcluido={onToggleConcluido}
+                    profileId={profileId}
                   />
                 ))}
 

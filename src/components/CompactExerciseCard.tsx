@@ -15,7 +15,9 @@ import {
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { InlinePesoInput } from "@/components/InlinePesoInput";
+import { WeightHistoryBadge } from "@/components/WeightHistoryBadge";
 import { useExerciseLibrary } from "@/hooks/useExerciseLibrary";
+import { useWeightHistory } from "@/hooks/useWeightHistory";
 import { supabase } from "@/integrations/supabase/client";
 
 interface CompactExerciseCardProps {
@@ -34,19 +36,24 @@ interface CompactExerciseCardProps {
   };
   index: number;
   onToggleConcluido?: (id: string, concluido: boolean) => Promise<any>;
+  profileId?: string;
 }
 
 export function CompactExerciseCard({
   exercicio,
   index,
   onToggleConcluido,
+  profileId,
 }: CompactExerciseCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [localConcluido, setLocalConcluido] = useState(
     exercicio.concluido || false
   );
   const { abrirExercicioNaBiblioteca } = useExerciseLibrary();
-
+  const { ultimoPeso, ultimaData, historico, loading: loadingHistory } = useWeightHistory(
+    exercicio.nome,
+    profileId || null
+  );
   const handleToggle = async () => {
     const novoValor = !localConcluido;
     setLocalConcluido(novoValor);
@@ -144,20 +151,24 @@ export function CompactExerciseCard({
                     <Dumbbell className="h-3 w-3" />
                     {exercicio.series || 3}x{exercicio.repeticoes || "12"}
                   </span>
-                  {exercicio.carga && (
-                    <InlinePesoInput
-                      exercicioId={exercicio.id}
-                      pesoRecomendado={exercicio.carga}
-                      pesoExecutado={exercicio.peso_executado || null}
-                      onSave={handleSavePeso}
-                    />
-                  )}
-                  {!exercicio.carga && exercicio.peso_executado && (
-                    <span className="font-mono font-semibold text-blue-600">
-                      {exercicio.peso_executado}kg
-                    </span>
-                  )}
+                  <InlinePesoInput
+                    exercicioId={exercicio.id}
+                    pesoRecomendado={exercicio.carga || null}
+                    pesoExecutado={exercicio.peso_executado || null}
+                    onSave={handleSavePeso}
+                  />
                 </div>
+                {/* Referência de peso anterior */}
+                {ultimoPeso && !exercicio.peso_executado && (
+                  <WeightHistoryBadge
+                    ultimoPeso={ultimoPeso}
+                    ultimaData={ultimaData}
+                    historico={historico}
+                    exercicioNome={exercicio.nome}
+                    loading={loadingHistory}
+                    compact
+                  />
+                )}
               </div>
 
               {/* Botão Expandir */}
@@ -237,6 +248,20 @@ export function CompactExerciseCard({
                       onSave={handleSavePeso}
                     />
                   </div>
+
+                  {/* Histórico de peso */}
+                  {ultimoPeso && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm md:text-xs text-muted-foreground">Histórico:</span>
+                      <WeightHistoryBadge
+                        ultimoPeso={ultimoPeso}
+                        ultimaData={ultimaData}
+                        historico={historico}
+                        exercicioNome={exercicio.nome}
+                        loading={loadingHistory}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Observações */}

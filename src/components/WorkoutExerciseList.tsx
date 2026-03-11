@@ -34,6 +34,7 @@ interface WorkoutExerciseListProps {
   onToggleBloco?: (blocoId: string, concluido: boolean) => Promise<void>;
   isWorkoutActive?: boolean;
   onFinalizarTreino?: () => void;
+  profileId?: string;
 }
 
 export function WorkoutExerciseList({
@@ -47,6 +48,7 @@ export function WorkoutExerciseList({
   onToggleBloco,
   isWorkoutActive,
   onFinalizarTreino,
+  profileId,
 }: WorkoutExerciseListProps) {
   return (
     <div className="space-y-4">
@@ -80,6 +82,7 @@ export function WorkoutExerciseList({
             index={idx}
             onToggleConcluido={onToggleExercicio}
             onToggleGrupoConcluido={onToggleGrupo}
+            profileId={profileId}
           />
         ))}
 
@@ -90,6 +93,7 @@ export function WorkoutExerciseList({
             exercicio={exercicio}
             index={index}
             onToggleConcluido={onToggleExercicio}
+            profileId={profileId}
           />
         ))}
       </div>

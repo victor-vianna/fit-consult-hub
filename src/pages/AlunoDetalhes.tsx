@@ -71,6 +71,7 @@ import { PlanilhaStatusCard } from "@/components/PlanilhaStatusCard";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { BroadcastMessageDialog } from "@/components/chat/BroadcastMessageDialog";
 import { useChatMessages } from "@/hooks/useChatMessages";
+import { WeightProgressionPanel } from "@/components/WeightProgressionPanel";
 
 interface Material {
   id: string;
@@ -664,6 +665,10 @@ export default function AlunoDetalhes() {
                 profileId={id!}
                 personalId={user!.id}
                 readOnly={false}
+              />
+              <WeightProgressionPanel
+                profileId={id!}
+                themeColor={personalSettings?.theme_color}
               />
             </TabsContent>
 

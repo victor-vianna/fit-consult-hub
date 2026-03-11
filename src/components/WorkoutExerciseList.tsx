@@ -34,6 +34,7 @@ interface WorkoutExerciseListProps {
   onToggleBloco?: (blocoId: string, concluido: boolean) => Promise<void>;
   isWorkoutActive?: boolean;
   onFinalizarTreino?: () => void;
+  profileId?: string;
 }
 
 export function WorkoutExerciseList({

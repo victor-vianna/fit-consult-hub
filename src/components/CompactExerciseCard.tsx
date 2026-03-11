@@ -255,6 +255,20 @@ export function CompactExerciseCard({
                       onSave={handleSavePeso}
                     />
                   </div>
+
+                  {/* Histórico de peso */}
+                  {ultimoPeso && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm md:text-xs text-muted-foreground">Histórico:</span>
+                      <WeightHistoryBadge
+                        ultimoPeso={ultimoPeso}
+                        ultimaData={ultimaData}
+                        historico={historico}
+                        exercicioNome={exercicio.nome}
+                        loading={loadingHistory}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Observações */}

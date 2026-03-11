@@ -194,6 +194,7 @@ export function CompactGroupCard({
                     exercicio={exercicio}
                     index={idx}
                     onToggleConcluido={onToggleConcluido}
+                    profileId={profileId}
                   />
                 ))}
 

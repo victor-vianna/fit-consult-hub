@@ -50,7 +50,10 @@ export function CompactExerciseCard({
     exercicio.concluido || false
   );
   const { abrirExercicioNaBiblioteca } = useExerciseLibrary();
-
+  const { ultimoPeso, ultimaData, historico, loading: loadingHistory } = useWeightHistory(
+    exercicio.nome,
+    profileId || null
+  );
   const handleToggle = async () => {
     const novoValor = !localConcluido;
     setLocalConcluido(novoValor);

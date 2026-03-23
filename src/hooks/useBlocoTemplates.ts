@@ -16,6 +16,7 @@ export interface BlocoTemplate {
   config_aquecimento: any;
   config_outro: any;
   created_at: string;
+  pasta_id: string | null;
 }
 
 export interface CriarBlocoTemplateInput {

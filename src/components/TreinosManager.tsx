@@ -533,8 +533,9 @@ export function TreinosManager({
       .insert({
         profile_id: profileId,
         personal_id: personalId,
-        semana: semanaSelecionada, // ✅ Usar a semana selecionada
+        semana: semanaSelecionada,
         dia_semana: dia,
+        ordem_no_dia: 1,
         concluido: false,
       })
       .select()

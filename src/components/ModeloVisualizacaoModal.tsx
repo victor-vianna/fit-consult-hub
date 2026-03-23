@@ -214,7 +214,7 @@ export function ModeloVisualizacaoModal({
         <Separator />
 
         {/* Conteúdo */}
-        <ScrollArea className="flex-1 -mx-6 px-6">
+        <ScrollArea className="flex-1 min-h-0 max-h-[50vh] -mx-6 px-6">
           <div className="space-y-4 py-2">
             {/* Blocos */}
             {modelo.blocos && modelo.blocos.length > 0 && (

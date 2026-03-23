@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { format } from "date-fns";
+import { format, subMonths, subYears, subWeeks } from "date-fns";
 import { TrendingUp } from "lucide-react";
 
 interface Props {
@@ -28,6 +28,7 @@ const METRICS: { key: Metric; label: string; color: string; unit: string }[] = [
 export function EvolucaoSection({ profileId, personalId, themeColor }: Props) {
   const [avaliacoes, setAvaliacoes] = useState<any[]>([]);
   const [selectedMetrics, setSelectedMetrics] = useState<Metric[]>(["peso", "percentual_gordura"]);
+  const [period, setPeriod] = useState<"4sem" | "3m" | "6m" | "1a" | "todos">("todos");
 
   useEffect(() => {
     const fetch = async () => {
@@ -42,14 +43,25 @@ export function EvolucaoSection({ profileId, personalId, themeColor }: Props) {
   }, [profileId]);
 
   const chartData = useMemo(() => {
-    return avaliacoes.map((a) => ({
+    const now = new Date();
+    let cutoff: Date | null = null;
+    if (period === "4sem") cutoff = subWeeks(now, 4);
+    else if (period === "3m") cutoff = subMonths(now, 3);
+    else if (period === "6m") cutoff = subMonths(now, 6);
+    else if (period === "1a") cutoff = subYears(now, 1);
+
+    const filtered = cutoff
+      ? avaliacoes.filter((a) => new Date(a.data_avaliacao) >= cutoff!)
+      : avaliacoes;
+
+    return filtered.map((a) => ({
       data: format(new Date(a.data_avaliacao), "dd/MM/yy"),
       ...METRICS.reduce((acc, m) => {
         acc[m.key] = a[m.key] ?? null;
         return acc;
       }, {} as Record<string, any>),
     }));
-  }, [avaliacoes]);
+  }, [avaliacoes, period]);
 
   const toggleMetric = (m: Metric) => {
     setSelectedMetrics((prev) =>
@@ -63,6 +75,24 @@ export function EvolucaoSection({ profileId, personalId, themeColor }: Props) {
         <CardTitle className="text-lg flex items-center gap-2">
           <TrendingUp className="h-5 w-5" /> Evolução
         </CardTitle>
+        <div className="flex gap-1.5 flex-wrap mt-2">
+          {([
+            { value: "4sem", label: "4 sem" },
+            { value: "3m", label: "3 meses" },
+            { value: "6m", label: "6 meses" },
+            { value: "1a", label: "1 ano" },
+            { value: "todos", label: "Todos" },
+          ] as const).map((p) => (
+            <Badge
+              key={p.value}
+              variant={period === p.value ? "default" : "outline"}
+              className="cursor-pointer text-xs"
+              onClick={() => setPeriod(p.value)}
+            >
+              {p.label}
+            </Badge>
+          ))}
+        </div>
         <div className="flex gap-2 flex-wrap mt-2">
           {METRICS.map((m) => (
             <Badge

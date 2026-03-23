@@ -13,7 +13,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { format } from "date-fns";
+import { format, subWeeks, subMonths, subYears } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { TrendingUp, BarChart3, Scale } from "lucide-react";
 
@@ -61,6 +61,7 @@ export function FeedbackEvolucaoChart({
     "qualidade_vida",
   ]);
   const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState<"4sem" | "3m" | "6m" | "1a" | "todos">("todos");
 
   useEffect(() => {
     const fetch = async () => {
@@ -79,7 +80,18 @@ export function FeedbackEvolucaoChart({
   }, [profileId, personalId]);
 
   const chartData = useMemo(() => {
-    return checkins.map((c) => ({
+    const now = new Date();
+    let cutoff: Date | null = null;
+    if (period === "4sem") cutoff = subWeeks(now, 4);
+    else if (period === "3m") cutoff = subMonths(now, 3);
+    else if (period === "6m") cutoff = subMonths(now, 6);
+    else if (period === "1a") cutoff = subYears(now, 1);
+
+    const filtered = cutoff
+      ? checkins.filter((c) => new Date(c.data_inicio) >= cutoff!)
+      : checkins;
+
+    return filtered.map((c) => ({
       label: `S${c.numero_semana}/${c.ano}`,
       data_inicio: c.data_inicio,
       ...FEEDBACK_METRICS.reduce((acc, m) => {
@@ -87,7 +99,7 @@ export function FeedbackEvolucaoChart({
         return acc;
       }, {} as Record<string, any>),
     }));
-  }, [checkins]);
+  }, [checkins, period]);
 
   const toggleMetric = (m: FeedbackMetric) => {
     setSelectedMetrics((prev) =>
@@ -95,18 +107,18 @@ export function FeedbackEvolucaoChart({
     );
   };
 
-  // Compute comparison between last 2 checkins
+  // Compute comparison between last 2 items of filtered data
   const comparison = useMemo(() => {
-    if (checkins.length < 2) return null;
-    const last = checkins[checkins.length - 1];
-    const prev = checkins[checkins.length - 2];
+    if (chartData.length < 2) return null;
+    const last = chartData[chartData.length - 1];
+    const prev = chartData[chartData.length - 2];
     return FEEDBACK_METRICS.map((m) => {
       const curr = last[m.key] as number | null;
       const prevVal = prev[m.key] as number | null;
       const diff = curr != null && prevVal != null ? curr - prevVal : null;
       return { ...m, current: curr, previous: prevVal, diff };
     }).filter((m) => m.current != null);
-  }, [checkins]);
+  }, [chartData]);
 
   if (loading) {
     return (
@@ -147,6 +159,24 @@ export function FeedbackEvolucaoChart({
             <TrendingUp className="h-5 w-5" style={{ color: themeColor }} />
             Evolução dos Feedbacks — {studentName}
           </CardTitle>
+          <div className="flex gap-1.5 flex-wrap mt-2">
+            {([
+              { value: "4sem", label: "4 sem" },
+              { value: "3m", label: "3 meses" },
+              { value: "6m", label: "6 meses" },
+              { value: "1a", label: "1 ano" },
+              { value: "todos", label: "Todos" },
+            ] as const).map((p) => (
+              <Badge
+                key={p.value}
+                variant={period === p.value ? "default" : "outline"}
+                className="cursor-pointer text-xs"
+                onClick={() => setPeriod(p.value)}
+              >
+                {p.label}
+              </Badge>
+            ))}
+          </div>
           <div className="flex gap-2 flex-wrap mt-2">
             {FEEDBACK_METRICS.map((m) => (
               <Badge

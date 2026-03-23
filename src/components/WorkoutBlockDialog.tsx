@@ -39,7 +39,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Sparkles, Info, Clock, Trash2, Edit, BookmarkPlus, User, Folder, FolderPlus, ChevronRight, ArrowLeft, FolderInput, MoreHorizontal } from "lucide-react";
+import { Loader2, Sparkles, Info, Clock, Trash2, Edit, BookmarkPlus, User, Folder, FolderPlus, ChevronRight, ArrowLeft, FolderInput, MoreHorizontal, Link, Plus, X } from "lucide-react";
 import {
   TipoBloco,
   PosicaoBloco,
@@ -167,6 +167,7 @@ export function WorkoutBlockDialog({
   const [atividades, setAtividades] = useState(
     blocoEditando?.config_aquecimento?.atividades?.join(", ") ?? ""
   );
+  const [links, setLinks] = useState<string[]>(blocoEditando?.links ?? []);
 
   // Carregar template do BD (meu template salvo)
   const handleSelectMeuTemplate = (template: BlocoTemplate) => {
@@ -175,6 +176,7 @@ export function WorkoutBlockDialog({
     setNome(template.nome);
     setDescricao(template.descricao || "");
     setDuracaoMinutos(template.duracao_estimada_minutos || 10);
+    setLinks((template as any).links || []);
 
     if (template.config_cardio) {
       const cc = template.config_cardio as any;
@@ -271,6 +273,7 @@ export function WorkoutBlockDialog({
         descricao: descricao.trim() || undefined,
         duracao_estimada_minutos: duracaoMinutos,
         obrigatorio,
+        links: links.filter(l => l.trim()),
       };
 
       // Configurações específicas por tipo

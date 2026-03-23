@@ -992,6 +992,54 @@ export function WorkoutBlockDialog({
               </Card>
             )}
 
+            {/* Links de referência */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Link className="h-4 w-4" />
+                  Links de Referência
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Adicione vídeos ou materiais de apoio para este bloco
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {links.map((link, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <Input
+                      value={link}
+                      onChange={(e) => {
+                        const newLinks = [...links];
+                        newLinks[idx] = e.target.value;
+                        setLinks(newLinks);
+                      }}
+                      placeholder="https://youtube.com/watch?v=..."
+                      className="text-sm"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 h-9 w-9 text-destructive"
+                      onClick={() => setLinks(links.filter((_, i) => i !== idx))}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setLinks([...links, ""])}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Adicionar Link
+                </Button>
+              </CardContent>
+            </Card>
+
             {/* Opções adicionais */}
             <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
               <div className="space-y-0.5">

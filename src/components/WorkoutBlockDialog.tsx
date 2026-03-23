@@ -575,9 +575,6 @@ export function WorkoutBlockDialog({
                   })()}
 
                   <Separator className="my-4" />
-                    ))}
-                  </div>
-                  <Separator className="my-4" />
                 </div>
               )}
 

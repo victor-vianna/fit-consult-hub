@@ -85,9 +85,19 @@ export function WorkoutBlockDialog({
   const [activeTab, setActiveTab] = useState<"manual" | "template">("template");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<BlocoTemplate | null>(null);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [novaPastaNome, setNovaPastaNome] = useState("");
+  const [showNovaPasta, setShowNovaPasta] = useState(false);
+  const [novaPastaCor, setNovaPastaCor] = useState("#3b82f6");
 
   // Hook para templates do BD
   const { templates: meusTemplates, loading: loadingTemplates, deletarTemplate, isDeletando } = useBlocoTemplates({
+    personalId: personalId || "",
+    enabled: !!personalId,
+  });
+
+  // Hook para pastas de templates
+  const { pastas, pastasHierarquicas, criarPasta, deletarPasta, moverTemplate, isCriando } = useBlocoTemplatePastas({
     personalId: personalId || "",
     enabled: !!personalId,
   });

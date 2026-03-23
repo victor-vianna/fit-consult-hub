@@ -29,6 +29,7 @@ export interface CriarBlocoTemplateInput {
   config_alongamento?: any;
   config_aquecimento?: any;
   config_outro?: any;
+  pasta_id?: string | null;
 }
 
 interface UseBlocoTemplatesProps {

@@ -78,6 +78,7 @@ export function useBlocoTemplates({
           config_alongamento: input.config_alongamento || null,
           config_aquecimento: input.config_aquecimento || null,
           config_outro: input.config_outro || null,
+          pasta_id: input.pasta_id || null,
         })
         .select()
         .single();

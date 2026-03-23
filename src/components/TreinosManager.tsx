@@ -1153,13 +1153,12 @@ export function TreinosManager({
               const blocos = treinoId ? obterBlocos(treinoId) : [];
               const temBlocos = blocos.length > 0;
 
-              const blocosInicio = blocos.filter((b) => b.posicao === "inicio");
-              const blocosMeio = blocos.filter((b) => b.posicao === "meio");
-              const blocosFim = blocos.filter((b) => b.posicao === "fim");
-
               const exerciciosIsolados = treino.exercicios.filter(
                 (ex) => !ex.grupo_id
               );
+
+              // Build unified list for drag-and-drop
+              const unifiedList = buildUnifiedList(exerciciosIsolados, grupos, blocos);
 
               return (
                 <Collapsible

@@ -12,6 +12,7 @@ import {
   HeadingLevel,
   Footer,
   ShadingType,
+  LevelFormat,
 } from "docx";
 import { saveAs } from "file-saver";
 import type { TreinoDia } from "@/types/treino";
@@ -32,15 +33,31 @@ function hexToRgb(hex: string): string {
   return hex.replace("#", "");
 }
 
+// US Letter: 12240 DXA wide, 1" margins = 9360 content width
+const PAGE_WIDTH = 12240;
+const PAGE_HEIGHT = 15840;
+const MARGIN = 1440;
+const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2; // 9360
+
+// Column widths for 6 columns (Exercise wider, rest equal)
+const COL_WIDTHS = [3200, 1100, 1260, 1200, 1200, 1400]; // sum = 9360
+
+const cellBorder = { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" };
+const cellBorders = { top: cellBorder, bottom: cellBorder, left: cellBorder, right: cellBorder };
+const cellMargins = { top: 60, bottom: 60, left: 80, right: 80 };
+
 function createHeaderRow(themeColor: string): TableRow {
   const headers = ["Exercício", "Séries", "Repetições", "Carga", "Descanso", "Obs."];
   return new TableRow({
     children: headers.map(
-      (h) =>
+      (h, i) =>
         new TableCell({
+          width: { size: COL_WIDTHS[i], type: WidthType.DXA },
+          borders: cellBorders,
+          margins: cellMargins,
           shading: {
-            type: ShadingType.SOLID,
-            color: hexToRgb(themeColor),
+            type: ShadingType.CLEAR,
+            color: "auto",
             fill: hexToRgb(themeColor),
           },
           children: [
@@ -77,6 +94,9 @@ function createExerciseRow(ex: any, prefix?: string): TableRow {
     children: values.map(
       (v, i) =>
         new TableCell({
+          width: { size: COL_WIDTHS[i], type: WidthType.DXA },
+          borders: cellBorders,
+          margins: cellMargins,
           children: [
             new Paragraph({
               children: [
@@ -135,9 +155,11 @@ export async function exportTreinoWord(params: ExportTreinoParams) {
           style: BorderStyle.SINGLE,
           size: 6,
           color: hexToRgb(themeColor),
+          space: 1,
         },
       },
       spacing: { after: 200 },
+      children: [],
     })
   );
 
@@ -176,7 +198,14 @@ export async function exportTreinoWord(params: ExportTreinoParams) {
 
     children.push(
       new Paragraph({
-        text: titulo,
+        children: [
+          new TextRun({
+            text: titulo,
+            bold: true,
+            size: 26,
+            font: "Calibri",
+          }),
+        ],
         heading: HeadingLevel.HEADING_2,
         spacing: { before: 300, after: 100 },
       })
@@ -214,6 +243,7 @@ export async function exportTreinoWord(params: ExportTreinoParams) {
               style: BorderStyle.SINGLE,
               size: 2,
               color: hexToRgb(themeColor),
+              space: 1,
             },
           },
           spacing: { before: 150, after: 80 },
@@ -232,7 +262,7 @@ export async function exportTreinoWord(params: ExportTreinoParams) {
           (grupo.exercicios || [])
             .sort((a: any, b: any) => (a.ordem_no_grupo || 0) - (b.ordem_no_grupo || 0))
             .forEach((ex: any, idx: number) => {
-              const prefix = idx === 0 ? `[${tipoLabel}]` : "→";
+              const prefix = idx === 0 ? `[${tipoLabel}]` : "  >";
               rows.push(createExerciseRow(ex, prefix));
             });
         });
@@ -241,7 +271,8 @@ export async function exportTreinoWord(params: ExportTreinoParams) {
           children.push(
             new Table({
               rows,
-              width: { size: 100, type: WidthType.PERCENTAGE },
+              width: { size: CONTENT_WIDTH, type: WidthType.DXA },
+              columnWidths: COL_WIDTHS,
             })
           );
         }
@@ -253,9 +284,10 @@ export async function exportTreinoWord(params: ExportTreinoParams) {
 
           children.push(
             new Paragraph({
+              numbering: { reference: "block-bullets", level: 0 },
               children: [
                 new TextRun({
-                  text: `• ${parts.join(" — ")}`,
+                  text: parts.join(" — "),
                   bold: true,
                   size: 20,
                   font: "Calibri",
@@ -268,8 +300,9 @@ export async function exportTreinoWord(params: ExportTreinoParams) {
             children.push(
               new Paragraph({
                 children: [
-                  new TextRun({ text: `  ${bloco.descricao}`, size: 18, font: "Calibri" }),
+                  new TextRun({ text: bloco.descricao, size: 18, font: "Calibri" }),
                 ],
+                indent: { left: 720 },
                 spacing: { after: 30 },
               })
             );
@@ -278,13 +311,38 @@ export async function exportTreinoWord(params: ExportTreinoParams) {
       }
     }
 
-    children.push(new Paragraph({ spacing: { after: 200 } }));
+    children.push(new Paragraph({ spacing: { after: 200 }, children: [] }));
   });
 
   const doc = new Document({
+    numbering: {
+      config: [
+        {
+          reference: "block-bullets",
+          levels: [
+            {
+              level: 0,
+              format: LevelFormat.BULLET,
+              text: "\u2022",
+              alignment: AlignmentType.LEFT,
+              style: {
+                paragraph: {
+                  indent: { left: 720, hanging: 360 },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    },
     sections: [
       {
-        properties: {},
+        properties: {
+          page: {
+            size: { width: PAGE_WIDTH, height: PAGE_HEIGHT },
+            margin: { top: MARGIN, right: MARGIN, bottom: MARGIN, left: MARGIN },
+          },
+        },
         children,
         footers: {
           default: new Footer({

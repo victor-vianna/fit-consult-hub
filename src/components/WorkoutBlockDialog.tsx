@@ -39,7 +39,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Sparkles, Info, Clock, Trash2, Edit, BookmarkPlus, User } from "lucide-react";
+import { Loader2, Sparkles, Info, Clock, Trash2, Edit, BookmarkPlus, User, Folder, FolderPlus, ChevronRight, ArrowLeft, FolderInput, MoreHorizontal } from "lucide-react";
 import {
   TipoBloco,
   PosicaoBloco,
@@ -52,6 +52,17 @@ import {
   formatarDuracao,
 } from "@/types/workoutBlocks";
 import { useBlocoTemplates, BlocoTemplate } from "@/hooks/useBlocoTemplates";
+import { useBlocoTemplatePastas, BlocoTemplatePasta } from "@/hooks/useBlocoTemplatePastas";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface WorkoutBlockDialogProps {
   open: boolean;

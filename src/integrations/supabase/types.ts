@@ -493,6 +493,61 @@ export type Database = {
           },
         ]
       }
+      bloco_template_pastas: {
+        Row: {
+          cor: string | null
+          created_at: string | null
+          id: string
+          nome: string
+          ordem: number | null
+          parent_id: string | null
+          personal_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          cor?: string | null
+          created_at?: string | null
+          id?: string
+          nome: string
+          ordem?: number | null
+          parent_id?: string | null
+          personal_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          cor?: string | null
+          created_at?: string | null
+          id?: string
+          nome?: string
+          ordem?: number | null
+          parent_id?: string | null
+          personal_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bloco_template_pastas_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "bloco_template_pastas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bloco_template_pastas_personal_id_fkey"
+            columns: ["personal_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bloco_template_pastas_personal_id_fkey"
+            columns: ["personal_id"]
+            isOneToOne: false
+            referencedRelation: "v_status_checkins"
+            referencedColumns: ["profile_id"]
+          },
+        ]
+      }
       bloco_templates: {
         Row: {
           config_alongamento: Json | null
@@ -504,6 +559,7 @@ export type Database = {
           duracao_estimada_minutos: number | null
           id: string
           nome: string
+          pasta_id: string | null
           personal_id: string
           posicao: string
           tipo: string
@@ -519,6 +575,7 @@ export type Database = {
           duracao_estimada_minutos?: number | null
           id?: string
           nome: string
+          pasta_id?: string | null
           personal_id: string
           posicao?: string
           tipo: string
@@ -534,12 +591,20 @@ export type Database = {
           duracao_estimada_minutos?: number | null
           id?: string
           nome?: string
+          pasta_id?: string | null
           personal_id?: string
           posicao?: string
           tipo?: string
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "bloco_templates_pasta_id_fkey"
+            columns: ["pasta_id"]
+            isOneToOne: false
+            referencedRelation: "bloco_template_pastas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "bloco_templates_personal_id_fkey"
             columns: ["personal_id"]

@@ -303,6 +303,13 @@ export function TreinosManager({
   // Tipo de item para identificação no drag-and-drop unificado
   type DraggableItemType = "exercise" | "group" | "block";
   
+  type UnifiedItem = {
+    sortableId: string;
+    type: DraggableItemType;
+    ordem: number;
+    data: any;
+  };
+
   const parseItemId = (id: string): { type: DraggableItemType; realId: string } => {
     if (id.startsWith("group-")) {
       return { type: "group", realId: id.replace("group-", "") };
@@ -313,7 +320,50 @@ export function TreinosManager({
     return { type: "exercise", realId: id };
   };
 
-  const handleUnifiedDragEnd = async (event: DragEndEvent, dia: number) => {
+  // Build unified list merging exercises, groups and blocks sorted by ordem
+  const buildUnifiedList = (
+    exerciciosIsolados: any[],
+    grupos: any[],
+    blocos: any[]
+  ): UnifiedItem[] => {
+    const items: UnifiedItem[] = [];
+
+    exerciciosIsolados.forEach((ex) => {
+      items.push({
+        sortableId: ex.id,
+        type: "exercise",
+        ordem: ex.ordem ?? 0,
+        data: ex,
+      });
+    });
+
+    grupos.forEach((grupo: any) => {
+      // Use the minimum ordem of the group's exercises to position the group
+      const minOrdem = grupo.exercicios?.length > 0
+        ? Math.min(...grupo.exercicios.map((e: any) => e.ordem ?? 0))
+        : 0;
+      items.push({
+        sortableId: `group-${grupo.grupo_id}`,
+        type: "group",
+        ordem: minOrdem,
+        data: grupo,
+      });
+    });
+
+    blocos.forEach((bloco: any) => {
+      items.push({
+        sortableId: `block-${bloco.id}`,
+        type: "block",
+        ordem: bloco.ordem ?? 0,
+        data: bloco,
+      });
+    });
+
+    items.sort((a, b) => a.ordem - b.ordem);
+    return items;
+  };
+
+  const handleUnifiedDragEnd = async (event: DragEndEvent, dia: number, unifiedList: UnifiedItem[]) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
@@ -323,54 +373,54 @@ export function TreinosManager({
     const treinoId = getTreinoId(treino);
     if (!treinoId) return;
 
-    const activeItem = parseItemId(String(active.id));
-    const overItem = parseItemId(String(over.id));
+    const oldIndex = unifiedList.findIndex((item) => item.sortableId === String(active.id));
+    const newIndex = unifiedList.findIndex((item) => item.sortableId === String(over.id));
+    if (oldIndex === -1 || newIndex === -1) return;
 
-    // Só permite reordenar itens do mesmo tipo
-    if (activeItem.type !== overItem.type) {
-      toast.info("Não é possível reordenar itens de tipos diferentes");
-      return;
-    }
+    const newOrder = arrayMove(unifiedList, oldIndex, newIndex);
 
     try {
-      if (activeItem.type === "exercise") {
-        // Exercícios isolados
-        const exerciciosIsolados = treino.exercicios.filter((ex) => !ex.grupo_id);
-        const oldIndex = exerciciosIsolados.findIndex((ex) => ex.id === activeItem.realId);
-        const newIndex = exerciciosIsolados.findIndex((ex) => ex.id === overItem.realId);
-        if (oldIndex === -1 || newIndex === -1) return;
+      // Batch update all items with new global ordem values
+      const exerciseUpdates: Promise<any>[] = [];
+      const blockUpdates: { id: string; ordem: number }[] = [];
+      const groupUpdates: { grupo_id: string; ordem: number }[] = [];
 
-        const newOrder = arrayMove(exerciciosIsolados, oldIndex, newIndex);
-        await reordenarExercicios(dia, newOrder);
-      } else if (activeItem.type === "group") {
-        // Grupos de exercícios
-        const grupos = obterGruposDoTreino(treinoId);
-        const oldIndex = grupos.findIndex((g) => g.grupo_id === activeItem.realId);
-        const newIndex = grupos.findIndex((g) => g.grupo_id === overItem.realId);
-        if (oldIndex === -1 || newIndex === -1) return;
+      newOrder.forEach((item, idx) => {
+        const globalOrdem = idx * 10; // Use multiples of 10 for spacing
+        if (item.type === "exercise") {
+          exerciseUpdates.push(
+            supabase.from("exercicios").update({ ordem: globalOrdem }).eq("id", item.data.id)
+          );
+        } else if (item.type === "block") {
+          blockUpdates.push({ id: item.data.id, ordem: globalOrdem });
+        } else if (item.type === "group") {
+          groupUpdates.push({ grupo_id: item.data.grupo_id, ordem: globalOrdem });
+        }
+      });
 
-        const newOrder = arrayMove(grupos, oldIndex, newIndex);
-        const updates = newOrder.map((grupo, idx) => ({
-          grupo_id: grupo.grupo_id,
-          ordem: idx + 1,
-        }));
-        await reordenarGrupos(updates);
-      } else if (activeItem.type === "block") {
-        // Blocos de treino
-        const blocos = obterBlocos(treinoId);
-        const oldIndex = blocos.findIndex((b) => b.id === activeItem.realId);
-        const newIndex = blocos.findIndex((b) => b.id === overItem.realId);
-        if (oldIndex === -1 || newIndex === -1) return;
+      await Promise.all([
+        ...exerciseUpdates,
+        blockUpdates.length > 0 ? reordenarBlocos(blockUpdates) : Promise.resolve(),
+        groupUpdates.length > 0 ? reordenarGrupos(groupUpdates) : Promise.resolve(),
+      ]);
 
-        const newOrder = arrayMove(blocos, oldIndex, newIndex);
-        const updates = newOrder.map((bloco, idx) => ({
-          id: bloco.id,
-          ordem: idx + 1,
-        }));
-        await reordenarBlocos(updates);
-      }
+      // Invalidate all related queries
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["treinos", profileId, personalId, semanaSelecionada],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["grupos-exercicios", profileId, personalId, semanaSelecionada],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["blocos-treino", profileId, personalId, semanaSelecionada],
+        }),
+      ]);
+
+      toast.success("Ordem atualizada");
     } catch (error) {
       console.error("[TreinosManager] Erro ao reordenar:", error);
+      toast.error("Erro ao reordenar itens");
     }
   };
 

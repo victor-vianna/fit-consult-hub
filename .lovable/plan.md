@@ -1,24 +1,38 @@
 
 
-## Plan: Add Period Filter to Feedback Evolution Charts
+## Plan: Add Video Links to Block Templates
 
-**Problem**: The chart always shows all check-ins with no way to filter by time period.
+**Problem**: Block templates (mobility, stretching, warm-up, etc.) have no field for demonstration video links. Personals can't attach reference videos showing how to perform the mobility/stretching routines.
 
-**Solution**: Add period selector tabs (4 weeks, 3 months, 6 months, 1 year, All) above the chart that filters `chartData` client-side.
+**Solution**: Add a `links` field (array of URLs) to block templates and blocks, with UI to add/view them.
 
-### Changes
+### Database
 
-**File: `src/components/FeedbackEvolucaoChart.tsx`**
+Add a `links` column (JSONB array) to both `blocos_treino` and `bloco_templates` tables:
 
-1. Add a `period` state with options: `"4sem"`, `"3m"`, `"6m"`, `"1a"`, `"todos"`
-2. Add a row of period selector buttons/tabs between the title and the metric badges
-3. Filter `chartData` in the `useMemo` based on selected period using `data_inicio` field (already present in checkins) compared against `subWeeks`/`subMonths` from `date-fns`
-4. The comparison card should also use the filtered data (last 2 of the filtered set)
+```sql
+ALTER TABLE public.blocos_treino ADD COLUMN links jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE public.bloco_templates ADD COLUMN links jsonb DEFAULT '[]'::jsonb;
+```
 
-**UI**: Small toggle group or tabs styled inline, e.g.:
-`[4 sem] [3 meses] [6 meses] [1 ano] [Todos]`
+### Type changes
 
-**Also apply to `EvolucaoSection`** (`src/components/avaliacao/EvolucaoSection.tsx`) for consistency — same period filter on the physical assessment evolution chart.
+**`src/types/workoutBlocks.ts`**: Add `links?: string[]` to `BlocoTreino` interface.
 
-No database changes needed — purely client-side filtering.
+**`src/hooks/useBlocoTemplates.ts`**: Add `links` to `BlocoTemplate` and `CriarBlocoTemplateInput` interfaces, propagate in mutations.
+
+### UI changes
+
+**`src/components/WorkoutBlockDialog.tsx`**:
+- Add a "Links de referência" section in the block creation/edit form
+- Simple list of URL inputs with add/remove buttons
+- Persist to `links` JSONB column
+
+**`src/components/WorkoutBlockCard.tsx`**:
+- Show clickable link icons when the block has links
+- Open in new tab on click
+
+### Template propagation
+
+When applying a template to a workout, copy `links` from template to the new block. When saving a block as template, copy its `links`.
 

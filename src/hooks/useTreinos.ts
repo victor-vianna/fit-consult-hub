@@ -305,6 +305,7 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
           personal_id: personalId,
           semana: semanaParaBuscar,
           dia_semana: diaValido,
+          ordem_no_dia: 1,
           concluido: false,
         })
         .select()

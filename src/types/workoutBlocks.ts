@@ -86,6 +86,7 @@ export interface BlocoTreino {
   config_alongamento?: ConfigAlongamento;
   config_aquecimento?: ConfigAquecimento;
   config_outro?: any;
+  links?: string[];
   concluido?: boolean;
   concluido_em?: string | null;
   created_at?: string;

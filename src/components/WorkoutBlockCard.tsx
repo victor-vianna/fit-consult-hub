@@ -24,6 +24,7 @@ import {
   Heart,
   Gauge,
   Save,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -405,6 +406,31 @@ export function WorkoutBlockCard({
                         )}
                       </ul>
                     )}
+                  </div>
+                )}
+
+                {/* Links de referência */}
+                {bloco.links && bloco.links.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-2 border-t">
+                    {bloco.links.map((link, idx) => (
+                      <a
+                        key={idx}
+                        href={link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        {(() => {
+                          try {
+                            const url = new URL(link);
+                            return url.hostname.replace("www.", "");
+                          } catch {
+                            return `Link ${idx + 1}`;
+                          }
+                        })()}
+                      </a>
+                    ))}
                   </div>
                 )}
 

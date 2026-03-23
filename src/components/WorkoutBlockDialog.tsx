@@ -39,7 +39,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Sparkles, Info, Clock, Trash2, Edit, BookmarkPlus, User, Folder, FolderPlus, ChevronRight, ArrowLeft, FolderInput, MoreHorizontal } from "lucide-react";
+import { Loader2, Sparkles, Info, Clock, Trash2, Edit, BookmarkPlus, User, Folder, FolderPlus, ChevronRight, ArrowLeft, FolderInput, MoreHorizontal, Link, Plus, X } from "lucide-react";
 import {
   TipoBloco,
   PosicaoBloco,
@@ -167,6 +167,7 @@ export function WorkoutBlockDialog({
   const [atividades, setAtividades] = useState(
     blocoEditando?.config_aquecimento?.atividades?.join(", ") ?? ""
   );
+  const [links, setLinks] = useState<string[]>(blocoEditando?.links ?? []);
 
   // Carregar template do BD (meu template salvo)
   const handleSelectMeuTemplate = (template: BlocoTemplate) => {
@@ -175,6 +176,7 @@ export function WorkoutBlockDialog({
     setNome(template.nome);
     setDescricao(template.descricao || "");
     setDuracaoMinutos(template.duracao_estimada_minutos || 10);
+    setLinks((template as any).links || []);
 
     if (template.config_cardio) {
       const cc = template.config_cardio as any;
@@ -271,6 +273,7 @@ export function WorkoutBlockDialog({
         descricao: descricao.trim() || undefined,
         duracao_estimada_minutos: duracaoMinutos,
         obrigatorio,
+        links: links.filter(l => l.trim()),
       };
 
       // Configurações específicas por tipo
@@ -988,6 +991,54 @@ export function WorkoutBlockDialog({
                 </CardContent>
               </Card>
             )}
+
+            {/* Links de referência */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Link className="h-4 w-4" />
+                  Links de Referência
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Adicione vídeos ou materiais de apoio para este bloco
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {links.map((link, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <Input
+                      value={link}
+                      onChange={(e) => {
+                        const newLinks = [...links];
+                        newLinks[idx] = e.target.value;
+                        setLinks(newLinks);
+                      }}
+                      placeholder="https://youtube.com/watch?v=..."
+                      className="text-sm"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 h-9 w-9 text-destructive"
+                      onClick={() => setLinks(links.filter((_, i) => i !== idx))}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setLinks([...links, ""])}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Adicionar Link
+                </Button>
+              </CardContent>
+            </Card>
 
             {/* Opções adicionais */}
             <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">

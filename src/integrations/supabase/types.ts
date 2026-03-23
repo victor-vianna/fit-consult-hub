@@ -558,6 +558,7 @@ export type Database = {
           descricao: string | null
           duracao_estimada_minutos: number | null
           id: string
+          links: Json | null
           nome: string
           pasta_id: string | null
           personal_id: string
@@ -574,6 +575,7 @@ export type Database = {
           descricao?: string | null
           duracao_estimada_minutos?: number | null
           id?: string
+          links?: Json | null
           nome: string
           pasta_id?: string | null
           personal_id: string
@@ -590,6 +592,7 @@ export type Database = {
           descricao?: string | null
           duracao_estimada_minutos?: number | null
           id?: string
+          links?: Json | null
           nome?: string
           pasta_id?: string | null
           personal_id?: string
@@ -634,6 +637,7 @@ export type Database = {
           descricao: string | null
           duracao_estimada_minutos: number | null
           id: string
+          links: Json | null
           nome: string
           obrigatorio: boolean | null
           ordem: number
@@ -654,6 +658,7 @@ export type Database = {
           descricao?: string | null
           duracao_estimada_minutos?: number | null
           id?: string
+          links?: Json | null
           nome: string
           obrigatorio?: boolean | null
           ordem?: number
@@ -674,6 +679,7 @@ export type Database = {
           descricao?: string | null
           duracao_estimada_minutos?: number | null
           id?: string
+          links?: Json | null
           nome?: string
           obrigatorio?: boolean | null
           ordem?: number

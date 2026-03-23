@@ -293,6 +293,7 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
               config_alongamento: bloco.config_alongamento ?? null,
               config_aquecimento: bloco.config_aquecimento ?? null,
               config_outro: bloco.config_outro ?? null,
+              links: bloco.links ?? [],
               concluido: false,
             }));
 
@@ -519,6 +520,7 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
             config_alongamento: bloco.config_alongamento ?? null,
             config_aquecimento: bloco.config_aquecimento ?? null,
             config_outro: bloco.config_outro ?? null,
+            links: bloco.links ?? [],
             concluido: false,
           }));
 

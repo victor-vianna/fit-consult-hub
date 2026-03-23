@@ -39,7 +39,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Sparkles, Info, Clock, Trash2, Edit, BookmarkPlus, User } from "lucide-react";
+import { Loader2, Sparkles, Info, Clock, Trash2, Edit, BookmarkPlus, User, Folder, FolderPlus, ChevronRight, ArrowLeft, FolderInput, MoreHorizontal } from "lucide-react";
 import {
   TipoBloco,
   PosicaoBloco,
@@ -52,6 +52,17 @@ import {
   formatarDuracao,
 } from "@/types/workoutBlocks";
 import { useBlocoTemplates, BlocoTemplate } from "@/hooks/useBlocoTemplates";
+import { useBlocoTemplatePastas, BlocoTemplatePasta } from "@/hooks/useBlocoTemplatePastas";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface WorkoutBlockDialogProps {
   open: boolean;
@@ -74,9 +85,19 @@ export function WorkoutBlockDialog({
   const [activeTab, setActiveTab] = useState<"manual" | "template">("template");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<BlocoTemplate | null>(null);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [novaPastaNome, setNovaPastaNome] = useState("");
+  const [showNovaPasta, setShowNovaPasta] = useState(false);
+  const [novaPastaCor, setNovaPastaCor] = useState("#3b82f6");
 
   // Hook para templates do BD
   const { templates: meusTemplates, loading: loadingTemplates, deletarTemplate, isDeletando } = useBlocoTemplates({
+    personalId: personalId || "",
+    enabled: !!personalId,
+  });
+
+  // Hook para pastas de templates
+  const { pastas, pastasHierarquicas, criarPasta, deletarPasta, moverTemplate, isCriando } = useBlocoTemplatePastas({
     personalId: personalId || "",
     enabled: !!personalId,
   });
@@ -340,55 +361,219 @@ export function WorkoutBlockDialog({
           {/* TAB: TEMPLATES */}
           <TabsContent value="template" className="space-y-4 mt-4">
             <div className="space-y-4">
-              {/* MEUS TEMPLATES SALVOS */}
-              {personalId && meusTemplates.length > 0 && (
+              {/* MEUS TEMPLATES SALVOS - COM PASTAS */}
+              {personalId && (meusTemplates.length > 0 || pastas.length > 0) && (
                 <div>
-                  <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    Meus Templates
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {meusTemplates.map((template) => (
-                      <Card
-                        key={template.id}
-                        className="cursor-pointer hover:border-primary transition-colors group relative"
-                      >
-                        <CardHeader className="p-3">
-                          <div className="flex items-center justify-between">
-                            <CardTitle 
-                              className="text-sm flex items-center gap-2 flex-1"
-                              onClick={() => handleSelectMeuTemplate(template)}
-                            >
-                              {TIPOS_BLOCO[template.tipo as TipoBloco]?.icon || "📦"}
-                              {template.nome}
-                              <Badge variant="outline" className="text-xs">
-                                Salvo
-                              </Badge>
-                            </CardTitle>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setTemplateToDelete(template);
-                                setDeleteDialogOpen(true);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          <CardDescription 
-                            className="text-xs"
-                            onClick={() => handleSelectMeuTemplate(template)}
-                          >
-                            {template.descricao || `${template.tipo} - ${template.posicao}`}
-                            {template.duracao_estimada_minutos && ` • ${template.duracao_estimada_minutos}min`}
-                          </CardDescription>
-                        </CardHeader>
-                      </Card>
-                    ))}
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Meus Templates
+                    </h4>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => setShowNovaPasta(!showNovaPasta)}
+                    >
+                      <FolderPlus className="h-3.5 w-3.5 mr-1" />
+                      Nova Pasta
+                    </Button>
                   </div>
+
+                  {/* Criar nova pasta */}
+                  {showNovaPasta && (
+                    <div className="flex gap-2 mb-3">
+                      <Input
+                        placeholder="Nome da pasta (ex: HIIT, Intervalado...)"
+                        value={novaPastaNome}
+                        onChange={(e) => setNovaPastaNome(e.target.value)}
+                        className="h-8 text-sm"
+                      />
+                      <input
+                        type="color"
+                        value={novaPastaCor}
+                        onChange={(e) => setNovaPastaCor(e.target.value)}
+                        className="w-8 h-8 rounded border cursor-pointer"
+                      />
+                      <Button
+                        size="sm"
+                        className="h-8"
+                        disabled={!novaPastaNome.trim() || isCriando}
+                        onClick={async () => {
+                          await criarPasta({ nome: novaPastaNome.trim(), cor: novaPastaCor, parent_id: currentFolderId });
+                          setNovaPastaNome("");
+                          setShowNovaPasta(false);
+                        }}
+                      >
+                        {isCriando ? <Loader2 className="h-3 w-3 animate-spin" /> : "Criar"}
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Breadcrumb navigation */}
+                  {currentFolderId && (
+                    <div className="flex items-center gap-1 mb-2 text-sm">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => {
+                          const currentPasta = pastas.find(p => p.id === currentFolderId);
+                          setCurrentFolderId(currentPasta?.parent_id || null);
+                        }}
+                      >
+                        <ArrowLeft className="h-3.5 w-3.5 mr-1" />
+                        Voltar
+                      </Button>
+                      <span className="text-muted-foreground text-xs">
+                        {(() => {
+                          const parts: string[] = [];
+                          let curr = pastas.find(p => p.id === currentFolderId);
+                          while (curr) {
+                            parts.unshift(curr.nome);
+                            curr = pastas.find(p => p.id === curr!.parent_id);
+                          }
+                          return parts.join(" / ");
+                        })()}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Subpastas da pasta atual */}
+                  {(() => {
+                    const subpastas = pastas.filter(p => p.parent_id === currentFolderId);
+                    if (subpastas.length === 0) return null;
+                    return (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
+                        {subpastas.map(pasta => {
+                          const count = meusTemplates.filter(t => t.pasta_id === pasta.id).length;
+                          const subCount = pastas.filter(p => p.parent_id === pasta.id).length;
+                          return (
+                            <div
+                              key={pasta.id}
+                              className="flex items-center gap-2 p-2.5 rounded-lg border bg-card hover:bg-accent/50 cursor-pointer transition-colors group"
+                              onClick={() => setCurrentFolderId(pasta.id)}
+                            >
+                              <Folder className="h-5 w-5 shrink-0" style={{ color: pasta.cor }} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{pasta.nome}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {count} template{count !== 1 ? "s" : ""}
+                                  {subCount > 0 && ` • ${subCount} subpasta${subCount !== 1 ? "s" : ""}`}
+                                </p>
+                              </div>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100">
+                                    <MoreHorizontal className="h-3.5 w-3.5" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deletarPasta(pasta.id);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Excluir pasta
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Templates da pasta atual */}
+                  {(() => {
+                    const templatesNaPasta = meusTemplates.filter(t => t.pasta_id === currentFolderId);
+                    if (templatesNaPasta.length === 0 && pastas.filter(p => p.parent_id === currentFolderId).length === 0) {
+                      return (
+                        <div className="text-center py-4 text-muted-foreground text-sm">
+                          {currentFolderId ? "Nenhum template nesta pasta" : "Nenhum template salvo"}
+                        </div>
+                      );
+                    }
+                    if (templatesNaPasta.length === 0) return null;
+                    return (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {templatesNaPasta.map((template) => (
+                          <Card
+                            key={template.id}
+                            className="cursor-pointer hover:border-primary transition-colors group relative"
+                          >
+                            <CardHeader className="p-3">
+                              <div className="flex items-center justify-between">
+                                <CardTitle 
+                                  className="text-sm flex items-center gap-2 flex-1"
+                                  onClick={() => handleSelectMeuTemplate(template)}
+                                >
+                                  {TIPOS_BLOCO[template.tipo as TipoBloco]?.icon || "📦"}
+                                  {template.nome}
+                                </CardTitle>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuSub>
+                                      <DropdownMenuSubTrigger>
+                                        <FolderInput className="h-4 w-4 mr-2" />
+                                        Mover para pasta
+                                      </DropdownMenuSubTrigger>
+                                      <DropdownMenuSubContent className="max-h-[250px] overflow-y-auto">
+                                        <DropdownMenuItem
+                                          disabled={!template.pasta_id}
+                                          onClick={(e) => { e.stopPropagation(); moverTemplate(template.id, null); }}
+                                        >
+                                          📂 Raiz (sem pasta)
+                                        </DropdownMenuItem>
+                                        {pastas.filter(p => p.id !== template.pasta_id).map(p => (
+                                          <DropdownMenuItem
+                                            key={p.id}
+                                            onClick={(e) => { e.stopPropagation(); moverTemplate(template.id, p.id); }}
+                                          >
+                                            <Folder className="h-4 w-4 mr-2 shrink-0" style={{ color: p.cor }} />
+                                            <span className="truncate">{p.nome}</span>
+                                          </DropdownMenuItem>
+                                        ))}
+                                      </DropdownMenuSubContent>
+                                    </DropdownMenuSub>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="text-destructive focus:text-destructive"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setTemplateToDelete(template);
+                                        setDeleteDialogOpen(true);
+                                      }}
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Excluir
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                              <CardDescription 
+                                className="text-xs"
+                                onClick={() => handleSelectMeuTemplate(template)}
+                              >
+                                {template.descricao || `${template.tipo} - ${template.posicao}`}
+                                {template.duracao_estimada_minutos && ` • ${template.duracao_estimada_minutos}min`}
+                              </CardDescription>
+                            </CardHeader>
+                          </Card>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
                   <Separator className="my-4" />
                 </div>
               )}

@@ -16,6 +16,7 @@ export interface BlocoTemplate {
   config_aquecimento: any;
   config_outro: any;
   created_at: string;
+  pasta_id: string | null;
 }
 
 export interface CriarBlocoTemplateInput {
@@ -28,6 +29,7 @@ export interface CriarBlocoTemplateInput {
   config_alongamento?: any;
   config_aquecimento?: any;
   config_outro?: any;
+  pasta_id?: string | null;
 }
 
 interface UseBlocoTemplatesProps {
@@ -76,6 +78,7 @@ export function useBlocoTemplates({
           config_alongamento: input.config_alongamento || null,
           config_aquecimento: input.config_aquecimento || null,
           config_outro: input.config_outro || null,
+          pasta_id: input.pasta_id || null,
         })
         .select()
         .single();

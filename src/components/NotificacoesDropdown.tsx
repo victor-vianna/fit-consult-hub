@@ -129,7 +129,7 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
             <p className="text-sm text-muted-foreground">Nenhuma notificação</p>
           </div>
         ) : (
-          <ScrollArea className="h-[400px]">
+          <ScrollArea className="h-[400px] p-1">
             {notificacoes.map((notificacao) => {
               const nomeAluno = getNomeAluno(notificacao);
               const temLinkAluno = notificacao.dados?.aluno_id || notificacao.dados?.profile_id;
@@ -137,8 +137,8 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
               return (
                 <div
                   key={notificacao.id}
-                  className={`p-3 border-b last:border-b-0 hover:bg-accent/50 transition-colors ${
-                    !notificacao.lida ? "bg-blue-50 dark:bg-blue-950/20" : ""
+                  className={`mx-2 my-1.5 p-3 rounded-lg border shadow-sm transition-all duration-200 hover:shadow-md hover:bg-accent/50 ${
+                    !notificacao.lida ? "bg-blue-50/80 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800" : "bg-card border-border"
                   } ${temLinkAluno ? "cursor-pointer" : ""}`}
                   onClick={temLinkAluno ? () => handleNotificacaoClick(notificacao) : undefined}
                 >

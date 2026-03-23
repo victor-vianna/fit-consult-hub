@@ -389,7 +389,7 @@ export function TreinosManager({
         const globalOrdem = idx * 10; // Use multiples of 10 for spacing
         if (item.type === "exercise") {
           exerciseUpdates.push(
-            supabase.from("exercicios").update({ ordem: globalOrdem }).eq("id", item.data.id)
+            supabase.from("exercicios").update({ ordem: globalOrdem }).eq("id", item.data.id).then()
           );
         } else if (item.type === "block") {
           blockUpdates.push({ id: item.data.id, ordem: globalOrdem });

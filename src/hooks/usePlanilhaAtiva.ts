@@ -385,7 +385,9 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
       .select("*")
       .eq("profile_id", profileId)
       .eq("personal_id", personalId)
-      .eq("semana", semanaOrigem);
+      .eq("semana", semanaOrigem)
+      .order("dia_semana")
+      .order("ordem_no_dia", { ascending: true });
 
     if (treinosError) {
       console.error("Erro ao buscar treinos origem:", treinosError);
@@ -399,39 +401,36 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
 
     console.log(`[usePlanilhaAtiva] Encontrados ${treinosOrigem.length} treinos para copiar`);
 
-    for (const treinoOrigem of treinosOrigem) {
-      // Verificar se já existe treino nesta semana/dia
-      const { data: treinoExistente } = await supabase
+    // Agrupar treinos por dia
+    const treinosPorDia = new Map<number, typeof treinosOrigem>();
+    for (const treino of treinosOrigem) {
+      const dia = treino.dia_semana;
+      if (!treinosPorDia.has(dia)) treinosPorDia.set(dia, []);
+      treinosPorDia.get(dia)!.push(treino);
+    }
+
+    // Para cada dia que tem treinos na origem
+    for (const [dia, treinosDoDia] of treinosPorDia) {
+      // Deletar TODOS os treinos existentes neste dia da semana destino
+      const { data: treinosExistentes } = await supabase
         .from("treinos_semanais")
         .select("id")
         .eq("profile_id", profileId)
         .eq("personal_id", personalId)
         .eq("semana", semanaDestino)
-        .eq("dia_semana", treinoOrigem.dia_semana)
-        .maybeSingle();
+        .eq("dia_semana", dia);
 
-      let treinoId: string;
-
-      if (treinoExistente) {
-        // Limpar exercícios e blocos antigos
+      if (treinosExistentes && treinosExistentes.length > 0) {
+        const idsExistentes = treinosExistentes.map((t) => t.id);
         await Promise.all([
-          supabase.from("exercicios").delete().eq("treino_semanal_id", treinoExistente.id),
-          supabase.from("blocos_treino").delete().eq("treino_semanal_id", treinoExistente.id),
+          supabase.from("exercicios").delete().in("treino_semanal_id", idsExistentes),
+          supabase.from("blocos_treino").delete().in("treino_semanal_id", idsExistentes),
         ]);
-        treinoId = treinoExistente.id;
+        await supabase.from("treinos_semanais").delete().in("id", idsExistentes);
+      }
 
-        // Atualizar dados do treino
-        await supabase
-          .from("treinos_semanais")
-          .update({
-            modelo_id: treinoOrigem.modelo_id,
-            nome_modelo: treinoOrigem.nome_modelo,
-            descricao: treinoOrigem.descricao,
-            concluido: false,
-          })
-          .eq("id", treinoExistente.id);
-      } else {
-        // Criar novo treino
+      // Copiar TODOS os treinos do dia (preservando múltiplos)
+      for (const treinoOrigem of treinosDoDia) {
         const { data: novoTreino, error: createError } = await supabase
           .from("treinos_semanais")
           .insert({
@@ -442,6 +441,8 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
             modelo_id: treinoOrigem.modelo_id,
             nome_modelo: treinoOrigem.nome_modelo,
             descricao: treinoOrigem.descricao,
+            nome_treino: treinoOrigem.nome_treino,
+            ordem_no_dia: treinoOrigem.ordem_no_dia,
             concluido: false,
           })
           .select()
@@ -452,78 +453,77 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
           continue;
         }
 
-        treinoId = novoTreino.id;
-      }
+        const treinoId = novoTreino.id;
 
-      // Copiar exercícios
-      const { data: exerciciosOrigem } = await supabase
-        .from("exercicios")
-        .select("*")
-        .eq("treino_semanal_id", treinoOrigem.id)
-        .is("deleted_at", null)
-        .order("ordem");
+        // Copiar exercícios
+        const { data: exerciciosOrigem } = await supabase
+          .from("exercicios")
+          .select("*")
+          .eq("treino_semanal_id", treinoOrigem.id)
+          .is("deleted_at", null)
+          .order("ordem");
 
-      if (exerciciosOrigem && exerciciosOrigem.length > 0) {
-        const grupoIdMap = new Map<string, string>();
+        if (exerciciosOrigem && exerciciosOrigem.length > 0) {
+          const grupoIdMap = new Map<string, string>();
 
-        const exerciciosInsert = exerciciosOrigem.map((ex: any) => {
-          let novoGrupoId = ex.grupo_id;
+          const exerciciosInsert = exerciciosOrigem.map((ex: any) => {
+            let novoGrupoId = ex.grupo_id;
+            if (ex.grupo_id && !grupoIdMap.has(ex.grupo_id)) {
+              novoGrupoId = generateUUID();
+              grupoIdMap.set(ex.grupo_id, novoGrupoId);
+            } else if (ex.grupo_id) {
+              novoGrupoId = grupoIdMap.get(ex.grupo_id) || ex.grupo_id;
+            }
 
-          if (ex.grupo_id && !grupoIdMap.has(ex.grupo_id)) {
-            novoGrupoId = generateUUID();
-            grupoIdMap.set(ex.grupo_id, novoGrupoId);
-          } else if (ex.grupo_id) {
-            novoGrupoId = grupoIdMap.get(ex.grupo_id) || ex.grupo_id;
-          }
+            return {
+              treino_semanal_id: treinoId,
+              nome: ex.nome,
+              link_video: ex.link_video,
+              series: ex.series,
+              repeticoes: ex.repeticoes,
+              descanso: ex.descanso,
+              carga: ex.carga,
+              observacoes: ex.observacoes,
+              ordem: ex.ordem,
+              grupo_id: novoGrupoId,
+              tipo_agrupamento: ex.tipo_agrupamento,
+              ordem_no_grupo: ex.ordem_no_grupo,
+              descanso_entre_grupos: ex.descanso_entre_grupos,
+              exercise_library_id: ex.exercise_library_id,
+              concluido: false,
+            };
+          });
 
-          return {
+          await supabase.from("exercicios").insert(exerciciosInsert);
+        }
+
+        // Copiar blocos
+        const { data: blocosOrigem } = await supabase
+          .from("blocos_treino")
+          .select("*")
+          .eq("treino_semanal_id", treinoOrigem.id)
+          .is("deleted_at", null)
+          .order("ordem");
+
+        if (blocosOrigem && blocosOrigem.length > 0) {
+          const blocosInsert = blocosOrigem.map((bloco: any) => ({
             treino_semanal_id: treinoId,
-            nome: ex.nome,
-            link_video: ex.link_video,
-            series: ex.series,
-            repeticoes: ex.repeticoes,
-            descanso: ex.descanso,
-            carga: ex.carga,
-            observacoes: ex.observacoes,
-            ordem: ex.ordem,
-            grupo_id: novoGrupoId,
-            tipo_agrupamento: ex.tipo_agrupamento,
-            ordem_no_grupo: ex.ordem_no_grupo,
-            descanso_entre_grupos: ex.descanso_entre_grupos,
-            exercise_library_id: ex.exercise_library_id,
+            tipo: bloco.tipo,
+            nome: bloco.nome,
+            duracao_estimada_minutos: bloco.duracao_estimada_minutos,
+            descricao: bloco.descricao,
+            posicao: bloco.posicao,
+            ordem: bloco.ordem,
+            obrigatorio: bloco.obrigatorio ?? false,
+            config_cardio: bloco.config_cardio ?? null,
+            config_alongamento: bloco.config_alongamento ?? null,
+            config_aquecimento: bloco.config_aquecimento ?? null,
+            config_outro: bloco.config_outro ?? null,
             concluido: false,
-          };
-        });
+          }));
 
-        await supabase.from("exercicios").insert(exerciciosInsert);
-      }
-
-      // Copiar blocos
-      const { data: blocosOrigem } = await supabase
-        .from("blocos_treino")
-        .select("*")
-        .eq("treino_semanal_id", treinoOrigem.id)
-        .is("deleted_at", null)
-        .order("ordem");
-
-      if (blocosOrigem && blocosOrigem.length > 0) {
-        const blocosInsert = blocosOrigem.map((bloco: any) => ({
-          treino_semanal_id: treinoId,
-          tipo: bloco.tipo,
-          nome: bloco.nome,
-          duracao_estimada_minutos: bloco.duracao_estimada_minutos,
-          descricao: bloco.descricao,
-          posicao: bloco.posicao,
-          ordem: bloco.ordem,
-          obrigatorio: bloco.obrigatorio ?? false,
-          config_cardio: bloco.config_cardio ?? null,
-          config_alongamento: bloco.config_alongamento ?? null,
-          config_aquecimento: bloco.config_aquecimento ?? null,
-          config_outro: bloco.config_outro ?? null,
-          concluido: false,
-        }));
-
-        await supabase.from("blocos_treino").insert(blocosInsert);
+          await supabase.from("blocos_treino").insert(blocosInsert);
+        }
       }
     }
 

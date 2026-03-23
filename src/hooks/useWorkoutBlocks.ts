@@ -207,6 +207,7 @@ export function useWorkoutBlocks({
           config_cardio: bloco.config_cardio ?? null,
           config_alongamento: bloco.config_alongamento ?? null,
           config_aquecimento: bloco.config_aquecimento ?? null,
+          links: bloco.links ?? [],
         } as any)
         .select()
         .single();

@@ -1,5 +1,4 @@
 // components/WorkoutExerciseList.tsx
-import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { CompactExerciseCard } from "./CompactExerciseCard";
 import { CompactGroupCard } from "./CompactGroupCard";
@@ -21,7 +20,14 @@ interface Exercicio {
   concluido?: boolean;
   grupo_id?: string | null;
   thumbnail?: string | null;
+  ordem?: number;
 }
+
+type UnifiedItem = {
+  type: "exercise" | "group" | "block";
+  ordem: number;
+  data: any;
+};
 
 interface WorkoutExerciseListProps {
   exerciciosIsolados: Exercicio[];
@@ -37,6 +43,44 @@ interface WorkoutExerciseListProps {
   profileId?: string;
 }
 
+function buildUnifiedList(
+  exerciciosIsolados: Exercicio[],
+  grupos: GrupoExercicio[],
+  blocos: BlocoTreino[]
+): UnifiedItem[] {
+  const items: UnifiedItem[] = [];
+
+  exerciciosIsolados.forEach((ex) => {
+    items.push({
+      type: "exercise",
+      ordem: ex.ordem ?? 0,
+      data: ex,
+    });
+  });
+
+  grupos.forEach((grupo: any) => {
+    const minOrdem = grupo.exercicios?.length > 0
+      ? Math.min(...grupo.exercicios.map((e: any) => e.ordem ?? 0))
+      : 0;
+    items.push({
+      type: "group",
+      ordem: minOrdem,
+      data: grupo,
+    });
+  });
+
+  blocos.forEach((bloco: any) => {
+    items.push({
+      type: "block",
+      ordem: bloco.ordem ?? 0,
+      data: bloco,
+    });
+  });
+
+  items.sort((a, b) => a.ordem - b.ordem);
+  return items;
+}
+
 export function WorkoutExerciseList({
   exerciciosIsolados,
   grupos,
@@ -50,93 +94,56 @@ export function WorkoutExerciseList({
   onFinalizarTreino,
   profileId,
 }: WorkoutExerciseListProps) {
+  // Merge all blocks into one array
+  const allBlocos = [...blocosInicio, ...blocosMeio, ...blocosFim];
+
+  // Build unified sorted list
+  const unifiedList = buildUnifiedList(exerciciosIsolados, grupos, allBlocos);
+
   return (
     <div className="space-y-4">
-      {/* Blocos do Início */}
-      {blocosInicio.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Separator className="flex-1" />
-            <span className="font-semibold">Aquecimento</span>
-            <Separator className="flex-1" />
-          </div>
-          {blocosInicio.map((bloco, idx) => (
-            <WorkoutBlockCard
-              key={bloco.id}
-              bloco={bloco}
-              index={idx}
-              readOnly={true}
-              onToggleConcluido={onToggleBloco}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Exercícios Principais */}
       <div className="space-y-2">
-        {/* Grupos */}
-        {grupos.map((grupo, idx) => (
-          <CompactGroupCard
-            key={grupo.grupo_id || `grupo-${idx}`}
-            grupo={grupo}
-            index={idx}
-            onToggleConcluido={onToggleExercicio}
-            onToggleGrupoConcluido={onToggleGrupo}
-            profileId={profileId}
-          />
-        ))}
+        {unifiedList.map((item, idx) => {
+          if (item.type === "block") {
+            const bloco = item.data;
+            return (
+              <WorkoutBlockCard
+                key={bloco.id}
+                bloco={bloco}
+                index={idx}
+                readOnly={true}
+                onToggleConcluido={onToggleBloco}
+              />
+            );
+          }
 
-        {/* Exercícios Isolados */}
-        {exerciciosIsolados.map((exercicio, index) => (
-          <CompactExerciseCard
-            key={exercicio.id}
-            exercicio={exercicio}
-            index={index}
-            onToggleConcluido={onToggleExercicio}
-            profileId={profileId}
-          />
-        ))}
+          if (item.type === "group") {
+            const grupo = item.data;
+            return (
+              <CompactGroupCard
+                key={grupo.grupo_id || `grupo-${idx}`}
+                grupo={grupo}
+                index={idx}
+                onToggleConcluido={onToggleExercicio}
+                onToggleGrupoConcluido={onToggleGrupo}
+                profileId={profileId}
+              />
+            );
+          }
+
+          // exercise
+          const exercicio = item.data;
+          return (
+            <CompactExerciseCard
+              key={exercicio.id}
+              exercicio={exercicio}
+              index={idx}
+              onToggleConcluido={onToggleExercicio}
+              profileId={profileId}
+            />
+          );
+        })}
       </div>
-
-      {/* Blocos do Meio */}
-      {blocosMeio.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Separator className="flex-1" />
-            <span className="font-semibold">Complementar</span>
-            <Separator className="flex-1" />
-          </div>
-          {blocosMeio.map((bloco, idx) => (
-            <WorkoutBlockCard
-              key={bloco.id}
-              bloco={bloco}
-              index={idx}
-              readOnly={true}
-              onToggleConcluido={onToggleBloco}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Blocos do Fim */}
-      {blocosFim.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Separator className="flex-1" />
-            <span className="font-semibold">Alongamento</span>
-            <Separator className="flex-1" />
-          </div>
-          {blocosFim.map((bloco, idx) => (
-            <WorkoutBlockCard
-              key={bloco.id}
-              bloco={bloco}
-              index={idx}
-              readOnly={true}
-              onToggleConcluido={onToggleBloco}
-            />
-          ))}
-        </div>
-      )}
 
       {/* Botão Finalizar Treino */}
       {isWorkoutActive && onFinalizarTreino && (

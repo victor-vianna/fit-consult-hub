@@ -303,6 +303,13 @@ export function TreinosManager({
   // Tipo de item para identificação no drag-and-drop unificado
   type DraggableItemType = "exercise" | "group" | "block";
   
+  type UnifiedItem = {
+    sortableId: string;
+    type: DraggableItemType;
+    ordem: number;
+    data: any;
+  };
+
   const parseItemId = (id: string): { type: DraggableItemType; realId: string } => {
     if (id.startsWith("group-")) {
       return { type: "group", realId: id.replace("group-", "") };
@@ -313,7 +320,50 @@ export function TreinosManager({
     return { type: "exercise", realId: id };
   };
 
-  const handleUnifiedDragEnd = async (event: DragEndEvent, dia: number) => {
+  // Build unified list merging exercises, groups and blocks sorted by ordem
+  const buildUnifiedList = (
+    exerciciosIsolados: any[],
+    grupos: any[],
+    blocos: any[]
+  ): UnifiedItem[] => {
+    const items: UnifiedItem[] = [];
+
+    exerciciosIsolados.forEach((ex) => {
+      items.push({
+        sortableId: ex.id,
+        type: "exercise",
+        ordem: ex.ordem ?? 0,
+        data: ex,
+      });
+    });
+
+    grupos.forEach((grupo: any) => {
+      // Use the minimum ordem of the group's exercises to position the group
+      const minOrdem = grupo.exercicios?.length > 0
+        ? Math.min(...grupo.exercicios.map((e: any) => e.ordem ?? 0))
+        : 0;
+      items.push({
+        sortableId: `group-${grupo.grupo_id}`,
+        type: "group",
+        ordem: minOrdem,
+        data: grupo,
+      });
+    });
+
+    blocos.forEach((bloco: any) => {
+      items.push({
+        sortableId: `block-${bloco.id}`,
+        type: "block",
+        ordem: bloco.ordem ?? 0,
+        data: bloco,
+      });
+    });
+
+    items.sort((a, b) => a.ordem - b.ordem);
+    return items;
+  };
+
+  const handleUnifiedDragEnd = async (event: DragEndEvent, dia: number, unifiedList: UnifiedItem[]) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
@@ -323,54 +373,54 @@ export function TreinosManager({
     const treinoId = getTreinoId(treino);
     if (!treinoId) return;
 
-    const activeItem = parseItemId(String(active.id));
-    const overItem = parseItemId(String(over.id));
+    const oldIndex = unifiedList.findIndex((item) => item.sortableId === String(active.id));
+    const newIndex = unifiedList.findIndex((item) => item.sortableId === String(over.id));
+    if (oldIndex === -1 || newIndex === -1) return;
 
-    // Só permite reordenar itens do mesmo tipo
-    if (activeItem.type !== overItem.type) {
-      toast.info("Não é possível reordenar itens de tipos diferentes");
-      return;
-    }
+    const newOrder = arrayMove(unifiedList, oldIndex, newIndex);
 
     try {
-      if (activeItem.type === "exercise") {
-        // Exercícios isolados
-        const exerciciosIsolados = treino.exercicios.filter((ex) => !ex.grupo_id);
-        const oldIndex = exerciciosIsolados.findIndex((ex) => ex.id === activeItem.realId);
-        const newIndex = exerciciosIsolados.findIndex((ex) => ex.id === overItem.realId);
-        if (oldIndex === -1 || newIndex === -1) return;
+      // Batch update all items with new global ordem values
+      const exerciseUpdates: Promise<any>[] = [];
+      const blockUpdates: { id: string; ordem: number }[] = [];
+      const groupUpdates: { grupo_id: string; ordem: number }[] = [];
 
-        const newOrder = arrayMove(exerciciosIsolados, oldIndex, newIndex);
-        await reordenarExercicios(dia, newOrder);
-      } else if (activeItem.type === "group") {
-        // Grupos de exercícios
-        const grupos = obterGruposDoTreino(treinoId);
-        const oldIndex = grupos.findIndex((g) => g.grupo_id === activeItem.realId);
-        const newIndex = grupos.findIndex((g) => g.grupo_id === overItem.realId);
-        if (oldIndex === -1 || newIndex === -1) return;
+      newOrder.forEach((item, idx) => {
+        const globalOrdem = idx * 10; // Use multiples of 10 for spacing
+        if (item.type === "exercise") {
+          exerciseUpdates.push(
+            (async () => { await supabase.from("exercicios").update({ ordem: globalOrdem }).eq("id", item.data.id); })()
+          );
+        } else if (item.type === "block") {
+          blockUpdates.push({ id: item.data.id, ordem: globalOrdem });
+        } else if (item.type === "group") {
+          groupUpdates.push({ grupo_id: item.data.grupo_id, ordem: globalOrdem });
+        }
+      });
 
-        const newOrder = arrayMove(grupos, oldIndex, newIndex);
-        const updates = newOrder.map((grupo, idx) => ({
-          grupo_id: grupo.grupo_id,
-          ordem: idx + 1,
-        }));
-        await reordenarGrupos(updates);
-      } else if (activeItem.type === "block") {
-        // Blocos de treino
-        const blocos = obterBlocos(treinoId);
-        const oldIndex = blocos.findIndex((b) => b.id === activeItem.realId);
-        const newIndex = blocos.findIndex((b) => b.id === overItem.realId);
-        if (oldIndex === -1 || newIndex === -1) return;
+      await Promise.all([
+        ...exerciseUpdates,
+        blockUpdates.length > 0 ? reordenarBlocos(blockUpdates) : Promise.resolve(),
+        groupUpdates.length > 0 ? reordenarGrupos(groupUpdates) : Promise.resolve(),
+      ]);
 
-        const newOrder = arrayMove(blocos, oldIndex, newIndex);
-        const updates = newOrder.map((bloco, idx) => ({
-          id: bloco.id,
-          ordem: idx + 1,
-        }));
-        await reordenarBlocos(updates);
-      }
+      // Invalidate all related queries
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["treinos", profileId, personalId, semanaSelecionada],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["grupos-exercicios", profileId, personalId, semanaSelecionada],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["blocos-treino", profileId, personalId, semanaSelecionada],
+        }),
+      ]);
+
+      toast.success("Ordem atualizada");
     } catch (error) {
       console.error("[TreinosManager] Erro ao reordenar:", error);
+      toast.error("Erro ao reordenar itens");
     }
   };
 
@@ -1103,13 +1153,12 @@ export function TreinosManager({
               const blocos = treinoId ? obterBlocos(treinoId) : [];
               const temBlocos = blocos.length > 0;
 
-              const blocosInicio = blocos.filter((b) => b.posicao === "inicio");
-              const blocosMeio = blocos.filter((b) => b.posicao === "meio");
-              const blocosFim = blocos.filter((b) => b.posicao === "fim");
-
               const exerciciosIsolados = treino.exercicios.filter(
                 (ex) => !ex.grupo_id
               );
+
+              // Build unified list for drag-and-drop
+              const unifiedList = buildUnifiedList(exerciciosIsolados, grupos, blocos);
 
               return (
                 <Collapsible
@@ -1409,22 +1458,18 @@ export function TreinosManager({
                             sensors={sensors}
                             collisionDetection={closestCenter}
                             onDragEnd={(event) =>
-                              handleUnifiedDragEnd(event, treino.dia)
+                              handleUnifiedDragEnd(event, treino.dia, unifiedList)
                             }
                           >
-                            <div className="space-y-4">
-                              {blocosInicio.length > 0 && (
-                                <div className="space-y-2">
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <Separator className="flex-1" />
-                                    <span>Início do Treino</span>
-                                    <Separator className="flex-1" />
-                                  </div>
-                                  <SortableContext
-                                    items={blocosInicio.map((b) => `block-${b.id}`)}
-                                    strategy={verticalListSortingStrategy}
-                                  >
-                                    {blocosInicio.map((bloco, idx) => (
+                            <SortableContext
+                              items={unifiedList.map((item) => item.sortableId)}
+                              strategy={verticalListSortingStrategy}
+                            >
+                              <div className="space-y-3">
+                                {unifiedList.map((item, idx) => {
+                                  if (item.type === "block") {
+                                    const bloco = item.data;
+                                    return (
                                       <SortableBlockCard
                                         key={bloco.id}
                                         bloco={bloco}
@@ -1446,10 +1491,7 @@ export function TreinosManager({
                                         onToggleConcluido={
                                           isAluno
                                             ? (blocoId, concluido) =>
-                                                marcarBlocoConcluido(
-                                                  blocoId,
-                                                  concluido
-                                                )
+                                                marcarBlocoConcluido(blocoId, concluido)
                                             : undefined
                                         }
                                         onSaveAsTemplate={
@@ -1458,18 +1500,12 @@ export function TreinosManager({
                                             : undefined
                                         }
                                       />
-                                    ))}
-                                  </SortableContext>
-                                </div>
-                              )}
+                                    );
+                                  }
 
-                              <div className="space-y-3">
-                                {grupos.length > 0 && (
-                                  <SortableContext
-                                    items={grupos.map((g: any) => `group-${g.grupo_id}`)}
-                                    strategy={verticalListSortingStrategy}
-                                  >
-                                    {grupos.map((grupo: any, idx: number) => (
+                                  if (item.type === "group") {
+                                    const grupo = item.data;
+                                    return (
                                       <SortableGroupCard
                                         key={grupo.grupo_id ?? `grupo-${idx}`}
                                         grupo={grupo}
@@ -1478,10 +1514,7 @@ export function TreinosManager({
                                         onEdit={
                                           isPersonal
                                             ? () => {
-                                                console.log(
-                                                  "[TreinosManager] Editar grupo:",
-                                                  grupo.grupo_id
-                                                );
+                                                console.log("[TreinosManager] Editar grupo:", grupo.grupo_id);
                                               }
                                             : undefined
                                         }
@@ -1495,159 +1528,40 @@ export function TreinosManager({
                                             : undefined
                                         }
                                       />
-                                    ))}
-                                  </SortableContext>
-                                )}
+                                    );
+                                  }
 
-                                {exerciciosIsolados.length > 0 && (
-                                  <SortableContext
-                                    items={exerciciosIsolados.map((ex) => ex.id)}
-                                    strategy={verticalListSortingStrategy}
-                                  >
-                                    <div className="space-y-2">
-                                      {exerciciosIsolados.map(
-                                        (exercicio, index) => {
-                                          const cardEx = {
-                                            id: exercicio.id,
-                                            nome: exercicio.nome,
-                                            link_video:
-                                              exercicio.link_video ?? null,
-                                            ordem: exercicio.ordem,
-                                            series: exercicio.series,
-                                            repeticoes: exercicio.repeticoes,
-                                            descanso: exercicio.descanso,
-                                            carga:
-                                              exercicio.carga != null
-                                                ? String(exercicio.carga)
-                                                : undefined,
-                                            observacoes:
-                                              exercicio.observacoes ??
-                                              undefined,
-                                            concluido: !!exercicio.concluido,
-                                          };
+                                  // exercise
+                                  const exercicio = item.data;
+                                  const cardEx = {
+                                    id: exercicio.id,
+                                    nome: exercicio.nome,
+                                    link_video: exercicio.link_video ?? null,
+                                    ordem: exercicio.ordem,
+                                    series: exercicio.series,
+                                    repeticoes: exercicio.repeticoes,
+                                    descanso: exercicio.descanso,
+                                    carga: exercicio.carga != null ? String(exercicio.carga) : undefined,
+                                    observacoes: exercicio.observacoes ?? undefined,
+                                    concluido: !!exercicio.concluido,
+                                  };
 
-                                          return (
-                                            <SortableExercicioCard
-                                              key={exercicio.id}
-                                              exercicio={cardEx}
-                                              index={index}
-                                              readOnly={readOnly}
-                                              onEdit={() => {
-                                                setExercicioEditando(
-                                                  treinoExToDialog(exercicio)
-                                                );
-                                                setExercicioDialogOpen(true);
-                                              }}
-                                              onDelete={handleRemover}
-                                            />
-                                          );
-                                        }
-                                      )}
-                                    </div>
-                                  </SortableContext>
-                                )}
+                                  return (
+                                    <SortableExercicioCard
+                                      key={exercicio.id}
+                                      exercicio={cardEx}
+                                      index={idx}
+                                      readOnly={readOnly}
+                                      onEdit={() => {
+                                        setExercicioEditando(treinoExToDialog(exercicio));
+                                        setExercicioDialogOpen(true);
+                                      }}
+                                      onDelete={handleRemover}
+                                    />
+                                  );
+                                })}
                               </div>
-
-                              {blocosMeio.length > 0 && (
-                                <div className="space-y-2">
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <Separator className="flex-1" />
-                                    <span>Complementar</span>
-                                    <Separator className="flex-1" />
-                                  </div>
-                                  <SortableContext
-                                    items={blocosMeio.map((b) => `block-${b.id}`)}
-                                    strategy={verticalListSortingStrategy}
-                                  >
-                                    {blocosMeio.map((bloco, idx) => (
-                                      <SortableBlockCard
-                                        key={bloco.id}
-                                        bloco={bloco}
-                                        index={idx}
-                                        readOnly={readOnly}
-                                        onEdit={
-                                          isPersonal
-                                            ? () => {
-                                                setBlocoEditando(bloco);
-                                                setBlockDialogOpen(true);
-                                              }
-                                            : undefined
-                                        }
-                                        onDelete={
-                                          isPersonal
-                                            ? () => handleDeleteBlock(bloco.id)
-                                            : undefined
-                                        }
-                                        onToggleConcluido={
-                                          isAluno
-                                            ? (blocoId, concluido) =>
-                                                marcarBlocoConcluido(
-                                                  blocoId,
-                                                  concluido
-                                                )
-                                            : undefined
-                                        }
-                                        onSaveAsTemplate={
-                                          isPersonal
-                                            ? salvarBlocoComoTemplate
-                                            : undefined
-                                        }
-                                      />
-                                    ))}
-                                  </SortableContext>
-                                </div>
-                              )}
-
-                              {blocosFim.length > 0 && (
-                                <div className="space-y-2">
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <Separator className="flex-1" />
-                                    <span>Finalização</span>
-                                    <Separator className="flex-1" />
-                                  </div>
-                                  <SortableContext
-                                    items={blocosFim.map((b) => `block-${b.id}`)}
-                                    strategy={verticalListSortingStrategy}
-                                  >
-                                    {blocosFim.map((bloco, idx) => (
-                                      <SortableBlockCard
-                                        key={bloco.id}
-                                        bloco={bloco}
-                                        index={idx}
-                                        readOnly={readOnly}
-                                        onEdit={
-                                          isPersonal
-                                            ? () => {
-                                                setBlocoEditando(bloco);
-                                                setBlockDialogOpen(true);
-                                              }
-                                            : undefined
-                                        }
-                                        onDelete={
-                                          isPersonal
-                                            ? () => handleDeleteBlock(bloco.id)
-                                            : undefined
-                                        }
-                                        onToggleConcluido={
-                                          isAluno
-                                            ? (blocoId, concluido) =>
-                                                marcarBlocoConcluido(
-                                                  blocoId,
-                                                  concluido
-                                                )
-                                            : undefined
-                                        }
-                                        onSaveAsTemplate={
-                                          isPersonal
-                                            ? salvarBlocoComoTemplate
-                                            : undefined
-                                        }
-                                      />
-                                    ))}
-                                  </SortableContext>
-                                </div>
-                              )}
-                            </div>
+                            </SortableContext>
                           </DndContext>
                         )}
                       </CardContent>

@@ -1385,21 +1385,51 @@ export function TreinosManager({
                     </CardHeader>
 
                     {/* Seletor de treinos múltiplos no mesmo dia */}
-                    {treinosDoDiaArr.length > 1 && (
+                    {treinosDoDiaArr.length >= 1 && treino.treinoId && (
                       <div className="px-6 pb-3 flex items-center gap-2 flex-wrap">
                         {treinosDoDiaArr
                           .sort((a, b) => (a.ordem_no_dia || 1) - (b.ordem_no_dia || 1))
                           .map((t) => (
-                            <Button
-                              key={t.treinoId}
-                              variant={selectedTreinoId === t.treinoId ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => setSelectedTreinoId(t.treinoId)}
-                              className="text-xs"
-                            >
-                              {t.nome_treino || `Treino ${t.ordem_no_dia || 1}`}
-                              {t.concluido && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
-                            </Button>
+                            <div key={t.treinoId} className="flex items-center gap-0.5">
+                              <Button
+                                variant={selectedTreinoId === t.treinoId ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setSelectedTreinoId(t.treinoId)}
+                                className="text-xs"
+                              >
+                                {t.nome_treino || `Treino Principal`}
+                                {t.concluido && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
+                              </Button>
+                              {/* Botão de excluir treino individual */}
+                              {!readOnly && isPersonal && selectedTreinoId === t.treinoId && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  title="Excluir este treino"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (t.treinoId) {
+                                      const totalItens = calcularTotalItens(t);
+                                      const msg = totalItens > 0
+                                        ? `Excluir "${t.nome_treino || 'Treino Principal'}" com ${totalItens} item(ns)? Esta ação não pode ser desfeita.`
+                                        : `Excluir "${t.nome_treino || 'Treino Principal'}" (vazio)?`;
+                                      if (confirm(msg)) {
+                                        deletarTreino(t.treinoId).then(() => {
+                                          // Selecionar outro treino se disponível
+                                          const outros = treinosDoDiaArr.filter(
+                                            (ot) => ot.treinoId !== t.treinoId
+                                          );
+                                          setSelectedTreinoId(outros[0]?.treinoId || null);
+                                        });
+                                      }
+                                    }
+                                  }}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
                           ))}
                         {!readOnly && isPersonal && (
                           <Button
@@ -1409,7 +1439,7 @@ export function TreinosManager({
                             onClick={() => {
                               const nome = prompt("Nome do novo treino (ex: Cardio Tarde):");
                               if (nome?.trim()) {
-                                criarTreinoNoDia(selectedDia, nome.trim());
+                                criarTreinoNoDia(selectedDia!, nome.trim());
                               }
                             }}
                           >
@@ -1417,26 +1447,6 @@ export function TreinosManager({
                             Adicionar Treino
                           </Button>
                         )}
-                      </div>
-                    )}
-
-                    {/* Botão para criar segundo treino quando há apenas 1 */}
-                    {treinosDoDiaArr.length === 1 && !readOnly && isPersonal && treino.treinoId && (
-                      <div className="px-6 pb-3">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-xs text-muted-foreground"
-                          onClick={() => {
-                            const nome = prompt("Nome do novo treino (ex: Cardio Tarde):");
-                            if (nome?.trim()) {
-                              criarTreinoNoDia(selectedDia, nome.trim());
-                            }
-                          }}
-                        >
-                          <Plus className="h-3 w-3 mr-1" />
-                          Adicionar treino ao dia
-                        </Button>
                       </div>
                     )}
 

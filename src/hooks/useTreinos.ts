@@ -382,7 +382,7 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
       const cargaDb = cargaForInsert((exercicio as Partial<Exercicio>).carga);
 
       // ✅ Usar treinoId alvo se fornecido, senão criar/encontrar
-      const treinoId = treinoIdAlvo || await criarTreinoSeNecessario(diaValido);
+      const treinoId = treinoIdAlvo || await criarTreinoSeNecessario(diaValido, treinoIdAlvo);
       const treino = treinos.find((t) => t.treinoId === treinoId) || treinos.find((t) => t.dia === diaValido);
       const proximaOrdem = treino ? treino.exercicios.length : 0;
 

@@ -616,16 +616,41 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
     }) => {
       if (!planilha) throw new Error("Sem planilha ativa");
 
-      // ✅ Buscar a última semana com treinos da planilha antiga
-      const { data: ultimosTreinos } = await supabase
+      // ✅ Buscar a última semana com treinos REAIS (com exercícios/blocos)
+      const { data: treinosAntigos } = await supabase
         .from("treinos_semanais")
-        .select("semana")
+        .select("semana, id")
         .eq("profile_id", planilha.profile_id)
         .eq("personal_id", planilha.personal_id)
-        .order("semana", { ascending: false })
-        .limit(1);
+        .order("semana", { ascending: false });
 
-      const semanaOrigemTreinos = ultimosTreinos?.[0]?.semana || getWeekStart(parseISO(planilha.data_inicio));
+      let semanaOrigemTreinos = getWeekStart(parseISO(planilha.data_inicio));
+      
+      if (treinosAntigos && treinosAntigos.length > 0) {
+        const semanasUnicas = [...new Set(treinosAntigos.map(t => t.semana))];
+        
+        for (const semana of semanasUnicas) {
+          const treinoIds = treinosAntigos.filter(t => t.semana === semana).map(t => t.id);
+          
+          const { count: countEx } = await supabase
+            .from("exercicios")
+            .select("id", { count: "exact", head: true })
+            .in("treino_semanal_id", treinoIds)
+            .is("deleted_at", null);
+
+          const { count: countBl } = await supabase
+            .from("blocos_treino")
+            .select("id", { count: "exact", head: true })
+            .in("treino_semanal_id", treinoIds)
+            .is("deleted_at", null);
+
+          if ((countEx && countEx > 0) || (countBl && countBl > 0)) {
+            semanaOrigemTreinos = semana;
+            break;
+          }
+        }
+      }
+
       console.log("[usePlanilhaAtiva] Semana origem para renovação:", semanaOrigemTreinos);
 
       // Marcar planilha atual como renovada

@@ -281,19 +281,40 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
     };
   }, [profileId, personalId, refetch, queryClient, semanaParaBuscar]);
 
-  // ✅ Criação automática de treino semanal com validação
+  // ✅ Criação automática de treino semanal com validação e verificação no banco
   const criarTreinoSeNecessario = useCallback(
-    async (dia: number): Promise<string> => {
-      // Validar dia antes de usar
+    async (dia: number, treinoIdAlvo?: string | null): Promise<string> => {
       const diaValido = validarDiaSemana(dia);
 
-      const treino = treinos.find((t) => t.dia === diaValido);
+      // Se foi passado um treinoId específico, validar que existe
+      if (treinoIdAlvo) {
+        const treinoSelecionado = treinos.find((t) => t.treinoId === treinoIdAlvo);
+        if (treinoSelecionado && treinoSelecionado.dia === diaValido) {
+          return treinoIdAlvo;
+        }
+      }
+
+      // Verificar no cache local
+      const treino = treinos.find((t) => t.dia === diaValido && t.treinoId);
       if (treino?.treinoId) {
-        console.log(
-          `[useTreinos] Treino já existe para dia ${diaValido}:`,
-          treino.treinoId
-        );
         return treino.treinoId as string;
+      }
+
+      // ✅ CORREÇÃO: Verificar diretamente no banco antes de criar (evita duplicatas)
+      const { data: existente } = await supabase
+        .from("treinos_semanais")
+        .select("id")
+        .eq("profile_id", profileId)
+        .eq("personal_id", personalId)
+        .eq("semana", semanaParaBuscar)
+        .eq("dia_semana", diaValido)
+        .order("ordem_no_dia", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (existente) {
+        console.log(`[useTreinos] Treino encontrado no banco para dia ${diaValido}:`, existente.id);
+        return existente.id;
       }
 
       console.log(`[useTreinos] Criando treino semanal para dia ${diaValido}`);
@@ -312,10 +333,7 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
         .single();
 
       if (error) {
-        console.error(
-          `[useTreinos] Erro ao criar treino para dia ${diaValido}:`,
-          error
-        );
+        console.error(`[useTreinos] Erro ao criar treino para dia ${diaValido}:`, error);
         throw error;
       }
 
@@ -364,7 +382,7 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
       const cargaDb = cargaForInsert((exercicio as Partial<Exercicio>).carga);
 
       // ✅ Usar treinoId alvo se fornecido, senão criar/encontrar
-      const treinoId = treinoIdAlvo || await criarTreinoSeNecessario(diaValido);
+      const treinoId = treinoIdAlvo || await criarTreinoSeNecessario(diaValido, treinoIdAlvo);
       const treino = treinos.find((t) => t.treinoId === treinoId) || treinos.find((t) => t.dia === diaValido);
       const proximaOrdem = treino ? treino.exercicios.length : 0;
 

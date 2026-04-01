@@ -538,38 +538,72 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
    */
   const importarTreinosDaUltimaSemanaMutation = useMutation({
     mutationFn: async () => {
-      if (!planilha || !profileId || !personalId) throw new Error("Dados insuficientes");
+      if (!profileId || !personalId) throw new Error("Dados insuficientes");
 
       const semanaAtual = getWeekStart(new Date());
 
-      // Preferência: última semana que possui treinos no banco
-      const { data: ultimosTreinos, error } = await supabase
+      // ✅ CORREÇÃO: Buscar última semana que REALMENTE tem exercícios ou blocos
+      // Primeiro buscar semanas distintas com treinos
+      const { data: semanasComTreinos, error } = await supabase
         .from("treinos_semanais")
-        .select("semana")
+        .select("semana, id")
         .eq("profile_id", profileId)
         .eq("personal_id", personalId)
-        .order("semana", { ascending: false })
-        .limit(1);
+        .neq("semana", semanaAtual)
+        .order("semana", { ascending: false });
 
       if (error) throw error;
 
-      const semanaOrigem = ultimosTreinos?.[0]?.semana || getPreviousWeekStart(semanaAtual);
-
-      if (semanaOrigem === semanaAtual) {
-        // Se por algum motivo a última semana encontrada for a mesma, força semana anterior
-        await copiarTreinosDeSemana(profileId, personalId, getPreviousWeekStart(semanaAtual), semanaAtual);
-        return;
+      if (!semanasComTreinos || semanasComTreinos.length === 0) {
+        toast.error("Nenhuma semana anterior com treinos encontrada");
+        throw new Error("Nenhuma semana anterior encontrada");
       }
 
+      // Agrupar por semana e verificar qual tem conteúdo real
+      const semanasUnicas = [...new Set(semanasComTreinos.map(t => t.semana))];
+      
+      let semanaOrigem: string | null = null;
+      
+      for (const semana of semanasUnicas) {
+        const treinoIds = semanasComTreinos.filter(t => t.semana === semana).map(t => t.id);
+        
+        // Verificar se tem exercícios
+        const { count: countEx } = await supabase
+          .from("exercicios")
+          .select("id", { count: "exact", head: true })
+          .in("treino_semanal_id", treinoIds)
+          .is("deleted_at", null);
+
+        // Verificar se tem blocos
+        const { count: countBl } = await supabase
+          .from("blocos_treino")
+          .select("id", { count: "exact", head: true })
+          .in("treino_semanal_id", treinoIds)
+          .is("deleted_at", null);
+
+        if ((countEx && countEx > 0) || (countBl && countBl > 0)) {
+          semanaOrigem = semana;
+          break;
+        }
+      }
+
+      if (!semanaOrigem) {
+        toast.error("Nenhuma semana anterior com exercícios encontrada");
+        throw new Error("Nenhuma semana com conteúdo encontrada");
+      }
+
+      console.log(`[usePlanilhaAtiva] Importando de ${semanaOrigem} para ${semanaAtual}`);
       await copiarTreinosDeSemana(profileId, personalId, semanaOrigem, semanaAtual);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["treinos"] });
       toast.success("Treino importado da última semana com sucesso!");
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Erro ao importar treino da última semana:", error);
-      toast.error("Erro ao importar treino da última semana");
+      if (!error.message?.includes("Nenhuma semana")) {
+        toast.error("Erro ao importar treino da última semana");
+      }
     },
   });
 
@@ -582,16 +616,41 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
     }) => {
       if (!planilha) throw new Error("Sem planilha ativa");
 
-      // ✅ Buscar a última semana com treinos da planilha antiga
-      const { data: ultimosTreinos } = await supabase
+      // ✅ Buscar a última semana com treinos REAIS (com exercícios/blocos)
+      const { data: treinosAntigos } = await supabase
         .from("treinos_semanais")
-        .select("semana")
+        .select("semana, id")
         .eq("profile_id", planilha.profile_id)
         .eq("personal_id", planilha.personal_id)
-        .order("semana", { ascending: false })
-        .limit(1);
+        .order("semana", { ascending: false });
 
-      const semanaOrigemTreinos = ultimosTreinos?.[0]?.semana || getWeekStart(parseISO(planilha.data_inicio));
+      let semanaOrigemTreinos = getWeekStart(parseISO(planilha.data_inicio));
+      
+      if (treinosAntigos && treinosAntigos.length > 0) {
+        const semanasUnicas = [...new Set(treinosAntigos.map(t => t.semana))];
+        
+        for (const semana of semanasUnicas) {
+          const treinoIds = treinosAntigos.filter(t => t.semana === semana).map(t => t.id);
+          
+          const { count: countEx } = await supabase
+            .from("exercicios")
+            .select("id", { count: "exact", head: true })
+            .in("treino_semanal_id", treinoIds)
+            .is("deleted_at", null);
+
+          const { count: countBl } = await supabase
+            .from("blocos_treino")
+            .select("id", { count: "exact", head: true })
+            .in("treino_semanal_id", treinoIds)
+            .is("deleted_at", null);
+
+          if ((countEx && countEx > 0) || (countBl && countBl > 0)) {
+            semanaOrigemTreinos = semana;
+            break;
+          }
+        }
+      }
+
       console.log("[usePlanilhaAtiva] Semana origem para renovação:", semanaOrigemTreinos);
 
       // Marcar planilha atual como renovada
@@ -673,12 +732,45 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
     },
   });
 
-  // Sincronizar treinos (replicar semana base para demais semanas)
+  // Sincronizar treinos (replicar semana atual para demais semanas)
   const sincronizarTreinosMutation = useMutation({
     mutationFn: async () => {
       if (!planilha || !profileId || !personalId) throw new Error("Dados insuficientes");
 
       const semanaBase = getWeekStart(new Date());
+      
+      // Verificar se a semana base tem conteúdo
+      const { data: treinosBase } = await supabase
+        .from("treinos_semanais")
+        .select("id")
+        .eq("profile_id", profileId)
+        .eq("personal_id", personalId)
+        .eq("semana", semanaBase);
+      
+      if (!treinosBase || treinosBase.length === 0) {
+        toast.error("A semana atual não tem treinos para sincronizar");
+        throw new Error("Semana atual vazia");
+      }
+
+      // Verificar se realmente tem exercícios/blocos
+      const treinoIds = treinosBase.map(t => t.id);
+      const { count: countEx } = await supabase
+        .from("exercicios")
+        .select("id", { count: "exact", head: true })
+        .in("treino_semanal_id", treinoIds)
+        .is("deleted_at", null);
+      
+      const { count: countBl } = await supabase
+        .from("blocos_treino")
+        .select("id", { count: "exact", head: true })
+        .in("treino_semanal_id", treinoIds)
+        .is("deleted_at", null);
+
+      if ((!countEx || countEx === 0) && (!countBl || countBl === 0)) {
+        toast.error("A semana atual não tem exercícios ou blocos para sincronizar");
+        throw new Error("Semana atual sem conteúdo");
+      }
+
       await replicarTreinosParaSemanasRestantes(
         planilha.profile_id,
         planilha.personal_id,
@@ -690,9 +782,11 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
       queryClient.invalidateQueries({ queryKey: ["treinos"] });
       toast.success("Treinos sincronizados com sucesso!");
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Erro ao sincronizar treinos:", error);
-      toast.error("Erro ao sincronizar treinos");
+      if (!error.message?.includes("Semana atual")) {
+        toast.error("Erro ao sincronizar treinos");
+      }
     },
   });
 

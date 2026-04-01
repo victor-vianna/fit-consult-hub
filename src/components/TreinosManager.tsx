@@ -552,31 +552,38 @@ export function TreinosManager({
 
   /**
    * Cria um treino semanal se ele não existir para o dia especificado
-   * @returns O ID do treino (existente ou recém-criado)
+   * Delega para o hook useTreinos que faz verificação no banco
    */
   const criarTreinoSeNecessario = async (dia: number): Promise<string> => {
     // ✅ Se há um treino selecionado, usar ele diretamente
     if (selectedTreinoId) {
       const treinoSelecionado = treinos.find((t) => t.treinoId === selectedTreinoId);
       if (treinoSelecionado && treinoSelecionado.dia === dia) {
-        console.log(`[TreinosManager] Usando treino selecionado: ${selectedTreinoId}`);
         return selectedTreinoId;
       }
     }
 
-    const treino = treinos.find((t) => t.dia === dia);
-
-    // Se já existe o treinoId, retorna ele
+    const treino = treinos.find((t) => t.dia === dia && t.treinoId);
     if (treino?.treinoId) {
-      console.log(
-        `[TreinosManager] Usando treino existente: ${treino.treinoId}`
-      );
       return treino.treinoId;
     }
 
-    // Se não existe, cria um novo treino semanal
-    // ✅ CORREÇÃO: Usar semanaSelecionada ao invés de cálculo manual
-    console.log(`[TreinosManager] Criando treino semanal para dia ${dia}, semana: ${semanaSelecionada}`);
+    // ✅ Delegar para adicionarExercicio que já cria o treino internamente
+    // Criar diretamente via supabase com verificação de duplicata
+    const { data: existente } = await supabase
+      .from("treinos_semanais")
+      .select("id")
+      .eq("profile_id", profileId)
+      .eq("personal_id", personalId)
+      .eq("semana", semanaSelecionada)
+      .eq("dia_semana", dia)
+      .order("ordem_no_dia", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (existente) {
+      return existente.id;
+    }
 
     const { data, error } = await supabase
       .from("treinos_semanais")
@@ -597,9 +604,6 @@ export function TreinosManager({
       throw error;
     }
 
-    console.log("[TreinosManager] Treino criado com sucesso:", data.id);
-
-    // ✅ Recarregar os treinos após criar
     await queryClient.invalidateQueries({
       queryKey: ["treinos", profileId, personalId, semanaSelecionada],
     });

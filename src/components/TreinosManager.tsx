@@ -1401,11 +1401,11 @@ export function TreinosManager({
                                 {t.concluido && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
                               </Button>
                               {/* Botão de excluir treino individual */}
-                              {!readOnly && isPersonal && selectedTreinoId === t.treinoId && (
+                              {!readOnly && isPersonal && (
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-60 hover:opacity-100"
                                   title="Excluir este treino"
                                   onClick={(e) => {
                                     e.stopPropagation();

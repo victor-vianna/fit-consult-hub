@@ -138,3 +138,61 @@ export function ChatPanel({ personalId, alunoId, currentUserId, themeColor }: Ch
     </div>
   );
 }
+
+/**
+ * Renderiza o conteúdo de uma mensagem, destacando blocos de citação
+ * (linhas iniciadas com "> ") como quotes visuais — usado pelas respostas
+ * a feedbacks semanais para mostrar a qual pergunta a resposta se refere.
+ */
+function MessageContent({
+  conteudo,
+  isMe,
+  themeColor,
+}: {
+  conteudo: string;
+  isMe: boolean;
+  themeColor?: string;
+}) {
+  const linhas = conteudo.split("\n");
+  const blocos: Array<{ tipo: "quote" | "texto"; linhas: string[] }> = [];
+
+  for (const linha of linhas) {
+    const isQuote = linha.startsWith("> ") || linha === ">";
+    const conteudoLinha = isQuote ? linha.replace(/^>\s?/, "") : linha;
+    const ultimo = blocos[blocos.length - 1];
+    const tipo = isQuote ? "quote" : "texto";
+    if (ultimo && ultimo.tipo === tipo) {
+      ultimo.linhas.push(conteudoLinha);
+    } else {
+      blocos.push({ tipo, linhas: [conteudoLinha] });
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {blocos.map((bloco, i) => {
+        if (bloco.tipo === "quote") {
+          return (
+            <div
+              key={i}
+              className={cn(
+                "rounded-md border-l-2 pl-2 py-1 text-xs whitespace-pre-wrap break-words",
+                isMe ? "border-white/60 bg-white/10 text-white/90" : "border-primary/50 bg-background/60 text-muted-foreground"
+              )}
+              style={!isMe && themeColor ? { borderLeftColor: themeColor } : undefined}
+            >
+              {bloco.linhas.join("\n")}
+            </div>
+          );
+        }
+        const texto = bloco.linhas.join("\n");
+        if (!texto.trim()) return null;
+        return (
+          <p key={i} className="text-sm whitespace-pre-wrap break-words">
+            {texto}
+          </p>
+        );
+      })}
+    </div>
+  );
+}

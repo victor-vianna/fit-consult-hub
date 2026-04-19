@@ -1033,7 +1033,9 @@ export function TreinosManager({
                   onOpenChange={setExportDialogOpen}
                   defaultNome={alunoProfile.nome}
                   semanaLabel={formatarSemana()}
-                  onExportWord={(nome) => {
+                  hasLetterhead={!!personalSettings.letterhead_url}
+                  letterheadUrl={personalSettings.letterhead_url}
+                  onExportWord={(nome, useLetterhead) => {
                     exportTreinoWord({
                       treinos,
                       gruposPorTreino,
@@ -1041,9 +1043,10 @@ export function TreinosManager({
                       alunoNome: nome,
                       semanaLabel: formatarSemana(),
                       personalSettings,
+                      useLetterhead,
                     });
                   }}
-                  onExportPDF={(nome) => {
+                  onExportPDF={(nome, useLetterhead) => {
                     exportTreinoPDF({
                       treinos,
                       gruposPorTreino,
@@ -1051,6 +1054,7 @@ export function TreinosManager({
                       alunoNome: nome,
                       semanaLabel: formatarSemana(),
                       personalSettings,
+                      useLetterhead,
                     });
                   }}
                 />

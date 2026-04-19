@@ -6,10 +6,12 @@ import {
   TableRow,
   TableCell,
   TextRun,
+  ImageRun,
   WidthType,
   AlignmentType,
   BorderStyle,
   HeadingLevel,
+  Header,
   Footer,
   ShadingType,
   LevelFormat,
@@ -18,6 +20,14 @@ import { saveAs } from "file-saver";
 import type { TreinoDia } from "@/types/treino";
 import type { PersonalSettings } from "@/hooks/usePersonalSettings";
 import { organizeForExport } from "./exportOrganizer";
+
+async function fetchImageBytes(url: string): Promise<{ bytes: Uint8Array; type: "png" | "jpg" }> {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  const buf = await blob.arrayBuffer();
+  const type: "png" | "jpg" = blob.type.includes("png") ? "png" : "jpg";
+  return { bytes: new Uint8Array(buf), type };
+}
 
 const diasSemana = [
   "Segunda-feira",
@@ -121,47 +131,60 @@ export interface ExportTreinoParams {
   alunoNome: string;
   semanaLabel: string;
   personalSettings: PersonalSettings;
+  useLetterhead?: boolean;
 }
 
 export async function exportTreinoWord(params: ExportTreinoParams) {
-  const { treinos, gruposPorTreino, blocosPorTreino, alunoNome, semanaLabel, personalSettings } = params;
+  const { treinos, gruposPorTreino, blocosPorTreino, alunoNome, semanaLabel, personalSettings, useLetterhead } = params;
   const themeColor = personalSettings.theme_color || "#3b82f6";
   const personalName = personalSettings.display_name || "Personal Trainer";
 
+  // Pre-load letterhead bytes if requested
+  let letterheadImage: { bytes: Uint8Array; type: "png" | "jpg" } | null = null;
+  if (useLetterhead && personalSettings.letterhead_url) {
+    try {
+      letterheadImage = await fetchImageBytes(personalSettings.letterhead_url);
+    } catch (err) {
+      console.warn("Falha ao carregar papel timbrado para Word:", err);
+    }
+  }
+
   const children: any[] = [];
 
-  // Header / Branding
-  children.push(
-    new Paragraph({
-      children: [
-        new TextRun({
-          text: personalName,
-          bold: true,
-          size: 36,
-          color: hexToRgb(themeColor),
-          font: "Calibri",
-        }),
-      ],
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 100 },
-    })
-  );
+  // Header / Branding (skip when letterhead is used — assume the timbrado has its own brand)
+  if (!letterheadImage) {
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: personalName,
+            bold: true,
+            size: 36,
+            color: hexToRgb(themeColor),
+            font: "Calibri",
+          }),
+        ],
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 100 },
+      })
+    );
 
-  // Separator line
-  children.push(
-    new Paragraph({
-      border: {
-        bottom: {
-          style: BorderStyle.SINGLE,
-          size: 6,
-          color: hexToRgb(themeColor),
-          space: 1,
+    // Separator line
+    children.push(
+      new Paragraph({
+        border: {
+          bottom: {
+            style: BorderStyle.SINGLE,
+            size: 6,
+            color: hexToRgb(themeColor),
+            space: 1,
+          },
         },
-      },
-      spacing: { after: 200 },
-      children: [],
-    })
-  );
+        spacing: { after: 200 },
+        children: [],
+      })
+    );
+  }
 
   // Student info
   children.push(
@@ -340,17 +363,40 @@ export async function exportTreinoWord(params: ExportTreinoParams) {
         properties: {
           page: {
             size: { width: PAGE_WIDTH, height: PAGE_HEIGHT },
-            margin: { top: MARGIN, right: MARGIN, bottom: MARGIN, left: MARGIN },
+            margin: letterheadImage
+              ? { top: 2880, right: MARGIN, bottom: 2160, left: MARGIN } // 2" top, 1.5" bottom for letterhead
+              : { top: MARGIN, right: MARGIN, bottom: MARGIN, left: MARGIN },
           },
         },
         children,
+        headers: letterheadImage
+          ? {
+              default: new Header({
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    spacing: { after: 0 },
+                    children: [
+                      new ImageRun({
+                        type: letterheadImage.type,
+                        data: letterheadImage.bytes,
+                        transformation: { width: 595, height: 120 }, // ~A4 width header strip
+                      } as any),
+                    ],
+                  }),
+                ],
+              }),
+            }
+          : undefined,
         footers: {
           default: new Footer({
             children: [
               new Paragraph({
                 children: [
                   new TextRun({
-                    text: `Gerado por ${personalName} — ${new Date().toLocaleDateString("pt-BR")}`,
+                    text: letterheadImage
+                      ? ""
+                      : `Gerado por ${personalName} — ${new Date().toLocaleDateString("pt-BR")}`,
                     size: 16,
                     color: "888888",
                     font: "Calibri",

@@ -30,48 +30,81 @@ export interface ExportTreinoPDFParams {
   alunoNome: string;
   semanaLabel: string;
   personalSettings: PersonalSettings;
+  useLetterhead?: boolean;
 }
 
 export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
-  const { treinos, gruposPorTreino, blocosPorTreino, alunoNome, semanaLabel, personalSettings } = params;
+  const { treinos, gruposPorTreino, blocosPorTreino, alunoNome, semanaLabel, personalSettings, useLetterhead } = params;
   const themeColor = personalSettings.theme_color || "#3b82f6";
   const personalName = personalSettings.display_name || "Personal Trainer";
   const rgb = hexToRgb(themeColor);
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
-  let y = 15;
+  const pageHeight = doc.internal.pageSize.getHeight();
 
-  // Logo
-  if (personalSettings.logo_url) {
+  // Pre-load letterhead if needed
+  let letterheadDataUrl: string | null = null;
+  if (useLetterhead && personalSettings.letterhead_url) {
     try {
-      const img = await loadImage(personalSettings.logo_url);
-      doc.addImage(img, "PNG", 14, y, 20, 20);
-      doc.setFontSize(20);
-      doc.setTextColor(rgb[0], rgb[1], rgb[2]);
-      doc.setFont("helvetica", "bold");
-      doc.text(personalName, 38, y + 13);
-      y += 25;
-    } catch {
+      letterheadDataUrl = await loadImage(personalSettings.letterhead_url);
+    } catch (err) {
+      console.warn("Não foi possível carregar o papel timbrado:", err);
+    }
+  }
+
+  const drawLetterhead = () => {
+    if (letterheadDataUrl) {
+      doc.addImage(letterheadDataUrl, "PNG", 0, 0, pageWidth, pageHeight);
+    }
+  };
+
+  // Hook every new page to draw letterhead first
+  const originalAddPage = doc.addPage.bind(doc);
+  (doc as any).addPage = function (...args: any[]) {
+    const result = originalAddPage(...args);
+    drawLetterhead();
+    return result;
+  };
+
+  // Draw letterhead on first page
+  drawLetterhead();
+
+  // When using letterhead, leave more top margin to avoid overlapping the header art
+  let y = letterheadDataUrl ? 50 : 15;
+
+  // Header (skip if letterhead is used — assume the timbrado already has branding)
+  if (!letterheadDataUrl) {
+    if (personalSettings.logo_url) {
+      try {
+        const img = await loadImage(personalSettings.logo_url);
+        doc.addImage(img, "PNG", 14, y, 20, 20);
+        doc.setFontSize(20);
+        doc.setTextColor(rgb[0], rgb[1], rgb[2]);
+        doc.setFont("helvetica", "bold");
+        doc.text(personalName, 38, y + 13);
+        y += 25;
+      } catch {
+        doc.setFontSize(20);
+        doc.setTextColor(rgb[0], rgb[1], rgb[2]);
+        doc.setFont("helvetica", "bold");
+        doc.text(personalName, pageWidth / 2, y + 5, { align: "center" });
+        y += 12;
+      }
+    } else {
       doc.setFontSize(20);
       doc.setTextColor(rgb[0], rgb[1], rgb[2]);
       doc.setFont("helvetica", "bold");
       doc.text(personalName, pageWidth / 2, y + 5, { align: "center" });
       y += 12;
     }
-  } else {
-    doc.setFontSize(20);
-    doc.setTextColor(rgb[0], rgb[1], rgb[2]);
-    doc.setFont("helvetica", "bold");
-    doc.text(personalName, pageWidth / 2, y + 5, { align: "center" });
-    y += 12;
-  }
 
-  // Separator
-  doc.setDrawColor(rgb[0], rgb[1], rgb[2]);
-  doc.setLineWidth(0.8);
-  doc.line(14, y, pageWidth - 14, y);
-  y += 8;
+    // Separator
+    doc.setDrawColor(rgb[0], rgb[1], rgb[2]);
+    doc.setLineWidth(0.8);
+    doc.line(14, y, pageWidth - 14, y);
+    y += 8;
+  }
 
   // Student info
   doc.setFontSize(11);
@@ -88,6 +121,10 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
   doc.text(semanaLabel, 14 + doc.getTextWidth("Semana: "), y);
   y += 10;
 
+  // Top margin for new pages (avoid letterhead header art)
+  const pageTopY = letterheadDataUrl ? 50 : 15;
+  const pageBottomLimit = letterheadDataUrl ? pageHeight - 35 : pageHeight - 20;
+
   // Days
   treinos.forEach((treino) => {
     const treinoId = treino.treinoId;
@@ -99,9 +136,9 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
     if (!hasContent) return;
 
     // Check page space
-    if (y > doc.internal.pageSize.getHeight() - 40) {
+    if (y > pageBottomLimit - 20) {
       doc.addPage();
-      y = 15;
+      y = pageTopY;
     }
 
     const diaNome = diasSemana[treino.dia - 1] || `Dia ${treino.dia}`;
@@ -127,9 +164,9 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
 
     for (const section of sections) {
       // Check page space
-      if (y > doc.internal.pageSize.getHeight() - 30) {
+      if (y > pageBottomLimit - 10) {
         doc.addPage();
-        y = 15;
+        y = pageTopY;
       }
 
       // Section label
@@ -201,7 +238,7 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
               4: { halign: "center", cellWidth: 18 },
               5: { halign: "left", cellWidth: 30 },
             },
-            margin: { left: 14, right: 14 },
+            margin: { left: 14, right: 14, top: pageTopY, bottom: pageHeight - pageBottomLimit },
           });
           y = (doc as any).lastAutoTable.finalY + 2;
         }
@@ -223,7 +260,7 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
             textColor: [40, 40, 40],
             cellPadding: 2,
           },
-          margin: { left: 16, right: 14 },
+          margin: { left: 16, right: 14, top: pageTopY, bottom: pageHeight - pageBottomLimit },
         });
         y = (doc as any).lastAutoTable.finalY + 2;
       }
@@ -232,16 +269,18 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
     y += 6;
   });
 
-  // Footer
-  const footerText = `Gerado por ${personalName} - ${new Date().toLocaleDateString("pt-BR")}`;
-  doc.setFontSize(8);
-  doc.setTextColor(150, 150, 150);
-  doc.setFont("helvetica", "normal");
+  // Footer (skip when letterhead is used to avoid overlapping)
+  if (!letterheadDataUrl) {
+    const footerText = `Gerado por ${personalName} - ${new Date().toLocaleDateString("pt-BR")}`;
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.setFont("helvetica", "normal");
 
-  const pageCount = doc.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.text(footerText, pageWidth / 2, doc.internal.pageSize.getHeight() - 8, { align: "center" });
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.text(footerText, pageWidth / 2, doc.internal.pageSize.getHeight() - 8, { align: "center" });
+    }
   }
 
   doc.save(`Treino_${alunoNome.replace(/\s+/g, "_")}_${semanaLabel.replace(/\//g, "-")}.pdf`);

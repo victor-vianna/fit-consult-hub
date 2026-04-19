@@ -7,6 +7,7 @@ export interface PersonalSettings {
   personal_id: string;
   display_name: string | null;
   logo_url: string | null;
+  letterhead_url: string | null;
   theme_color: string;
   created_at: string;
   updated_at: string;
@@ -188,12 +189,84 @@ export function usePersonalSettings(personalId?: string) {
     }
   };
 
+  const uploadLetterhead = async (file: File) => {
+    if (!personalId) return;
+
+    try {
+      if (!file.type.startsWith("image/")) {
+        throw new Error("Apenas imagens são permitidas (PNG ou JPG)");
+      }
+
+      // Máx 5MB para papel timbrado (pode ser maior que logo)
+      if (file.size > 5 * 1024 * 1024) {
+        throw new Error("A imagem deve ter no máximo 5MB");
+      }
+
+      // Deletar timbrado antigo se existir
+      if (settings?.letterhead_url) {
+        const oldPath = settings.letterhead_url.split("/").pop();
+        if (oldPath) {
+          await supabase.storage
+            .from("personal-letterheads")
+            .remove([`${personalId}/${oldPath}`]);
+        }
+      }
+
+      const fileExt = file.name.split(".").pop();
+      const fileName = `letterhead-${Date.now()}.${fileExt}`;
+      const filePath = `${personalId}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("personal-letterheads")
+        .upload(filePath, file, { cacheControl: "3600", upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("personal-letterheads")
+        .getPublicUrl(filePath);
+
+      await updateSettings({ letterhead_url: urlData.publicUrl });
+      return urlData.publicUrl;
+    } catch (error: any) {
+      toast({
+        title: "Erro ao enviar papel timbrado",
+        description: error.message,
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
+  const removeLetterhead = async () => {
+    if (!personalId || !settings?.letterhead_url) return;
+
+    try {
+      const oldPath = settings.letterhead_url.split("/").pop();
+      if (oldPath) {
+        await supabase.storage
+          .from("personal-letterheads")
+          .remove([`${personalId}/${oldPath}`]);
+      }
+      await updateSettings({ letterhead_url: null });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao remover papel timbrado",
+        description: error.message,
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
   return {
     settings,
     loading,
     updateSettings,
     uploadLogo,
     removeLogo,
+    uploadLetterhead,
+    removeLetterhead,
     refetch: fetchSettings,
   };
 }

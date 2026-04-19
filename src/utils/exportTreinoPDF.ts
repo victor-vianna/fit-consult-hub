@@ -30,48 +30,81 @@ export interface ExportTreinoPDFParams {
   alunoNome: string;
   semanaLabel: string;
   personalSettings: PersonalSettings;
+  useLetterhead?: boolean;
 }
 
 export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
-  const { treinos, gruposPorTreino, blocosPorTreino, alunoNome, semanaLabel, personalSettings } = params;
+  const { treinos, gruposPorTreino, blocosPorTreino, alunoNome, semanaLabel, personalSettings, useLetterhead } = params;
   const themeColor = personalSettings.theme_color || "#3b82f6";
   const personalName = personalSettings.display_name || "Personal Trainer";
   const rgb = hexToRgb(themeColor);
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
-  let y = 15;
+  const pageHeight = doc.internal.pageSize.getHeight();
 
-  // Logo
-  if (personalSettings.logo_url) {
+  // Pre-load letterhead if needed
+  let letterheadDataUrl: string | null = null;
+  if (useLetterhead && personalSettings.letterhead_url) {
     try {
-      const img = await loadImage(personalSettings.logo_url);
-      doc.addImage(img, "PNG", 14, y, 20, 20);
-      doc.setFontSize(20);
-      doc.setTextColor(rgb[0], rgb[1], rgb[2]);
-      doc.setFont("helvetica", "bold");
-      doc.text(personalName, 38, y + 13);
-      y += 25;
-    } catch {
+      letterheadDataUrl = await loadImage(personalSettings.letterhead_url);
+    } catch (err) {
+      console.warn("Não foi possível carregar o papel timbrado:", err);
+    }
+  }
+
+  const drawLetterhead = () => {
+    if (letterheadDataUrl) {
+      doc.addImage(letterheadDataUrl, "PNG", 0, 0, pageWidth, pageHeight);
+    }
+  };
+
+  // Hook every new page to draw letterhead first
+  const originalAddPage = doc.addPage.bind(doc);
+  (doc as any).addPage = function (...args: any[]) {
+    const result = originalAddPage(...args);
+    drawLetterhead();
+    return result;
+  };
+
+  // Draw letterhead on first page
+  drawLetterhead();
+
+  // When using letterhead, leave more top margin to avoid overlapping the header art
+  let y = letterheadDataUrl ? 50 : 15;
+
+  // Header (skip if letterhead is used — assume the timbrado already has branding)
+  if (!letterheadDataUrl) {
+    if (personalSettings.logo_url) {
+      try {
+        const img = await loadImage(personalSettings.logo_url);
+        doc.addImage(img, "PNG", 14, y, 20, 20);
+        doc.setFontSize(20);
+        doc.setTextColor(rgb[0], rgb[1], rgb[2]);
+        doc.setFont("helvetica", "bold");
+        doc.text(personalName, 38, y + 13);
+        y += 25;
+      } catch {
+        doc.setFontSize(20);
+        doc.setTextColor(rgb[0], rgb[1], rgb[2]);
+        doc.setFont("helvetica", "bold");
+        doc.text(personalName, pageWidth / 2, y + 5, { align: "center" });
+        y += 12;
+      }
+    } else {
       doc.setFontSize(20);
       doc.setTextColor(rgb[0], rgb[1], rgb[2]);
       doc.setFont("helvetica", "bold");
       doc.text(personalName, pageWidth / 2, y + 5, { align: "center" });
       y += 12;
     }
-  } else {
-    doc.setFontSize(20);
-    doc.setTextColor(rgb[0], rgb[1], rgb[2]);
-    doc.setFont("helvetica", "bold");
-    doc.text(personalName, pageWidth / 2, y + 5, { align: "center" });
-    y += 12;
-  }
 
-  // Separator
-  doc.setDrawColor(rgb[0], rgb[1], rgb[2]);
-  doc.setLineWidth(0.8);
-  doc.line(14, y, pageWidth - 14, y);
-  y += 8;
+    // Separator
+    doc.setDrawColor(rgb[0], rgb[1], rgb[2]);
+    doc.setLineWidth(0.8);
+    doc.line(14, y, pageWidth - 14, y);
+    y += 8;
+  }
 
   // Student info
   doc.setFontSize(11);

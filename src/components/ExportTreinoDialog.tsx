@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FileDown, FileText } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { FileDown, FileText, FileImage } from "lucide-react";
 import { toast } from "sonner";
 
 interface ExportTreinoDialogProps {
@@ -18,8 +19,10 @@ interface ExportTreinoDialogProps {
   onOpenChange: (open: boolean) => void;
   defaultNome: string;
   semanaLabel: string;
-  onExportWord: (nome: string) => void;
-  onExportPDF: (nome: string) => void;
+  hasLetterhead?: boolean;
+  letterheadUrl?: string | null;
+  onExportWord: (nome: string, useLetterhead: boolean) => void;
+  onExportPDF: (nome: string, useLetterhead: boolean) => void;
 }
 
 export function ExportTreinoDialog({
@@ -27,19 +30,23 @@ export function ExportTreinoDialog({
   onOpenChange,
   defaultNome,
   semanaLabel,
+  hasLetterhead = false,
+  letterheadUrl = null,
   onExportWord,
   onExportPDF,
 }: ExportTreinoDialogProps) {
   const [nome, setNome] = useState(defaultNome);
+  const [useLetterhead, setUseLetterhead] = useState(false);
 
-  // Reset name when dialog opens
-  const handleOpenChange = (v: boolean) => {
-    if (v) setNome(defaultNome);
-    onOpenChange(v);
-  };
+  useEffect(() => {
+    if (open) {
+      setNome(defaultNome);
+      setUseLetterhead(hasLetterhead); // ligado por padrão se existir
+    }
+  }, [open, defaultNome, hasLetterhead]);
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Exportar Treino</DialogTitle>
@@ -61,6 +68,37 @@ export function ExportTreinoDialog({
           <div className="text-sm text-muted-foreground">
             Semana: <span className="font-medium">{semanaLabel}</span>
           </div>
+
+          {hasLetterhead && (
+            <div className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30">
+              {letterheadUrl && (
+                <img
+                  src={letterheadUrl}
+                  alt="Papel timbrado"
+                  className="w-10 h-14 object-contain rounded border bg-background flex-shrink-0"
+                />
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <Label
+                    htmlFor="use-letterhead"
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <FileImage className="h-4 w-4" />
+                    Usar papel timbrado
+                  </Label>
+                  <Switch
+                    id="use-letterhead"
+                    checked={useLetterhead}
+                    onCheckedChange={setUseLetterhead}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Aplica sua imagem como fundo da página.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         <DialogFooter className="flex gap-2 sm:gap-2">
@@ -68,7 +106,7 @@ export function ExportTreinoDialog({
             variant="outline"
             className="flex-1 gap-2"
             onClick={() => {
-              onExportWord(nome);
+              onExportWord(nome, useLetterhead);
               onOpenChange(false);
               toast.success("Exportando Word...");
             }}
@@ -79,7 +117,7 @@ export function ExportTreinoDialog({
           <Button
             className="flex-1 gap-2"
             onClick={() => {
-              onExportPDF(nome);
+              onExportPDF(nome, useLetterhead);
               onOpenChange(false);
               toast.success("Exportando PDF...");
             }}

@@ -9,7 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Settings, Upload, X } from "lucide-react";
+import { Settings, Upload, X, FileImage } from "lucide-react";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "@/hooks/use-toast";
@@ -19,11 +19,20 @@ interface Props {
 }
 
 export function PersonalSettingsDialog({ personalId }: Props) {
-  const { settings, loading, updateSettings, uploadLogo, removeLogo } =
-    usePersonalSettings(personalId);
+  const {
+    settings,
+    loading,
+    updateSettings,
+    uploadLogo,
+    removeLogo,
+    uploadLetterhead,
+    removeLetterhead,
+  } = usePersonalSettings(personalId);
   const [open, setOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingLetterhead, setUploadingLetterhead] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const letterheadInputRef = useRef<HTMLInputElement>(null);
 
   const [displayName, setDisplayName] = useState(settings?.display_name || "");
   const [themeColor, setThemeColor] = useState(
@@ -83,6 +92,48 @@ export function PersonalSettingsDialog({ personalId }: Props) {
       await removeLogo();
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleLetterheadChange = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "Erro",
+        description: "Arquivo muito grande. Máximo: 5MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!["image/png", "image/jpeg", "image/jpg"].includes(file.type)) {
+      toast({
+        title: "Erro",
+        description: "Use uma imagem PNG ou JPG.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploadingLetterhead(true);
+    try {
+      await uploadLetterhead(file);
+    } finally {
+      setUploadingLetterhead(false);
+      if (letterheadInputRef.current) letterheadInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveLetterhead = async () => {
+    setUploadingLetterhead(true);
+    try {
+      await removeLetterhead();
+    } finally {
+      setUploadingLetterhead(false);
     }
   };
 

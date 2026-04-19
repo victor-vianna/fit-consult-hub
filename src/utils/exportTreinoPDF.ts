@@ -238,7 +238,7 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
               4: { halign: "center", cellWidth: 18 },
               5: { halign: "left", cellWidth: 30 },
             },
-            margin: { left: 14, right: 14 },
+            margin: { left: 14, right: 14, top: pageTopY, bottom: pageHeight - pageBottomLimit },
           });
           y = (doc as any).lastAutoTable.finalY + 2;
         }

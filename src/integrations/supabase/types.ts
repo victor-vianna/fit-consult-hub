@@ -1432,6 +1432,7 @@ export type Database = {
           created_at: string | null
           display_name: string | null
           id: string
+          letterhead_url: string | null
           logo_url: string | null
           personal_id: string
           theme_color: string | null
@@ -1441,6 +1442,7 @@ export type Database = {
           created_at?: string | null
           display_name?: string | null
           id?: string
+          letterhead_url?: string | null
           logo_url?: string | null
           personal_id: string
           theme_color?: string | null
@@ -1450,6 +1452,7 @@ export type Database = {
           created_at?: string | null
           display_name?: string | null
           id?: string
+          letterhead_url?: string | null
           logo_url?: string | null
           personal_id?: string
           theme_color?: string | null

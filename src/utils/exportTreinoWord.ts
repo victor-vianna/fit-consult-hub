@@ -151,38 +151,40 @@ export async function exportTreinoWord(params: ExportTreinoParams) {
 
   const children: any[] = [];
 
-  // Header / Branding
-  children.push(
-    new Paragraph({
-      children: [
-        new TextRun({
-          text: personalName,
-          bold: true,
-          size: 36,
-          color: hexToRgb(themeColor),
-          font: "Calibri",
-        }),
-      ],
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 100 },
-    })
-  );
+  // Header / Branding (skip when letterhead is used — assume the timbrado has its own brand)
+  if (!letterheadImage) {
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: personalName,
+            bold: true,
+            size: 36,
+            color: hexToRgb(themeColor),
+            font: "Calibri",
+          }),
+        ],
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 100 },
+      })
+    );
 
-  // Separator line
-  children.push(
-    new Paragraph({
-      border: {
-        bottom: {
-          style: BorderStyle.SINGLE,
-          size: 6,
-          color: hexToRgb(themeColor),
-          space: 1,
+    // Separator line
+    children.push(
+      new Paragraph({
+        border: {
+          bottom: {
+            style: BorderStyle.SINGLE,
+            size: 6,
+            color: hexToRgb(themeColor),
+            space: 1,
+          },
         },
-      },
-      spacing: { after: 200 },
-      children: [],
-    })
-  );
+        spacing: { after: 200 },
+        children: [],
+      })
+    );
+  }
 
   // Student info
   children.push(

@@ -363,17 +363,40 @@ export async function exportTreinoWord(params: ExportTreinoParams) {
         properties: {
           page: {
             size: { width: PAGE_WIDTH, height: PAGE_HEIGHT },
-            margin: { top: MARGIN, right: MARGIN, bottom: MARGIN, left: MARGIN },
+            margin: letterheadImage
+              ? { top: 2880, right: MARGIN, bottom: 2160, left: MARGIN } // 2" top, 1.5" bottom for letterhead
+              : { top: MARGIN, right: MARGIN, bottom: MARGIN, left: MARGIN },
           },
         },
         children,
+        headers: letterheadImage
+          ? {
+              default: new Header({
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    spacing: { after: 0 },
+                    children: [
+                      new ImageRun({
+                        type: letterheadImage.type,
+                        data: letterheadImage.bytes,
+                        transformation: { width: 595, height: 120 }, // ~A4 width header strip
+                      } as any),
+                    ],
+                  }),
+                ],
+              }),
+            }
+          : undefined,
         footers: {
           default: new Footer({
             children: [
               new Paragraph({
                 children: [
                   new TextRun({
-                    text: `Gerado por ${personalName} — ${new Date().toLocaleDateString("pt-BR")}`,
+                    text: letterheadImage
+                      ? ""
+                      : `Gerado por ${personalName} — ${new Date().toLocaleDateString("pt-BR")}`,
                     size: 16,
                     color: "888888",
                     font: "Calibri",

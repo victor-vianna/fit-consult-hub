@@ -269,16 +269,18 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
     y += 6;
   });
 
-  // Footer
-  const footerText = `Gerado por ${personalName} - ${new Date().toLocaleDateString("pt-BR")}`;
-  doc.setFontSize(8);
-  doc.setTextColor(150, 150, 150);
-  doc.setFont("helvetica", "normal");
+  // Footer (skip when letterhead is used to avoid overlapping)
+  if (!letterheadDataUrl) {
+    const footerText = `Gerado por ${personalName} - ${new Date().toLocaleDateString("pt-BR")}`;
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.setFont("helvetica", "normal");
 
-  const pageCount = doc.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.text(footerText, pageWidth / 2, doc.internal.pageSize.getHeight() - 8, { align: "center" });
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.text(footerText, pageWidth / 2, doc.internal.pageSize.getHeight() - 8, { align: "center" });
+    }
   }
 
   doc.save(`Treino_${alunoNome.replace(/\s+/g, "_")}_${semanaLabel.replace(/\//g, "-")}.pdf`);

@@ -260,7 +260,7 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
             textColor: [40, 40, 40],
             cellPadding: 2,
           },
-          margin: { left: 16, right: 14 },
+          margin: { left: 16, right: 14, top: pageTopY, bottom: pageHeight - pageBottomLimit },
         });
         y = (doc as any).lastAutoTable.finalY + 2;
       }

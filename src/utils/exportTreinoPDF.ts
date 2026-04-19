@@ -121,6 +121,10 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
   doc.text(semanaLabel, 14 + doc.getTextWidth("Semana: "), y);
   y += 10;
 
+  // Top margin for new pages (avoid letterhead header art)
+  const pageTopY = letterheadDataUrl ? 50 : 15;
+  const pageBottomLimit = letterheadDataUrl ? pageHeight - 35 : pageHeight - 20;
+
   // Days
   treinos.forEach((treino) => {
     const treinoId = treino.treinoId;
@@ -132,9 +136,9 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
     if (!hasContent) return;
 
     // Check page space
-    if (y > doc.internal.pageSize.getHeight() - 40) {
+    if (y > pageBottomLimit - 20) {
       doc.addPage();
-      y = 15;
+      y = pageTopY;
     }
 
     const diaNome = diasSemana[treino.dia - 1] || `Dia ${treino.dia}`;

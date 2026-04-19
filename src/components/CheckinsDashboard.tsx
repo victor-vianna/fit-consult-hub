@@ -639,6 +639,7 @@ export function CheckinsDashboard({
                 personalId={personalId}
                 alunoNome={studentName}
                 themeColor={themeColor}
+                checkin={selectedCheckin}
               />
             </>
           )}

@@ -164,9 +164,9 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
 
     for (const section of sections) {
       // Check page space
-      if (y > doc.internal.pageSize.getHeight() - 30) {
+      if (y > pageBottomLimit - 10) {
         doc.addPage();
-        y = 15;
+        y = pageTopY;
       }
 
       // Section label

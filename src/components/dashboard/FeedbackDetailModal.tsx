@@ -302,6 +302,7 @@ export function FeedbackDetailModal({
                   personalId={personalId}
                   alunoNome={alunoNome}
                   themeColor={themeColor}
+                  checkin={checkin}
                 />
               </>
             ) : (

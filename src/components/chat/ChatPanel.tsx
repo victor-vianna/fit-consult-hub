@@ -86,7 +86,7 @@ export function ChatPanel({ personalId, alunoId, currentUserId, themeColor }: Ch
                   )}
                   style={isMe ? { backgroundColor: themeColor || "hsl(var(--primary))" } : undefined}
                 >
-                  <p className="text-sm whitespace-pre-wrap break-words">{msg.conteudo}</p>
+                  <MessageContent conteudo={msg.conteudo} isMe={isMe} themeColor={themeColor} />
                   <div className={cn(
                     "flex items-center gap-1 mt-1",
                     isMe ? "justify-end" : ""

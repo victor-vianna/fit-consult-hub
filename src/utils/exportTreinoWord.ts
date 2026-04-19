@@ -6,10 +6,12 @@ import {
   TableRow,
   TableCell,
   TextRun,
+  ImageRun,
   WidthType,
   AlignmentType,
   BorderStyle,
   HeadingLevel,
+  Header,
   Footer,
   ShadingType,
   LevelFormat,
@@ -18,6 +20,14 @@ import { saveAs } from "file-saver";
 import type { TreinoDia } from "@/types/treino";
 import type { PersonalSettings } from "@/hooks/usePersonalSettings";
 import { organizeForExport } from "./exportOrganizer";
+
+async function fetchImageBytes(url: string): Promise<{ bytes: Uint8Array; type: "png" | "jpg" }> {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  const buf = await blob.arrayBuffer();
+  const type: "png" | "jpg" = blob.type.includes("png") ? "png" : "jpg";
+  return { bytes: new Uint8Array(buf), type };
+}
 
 const diasSemana = [
   "Segunda-feira",
@@ -121,12 +131,23 @@ export interface ExportTreinoParams {
   alunoNome: string;
   semanaLabel: string;
   personalSettings: PersonalSettings;
+  useLetterhead?: boolean;
 }
 
 export async function exportTreinoWord(params: ExportTreinoParams) {
-  const { treinos, gruposPorTreino, blocosPorTreino, alunoNome, semanaLabel, personalSettings } = params;
+  const { treinos, gruposPorTreino, blocosPorTreino, alunoNome, semanaLabel, personalSettings, useLetterhead } = params;
   const themeColor = personalSettings.theme_color || "#3b82f6";
   const personalName = personalSettings.display_name || "Personal Trainer";
+
+  // Pre-load letterhead bytes if requested
+  let letterheadImage: { bytes: Uint8Array; type: "png" | "jpg" } | null = null;
+  if (useLetterhead && personalSettings.letterhead_url) {
+    try {
+      letterheadImage = await fetchImageBytes(personalSettings.letterhead_url);
+    } catch (err) {
+      console.warn("Falha ao carregar papel timbrado para Word:", err);
+    }
+  }
 
   const children: any[] = [];
 

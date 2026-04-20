@@ -228,6 +228,7 @@ export function TreinosManager({
     loading: loadingGrupos,
     obterGruposDoTreino,
     criarGrupo,
+    editarGrupo,
     deletarGrupo,
     reordenarGrupos,
     isCriando: isCriandoGrupo,
@@ -276,6 +277,13 @@ export function TreinosManager({
 
   // 🆕 Estado para abrir dialog de agrupamento e blocos
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
+  const [grupoEditando, setGrupoEditando] = useState<{
+    grupo_id: string;
+    treino_semanal_id: string;
+    tipo_agrupamento: any;
+    descanso_entre_grupos?: number | null;
+    exercicios: any[];
+  } | null>(null);
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [blocoEditando, setBlocoEditando] = useState<BlocoTreino | null>(null);
   const [salvarModeloOpen, setSalvarModeloOpen] = useState(false);

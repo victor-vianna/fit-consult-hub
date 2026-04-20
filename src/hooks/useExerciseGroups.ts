@@ -471,6 +471,81 @@ export function useExerciseGroups({
     },
   });
 
+  // Mutation: Editar grupo completo (limpeza + reinserção)
+  const editarGrupoMutation = useMutation({
+    mutationFn: async ({
+      grupoId,
+      treinoSemanalId,
+      payload,
+    }: {
+      grupoId: string;
+      treinoSemanalId: string;
+      payload: GrupoExerciciosInput;
+    }) => {
+      console.log("[useExerciseGroups] Editando grupo:", grupoId);
+
+      // 1. Buscar ordem atual do grupo (preservar posição)
+      const { data: existentes } = await supabase
+        .from("exercicios")
+        .select("ordem")
+        .eq("grupo_id", grupoId)
+        .is("deleted_at", null)
+        .order("ordem", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      const ordemBase = existentes?.ordem ?? 1;
+
+      // 2. Hard delete dos exercícios antigos (não soft, para evitar conflitos)
+      const { error: delError } = await supabase
+        .from("exercicios")
+        .delete()
+        .eq("grupo_id", grupoId);
+
+      if (delError) throw delError;
+
+      // 3. Reinserir com mesmo grupo_id e ordem preservada
+      const inserts = payload.exercicios.map((ex, idx) => ({
+        treino_semanal_id: treinoSemanalId,
+        nome: ex.nome,
+        link_video: ex.link_video ?? null,
+        series: ex.series,
+        repeticoes: ex.repeticoes,
+        descanso: ex.descanso ?? 0,
+        carga: ex.carga != null ? String(ex.carga) : null,
+        observacoes: ex.observacoes ?? null,
+        ordem: ordemBase,
+        grupo_id: grupoId,
+        tipo_agrupamento: String(payload.tipo),
+        ordem_no_grupo: idx + 1,
+        descanso_entre_grupos: payload.descanso_entre_grupos ?? null,
+        concluido: false,
+      }));
+
+      const { error: insError } = await supabase
+        .from("exercicios")
+        .insert(inserts);
+
+      if (insError) throw insError;
+
+      return { grupoId };
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: buildQueryKey(profileId, personalId, semana),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["treinos", profileId, personalId, semana],
+      });
+      await refetch();
+      toast.success("Grupo atualizado com sucesso");
+    },
+    onError: (error: any) => {
+      console.error("[useExerciseGroups] Erro ao editar grupo:", error);
+      toast.error("Erro ao editar grupo");
+    },
+  });
+
   // Mutation: Reordenar grupos (atualiza ordem de todos os exercícios do grupo)
   const reordenarGruposMutation = useMutation({
     mutationFn: async ({
@@ -535,6 +610,12 @@ export function useExerciseGroups({
     ) => atualizarMetaGrupoMutation.mutateAsync({ grupoId, dataPatch }),
     deletarGrupo: (grupoId: string) =>
       deletarGrupoMutation.mutateAsync(grupoId),
+    editarGrupo: (
+      grupoId: string,
+      treinoSemanalId: string,
+      payload: GrupoExerciciosInput
+    ) =>
+      editarGrupoMutation.mutateAsync({ grupoId, treinoSemanalId, payload }),
     reordenarGrupos: (grupos: { grupo_id: string; ordem: number }[]) =>
       reordenarGruposMutation.mutateAsync({ grupos }),
     refetch: () => refetch(),

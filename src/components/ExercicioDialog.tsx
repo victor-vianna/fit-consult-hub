@@ -58,12 +58,29 @@ interface ExercicioGroupResult {
 
 export type ExercicioDialogResult = ExercicioSimpleResult | ExercicioGroupResult;
 
+interface GrupoEditando {
+  grupo_id: string;
+  tipo_agrupamento: TipoAgrupamento;
+  descanso_entre_grupos?: number | null;
+  exercicios: Array<{
+    nome: string;
+    link_video?: string | null;
+    series?: number | null;
+    repeticoes?: string | null;
+    descanso?: number | null;
+    carga?: string | number | null;
+    observacoes?: string | null;
+  }>;
+}
+
 interface ExercicioDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (exercicio: Omit<ExercicioItem, "id">) => Promise<void>;
   onSaveGroup?: (result: ExercicioGroupResult) => Promise<void>;
+  onUpdateGroup?: (grupoId: string, result: ExercicioGroupResult) => Promise<void>;
   exercicio?: ExercicioItem | null;
+  grupoEditando?: GrupoEditando | null;
   diaNome?: string;
 }
 
@@ -82,7 +99,9 @@ export function ExercicioDialog({
   onOpenChange,
   onSave,
   onSaveGroup,
+  onUpdateGroup,
   exercicio,
+  grupoEditando,
   diaNome,
 }: ExercicioDialogProps) {
   // Modo: "simple" ou "group"
@@ -105,7 +124,24 @@ export function ExercicioDialog({
   // Preenche o form ao abrir
   useEffect(() => {
     if (open) {
-      if (exercicio) {
+      if (grupoEditando) {
+        // Modo edição de grupo
+        setModo("group");
+        setTipoAgrupamento(grupoEditando.tipo_agrupamento || "bi-set");
+        setDescansoEntreGrupos(grupoEditando.descanso_entre_grupos ?? 90);
+        setGrupoExercicios(
+          grupoEditando.exercicios.map((ex) => ({
+            nome: ex.nome || "",
+            link_video: ex.link_video || "",
+            series: ex.series || 3,
+            repeticoes: ex.repeticoes || "10-12",
+            descanso: ex.descanso ?? 0,
+            carga: ex.carga != null ? String(ex.carga) : "",
+            observacoes: ex.observacoes || "",
+          }))
+        );
+        setFormData(defaultExercicio());
+      } else if (exercicio) {
         // Modo edição: sempre simples
         setModo("simple");
         setFormData({
@@ -126,7 +162,7 @@ export function ExercicioDialog({
       }
       setErrors({});
     }
-  }, [open, exercicio]);
+  }, [open, exercicio, grupoEditando]);
 
   // Validação
   const validarExercicio = (ex: Omit<ExercicioItem, "id">, prefix = ""): Record<string, string> => {
@@ -167,6 +203,14 @@ export function ExercicioDialog({
     try {
       if (modo === "simple") {
         await onSave(formData);
+      } else if (grupoEditando && onUpdateGroup) {
+        // Atualizar grupo existente
+        await onUpdateGroup(grupoEditando.grupo_id, {
+          type: "group",
+          tipoAgrupamento,
+          descansoEntreGrupos,
+          exercicios: grupoExercicios,
+        });
       } else if (onSaveGroup) {
         await onSaveGroup({
           type: "group",
@@ -264,13 +308,21 @@ export function ExercicioDialog({
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold">
-              {isEditing ? "Editar Exercício" : modo === "group" ? "Criar Exercício Conjugado" : "Adicionar Exercício"}
+              {grupoEditando
+                ? "Editar Conjugado"
+                : isEditing
+                ? "Editar Exercício"
+                : modo === "group"
+                ? "Criar Exercício Conjugado"
+                : "Adicionar Exercício"}
               {diaNome && (
                 <span className="text-muted-foreground"> — {diaNome}</span>
               )}
             </DialogTitle>
             <DialogDescription>
-              {isEditing
+              {grupoEditando
+                ? "Atualize os exercícios do conjugado. As alterações sobrescrevem os dados anteriores."
+                : isEditing
                 ? "Atualize as informações do exercício selecionado."
                 : modo === "group"
                 ? "Monte um conjunto de exercícios conjugados com configuração individual."
@@ -458,15 +510,17 @@ export function ExercicioDialog({
                   </p>
                 </div>
 
-                {/* Link para voltar a simples */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs text-muted-foreground"
-                  onClick={voltarParaSimples}
-                >
-                  ← Voltar para exercício simples
-                </Button>
+                {/* Link para voltar a simples (apenas ao criar) */}
+                {!grupoEditando && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-muted-foreground"
+                    onClick={voltarParaSimples}
+                  >
+                    ← Voltar para exercício simples
+                  </Button>
+                )}
               </>
             )}
           </div>
@@ -485,6 +539,8 @@ export function ExercicioDialog({
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Salvando...
                 </>
+              ) : grupoEditando ? (
+                "Salvar Alterações"
               ) : isEditing ? (
                 "Salvar Alterações"
               ) : modo === "group" ? (

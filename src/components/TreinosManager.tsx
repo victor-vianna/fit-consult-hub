@@ -1540,7 +1540,16 @@ export function TreinosManager({
                                         onEdit={
                                           isPersonal
                                             ? () => {
-                                                console.log("[TreinosManager] Editar grupo:", grupo.grupo_id);
+                                                if (!grupo.grupo_id || !treinoId) return;
+                                                setSelectedDia(treino.dia);
+                                                setGrupoEditando({
+                                                  grupo_id: grupo.grupo_id,
+                                                  treino_semanal_id: treinoId,
+                                                  tipo_agrupamento: grupo.tipo_agrupamento,
+                                                  descanso_entre_grupos: grupo.descanso_entre_grupos,
+                                                  exercicios: grupo.exercicios || [],
+                                                });
+                                                setExercicioDialogOpen(true);
                                               }
                                             : undefined
                                         }

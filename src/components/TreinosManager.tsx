@@ -1641,10 +1641,37 @@ export function TreinosManager({
             if (!open) {
               setExercicioEditando(null);
               setExercicioTemp(null);
+              setGrupoEditando(null);
             }
           }}
           exercicio={(exercicioEditando ?? exercicioTemp ?? null) as any}
+          grupoEditando={grupoEditando}
           onSave={handleSaveExercicio}
+          onUpdateGroup={async (grupoId, result) => {
+            if (!grupoEditando) return;
+            try {
+              setLoadingStates((prev) => ({ ...prev, editando: true }));
+              await editarGrupo(grupoId, grupoEditando.treino_semanal_id, {
+                tipo: result.tipoAgrupamento as any,
+                exercicios: result.exercicios.map((ex) => ({
+                  nome: ex.nome,
+                  link_video: ex.link_video || null,
+                  series: ex.series,
+                  repeticoes: ex.repeticoes,
+                  descanso: ex.descanso,
+                  carga: ex.carga || null,
+                  observacoes: ex.observacoes || null,
+                })),
+                descanso_entre_grupos: result.descansoEntreGrupos,
+              });
+              setExercicioDialogOpen(false);
+              setGrupoEditando(null);
+            } catch (error) {
+              console.error("[TreinosManager] Erro ao editar grupo:", error);
+            } finally {
+              setLoadingStates((prev) => ({ ...prev, editando: false }));
+            }
+          }}
           onSaveGroup={async (result) => {
             if (selectedDia === null) return;
             try {

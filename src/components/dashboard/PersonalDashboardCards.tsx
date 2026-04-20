@@ -32,6 +32,8 @@ import {
   DashboardCardConfig,
   DEFAULT_CARDS,
 } from "./DashboardCustomizeDialog";
+import { PriorityStudentsSection } from "./PriorityStudentsSection";
+import { usePriorityStudents } from "@/hooks/usePriorityStudents";
 
 interface PersonalDashboardCardsProps {
   personalId: string;
@@ -94,6 +96,7 @@ export function PersonalDashboardCards({
 }: PersonalDashboardCardsProps) {
   const navigate = useNavigate();
   const mensagensNaoLidas = useChatNaoLidas(personalId);
+  const { students: priorityStudents, loading: priorityLoading } = usePriorityStudents(personalId);
   const [treinosAndamento, setTreinosAndamento] = useState<TreinoEmAndamento[]>([]);
   const [alunosInativos, setAlunosInativos] = useState<AlunoInativo[]>([]);
   const [vencimentosProximos, setVencimentosProximos] = useState<VencimentoProximo[]>([]);
@@ -832,6 +835,13 @@ export function PersonalDashboardCards({
           Personalizar cards
         </Button>
       </div>
+
+      {/* Seção de Alunos Prioritários */}
+      <PriorityStudentsSection
+        students={priorityStudents}
+        themeColor={themeColor}
+        loading={priorityLoading}
+      />
 
       {/* Render cards in saved order */}
       {cardConfig.filter((c) => !detailCardIds.includes(c.id) && c.visible).map((c) => (

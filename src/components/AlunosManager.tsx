@@ -51,6 +51,8 @@ import {
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { format } from "date-fns";
 import { AppLayout } from "@/components/AppLayout";
+import { usePriorityStudents } from "@/hooks/usePriorityStudents";
+import { AlertTriangle } from "lucide-react";
 
 interface Aluno {
   id: string;
@@ -85,6 +87,7 @@ export default function AlunosManager() {
   });
 
   const { settings: personalSettings } = usePersonalSettings(user?.id);
+  const { flagsByStudent } = usePriorityStudents(user?.id);
 
   useEffect(() => {
     if (user) {
@@ -476,19 +479,36 @@ export default function AlunosManager() {
 
         {alunosFiltrados.length > 0 ? (
           <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {alunosFiltrados.map((aluno) => (
+            {alunosFiltrados.map((aluno) => {
+              const flags = flagsByStudent[aluno.id] || [];
+              const hasHighPriority = flags.some((f) => f.severity === "alta");
+              const hasPriority = flags.length > 0;
+
+              return (
               <Card
                 key={aluno.id}
-                className="group hover:shadow-xl transition-all duration-300 border-2 cursor-pointer relative overflow-hidden touch-target"
+                className={`group hover:shadow-xl transition-all duration-300 border-2 cursor-pointer relative overflow-hidden touch-target ${
+                  hasHighPriority
+                    ? "border-destructive/50 ring-1 ring-destructive/20"
+                    : hasPriority
+                    ? "border-orange-500/50"
+                    : ""
+                }`}
                 onClick={() => navigate(`/aluno/${aluno.id}`)}
               >
                 <div
                   className={`absolute left-0 top-0 bottom-0 w-1 ${
-                    aluno.is_active ? "bg-green-500" : "bg-red-500"
+                    hasHighPriority
+                      ? "bg-destructive"
+                      : hasPriority
+                      ? "bg-orange-500"
+                      : aluno.is_active
+                      ? "bg-green-500"
+                      : "bg-red-500"
                   }`}
                 />
 
-                <div className="absolute top-3 right-3">
+                <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
                   {aluno.is_active ? (
                     <Badge className="bg-green-600 hover:bg-green-700">
                       <UserCheck className="h-3 w-3 mr-1" />
@@ -500,6 +520,15 @@ export default function AlunosManager() {
                       Bloqueado
                     </Badge>
                   )}
+                  {hasPriority && (
+                    <Badge
+                      variant={hasHighPriority ? "destructive" : "secondary"}
+                      className="gap-1"
+                    >
+                      <AlertTriangle className="h-3 w-3" />
+                      {flags.length} alerta{flags.length > 1 ? "s" : ""}
+                    </Badge>
+                  )}
                 </div>
 
                 <CardContent className="pt-6 pl-5">
@@ -508,6 +537,20 @@ export default function AlunosManager() {
                       <h3 className="font-bold text-lg group-hover:text-primary transition-colors">
                         {aluno.nome}
                       </h3>
+                      {hasPriority && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {flags.slice(0, 3).map((f, i) => (
+                            <Badge
+                              key={i}
+                              variant={f.severity === "alta" ? "destructive" : "secondary"}
+                              className="text-[10px] py-0 h-5"
+                            >
+                              {f.label}
+                              {f.detail && ` · ${f.detail}`}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-2 text-sm text-muted-foreground">
@@ -583,7 +626,8 @@ export default function AlunosManager() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <Card className="border-2">

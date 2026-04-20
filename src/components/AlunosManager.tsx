@@ -51,6 +51,8 @@ import {
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { format } from "date-fns";
 import { AppLayout } from "@/components/AppLayout";
+import { usePriorityStudents } from "@/hooks/usePriorityStudents";
+import { AlertTriangle } from "lucide-react";
 
 interface Aluno {
   id: string;
@@ -85,6 +87,7 @@ export default function AlunosManager() {
   });
 
   const { settings: personalSettings } = usePersonalSettings(user?.id);
+  const { flagsByStudent } = usePriorityStudents(user?.id);
 
   useEffect(() => {
     if (user) {

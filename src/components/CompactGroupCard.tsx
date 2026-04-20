@@ -21,6 +21,7 @@ const TIPOS_AGRUPAMENTO = {
   "tri-set": { label: "Tri-Set", icon: "🔄🔄" },
   "drop-set": { label: "Drop-Set", icon: "📉" },
   superset: { label: "Super-Set", icon: "⚡" },
+  circuito: { label: "Circuito", icon: "🔁" },
 } as const;
 
 interface CompactGroupCardProps {

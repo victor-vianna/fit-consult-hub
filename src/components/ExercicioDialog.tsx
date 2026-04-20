@@ -58,12 +58,29 @@ interface ExercicioGroupResult {
 
 export type ExercicioDialogResult = ExercicioSimpleResult | ExercicioGroupResult;
 
+interface GrupoEditando {
+  grupo_id: string;
+  tipo_agrupamento: TipoAgrupamento;
+  descanso_entre_grupos?: number | null;
+  exercicios: Array<{
+    nome: string;
+    link_video?: string | null;
+    series?: number | null;
+    repeticoes?: string | null;
+    descanso?: number | null;
+    carga?: string | number | null;
+    observacoes?: string | null;
+  }>;
+}
+
 interface ExercicioDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (exercicio: Omit<ExercicioItem, "id">) => Promise<void>;
   onSaveGroup?: (result: ExercicioGroupResult) => Promise<void>;
+  onUpdateGroup?: (grupoId: string, result: ExercicioGroupResult) => Promise<void>;
   exercicio?: ExercicioItem | null;
+  grupoEditando?: GrupoEditando | null;
   diaNome?: string;
 }
 
@@ -82,7 +99,9 @@ export function ExercicioDialog({
   onOpenChange,
   onSave,
   onSaveGroup,
+  onUpdateGroup,
   exercicio,
+  grupoEditando,
   diaNome,
 }: ExercicioDialogProps) {
   // Modo: "simple" ou "group"
@@ -105,7 +124,24 @@ export function ExercicioDialog({
   // Preenche o form ao abrir
   useEffect(() => {
     if (open) {
-      if (exercicio) {
+      if (grupoEditando) {
+        // Modo edição de grupo
+        setModo("group");
+        setTipoAgrupamento(grupoEditando.tipo_agrupamento || "bi-set");
+        setDescansoEntreGrupos(grupoEditando.descanso_entre_grupos ?? 90);
+        setGrupoExercicios(
+          grupoEditando.exercicios.map((ex) => ({
+            nome: ex.nome || "",
+            link_video: ex.link_video || "",
+            series: ex.series || 3,
+            repeticoes: ex.repeticoes || "10-12",
+            descanso: ex.descanso ?? 0,
+            carga: ex.carga != null ? String(ex.carga) : "",
+            observacoes: ex.observacoes || "",
+          }))
+        );
+        setFormData(defaultExercicio());
+      } else if (exercicio) {
         // Modo edição: sempre simples
         setModo("simple");
         setFormData({
@@ -126,7 +162,7 @@ export function ExercicioDialog({
       }
       setErrors({});
     }
-  }, [open, exercicio]);
+  }, [open, exercicio, grupoEditando]);
 
   // Validação
   const validarExercicio = (ex: Omit<ExercicioItem, "id">, prefix = ""): Record<string, string> => {

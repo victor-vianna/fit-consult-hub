@@ -308,13 +308,21 @@ export function ExercicioDialog({
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold">
-              {isEditing ? "Editar Exercício" : modo === "group" ? "Criar Exercício Conjugado" : "Adicionar Exercício"}
+              {grupoEditando
+                ? "Editar Conjugado"
+                : isEditing
+                ? "Editar Exercício"
+                : modo === "group"
+                ? "Criar Exercício Conjugado"
+                : "Adicionar Exercício"}
               {diaNome && (
                 <span className="text-muted-foreground"> — {diaNome}</span>
               )}
             </DialogTitle>
             <DialogDescription>
-              {isEditing
+              {grupoEditando
+                ? "Atualize os exercícios do conjugado. As alterações sobrescrevem os dados anteriores."
+                : isEditing
                 ? "Atualize as informações do exercício selecionado."
                 : modo === "group"
                 ? "Monte um conjunto de exercícios conjugados com configuração individual."
@@ -529,6 +537,8 @@ export function ExercicioDialog({
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Salvando...
                 </>
+              ) : grupoEditando ? (
+                "Salvar Alterações"
               ) : isEditing ? (
                 "Salvar Alterações"
               ) : modo === "group" ? (

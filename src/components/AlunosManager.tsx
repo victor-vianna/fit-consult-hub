@@ -626,7 +626,8 @@ export default function AlunosManager() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <Card className="border-2">

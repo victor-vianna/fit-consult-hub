@@ -510,15 +510,17 @@ export function ExercicioDialog({
                   </p>
                 </div>
 
-                {/* Link para voltar a simples */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs text-muted-foreground"
-                  onClick={voltarParaSimples}
-                >
-                  ← Voltar para exercício simples
-                </Button>
+                {/* Link para voltar a simples (apenas ao criar) */}
+                {!grupoEditando && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-muted-foreground"
+                    onClick={voltarParaSimples}
+                  >
+                    ← Voltar para exercício simples
+                  </Button>
+                )}
               </>
             )}
           </div>

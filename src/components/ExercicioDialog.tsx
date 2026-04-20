@@ -203,6 +203,14 @@ export function ExercicioDialog({
     try {
       if (modo === "simple") {
         await onSave(formData);
+      } else if (grupoEditando && onUpdateGroup) {
+        // Atualizar grupo existente
+        await onUpdateGroup(grupoEditando.grupo_id, {
+          type: "group",
+          tipoAgrupamento,
+          descansoEntreGrupos,
+          exercicios: grupoExercicios,
+        });
       } else if (onSaveGroup) {
         await onSaveGroup({
           type: "group",

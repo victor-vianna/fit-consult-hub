@@ -136,7 +136,18 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
           const newMsg = payload.new as ChatMessage;
           setMensagens(prev => [...prev, newMsg]);
           if (newMsg.destinatario_id === currentUserId) {
-            setNaoLidas(prev => prev + 1);
+            // Se o painel está visível, marcar imediatamente como lida
+            if (typeof document !== "undefined" && document.visibilityState === "visible") {
+              supabase
+                .from("mensagens_chat")
+                .update({ lida: true })
+                .eq("id", newMsg.id)
+                .then(() => {
+                  setMensagens(prev => prev.map(m => m.id === newMsg.id ? { ...m, lida: true } : m));
+                });
+            } else {
+              setNaoLidas(prev => prev + 1);
+            }
           }
         }
       )

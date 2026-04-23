@@ -13,6 +13,7 @@ import { Settings, Upload, X, FileImage } from "lucide-react";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "@/hooks/use-toast";
+import { AlunoDashboardCustomizeDialog } from "@/components/AlunoDashboardCustomizeDialog";
 
 interface Props {
   personalId: string;
@@ -330,6 +331,13 @@ export function PersonalSettingsDialog({ personalId }: Props) {
                 </div>
               </div>
             </div>
+          </div>
+
+          <div className="pt-4 border-t">
+            <AlunoDashboardCustomizeDialog personalId={personalId} />
+            <p className="text-xs text-muted-foreground mt-2">
+              Edite os textos de boas-vindas, frase final do treino e quais cards o aluno vê.
+            </p>
           </div>
 
           <Button onClick={handleSave} className="w-full">

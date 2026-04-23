@@ -45,18 +45,11 @@ export interface WorkoutCompletionData {
   tempoPausas: number;
   totalDescansos: number;
   mensagemMotivacional: string;
+  exerciciosConcluidos: number;
+  exerciciosTotal: number;
 }
 
-const mensagensMotivacionais = [
-  "💪 Você arrasou! Cada treino te deixa mais forte!",
-  "🔥 Treino concluído com sucesso! Continue assim!",
-  "🏆 Parabéns! Mais um passo em direção aos seus objetivos!",
-  "⭐ Incrível! Sua dedicação está fazendo a diferença!",
-  "🎯 Missão cumprida! Seu esforço vale a pena!",
-  "💥 Você é imparável! Que treino sensacional!",
-  "🌟 Excelente trabalho! Seu corpo agradece!",
-  "🚀 Treino finalizado! Você está evoluindo a cada dia!",
-];
+const FRASE_FINAL_PADRAO = "Treino finalizado com excelência.";
 
 export function useWorkoutTimer({
   treinoId,

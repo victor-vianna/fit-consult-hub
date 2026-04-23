@@ -2,6 +2,16 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+export const DEFAULT_CARDS_VISIVEIS = [
+  "treinos",
+  "historico",
+  "avaliacao",
+  "materiais",
+  "plano",
+  "biblioteca",
+  "chat",
+] as const;
+
 export interface PersonalSettings {
   id: string;
   personal_id: string;
@@ -9,6 +19,12 @@ export interface PersonalSettings {
   logo_url: string | null;
   letterhead_url: string | null;
   theme_color: string;
+  mensagem_conclusao_treino: string | null;
+  welcome_title: string | null;
+  welcome_message: string | null;
+  jornada_title: string | null;
+  jornada_message: string | null;
+  cards_visiveis: string[] | null;
   created_at: string;
   updated_at: string;
 }

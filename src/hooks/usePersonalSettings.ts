@@ -2,6 +2,16 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+export const DEFAULT_CARDS_VISIVEIS = [
+  "treinos",
+  "historico",
+  "avaliacao",
+  "materiais",
+  "plano",
+  "biblioteca",
+  "chat",
+] as const;
+
 export interface PersonalSettings {
   id: string;
   personal_id: string;
@@ -9,6 +19,12 @@ export interface PersonalSettings {
   logo_url: string | null;
   letterhead_url: string | null;
   theme_color: string;
+  mensagem_conclusao_treino: string | null;
+  welcome_title: string | null;
+  welcome_message: string | null;
+  jornada_title: string | null;
+  jornada_message: string | null;
+  cards_visiveis: string[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -24,6 +40,13 @@ export function usePersonalSettings(personalId?: string) {
     }
   }, [personalId]);
 
+  const normalize = (raw: any): PersonalSettings => ({
+    ...raw,
+    cards_visiveis: Array.isArray(raw?.cards_visiveis)
+      ? (raw.cards_visiveis as string[])
+      : [...DEFAULT_CARDS_VISIVEIS],
+  });
+
   const fetchSettings = async () => {
     if (!personalId) return;
 
@@ -35,14 +58,13 @@ export function usePersonalSettings(personalId?: string) {
         .single();
 
       if (error) {
-        // Se não existir, criar configurações padrão
         if (error.code === "PGRST116") {
           await createDefaultSettings();
         } else {
           throw error;
         }
       } else {
-        setSettings(data);
+        setSettings(normalize(data));
       }
     } catch (error) {
       console.error("Erro ao buscar configurações:", error);
@@ -72,7 +94,7 @@ export function usePersonalSettings(personalId?: string) {
         .single();
 
       if (error) throw error;
-      setSettings(data);
+      setSettings(normalize(data));
     } catch (error) {
       console.error("Erro ao criar configurações padrão:", error);
     }
@@ -91,7 +113,7 @@ export function usePersonalSettings(personalId?: string) {
 
       if (error) throw error;
 
-      setSettings(data);
+      setSettings(normalize(data));
       toast({
         title: "✅ Configurações atualizadas",
         description: "Suas configurações foram salvas com sucesso.",

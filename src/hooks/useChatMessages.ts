@@ -68,6 +68,20 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
     ));
   }, [conversaKey, currentUserId]);
 
+  // Marcar uma mensagem específica como NÃO lida (manual, para o destinatário)
+  const marcarComoNaoLida = useCallback(async (mensagemId: string) => {
+    const { error } = await supabase
+      .from("mensagens_chat")
+      .update({ lida: false })
+      .eq("id", mensagemId)
+      .eq("destinatario_id", currentUserId);
+
+    if (!error) {
+      setMensagens(prev => prev.map(m => m.id === mensagemId ? { ...m, lida: false } : m));
+      setNaoLidas(prev => prev + 1);
+    }
+  }, [currentUserId]);
+
   // Enviar mensagem
   const enviarMensagem = useCallback(async (conteudo: string) => {
     if (!conteudo.trim()) return;
@@ -122,7 +136,18 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
           const newMsg = payload.new as ChatMessage;
           setMensagens(prev => [...prev, newMsg]);
           if (newMsg.destinatario_id === currentUserId) {
-            setNaoLidas(prev => prev + 1);
+            // Se o painel está visível, marcar imediatamente como lida
+            if (typeof document !== "undefined" && document.visibilityState === "visible") {
+              supabase
+                .from("mensagens_chat")
+                .update({ lida: true })
+                .eq("id", newMsg.id)
+                .then(() => {
+                  setMensagens(prev => prev.map(m => m.id === newMsg.id ? { ...m, lida: true } : m));
+                });
+            } else {
+              setNaoLidas(prev => prev + 1);
+            }
           }
         }
       )
@@ -153,6 +178,7 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
     naoLidas,
     enviarMensagem,
     marcarComoLidas,
+    marcarComoNaoLida,
     fetchNaoLidas,
   };
 }
@@ -187,10 +213,75 @@ export function useChatNaoLidas(userId: string) {
         },
         () => fetch()
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "mensagens_chat",
+          filter: `destinatario_id=eq.${userId}`,
+        },
+        () => fetch()
+      )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, [userId]);
 
   return total;
+}
+
+// Hook que retorna a última mensagem da conversa (para preview no dashboard)
+export interface UltimaMensagemPreview {
+  id: string;
+  conteudo: string;
+  remetente_id: string;
+  destinatario_id: string;
+  lida: boolean;
+  created_at: string;
+}
+
+export function useUltimaMensagem(personalId: string, alunoId: string) {
+  const [ultima, setUltima] = useState<UltimaMensagemPreview | null>(null);
+  const [loading, setLoading] = useState(true);
+  const conversaKey = personalId && alunoId ? `${personalId}::${alunoId}` : "";
+
+  useEffect(() => {
+    if (!conversaKey) {
+      setLoading(false);
+      return;
+    }
+
+    const fetch = async () => {
+      const { data } = await supabase
+        .from("mensagens_chat")
+        .select("id, conteudo, remetente_id, destinatario_id, lida, created_at")
+        .eq("conversa_key", conversaKey)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setUltima((data as UltimaMensagemPreview | null) ?? null);
+      setLoading(false);
+    };
+
+    fetch();
+
+    const channel = supabase
+      .channel(`chat-last:${conversaKey}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "mensagens_chat",
+          filter: `conversa_key=eq.${conversaKey}`,
+        },
+        () => fetch()
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [conversaKey]);
+
+  return { ultima, loading };
 }

@@ -3,18 +3,19 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Trophy,
-  Clock,
-  Calendar,
-  Coffee,
   Share2,
   Home,
-  MessageSquare,
   Star,
-  Dumbbell,
+  ChevronDown,
   CheckCircle2,
+  Clock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { WorkoutCompletionData } from "@/hooks/useWorkoutTimer";
@@ -27,8 +28,6 @@ interface WorkoutCompletionScreenProps {
   onClose: () => void;
 }
 
-const diasSemana = ["D", "S", "T", "Q", "Q", "S", "S"];
-
 export function WorkoutCompletionScreen({
   data,
   treinoId,
@@ -37,20 +36,12 @@ export function WorkoutCompletionScreen({
   const [feedback, setFeedback] = useState("");
   const [rating, setRating] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
-  // Dia atual da semana (0 = Domingo)
-  const hoje = new Date().getDay();
-
-  const handleSubmitFeedback = async () => {
-    if (!rating && !feedback.trim()) {
-      onClose();
-      return;
-    }
-
+  const enviarFeedback = async () => {
+    if (!rating && !feedback.trim()) return;
     setIsSubmitting(true);
     try {
-      // Salvar feedback na sessão ou criar notificação para o personal
       const { data: sessaoData } = await supabase
         .from("treino_sessoes")
         .select("personal_id, profile_id")
@@ -74,13 +65,7 @@ export function WorkoutCompletionScreen({
           lida: false,
         });
       }
-
-      setSubmitted(true);
-      toast.success("Obrigado pelo feedback!");
-      
-      setTimeout(() => {
-        onClose();
-      }, 1500);
+      toast.success("Feedback enviado!");
     } catch (err) {
       console.error("Erro ao enviar feedback:", err);
       toast.error("Erro ao enviar feedback");
@@ -89,25 +74,39 @@ export function WorkoutCompletionScreen({
     }
   };
 
+  const handleVoltar = async () => {
+    if (rating || feedback.trim()) {
+      await enviarFeedback();
+    }
+    onClose();
+  };
+
   const handleShare = async () => {
-    const shareText = `🏋️ Treino concluído!\n\n⏱️ Tempo: ${data.tempoFormatado}\n📅 Data: ${data.data}\n\n${data.mensagemMotivacional}`;
-    
+    const shareText = `🏋️ Treino concluído!\n\n⏱️ Tempo: ${data.tempoFormatado}\n💪 Exercícios: ${data.exerciciosConcluidos}/${data.exerciciosTotal}\n📅 ${data.data}\n\n${data.mensagemMotivacional}`;
+
     if (navigator.share) {
       try {
         await navigator.share({
           title: "Treino Concluído!",
           text: shareText,
         });
-      } catch (err) {
-        // Usuário cancelou ou erro
-        console.log("Share cancelled");
+      } catch {
+        /* cancel */
       }
     } else {
-      // Fallback: copiar para clipboard
       await navigator.clipboard.writeText(shareText);
       toast.success("Copiado para a área de transferência!");
     }
   };
+
+  // Tempo formatado: remove HH se for 00
+  const tempoExibido = (() => {
+    const parts = data.tempoFormatado.split(":");
+    if (parts.length === 3 && parts[0] === "00") {
+      return parts.slice(1).join(":");
+    }
+    return data.tempoFormatado;
+  })();
 
   return (
     <AnimatePresence>
@@ -115,239 +114,134 @@ export function WorkoutCompletionScreen({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-gradient-to-b from-primary/20 via-background to-background flex flex-col items-center justify-start overflow-y-auto py-8 px-4"
+        className="fixed inset-0 z-50 bg-background flex items-center justify-center overflow-y-auto p-4"
       >
-        {/* Header com mensagem de parabéns */}
-        <motion.div
-          initial={{ y: -50, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="text-center mb-6"
+        {/* Botão Compartilhar discreto no topo */}
+        <button
+          onClick={handleShare}
+          className="absolute top-4 right-4 p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          aria-label="Compartilhar"
         >
-          <h1 className="text-3xl sm:text-4xl font-bold italic bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            Parabéns!
-          </h1>
-          <p className="text-lg sm:text-xl text-muted-foreground mt-2">
-            Você concluiu seu treino!
-          </p>
-          {/* Confirmação de progresso salvo */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.4 }}
-            className="flex items-center justify-center gap-2 mt-3 text-sm text-green-600 dark:text-green-400"
-          >
-            <CheckCircle2 className="h-4 w-4" />
-            <span>Progresso salvo com sucesso!</span>
-          </motion.div>
-        </motion.div>
+          <Share2 className="h-5 w-5" />
+        </button>
 
-        {/* Card principal de conclusão */}
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.3, type: "spring" }}
+          initial={{ scale: 0.9, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 200, damping: 20 }}
           className="w-full max-w-md"
         >
-          <Card className="border-2 border-primary/20 shadow-2xl bg-card/95 backdrop-blur-sm overflow-hidden">
-            <CardContent className="p-0">
-              {/* Header do card */}
-              <div className="flex items-center justify-between p-4 border-b bg-muted/30">
-                <div className="flex items-center gap-2">
-                  <Dumbbell className="h-5 w-5 text-primary" />
-                  <span className="font-semibold text-sm">FitConsult</span>
+          <Card className="border-2 shadow-xl">
+            <CardContent className="p-8 space-y-6">
+              {/* Troféu */}
+              <div className="flex justify-center">
+                <motion.div
+                  initial={{ scale: 0, rotate: -30 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ delay: 0.2, type: "spring", bounce: 0.6 }}
+                  className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center"
+                >
+                  <Trophy className="h-10 w-10 text-primary" />
+                </motion.div>
+              </div>
+
+              {/* Título */}
+              <div className="text-center space-y-1">
+                <h1 className="text-2xl font-bold tracking-tight">
+                  Treino Concluído
+                </h1>
+                <p className="text-sm text-muted-foreground">{data.data}</p>
+              </div>
+
+              {/* Tempo total destacado */}
+              <div className="text-center space-y-1.5 py-2">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                  Tempo total
+                </p>
+                <p className="text-5xl font-bold font-mono tracking-tight text-foreground">
+                  {tempoExibido}
+                </p>
+              </div>
+
+              {/* Início → Fim e exercícios */}
+              <div className="grid grid-cols-2 gap-3 text-center">
+                <div className="rounded-lg border bg-muted/30 px-3 py-3">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1 flex items-center justify-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Início → Fim
+                  </p>
+                  <p className="text-sm font-semibold tabular-nums">
+                    {data.horaInicio} → {data.horaFim}
+                  </p>
                 </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  <span className="text-sm">{data.data}</span>
+                <div className="rounded-lg border bg-muted/30 px-3 py-3">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1 flex items-center justify-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Exercícios
+                  </p>
+                  <p className="text-sm font-semibold tabular-nums">
+                    {data.exerciciosConcluidos} de {data.exerciciosTotal}
+                  </p>
                 </div>
               </div>
 
-              {/* Conteúdo principal */}
-              <div className="p-6 space-y-6">
-                {/* Ícone de troféu */}
-                <div className="flex justify-center">
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.5, type: "spring", bounce: 0.5 }}
-                    className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center"
-                  >
-                    <Trophy className="h-10 w-10 text-primary" />
-                  </motion.div>
-                </div>
-
-                {/* Título */}
-                <div className="text-center">
-                  <h2 className="text-2xl font-bold">Treino Concluído!</h2>
-                </div>
-
-                {/* Tempo principal */}
-                <div className="text-center space-y-1">
-                  <p className="text-sm text-muted-foreground">Tempo de treino:</p>
-                  <motion.p
-                    initial={{ scale: 0.5 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.6 }}
-                    className="text-4xl sm:text-5xl font-bold font-mono tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent"
-                  >
-                    {data.tempoFormatado.split(":").slice(1).join(":")}
-                  </motion.p>
-                </div>
-
-                {/* Horários */}
-                <div className="flex justify-center gap-8 text-sm">
-                  <div className="text-center">
-                    <span className="text-muted-foreground">Início:</span>
-                    <p className="font-semibold">{data.horaInicio}</p>
-                  </div>
-                  <div className="text-center">
-                    <span className="text-muted-foreground">Fim:</span>
-                    <p className="font-semibold">{data.horaFim}</p>
-                  </div>
-                </div>
-
-                {/* Estatísticas extras */}
-                {(data.tempoDescanso > 0 || data.totalDescansos > 0) && (
-                  <div className="flex justify-center gap-4">
-                    {data.totalDescansos > 0 && (
-                      <Badge variant="secondary" className="gap-1">
-                        <Coffee className="h-3 w-3" />
-                        {data.totalDescansos} descansos
-                      </Badge>
-                    )}
-                  </div>
-                )}
-
-                {/* Dias da semana com check no dia atual */}
-                <div className="flex justify-center gap-2">
-                  {diasSemana.map((dia, index) => (
-                    <div
-                      key={index}
-                      className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all ${
-                        index === hoje
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "border-muted text-muted-foreground"
-                      }`}
-                    >
-                      {index === hoje ? (
-                        <CheckCircle2 className="h-5 w-5" />
-                      ) : (
-                        dia
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Seção de feedback */}
-        {!submitted && (
-          <motion.div
-            initial={{ y: 50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.7 }}
-            className="w-full max-w-md mt-6 space-y-4"
-          >
-            {/* Avaliação com estrelas */}
-            <div className="text-center space-y-2">
-              <p className="text-sm text-muted-foreground">
-                O que você achou do treino?
+              {/* Frase motivacional */}
+              <p className="text-center text-sm text-muted-foreground italic px-2">
+                {data.mensagemMotivacional}
               </p>
-              <div className="flex justify-center gap-2">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    onClick={() => setRating(star)}
-                    className="p-1 transition-transform hover:scale-110"
-                  >
-                    <Star
-                      className={`h-8 w-8 ${
-                        rating && star <= rating
-                          ? "fill-yellow-400 text-yellow-400"
-                          : "text-muted-foreground"
+
+              {/* Feedback opcional em collapse */}
+              <Collapsible open={feedbackOpen} onOpenChange={setFeedbackOpen}>
+                <CollapsibleTrigger asChild>
+                  <button className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-1">
+                    Deixar feedback para o personal
+                    <ChevronDown
+                      className={`h-3 w-3 transition-transform ${
+                        feedbackOpen ? "rotate-180" : ""
                       }`}
                     />
                   </button>
-                ))}
-              </div>
-            </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-3 pt-3">
+                  <div className="flex justify-center gap-1.5">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        onClick={() => setRating(star)}
+                        className="p-0.5 transition-transform hover:scale-110"
+                        aria-label={`${star} estrelas`}
+                      >
+                        <Star
+                          className={`h-6 w-6 ${
+                            rating && star <= rating
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "text-muted-foreground/40"
+                          }`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  <Textarea
+                    placeholder="Como foi o treino? (opcional)"
+                    value={feedback}
+                    onChange={(e) => setFeedback(e.target.value)}
+                    className="resize-none text-sm"
+                    rows={3}
+                  />
+                </CollapsibleContent>
+              </Collapsible>
 
-            {/* Campo de comentário */}
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground text-center">
-                Deixe um comentário para seu personal (opcional)
-              </p>
-              <Textarea
-                placeholder="Como foi o treino? Alguma observação?"
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
-                className="resize-none"
-                rows={3}
-              />
-            </div>
-          </motion.div>
-        )}
-
-        {/* Mensagem motivacional */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.9 }}
-          className="w-full max-w-md mt-6"
-        >
-          <Card className="bg-primary/5 border-primary/20">
-            <CardContent className="p-4 text-center">
-              <p className="text-lg font-medium">{data.mensagemMotivacional}</p>
+              {/* Ação primária */}
+              <Button
+                onClick={handleVoltar}
+                className="w-full h-12 text-base gap-2"
+                disabled={isSubmitting}
+              >
+                <Home className="h-5 w-5" />
+                {isSubmitting ? "Enviando..." : "Voltar ao Início"}
+              </Button>
             </CardContent>
           </Card>
-        </motion.div>
-
-        {/* Botões de ação */}
-        <motion.div
-          initial={{ y: 50, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 1 }}
-          className="w-full max-w-md mt-6 space-y-3 pb-8"
-        >
-          <Button
-            onClick={handleShare}
-            variant="outline"
-            className="w-full h-12 text-base gap-2"
-          >
-            <Share2 className="h-5 w-5" />
-            Compartilhar
-          </Button>
-
-          <Button
-            onClick={handleSubmitFeedback}
-            className="w-full h-12 text-base gap-2"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <>
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ repeat: Infinity, duration: 1 }}
-                >
-                  <Clock className="h-5 w-5" />
-                </motion.div>
-                Enviando...
-              </>
-            ) : submitted ? (
-              <>
-                <CheckCircle2 className="h-5 w-5" />
-                Obrigado!
-              </>
-            ) : (
-              <>
-                <Home className="h-5 w-5" />
-                {rating || feedback.trim() ? "Enviar e Voltar" : "Voltar ao Início"}
-              </>
-            )}
-          </Button>
         </motion.div>
       </motion.div>
     </AnimatePresence>

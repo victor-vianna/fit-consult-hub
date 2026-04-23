@@ -45,18 +45,11 @@ export interface WorkoutCompletionData {
   tempoPausas: number;
   totalDescansos: number;
   mensagemMotivacional: string;
+  exerciciosConcluidos: number;
+  exerciciosTotal: number;
 }
 
-const mensagensMotivacionais = [
-  "💪 Você arrasou! Cada treino te deixa mais forte!",
-  "🔥 Treino concluído com sucesso! Continue assim!",
-  "🏆 Parabéns! Mais um passo em direção aos seus objetivos!",
-  "⭐ Incrível! Sua dedicação está fazendo a diferença!",
-  "🎯 Missão cumprida! Seu esforço vale a pena!",
-  "💥 Você é imparável! Que treino sensacional!",
-  "🌟 Excelente trabalho! Seu corpo agradece!",
-  "🚀 Treino finalizado! Você está evoluindo a cada dia!",
-];
+const FRASE_FINAL_PADRAO = "Treino finalizado com excelência.";
 
 export function useWorkoutTimer({
   treinoId,
@@ -815,9 +808,27 @@ export function useWorkoutTimer({
         lida: false,
       });
 
-      // Preparar dados de conclusão
-      const mensagemMotivacional = mensagensMotivacionais[Math.floor(Math.random() * mensagensMotivacionais.length)];
-      
+      // Mensagem customizada do personal (fallback profissional)
+      const { data: personalCfg } = await supabase
+        .from("personal_settings")
+        .select("mensagem_conclusao_treino")
+        .eq("personal_id", personalId)
+        .maybeSingle();
+
+      const mensagemMotivacional =
+        personalCfg?.mensagem_conclusao_treino?.trim() || FRASE_FINAL_PADRAO;
+
+      // Contagem de exercícios (concluídos / total)
+      const { data: exerciciosTreino } = await supabase
+        .from("exercicios")
+        .select("id, concluido")
+        .eq("treino_semanal_id", treinoId)
+        .is("deleted_at", null);
+
+      const exerciciosTotal = exerciciosTreino?.length || 0;
+      const exerciciosConcluidos =
+        exerciciosTreino?.filter((e) => e.concluido).length || 0;
+
       const dadosConclusao: WorkoutCompletionData = {
         tempoTotal: tempoFinal,
         tempoFormatado: formatTime(tempoFinal),
@@ -828,6 +839,8 @@ export function useWorkoutTimer({
         tempoPausas: pausasTotalSegundos,
         totalDescansos: descansosFinais?.length || 0,
         mensagemMotivacional,
+        exerciciosConcluidos,
+        exerciciosTotal,
       };
 
       setCompletionData(dadosConclusao);

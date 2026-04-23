@@ -1429,34 +1429,52 @@ export type Database = {
       }
       personal_settings: {
         Row: {
+          cards_visiveis: Json | null
           created_at: string | null
           display_name: string | null
           id: string
+          jornada_message: string | null
+          jornada_title: string | null
           letterhead_url: string | null
           logo_url: string | null
+          mensagem_conclusao_treino: string | null
           personal_id: string
           theme_color: string | null
           updated_at: string | null
+          welcome_message: string | null
+          welcome_title: string | null
         }
         Insert: {
+          cards_visiveis?: Json | null
           created_at?: string | null
           display_name?: string | null
           id?: string
+          jornada_message?: string | null
+          jornada_title?: string | null
           letterhead_url?: string | null
           logo_url?: string | null
+          mensagem_conclusao_treino?: string | null
           personal_id: string
           theme_color?: string | null
           updated_at?: string | null
+          welcome_message?: string | null
+          welcome_title?: string | null
         }
         Update: {
+          cards_visiveis?: Json | null
           created_at?: string | null
           display_name?: string | null
           id?: string
+          jornada_message?: string | null
+          jornada_title?: string | null
           letterhead_url?: string | null
           logo_url?: string | null
+          mensagem_conclusao_treino?: string | null
           personal_id?: string
           theme_color?: string | null
           updated_at?: string | null
+          welcome_message?: string | null
+          welcome_title?: string | null
         }
         Relationships: [
           {

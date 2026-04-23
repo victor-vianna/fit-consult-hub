@@ -1,7 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, MessageSquare } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useChatMessages } from "@/hooks/useChatMessages";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -25,11 +30,23 @@ export function ChatPanel({ personalId, alunoId, currentUserId, themeColor }: Ch
     sending,
     enviarMensagem,
     marcarComoLidas,
+    marcarComoNaoLida,
   } = useChatMessages({ personalId, alunoId, currentUserId });
 
   // Marcar como lidas ao abrir
   useEffect(() => {
     marcarComoLidas();
+  }, [marcarComoLidas]);
+
+  // Marcar como lidas ao voltar a aba (usuário deixou aba aberta)
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState === "visible") {
+        marcarComoLidas();
+      }
+    };
+    document.addEventListener("visibilitychange", handler);
+    return () => document.removeEventListener("visibilitychange", handler);
   }, [marcarComoLidas]);
 
   // Scroll para baixo ao receber mensagem
@@ -75,38 +92,58 @@ export function ChatPanel({ personalId, alunoId, currentUserId, themeColor }: Ch
         ) : (
           mensagens.map((msg) => {
             const isMe = msg.remetente_id === currentUserId;
+            const podeMarcarNaoLida = !isMe && msg.lida;
+            const bubble = (
+              <div
+                className={cn(
+                  "max-w-[75%] rounded-2xl px-4 py-2.5 shadow-sm cursor-default select-text",
+                  isMe
+                    ? "rounded-br-md text-white"
+                    : "rounded-bl-md bg-muted text-foreground"
+                )}
+                style={isMe ? { backgroundColor: themeColor || "hsl(var(--primary))" } : undefined}
+              >
+                <MessageContent conteudo={msg.conteudo} isMe={isMe} themeColor={themeColor} />
+                <div className={cn(
+                  "flex items-center gap-1 mt-1",
+                  isMe ? "justify-end" : ""
+                )}>
+                  <p className={cn(
+                    "text-[10px]",
+                    isMe ? "text-white/70" : "text-muted-foreground"
+                  )}>
+                    {formatDistanceToNow(new Date(msg.created_at), {
+                      addSuffix: true,
+                      locale: ptBR,
+                    })}
+                  </p>
+                  {isMe && (
+                    <span className={cn("text-[10px]", msg.lida ? "text-white/90" : "text-white/50")}>
+                      {msg.lida ? "✔✔" : "✔"}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+
             return (
               <div key={msg.id} className={cn("flex", isMe ? "justify-end" : "justify-start")}>
-                <div
-                  className={cn(
-                    "max-w-[75%] rounded-2xl px-4 py-2.5 shadow-sm",
-                    isMe
-                      ? "rounded-br-md text-white"
-                      : "rounded-bl-md bg-muted text-foreground"
-                  )}
-                  style={isMe ? { backgroundColor: themeColor || "hsl(var(--primary))" } : undefined}
-                >
-                  <MessageContent conteudo={msg.conteudo} isMe={isMe} themeColor={themeColor} />
-                  <div className={cn(
-                    "flex items-center gap-1 mt-1",
-                    isMe ? "justify-end" : ""
-                  )}>
-                    <p className={cn(
-                      "text-[10px]",
-                      isMe ? "text-white/70" : "text-muted-foreground"
-                    )}>
-                      {formatDistanceToNow(new Date(msg.created_at), {
-                        addSuffix: true,
-                        locale: ptBR,
-                      })}
-                    </p>
-                    {isMe && (
-                      <span className={cn("text-[10px]", msg.lida ? "text-white/90" : "text-white/50")}>
-                        {msg.lida ? "✔✔" : "✔"}
-                      </span>
-                    )}
-                  </div>
-                </div>
+                {podeMarcarNaoLida ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="max-w-[75%] text-left">
+                        {bubble}
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" side="bottom">
+                      <DropdownMenuItem onClick={() => marcarComoNaoLida(msg.id)}>
+                        Marcar como não lida
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  bubble
+                )}
               </div>
             );
           })
@@ -141,8 +178,7 @@ export function ChatPanel({ personalId, alunoId, currentUserId, themeColor }: Ch
 
 /**
  * Renderiza o conteúdo de uma mensagem, destacando blocos de citação
- * (linhas iniciadas com "> ") como quotes visuais — usado pelas respostas
- * a feedbacks semanais para mostrar a qual pergunta a resposta se refere.
+ * (linhas iniciadas com "> ") como quotes visuais.
  */
 function MessageContent({
   conteudo,

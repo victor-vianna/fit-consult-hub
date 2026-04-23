@@ -47,7 +47,10 @@ import { AppLayout } from "@/components/AppLayout";
 import ExercisesLibrary from "@/components/ExercisesLibrary";
 import { PlanilhaStatusCard } from "@/components/PlanilhaStatusCard";
 import { ChatPanel } from "@/components/chat/ChatPanel";
-import { useChatNaoLidas } from "@/hooks/useChatMessages";
+import { useChatNaoLidas, useUltimaMensagem } from "@/hooks/useChatMessages";
+import { DEFAULT_CARDS_VISIVEIS } from "@/hooks/usePersonalSettings";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface Material {
   id: string;

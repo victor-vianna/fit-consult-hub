@@ -40,6 +40,13 @@ export function usePersonalSettings(personalId?: string) {
     }
   }, [personalId]);
 
+  const normalize = (raw: any): PersonalSettings => ({
+    ...raw,
+    cards_visiveis: Array.isArray(raw?.cards_visiveis)
+      ? (raw.cards_visiveis as string[])
+      : [...DEFAULT_CARDS_VISIVEIS],
+  });
+
   const fetchSettings = async () => {
     if (!personalId) return;
 
@@ -51,14 +58,13 @@ export function usePersonalSettings(personalId?: string) {
         .single();
 
       if (error) {
-        // Se não existir, criar configurações padrão
         if (error.code === "PGRST116") {
           await createDefaultSettings();
         } else {
           throw error;
         }
       } else {
-        setSettings(data);
+        setSettings(normalize(data));
       }
     } catch (error) {
       console.error("Erro ao buscar configurações:", error);
@@ -88,7 +94,7 @@ export function usePersonalSettings(personalId?: string) {
         .single();
 
       if (error) throw error;
-      setSettings(data);
+      setSettings(normalize(data));
     } catch (error) {
       console.error("Erro ao criar configurações padrão:", error);
     }
@@ -107,7 +113,7 @@ export function usePersonalSettings(personalId?: string) {
 
       if (error) throw error;
 
-      setSettings(data);
+      setSettings(normalize(data));
       toast({
         title: "✅ Configurações atualizadas",
         description: "Suas configurações foram salvas com sucesso.",

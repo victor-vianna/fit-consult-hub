@@ -146,6 +146,63 @@ export default function AreaAluno() {
     setViewerOpen(true);
   };
 
+  const cardsVisiveis = (personalSettings?.cards_visiveis?.length
+    ? personalSettings.cards_visiveis
+    : [...DEFAULT_CARDS_VISIVEIS]) as string[];
+
+  const { ultima: ultimaMsg } = useUltimaMensagem(
+    profile?.personal_id || "",
+    user?.id || ""
+  );
+
+  const renderChatPreview = () => {
+    if (!ultimaMsg || !profile?.personal_id) return null;
+    const isFromPersonal = ultimaMsg.remetente_id === profile.personal_id;
+    const naoLida = isFromPersonal && !ultimaMsg.lida;
+    return (
+      <button
+        onClick={() => setActiveSection("chat")}
+        className={`w-full text-left rounded-lg border p-3 flex items-start gap-3 transition-colors hover:bg-muted/50 ${
+          naoLida ? "border-destructive/50 bg-destructive/5" : "bg-card"
+        }`}
+      >
+        <div className="relative shrink-0">
+          <div
+            className="h-10 w-10 rounded-full flex items-center justify-center text-white font-semibold"
+            style={{ backgroundColor: personalSettings?.theme_color || "hsl(var(--primary))" }}
+          >
+            <MessageSquare className="h-5 w-5" />
+          </div>
+          {naoLida && (
+            <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-destructive animate-pulse border-2 border-background" />
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold truncate">Mensagens</p>
+            <span className="text-[10px] text-muted-foreground shrink-0">
+              {formatDistanceToNow(new Date(ultimaMsg.created_at), { addSuffix: true, locale: ptBR })}
+            </span>
+          </div>
+          <p className={`text-xs truncate ${naoLida ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+            {isFromPersonal ? "" : "Você: "}
+            {ultimaMsg.conteudo}
+          </p>
+        </div>
+      </button>
+    );
+  };
+
+  const cardConfig: Record<string, { title: string; icon: any; section: string; badge?: number }> = {
+    treinos: { title: "Treinos", icon: Dumbbell, section: "treinos" },
+    historico: { title: "Histórico", icon: Calendar, section: "historico" },
+    avaliacao: { title: "Avaliação", icon: Activity, section: "avaliacao" },
+    materiais: { title: "Materiais", icon: FileText, section: "materiais" },
+    plano: { title: "Meu Plano", icon: CreditCard, section: "plano" },
+    biblioteca: { title: "Biblioteca", icon: Library, section: "biblioteca" },
+    chat: { title: "Chat", icon: MessageSquare, section: "chat", badge: chatNaoLidas },
+  };
+
   const renderMobileHome = () => {
     return (
       <div className="space-y-4 container-mobile pb-24 animate-fade-in">
@@ -158,6 +215,9 @@ export default function AreaAluno() {
           />
         )}
 
+        {/* Preview de mensagens */}
+        {renderChatPreview()}
+
         {/* Card de status da planilha */}
         {profile?.personal_id && (
           <PlanilhaStatusCard
@@ -169,47 +229,19 @@ export default function AreaAluno() {
         )}
 
         <div className="grid grid-cols-2 gap-4 sm:gap-6 md:gap-4">
-          <ActionCard
-            title="Treinos"
-            icon={Dumbbell}
-            onClick={() => setActiveSection("treinos")}
-          />
-          <ActionCard
-            title="Histórico"
-            icon={Calendar}
-            onClick={() => setActiveSection("historico")}
-          />
-          <ActionCard
-            title="Avaliação"
-            icon={Activity}
-            onClick={() => setActiveSection("avaliacao")}
-          />
-          <ActionCard
-            title="Materiais"
-            icon={FileText}
-            onClick={() => setActiveSection("materiais")}
-          />
-          {/* <ActionCard
-            title="Consultoria"
-            icon={BookOpen}
-            onClick={() => setActiveSection("consultoria")}
-          /> */}
-          <ActionCard
-            title="Meu Plano"
-            icon={CreditCard}
-            onClick={() => setActiveSection("plano")}
-          />
-          <ActionCard
-            title="Biblioteca"
-            icon={Library}
-            onClick={() => setActiveSection("biblioteca")}
-          />
-          <ActionCard
-            title="Chat"
-            icon={MessageSquare}
-            onClick={() => setActiveSection("chat")}
-            badge={chatNaoLidas > 0 ? chatNaoLidas : undefined}
-          />
+          {cardsVisiveis.map((id) => {
+            const cfg = cardConfig[id];
+            if (!cfg) return null;
+            return (
+              <ActionCard
+                key={id}
+                title={cfg.title}
+                icon={cfg.icon}
+                onClick={() => setActiveSection(cfg.section)}
+                badge={cfg.badge && cfg.badge > 0 ? cfg.badge : undefined}
+              />
+            );
+          })}
         </div>
 
         <Card
@@ -230,19 +262,23 @@ export default function AreaAluno() {
                 color: personalSettings?.theme_color || undefined,
               }}
             >
-              Sua Jornada Começa Agora
+              {personalSettings?.jornada_title || "Sua Jornada Começa Agora"}
             </CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            <p className="mb-3">
-              Agora que você já conhece o funcionamento da minha consultoria,
-              chegou o momento de dar o primeiro passo!
-            </p>
-            <p className="font-semibold">
-              Vamos juntos transformar sua rotina, superar desafios e conquistar
-              os seus melhores resultados. Estou pronto para te acompanhar – vem
-              comigo! 💪
-            </p>
+          <CardContent className="text-sm text-muted-foreground whitespace-pre-line">
+            {personalSettings?.jornada_message || (
+              <>
+                <p className="mb-3">
+                  Agora que você já conhece o funcionamento da minha consultoria,
+                  chegou o momento de dar o primeiro passo!
+                </p>
+                <p className="font-semibold">
+                  Vamos juntos transformar sua rotina, superar desafios e conquistar
+                  os seus melhores resultados. Estou pronto para te acompanhar – vem
+                  comigo! 💪
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

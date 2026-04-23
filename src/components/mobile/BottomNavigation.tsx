@@ -9,24 +9,18 @@ interface BottomNavigationProps {
   onSectionChange: (section: string) => void;
   onSignOut: () => void;
   personalWhatsApp?: string;
+  chatNaoLidas?: number;
 }
 
 export function BottomNavigation({ 
   activeSection, 
   onSectionChange, 
   onSignOut,
-  personalWhatsApp 
+  personalWhatsApp,
+  chatNaoLidas = 0,
 }: BottomNavigationProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { light } = useHaptic();
-
-  const handleWhatsAppClick = () => {
-    light();
-    if (personalWhatsApp) {
-      const cleanPhone = personalWhatsApp.replace(/\D/g, '');
-      window.open(`https://wa.me/${cleanPhone}`, '_blank');
-    }
-  };
 
   const handleSectionChange = (section: string) => {
     light();
@@ -56,7 +50,7 @@ export function BottomNavigation({
           <button
             onClick={() => handleSectionChange('chat')}
             className={cn(
-              "flex flex-col items-center gap-1 px-6 py-2 rounded-lg",
+              "flex flex-col items-center gap-1 px-6 py-2 rounded-lg relative",
               "transition-all duration-300 ease-in-out",
               "active:scale-95",
               "touch-target",
@@ -65,7 +59,14 @@ export function BottomNavigation({
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
-            <MessageCircle className="h-6 w-6 transition-transform" />
+            <div className="relative">
+              <MessageCircle className="h-6 w-6 transition-transform" />
+              {chatNaoLidas > 0 && (
+                <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center animate-pulse">
+                  {chatNaoLidas > 9 ? "9+" : chatNaoLidas}
+                </span>
+              )}
+            </div>
             <span className="text-xs font-medium">Chat</span>
           </button>
 
@@ -101,3 +102,4 @@ export function BottomNavigation({
     </>
   );
 }
+

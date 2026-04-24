@@ -350,6 +350,9 @@ export default function AreaAluno() {
               />
             )}
 
+            {/* Preview de mensagens */}
+            {renderChatPreview()}
+
             <Card>
               <CardHeader>
                 <CardTitle
@@ -358,21 +361,29 @@ export default function AreaAluno() {
                     color: personalSettings?.theme_color || undefined,
                   }}
                 >
-                  Bem-vindo(a), {profile?.nome}! 🎉
+                  {personalSettings?.welcome_title
+                    ? personalSettings.welcome_title.replace("{nome}", profile?.nome ?? "")
+                    : `Bem-vindo(a), ${profile?.nome ?? ""}! 🎉`}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4 text-muted-foreground">
-                <p>Seja muito bem-vindo(a) à minha consultoria online!</p>
-                <p>
-                  Fico muito feliz por ter você aqui, e quero te dizer que este
-                  é um espaço exclusivo, criado para oferecer orientação de
-                  qualidade, com um acompanhamento próximo e personalizado.
-                </p>
-                <p>
-                  Aqui, tudo é feito por mim, com total dedicação para garantir
-                  que você tenha o suporte necessário para alcançar os melhores
-                  resultados!
-                </p>
+              <CardContent className="space-y-4 text-muted-foreground whitespace-pre-line">
+                {personalSettings?.welcome_message ? (
+                  <p>{personalSettings.welcome_message}</p>
+                ) : (
+                  <>
+                    <p>Seja muito bem-vindo(a) à minha consultoria online!</p>
+                    <p>
+                      Fico muito feliz por ter você aqui, e quero te dizer que este
+                      é um espaço exclusivo, criado para oferecer orientação de
+                      qualidade, com um acompanhamento próximo e personalizado.
+                    </p>
+                    <p>
+                      Aqui, tudo é feito por mim, com total dedicação para garantir
+                      que você tenha o suporte necessário para alcançar os melhores
+                      resultados!
+                    </p>
+                  </>
+                )}
               </CardContent>
             </Card>
 
@@ -393,22 +404,28 @@ export default function AreaAluno() {
                     color: personalSettings?.theme_color || undefined,
                   }}
                 >
-                  Sua Jornada Começa Agora
+                  {personalSettings?.jornada_title || "Sua Jornada Começa Agora"}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="text-muted-foreground">
-                <p className="mb-4">
-                  Agora que você já conhece o funcionamento da minha
-                  consultoria, chegou o momento de dar o primeiro passo! Estou
-                  aqui para te guiar nessa jornada, garantindo que você tenha o
-                  suporte necessário para evoluir de forma consistente e
-                  alcançar seus objetivos.
-                </p>
-                <p className="font-semibold">
-                  Vamos juntos transformar sua rotina, superar desafios e
-                  conquistar os seus melhores resultados. Estou pronto para te
-                  acompanhar – vem comigo! 💪
-                </p>
+              <CardContent className="text-muted-foreground whitespace-pre-line">
+                {personalSettings?.jornada_message ? (
+                  <p>{personalSettings.jornada_message}</p>
+                ) : (
+                  <>
+                    <p className="mb-4">
+                      Agora que você já conhece o funcionamento da minha
+                      consultoria, chegou o momento de dar o primeiro passo! Estou
+                      aqui para te guiar nessa jornada, garantindo que você tenha o
+                      suporte necessário para evoluir de forma consistente e
+                      alcançar seus objetivos.
+                    </p>
+                    <p className="font-semibold">
+                      Vamos juntos transformar sua rotina, superar desafios e
+                      conquistar os seus melhores resultados. Estou pronto para te
+                      acompanhar – vem comigo! 💪
+                    </p>
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -669,6 +686,7 @@ export default function AreaAluno() {
             onSectionChange={setActiveSection}
             onSignOut={signOut}
             personalWhatsApp={personalProfile?.telefone}
+            chatNaoLidas={chatNaoLidas}
           />
 
           {selectedFile && (

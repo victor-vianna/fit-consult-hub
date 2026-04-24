@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +45,21 @@ export function CicloTreinoFields({
   const [modalidade, setModalidade] = useState(initialValues?.ciclo_modalidade || "");
   const [nivel, setNivel] = useState(initialValues?.ciclo_nivel || "");
   const [numero, setNumero] = useState(initialValues?.ciclo_numero?.toString() || "");
+
+  // 🔧 FIX: Sincronizar estado com initialValues quando dados chegam do banco assincronamente
+  // ou quando muda de planilha. Sem isso, o ciclo salvo não aparece ao retornar à tela.
+  useEffect(() => {
+    setGenero(initialValues?.ciclo_genero || "");
+    setModalidade(initialValues?.ciclo_modalidade || "");
+    setNivel(initialValues?.ciclo_nivel || "");
+    setNumero(initialValues?.ciclo_numero?.toString() || "");
+  }, [
+    planilhaId,
+    initialValues?.ciclo_genero,
+    initialValues?.ciclo_modalidade,
+    initialValues?.ciclo_nivel,
+    initialValues?.ciclo_numero,
+  ]);
 
   const { pastas, loading: loadingPastas } = useModeloPastas({
     personalId,

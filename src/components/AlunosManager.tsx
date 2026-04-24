@@ -68,16 +68,26 @@ export default function AlunosManager() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [alunos, setAlunos] = useState<Aluno[]>([]);
-  const [alunosFiltrados, setAlunosFiltrados] = useState<Aluno[]>([]);
+  const queryClient = useQueryClient();
+
+  // 🔧 Filtros persistidos em sessionStorage para preservar estado entre navegações
+  const FILTERS_KEY = "alunos-filters";
+  const initialFilters = (() => {
+    try {
+      const raw = sessionStorage.getItem(FILTERS_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return { searchTerm: "", filtroStatus: "todos", ordenacao: "nome" };
+  })();
+
   const [loading, setLoading] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState<string>(initialFilters.searchTerm);
   const [filtroStatus, setFiltroStatus] = useState<
     "todos" | "ativos" | "inativos"
-  >("todos");
+  >(initialFilters.filtroStatus);
   const [ordenacao, setOrdenacao] = useState<"nome" | "recente" | "antigo">(
-    "nome"
+    initialFilters.ordenacao
   );
 
   const [novoAluno, setNovoAluno] = useState({
@@ -90,39 +100,38 @@ export default function AlunosManager() {
   const { settings: personalSettings } = usePersonalSettings(user?.id);
   const { flagsByStudent } = usePriorityStudents(user?.id);
 
+  // 🔧 Persistir filtros sempre que mudarem
   useEffect(() => {
-    if (user) {
-      fetchAlunos();
-    }
-  }, [user]);
-
-  useEffect(() => {
-    filtrarEOrdenarAlunos();
-  }, [alunos, searchTerm, filtroStatus, ordenacao]);
-
-  const fetchAlunos = async () => {
-    if (!user) return;
-
     try {
+      sessionStorage.setItem(
+        FILTERS_KEY,
+        JSON.stringify({ searchTerm, filtroStatus, ordenacao })
+      );
+    } catch {}
+  }, [searchTerm, filtroStatus, ordenacao]);
+
+  // 🔧 React Query: cache compartilhado, sem refetch desnecessário entre navegações
+  const { data: alunos = [] } = useQuery<Aluno[]>({
+    queryKey: ["alunos", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("personal_id", user.id)
         .order("nome");
-
       if (error) throw error;
-      setAlunos(data || []);
-    } catch (error) {
-      console.error("Erro ao carregar alunos:", error);
-      toast({
-        title: "Erro ao carregar alunos",
-        description: "Ocorreu um erro ao buscar a lista de alunos",
-        variant: "destructive",
-      });
-    }
+      return (data as Aluno[]) || [];
+    },
+    enabled: !!user,
+    staleTime: 60_000,
+  });
+
+  const fetchAlunos = () => {
+    queryClient.invalidateQueries({ queryKey: ["alunos", user?.id] });
   };
 
-  const filtrarEOrdenarAlunos = () => {
+  const alunosFiltrados = useMemo(() => {
     let resultado = [...alunos];
 
     if (searchTerm) {
@@ -153,8 +162,8 @@ export default function AlunosManager() {
       }
     });
 
-    setAlunosFiltrados(resultado);
-  };
+    return resultado;
+  }, [alunos, searchTerm, filtroStatus, ordenacao]);
 
   const handleCreateAluno = async () => {
     if (!novoAluno.nome || !novoAluno.email || !novoAluno.password) {

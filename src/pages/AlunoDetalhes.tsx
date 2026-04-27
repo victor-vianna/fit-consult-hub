@@ -506,32 +506,86 @@ export default function AlunoDetalhes() {
                   </div>
 
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-                        {aluno.nome}
-                      </h1>
-                      {isMobile && (
-                        <Badge
-                          variant={aluno.is_active ? "default" : "destructive"}
-                          className="text-xs"
-                        >
-                          {aluno.is_active ? "Ativo" : "Bloqueado"}
-                        </Badge>
-                      )}
-                    </div>
-
-                    <div className="space-y-1 text-sm md:text-base">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Mail className="h-4 w-4" />
-                        <span>{aluno.email}</span>
-                      </div>
-                      {aluno.telefone && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Phone className="h-4 w-4" />
-                          <span>{aluno.telefone}</span>
+                    {editandoPerfil ? (
+                      <div className="space-y-2">
+                        <div>
+                          <Label htmlFor="edit-nome" className="text-xs">Nome</Label>
+                          <Input
+                            id="edit-nome"
+                            value={editNome}
+                            onChange={(e) => setEditNome(e.target.value)}
+                            className="text-lg font-semibold"
+                            autoFocus
+                          />
                         </div>
-                      )}
-                    </div>
+                        <div>
+                          <Label htmlFor="edit-tel" className="text-xs">Telefone</Label>
+                          <Input
+                            id="edit-tel"
+                            value={editTelefone}
+                            onChange={(e) => setEditTelefone(e.target.value)}
+                            placeholder="(00) 00000-0000"
+                          />
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <Button
+                            size="sm"
+                            onClick={salvarPerfil}
+                            disabled={salvandoPerfil}
+                          >
+                            <Check className="h-4 w-4 mr-1" />
+                            Salvar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={cancelarEdicaoPerfil}
+                            disabled={salvandoPerfil}
+                          >
+                            <X className="h-4 w-4 mr-1" />
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+                            {aluno.nome}
+                          </h1>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={iniciarEdicaoPerfil}
+                            title="Editar nome e telefone"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          {isMobile && (
+                            <Badge
+                              variant={aluno.is_active ? "default" : "destructive"}
+                              className="text-xs"
+                            >
+                              {aluno.is_active ? "Ativo" : "Bloqueado"}
+                            </Badge>
+                          )}
+                        </div>
+
+                        <div className="space-y-1 text-sm md:text-base">
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Mail className="h-4 w-4" />
+                            <span>{aluno.email}</span>
+                          </div>
+                          {aluno.telefone && (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Phone className="h-4 w-4" />
+                              <span>{aluno.telefone}</span>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 

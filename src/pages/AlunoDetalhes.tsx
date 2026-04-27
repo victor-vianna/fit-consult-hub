@@ -114,6 +114,10 @@ export default function AlunoDetalhes() {
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "geral");
   const [refreshKey, setRefreshKey] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+  const [editandoPerfil, setEditandoPerfil] = useState(false);
+  const [editNome, setEditNome] = useState("");
+  const [editTelefone, setEditTelefone] = useState("");
+  const [salvandoPerfil, setSalvandoPerfil] = useState(false);
 
   // Chat não lidas badge
   const chatHook = useChatMessages({
@@ -324,6 +328,58 @@ export default function AlunoDetalhes() {
   const handleActiveStatusChange = (newStatus: boolean) => {
     if (aluno) {
       setAluno({ ...aluno, is_active: newStatus });
+    }
+  };
+
+  const iniciarEdicaoPerfil = () => {
+    if (!aluno) return;
+    setEditNome(aluno.nome);
+    setEditTelefone(aluno.telefone || "");
+    setEditandoPerfil(true);
+  };
+
+  const cancelarEdicaoPerfil = () => {
+    setEditandoPerfil(false);
+  };
+
+  const salvarPerfil = async () => {
+    if (!aluno) return;
+    const nomeTrim = editNome.trim();
+    if (!nomeTrim) {
+      toast({
+        title: "Nome inválido",
+        description: "O nome não pode ficar em branco.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSalvandoPerfil(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          nome: nomeTrim,
+          telefone: editTelefone.trim() || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", aluno.id);
+
+      if (error) throw error;
+
+      setAluno({ ...aluno, nome: nomeTrim, telefone: editTelefone.trim() || undefined });
+      setEditandoPerfil(false);
+      toast({
+        title: "Perfil atualizado",
+        description: "Os dados do aluno foram atualizados com sucesso.",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Erro ao atualizar",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSalvandoPerfil(false);
     }
   };
 

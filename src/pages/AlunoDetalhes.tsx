@@ -53,6 +53,9 @@ import {
   ClipboardList,
   ClipboardCheck,
   MessageSquare,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 import { DocumentViewer } from "@/components/DocumentViewer";
 import { format } from "date-fns";
@@ -111,6 +114,10 @@ export default function AlunoDetalhes() {
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "geral");
   const [refreshKey, setRefreshKey] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+  const [editandoPerfil, setEditandoPerfil] = useState(false);
+  const [editNome, setEditNome] = useState("");
+  const [editTelefone, setEditTelefone] = useState("");
+  const [salvandoPerfil, setSalvandoPerfil] = useState(false);
 
   // Chat não lidas badge
   const chatHook = useChatMessages({
@@ -324,6 +331,58 @@ export default function AlunoDetalhes() {
     }
   };
 
+  const iniciarEdicaoPerfil = () => {
+    if (!aluno) return;
+    setEditNome(aluno.nome);
+    setEditTelefone(aluno.telefone || "");
+    setEditandoPerfil(true);
+  };
+
+  const cancelarEdicaoPerfil = () => {
+    setEditandoPerfil(false);
+  };
+
+  const salvarPerfil = async () => {
+    if (!aluno) return;
+    const nomeTrim = editNome.trim();
+    if (!nomeTrim) {
+      toast({
+        title: "Nome inválido",
+        description: "O nome não pode ficar em branco.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSalvandoPerfil(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          nome: nomeTrim,
+          telefone: editTelefone.trim() || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", aluno.id);
+
+      if (error) throw error;
+
+      setAluno({ ...aluno, nome: nomeTrim, telefone: editTelefone.trim() || undefined });
+      setEditandoPerfil(false);
+      toast({
+        title: "Perfil atualizado",
+        description: "Os dados do aluno foram atualizados com sucesso.",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Erro ao atualizar",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSalvandoPerfil(false);
+    }
+  };
+
   const handleTreinoAtualizado = () => {
     setRefreshKey((prev) => prev + 1);
   };
@@ -447,32 +506,86 @@ export default function AlunoDetalhes() {
                   </div>
 
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-                        {aluno.nome}
-                      </h1>
-                      {isMobile && (
-                        <Badge
-                          variant={aluno.is_active ? "default" : "destructive"}
-                          className="text-xs"
-                        >
-                          {aluno.is_active ? "Ativo" : "Bloqueado"}
-                        </Badge>
-                      )}
-                    </div>
-
-                    <div className="space-y-1 text-sm md:text-base">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Mail className="h-4 w-4" />
-                        <span>{aluno.email}</span>
-                      </div>
-                      {aluno.telefone && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Phone className="h-4 w-4" />
-                          <span>{aluno.telefone}</span>
+                    {editandoPerfil ? (
+                      <div className="space-y-2">
+                        <div>
+                          <Label htmlFor="edit-nome" className="text-xs">Nome</Label>
+                          <Input
+                            id="edit-nome"
+                            value={editNome}
+                            onChange={(e) => setEditNome(e.target.value)}
+                            className="text-lg font-semibold"
+                            autoFocus
+                          />
                         </div>
-                      )}
-                    </div>
+                        <div>
+                          <Label htmlFor="edit-tel" className="text-xs">Telefone</Label>
+                          <Input
+                            id="edit-tel"
+                            value={editTelefone}
+                            onChange={(e) => setEditTelefone(e.target.value)}
+                            placeholder="(00) 00000-0000"
+                          />
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <Button
+                            size="sm"
+                            onClick={salvarPerfil}
+                            disabled={salvandoPerfil}
+                          >
+                            <Check className="h-4 w-4 mr-1" />
+                            Salvar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={cancelarEdicaoPerfil}
+                            disabled={salvandoPerfil}
+                          >
+                            <X className="h-4 w-4 mr-1" />
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+                            {aluno.nome}
+                          </h1>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={iniciarEdicaoPerfil}
+                            title="Editar nome e telefone"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          {isMobile && (
+                            <Badge
+                              variant={aluno.is_active ? "default" : "destructive"}
+                              className="text-xs"
+                            >
+                              {aluno.is_active ? "Ativo" : "Bloqueado"}
+                            </Badge>
+                          )}
+                        </div>
+
+                        <div className="space-y-1 text-sm md:text-base">
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Mail className="h-4 w-4" />
+                            <span>{aluno.email}</span>
+                          </div>
+                          {aluno.telefone && (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Phone className="h-4 w-4" />
+                              <span>{aluno.telefone}</span>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 

@@ -53,6 +53,9 @@ import {
   ClipboardList,
   ClipboardCheck,
   MessageSquare,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 import { DocumentViewer } from "@/components/DocumentViewer";
 import { format } from "date-fns";

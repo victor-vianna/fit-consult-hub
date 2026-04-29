@@ -298,8 +298,8 @@ export default function AreaAluno() {
                 Acesso aos treinos bloqueado
               </h2>
               <p className="text-muted-foreground max-w-md">
-                Sua planilha de treino expirou há mais de 7 dias. 
-                Entre em contato com seu personal trainer para renovar seu plano 
+                Seu acesso aos treinos está temporariamente suspenso.
+                Entre em contato com seu personal trainer para regularizar
                 e voltar a treinar!
               </p>
             </div>

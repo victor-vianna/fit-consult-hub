@@ -147,13 +147,23 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
   }, [planilha?.data_prevista_fim]);
 
   const status: PlanilhaUIStatus = useMemo(() => {
+    // OVERRIDE DO PERSONAL: se o personal bloqueou manualmente (is_active=false),
+    // o aluno é bloqueado independente do estado da planilha.
+    if (profileStatus && profileStatus.is_active === false) {
+      return PLANILHA_UI_STATUS.BLOQUEADA;
+    }
+
     if (!planilha) return PLANILHA_UI_STATUS.SEM_PLANILHA;
-    if (diasRestantes <= 0 && diasAposExpiracao > 7) return PLANILHA_UI_STATUS.BLOQUEADA;
+
+    // Se o personal mantém o aluno ativo (is_active=true ou indefinido),
+    // a planilha vencida NÃO bloqueia o acesso aos treinos —
+    // apenas exibe avisos (EXPIRADA / CRITICA / EXPIRANDO).
+    // O bloqueio real só acontece via toggle manual do personal acima.
     if (diasRestantes <= 0) return PLANILHA_UI_STATUS.EXPIRADA;
     if (diasRestantes <= 3) return PLANILHA_UI_STATUS.CRITICA;
     if (diasRestantes <= 7) return PLANILHA_UI_STATUS.EXPIRANDO;
     return PLANILHA_UI_STATUS.ATIVA;
-  }, [planilha, diasRestantes, diasAposExpiracao]);
+  }, [planilha, diasRestantes, diasAposExpiracao, profileStatus]);
 
   /**
    * Replica os treinos da semana base para as demais semanas da planilha

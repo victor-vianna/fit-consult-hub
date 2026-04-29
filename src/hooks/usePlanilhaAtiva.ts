@@ -37,6 +37,28 @@ const generateUUID = (): string => {
 export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaParams) {
   const queryClient = useQueryClient();
 
+  // Buscar status is_active do aluno (override do personal)
+  // Quando is_active = true, o personal liberou explicitamente o acesso,
+  // independentemente do estado da planilha ou pagamento.
+  const { data: profileStatus } = useQuery({
+    queryKey: ["profile-is-active", profileId],
+    queryFn: async () => {
+      if (!profileId) return null;
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("is_active")
+        .eq("id", profileId)
+        .maybeSingle();
+      if (error) {
+        console.error("Erro ao buscar is_active:", error);
+        return null;
+      }
+      return data;
+    },
+    enabled: !!profileId,
+    staleTime: 30_000,
+  });
+
   // Buscar planilha ativa
   const { data: planilha, isLoading: loading } = useQuery({
     queryKey: ["planilha-ativa", profileId, personalId],
@@ -125,13 +147,23 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
   }, [planilha?.data_prevista_fim]);
 
   const status: PlanilhaUIStatus = useMemo(() => {
+    // OVERRIDE DO PERSONAL: se o personal bloqueou manualmente (is_active=false),
+    // o aluno é bloqueado independente do estado da planilha.
+    if (profileStatus && profileStatus.is_active === false) {
+      return PLANILHA_UI_STATUS.BLOQUEADA;
+    }
+
     if (!planilha) return PLANILHA_UI_STATUS.SEM_PLANILHA;
-    if (diasRestantes <= 0 && diasAposExpiracao > 7) return PLANILHA_UI_STATUS.BLOQUEADA;
+
+    // Se o personal mantém o aluno ativo (is_active=true ou indefinido),
+    // a planilha vencida NÃO bloqueia o acesso aos treinos —
+    // apenas exibe avisos (EXPIRADA / CRITICA / EXPIRANDO).
+    // O bloqueio real só acontece via toggle manual do personal acima.
     if (diasRestantes <= 0) return PLANILHA_UI_STATUS.EXPIRADA;
     if (diasRestantes <= 3) return PLANILHA_UI_STATUS.CRITICA;
     if (diasRestantes <= 7) return PLANILHA_UI_STATUS.EXPIRANDO;
     return PLANILHA_UI_STATUS.ATIVA;
-  }, [planilha, diasRestantes, diasAposExpiracao]);
+  }, [planilha, diasRestantes, diasAposExpiracao, profileStatus]);
 
   /**
    * Replica os treinos da semana base para as demais semanas da planilha

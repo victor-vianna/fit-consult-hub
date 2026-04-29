@@ -37,6 +37,28 @@ const generateUUID = (): string => {
 export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaParams) {
   const queryClient = useQueryClient();
 
+  // Buscar status is_active do aluno (override do personal)
+  // Quando is_active = true, o personal liberou explicitamente o acesso,
+  // independentemente do estado da planilha ou pagamento.
+  const { data: profileStatus } = useQuery({
+    queryKey: ["profile-is-active", profileId],
+    queryFn: async () => {
+      if (!profileId) return null;
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("is_active")
+        .eq("id", profileId)
+        .maybeSingle();
+      if (error) {
+        console.error("Erro ao buscar is_active:", error);
+        return null;
+      }
+      return data;
+    },
+    enabled: !!profileId,
+    staleTime: 30_000,
+  });
+
   // Buscar planilha ativa
   const { data: planilha, isLoading: loading } = useQuery({
     queryKey: ["planilha-ativa", profileId, personalId],

@@ -62,7 +62,10 @@ import { format } from "date-fns";
 import { CalendarioSemanal } from "@/components/CalendarioSemanal";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { TreinosManager } from "@/components/TreinosManager";
-import { StudentActiveToggle } from "@/components/ui/StudantActiveToggle";
+import {
+  AccessControlPanel,
+  AccessStatusBadge,
+} from "@/components/aluno/AccessControlPanel";
 import { SubscriptionManager } from "@/components/SubscriptionManager";
 import { CalendarioTreinosMensal } from "@/components/CalendarioTreinosMensal";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
@@ -463,12 +466,7 @@ export default function AlunoDetalhes() {
 
               {!isMobile && (
                 <div className="flex items-center gap-2">
-                  <Badge
-                    variant={aluno.is_active ? "default" : "destructive"}
-                    className="text-xs"
-                  >
-                    {aluno.is_active ? "✓ Ativo" : "✕ Bloqueado"}
-                  </Badge>
+                  <AccessStatusBadge studentId={aluno.id} />
                 </div>
               )}
             </div>
@@ -562,14 +560,7 @@ export default function AlunoDetalhes() {
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
-                          {isMobile && (
-                            <Badge
-                              variant={aluno.is_active ? "default" : "destructive"}
-                              className="text-xs"
-                            >
-                              {aluno.is_active ? "Ativo" : "Bloqueado"}
-                            </Badge>
-                          )}
+                          {isMobile && <AccessStatusBadge studentId={aluno.id} />}
                         </div>
 
                         <div className="space-y-1 text-sm md:text-base">
@@ -590,12 +581,6 @@ export default function AlunoDetalhes() {
                 </div>
 
                 <div className="flex flex-col gap-3">
-                  <StudentActiveToggle
-                    studentId={aluno.id}
-                    studentName={aluno.nome}
-                    isActive={aluno.is_active}
-                    onChanged={handleActiveStatusChange}
-                  />
                   {aluno?.telefone && (
                     <WhatsAppButton
                       telefone={aluno.telefone}
@@ -605,26 +590,6 @@ export default function AlunoDetalhes() {
                 </div>
               </div>
             </CardHeader>
-
-            {/* Banner de Aviso */}
-            {!aluno.is_active && (
-              <div className="mx-6 mb-6">
-                <div className="p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border-l-4 border-yellow-500 rounded-r-xl shadow-sm">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-semibold text-yellow-900">
-                        ⚠️ Acesso Bloqueado
-                      </p>
-                      <p className="text-sm text-yellow-800 mt-1">
-                        Este aluno não pode acessar o sistema. Ele verá uma tela
-                        de "Acesso Suspenso" ao tentar fazer login.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </Card>
 
           {/* Tabs Premium */}
@@ -752,6 +717,12 @@ export default function AlunoDetalhes() {
 
             {/* Aba Geral */}
             <TabsContent value="geral" className="space-y-6">
+              {/* Painel de controle de acesso */}
+              <AccessControlPanel
+                studentId={aluno.id}
+                studentName={aluno.nome}
+              />
+
               {/* Card de status da planilha */}
               {user && (
                 <PlanilhaStatusCard

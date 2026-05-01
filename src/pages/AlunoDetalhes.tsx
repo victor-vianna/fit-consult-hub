@@ -328,11 +328,6 @@ export default function AlunoDetalhes() {
     setViewerOpen(true);
   };
 
-  const handleActiveStatusChange = (newStatus: boolean) => {
-    if (aluno) {
-      setAluno({ ...aluno, is_active: newStatus });
-    }
-  };
 
   const iniciarEdicaoPerfil = () => {
     if (!aluno) return;

@@ -1738,6 +1738,9 @@ export type Database = {
           created_at: string | null
           from_active: boolean | null
           id: string
+          mensagem_aluno: string | null
+          motivo: string | null
+          observacao_personal: string | null
           student_id: string
           to_active: boolean | null
         }
@@ -1746,6 +1749,9 @@ export type Database = {
           created_at?: string | null
           from_active?: boolean | null
           id?: string
+          mensagem_aluno?: string | null
+          motivo?: string | null
+          observacao_personal?: string | null
           student_id: string
           to_active?: boolean | null
         }
@@ -1754,6 +1760,9 @@ export type Database = {
           created_at?: string | null
           from_active?: boolean | null
           id?: string
+          mensagem_aluno?: string | null
+          motivo?: string | null
+          observacao_personal?: string | null
           student_id?: string
           to_active?: boolean | null
         }

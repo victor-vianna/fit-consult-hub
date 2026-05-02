@@ -70,7 +70,10 @@ export function FotosSection({ profileId, personalId, themeColor, refreshKey, on
         .eq("personal_id", personalId)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      setFotos((data as any[]) || []);
+      const list = (data as any[]) || [];
+      // Resolve signed URLs (bucket is private)
+      const map = await getFotosSignedMap(list.map((f) => f.foto_url));
+      setFotos(list.map((f) => ({ ...f, foto_url: map[f.foto_url] || f.foto_url })));
     } catch (error: any) {
       console.error("Erro ao buscar fotos:", error);
     } finally {

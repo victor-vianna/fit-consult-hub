@@ -384,9 +384,9 @@ export function AvaliacaoFisicaManager({
 
   const handleDeleteFoto = async (foto: FotoEvolucao) => {
     try {
-      const urlParts = foto.foto_url.split("/fotos-evolucao/");
-      if (urlParts[1]) {
-        await supabase.storage.from("fotos-evolucao").remove([urlParts[1]]);
+      const storagePath = extractFotoPath((foto as any).foto_path || foto.foto_url);
+      if (storagePath) {
+        await supabase.storage.from("fotos-evolucao").remove([storagePath]);
       }
 
       const { error } = await supabase

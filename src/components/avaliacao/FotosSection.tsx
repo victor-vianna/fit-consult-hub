@@ -100,13 +100,12 @@ export function FotosSection({ profileId, personalId, themeColor, refreshKey, on
       const { error: uploadError } = await supabase.storage.from("fotos-evolucao").upload(fileName, file);
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage.from("fotos-evolucao").getPublicUrl(fileName);
-
+      // Store the storage path (bucket is private — public URLs do not work)
       const insertData: any = {
         profile_id: profileId,
         personal_id: personalId,
         tipo_foto: tipoFoto,
-        foto_url: urlData.publicUrl,
+        foto_url: fileName,
         foto_nome: file.name,
         descricao: descricao || null,
         data_foto: dataFoto || null,

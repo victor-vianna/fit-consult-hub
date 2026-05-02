@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { extractFotoPath, getFotosSignedMap } from "@/utils/fotosEvolucao";
 
 interface AvaliacaoFisica {
   id: string;
@@ -145,7 +146,15 @@ export function AvaliacaoFisicaManager({
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setFotos(data || []);
+      const list = data || [];
+      const map = await getFotosSignedMap(list.map((f: any) => f.foto_url));
+      setFotos(
+        list.map((f: any) => ({
+          ...f,
+          foto_path: f.foto_url,
+          foto_url: map[f.foto_url] || f.foto_url,
+        })) as any
+      );
     } catch (error: any) {
       console.error("Erro ao buscar fotos:", error);
     }
@@ -266,9 +275,9 @@ export function AvaliacaoFisicaManager({
 
       if (fotos && fotos.length > 0) {
         for (const foto of fotos) {
-          const urlParts = foto.foto_url.split("/fotos-evolucao/");
-          if (urlParts[1]) {
-            await supabase.storage.from("fotos-evolucao").remove([urlParts[1]]);
+          const storagePath = extractFotoPath(foto.foto_url);
+          if (storagePath) {
+            await supabase.storage.from("fotos-evolucao").remove([storagePath]);
           }
         }
       }
@@ -343,11 +352,7 @@ export function AvaliacaoFisicaManager({
 
         if (uploadError) throw uploadError;
 
-        const { data: urlData } = supabase.storage
-          .from("fotos-evolucao")
-          .getPublicUrl(fileName);
-
-        // Salvar no banco
+        // Bucket is private — store path; resolve via signed URL on read
         const { error: dbError } = await supabase
           .from("fotos_evolucao")
           .insert({
@@ -355,7 +360,7 @@ export function AvaliacaoFisicaManager({
             profile_id: profileId,
             personal_id: personalId,
             tipo_foto: tipoFoto,
-            foto_url: urlData.publicUrl,
+            foto_url: fileName,
             foto_nome: file.name,
             descricao,
           });
@@ -379,9 +384,9 @@ export function AvaliacaoFisicaManager({
 
   const handleDeleteFoto = async (foto: FotoEvolucao) => {
     try {
-      const urlParts = foto.foto_url.split("/fotos-evolucao/");
-      if (urlParts[1]) {
-        await supabase.storage.from("fotos-evolucao").remove([urlParts[1]]);
+      const storagePath = extractFotoPath((foto as any).foto_path || foto.foto_url);
+      if (storagePath) {
+        await supabase.storage.from("fotos-evolucao").remove([storagePath]);
       }
 
       const { error } = await supabase

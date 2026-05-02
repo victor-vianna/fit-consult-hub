@@ -14,12 +14,14 @@ import { Plus, Trash2, Eye, X, Camera, Image as ImageIcon, Calendar, Edit } from
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { FotoTimeline } from "./FotoTimeline";
+import { getFotosSignedMap, getFotoSignedUrl } from "@/utils/fotosEvolucao";
 
 interface FotoEvolucao {
   id: string;
   avaliacao_id: string | null;
   tipo_foto: string;
-  foto_url: string;
+  foto_url: string; // displayable (signed) URL
+  foto_path?: string; // original storage path/URL stored in DB
   foto_nome: string;
   descricao?: string;
   data_foto?: string;
@@ -69,7 +71,15 @@ export function FotosSection({ profileId, personalId, themeColor, refreshKey, on
         .eq("personal_id", personalId)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      setFotos((data as any[]) || []);
+      const list = (data as any[]) || [];
+      const map = await getFotosSignedMap(list.map((f) => f.foto_url));
+      setFotos(
+        list.map((f) => ({
+          ...f,
+          foto_path: f.foto_url,
+          foto_url: map[f.foto_url] || f.foto_url,
+        }))
+      );
     } catch (error: any) {
       console.error("Erro ao buscar fotos:", error);
     } finally {
@@ -96,13 +106,12 @@ export function FotosSection({ profileId, personalId, themeColor, refreshKey, on
       const { error: uploadError } = await supabase.storage.from("fotos-evolucao").upload(fileName, file);
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage.from("fotos-evolucao").getPublicUrl(fileName);
-
+      // Store the storage path (bucket is private — public URLs do not work)
       const insertData: any = {
         profile_id: profileId,
         personal_id: personalId,
         tipo_foto: tipoFoto,
-        foto_url: urlData.publicUrl,
+        foto_url: fileName,
         foto_nome: file.name,
         descricao: descricao || null,
         data_foto: dataFoto || null,
@@ -124,8 +133,10 @@ export function FotosSection({ profileId, personalId, themeColor, refreshKey, on
 
   const handleDeleteFoto = async (foto: FotoEvolucao) => {
     try {
-      const urlParts = foto.foto_url.split("/fotos-evolucao/");
-      if (urlParts[1]) await supabase.storage.from("fotos-evolucao").remove([urlParts[1]]);
+      const path = foto.foto_path || foto.foto_url;
+      const { extractFotoPath } = await import("@/utils/fotosEvolucao");
+      const storagePath = extractFotoPath(path);
+      if (storagePath) await supabase.storage.from("fotos-evolucao").remove([storagePath]);
       const { error } = await supabase.from("fotos_evolucao").delete().eq("id", foto.id);
       if (error) throw error;
       toast({ title: "Foto removida!" });

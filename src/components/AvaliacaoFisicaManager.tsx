@@ -275,9 +275,9 @@ export function AvaliacaoFisicaManager({
 
       if (fotos && fotos.length > 0) {
         for (const foto of fotos) {
-          const urlParts = foto.foto_url.split("/fotos-evolucao/");
-          if (urlParts[1]) {
-            await supabase.storage.from("fotos-evolucao").remove([urlParts[1]]);
+          const storagePath = extractFotoPath(foto.foto_url);
+          if (storagePath) {
+            await supabase.storage.from("fotos-evolucao").remove([storagePath]);
           }
         }
       }

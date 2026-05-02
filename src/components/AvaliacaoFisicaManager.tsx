@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { extractFotoPath, getFotosSignedMap } from "@/utils/fotosEvolucao";
 
 interface AvaliacaoFisica {
   id: string;

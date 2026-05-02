@@ -20,7 +20,8 @@ interface FotoEvolucao {
   id: string;
   avaliacao_id: string | null;
   tipo_foto: string;
-  foto_url: string;
+  foto_url: string; // displayable (signed) URL
+  foto_path?: string; // original storage path/URL stored in DB
   foto_nome: string;
   descricao?: string;
   data_foto?: string;

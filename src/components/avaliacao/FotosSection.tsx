@@ -133,8 +133,10 @@ export function FotosSection({ profileId, personalId, themeColor, refreshKey, on
 
   const handleDeleteFoto = async (foto: FotoEvolucao) => {
     try {
-      const urlParts = foto.foto_url.split("/fotos-evolucao/");
-      if (urlParts[1]) await supabase.storage.from("fotos-evolucao").remove([urlParts[1]]);
+      const path = foto.foto_path || foto.foto_url;
+      const { extractFotoPath } = await import("@/utils/fotosEvolucao");
+      const storagePath = extractFotoPath(path);
+      if (storagePath) await supabase.storage.from("fotos-evolucao").remove([storagePath]);
       const { error } = await supabase.from("fotos_evolucao").delete().eq("id", foto.id);
       if (error) throw error;
       toast({ title: "Foto removida!" });

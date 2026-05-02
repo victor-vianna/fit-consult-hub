@@ -146,7 +146,15 @@ export function AvaliacaoFisicaManager({
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setFotos(data || []);
+      const list = data || [];
+      const map = await getFotosSignedMap(list.map((f: any) => f.foto_url));
+      setFotos(
+        list.map((f: any) => ({
+          ...f,
+          foto_path: f.foto_url,
+          foto_url: map[f.foto_url] || f.foto_url,
+        })) as any
+      );
     } catch (error: any) {
       console.error("Erro ao buscar fotos:", error);
     }

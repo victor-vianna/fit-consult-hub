@@ -352,11 +352,7 @@ export function AvaliacaoFisicaManager({
 
         if (uploadError) throw uploadError;
 
-        const { data: urlData } = supabase.storage
-          .from("fotos-evolucao")
-          .getPublicUrl(fileName);
-
-        // Salvar no banco
+        // Bucket is private — store path; resolve via signed URL on read
         const { error: dbError } = await supabase
           .from("fotos_evolucao")
           .insert({
@@ -364,7 +360,7 @@ export function AvaliacaoFisicaManager({
             profile_id: profileId,
             personal_id: personalId,
             tipo_foto: tipoFoto,
-            foto_url: urlData.publicUrl,
+            foto_url: fileName,
             foto_nome: file.name,
             descricao,
           });

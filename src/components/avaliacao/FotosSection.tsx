@@ -14,6 +14,7 @@ import { Plus, Trash2, Eye, X, Camera, Image as ImageIcon, Calendar, Edit } from
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { FotoTimeline } from "./FotoTimeline";
+import { getFotosSignedMap, getFotoSignedUrl } from "@/utils/fotosEvolucao";
 
 interface FotoEvolucao {
   id: string;

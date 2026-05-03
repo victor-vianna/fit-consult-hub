@@ -2498,6 +2498,15 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_personal: { Args: { _user_id: string }; Returns: boolean }
+      log_activity: {
+        Args: {
+          p_action: string
+          p_metadata?: Json
+          p_resource_id?: string
+          p_resource_type?: string
+        }
+        Returns: string
+      }
       marcar_bloco_concluido: {
         Args: { p_bloco_id: string; p_concluido: boolean }
         Returns: undefined

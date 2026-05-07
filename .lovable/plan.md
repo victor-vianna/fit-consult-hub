@@ -1,114 +1,109 @@
-## Objetivo
+# Plano de Correções do Sistema
 
-Implementar o **MVP do Painel de Acesso do Aluno** e substituir todos os toggles antigos `Ativo/Bloqueado` pelo novo padrão profissional, em todo o sistema.
-
-## Escopo do MVP
-
-1. Migration leve em `student_access_logs` para registrar motivo + mensagem
-2. Novo componente `AccessControlPanel` com diálogo profissional
-3. Substituição em **todos os lugares** que hoje usam `StudentActiveToggle` ou botões diretos de bloqueio
-4. Tela `/acesso-suspenso` humanizada com motivo e mensagem do personal
-
-Reativação automática por data fica para fase 2 (não entra agora).
+Dividido em 3 frentes independentes que podem ser implementadas em sequência. Cada frente entrega valor sozinha.
 
 ---
 
-## 1. Migration
+## Frente 1 — Persistência de fluxo e cache (Aluno + Personal)
 
-```sql
-ALTER TABLE student_access_logs
-  ADD COLUMN motivo text,
-  ADD COLUMN mensagem_aluno text,
-  ADD COLUMN observacao_personal text;
-```
+**Objetivo:** o usuário sempre volta exatamente de onde parou, mesmo após trocar aba, navegar, recarregar ou suspender o app no celular.
 
-Sem CHECK constraint — motivos serão validados no frontend (lista controlada). Compatível com logs antigos (campos nullable).
+### O que será feito
+- **Camada única de persistência** baseada em `localStorage` + `sessionStorage` com um hook `usePersistedState(key, value)` reutilizável.
+- **Treino em andamento (aluno):**
+  - Persistir `treinoId`, `exercicios concluídos`, `pesos executados`, `timer`, `bloco atual` em `localStorage` por aluno.
+  - Restaurar automaticamente ao reabrir a página `/aluno/treino/...`.
+  - Sobreviver ao `visibilitychange` (já temos rehidratação de sessão; estender para o estado do treino).
+- **Montagem de treino (personal):**
+  - Rascunho automático (auto-save a cada mudança, debounce 500ms) por `treinoId` em `localStorage`.
+  - Banner "Você tem alterações não salvas" ao reabrir.
+  - Confirmação antes de descartar (`beforeunload` + dialog interno em navegação SPA).
+- **Modais e abas:**
+  - Sincronizar tab ativa via query param (`?tab=`) — já é padrão; aplicar onde ainda usa estado local.
+  - Modais críticos (montagem, edição) viram rotas (`/aluno/:id?modal=editar-treino`) para sobreviver a refresh.
+  - Modais não-críticos persistem `open` em `sessionStorage`.
+- **Cache de queries:** revisar `staleTime` e `gcTime` do React Query para fluxos frequentes (treinos, exercícios, perfil) — manter por 5–10 min.
 
-## 2. Novos componentes
-
-```text
-src/components/aluno/AccessControlPanel.tsx     painel completo (status + ações + mini-histórico)
-src/components/aluno/ManageAccessDialog.tsx     diálogo de pausar/suspender/reativar
-src/components/aluno/AccessHistoryList.tsx      lista de logs de acesso
-src/hooks/useStudentAccess.ts                   hook unificado: status, mutate, histórico
-```
-
-### `useStudentAccess(studentId)`
-- Lê `profiles.is_active` + último registro de `student_access_logs`
-- Deriva estado UI: `ativo` | `pausado` | `suspenso`
-- Retorna `mutate({ acao, motivo, mensagemAluno, observacao })` que faz update + insert do log numa transação client-side (dois statements, com rollback manual em erro)
-- React Query com invalidação correta
-
-### `ManageAccessDialog`
-- Se ativo → escolha: Pausar / Suspender
-  - Select **Motivo**: Férias, Lesão, Viagem, Inadimplência, Violação de regras, Outro
-  - Textarea **Mensagem ao aluno** (pré-preenchida por motivo, editável)
-  - Textarea **Observação interna** (opcional, só personal)
-- Se bloqueado → botão Reativar + observação opcional
-- Sem `confirm()` nativo. Tudo em Dialog do shadcn com loading states.
-
-### `AccessControlPanel`
-- Card com badge de status colorido (verde/âmbar/vermelho)
-- Última alteração: "Pausado por X há 3 dias — motivo: Férias"
-- Botão "Gerenciar acesso"
-- Acordeão "Histórico de acesso" → renderiza `AccessHistoryList`
-
-## 3. Substituições no sistema
-
-| Local | Hoje | Depois |
-|---|---|---|
-| `src/pages/AlunoDetalhes.tsx` | `StudentActiveToggle` + botão duplicado no header | `AccessControlPanel` na aba perfil; header mostra apenas badge de status (read-only) |
-| `src/components/AlunosManager.tsx` | Filtro Ativo/Bloqueado + badge na lista | Mantém badge (apenas leitura). Ação só em AlunoDetalhes — remove bloqueio inline se houver |
-| `src/components/dashboard/PersonalDashboardCards.tsx` | Possível toggle direto | Remove toggle, mantém badge informativo |
-| `src/components/HistoricoAlunoPersonal.tsx` | Verificar uso de `is_active` | Manter apenas leitura |
-| `src/components/ui/StudantActiveToggle.tsx` | Componente legado | **Deletar** após migrar todos os usos |
-
-Princípio: **um único lugar para alterar acesso** (página do aluno → painel). Em listas/dashboards é só leitura — evita cliques acidentais e centraliza o fluxo de motivo+mensagem.
-
-## 4. Tela `/acesso-suspenso` humanizada
-
-`src/pages/AcessoSuspenso.tsx` busca o último log de `student_access_logs` do aluno logado e exibe:
-
-- Ícone + título por motivo (Pause para pausa, AlertCircle para suspensão)
-- Mensagem personalizada do personal (do log)
-- "Suspenso desde DD/MM/YYYY"
-- Botão **"Falar com meu personal"** → abre WhatsApp (telefone do personal via `profiles`) ou rota `/aluno?tab=chat` se preferir chat interno
-- Botão secundário "Sair"
-
-## 5. Mensagens padrão por motivo
-
-Pré-preenche a textarea de mensagem ao aluno (editável):
-
-- **Férias:** "Seu acesso está pausado durante o período de férias. Bons momentos! Volte quando estiver pronto."
-- **Lesão:** "Seu acesso está pausado para sua recuperação. Cuide-se e nos avise quando estiver liberado para retornar."
-- **Viagem:** "Acesso pausado durante sua viagem. Boa viagem!"
-- **Inadimplência:** "Seu acesso foi temporariamente suspenso. Entre em contato para regularizar e reativar."
-- **Violação de regras:** "Seu acesso foi suspenso. Entre em contato para mais informações."
-- **Outro:** vazia
-
-## 6. Validações e segurança
-
-- RLS atual de `student_access_logs` já permite insert autenticado e select para personal/admin — ok
-- RLS de `profiles` já permite ao personal atualizar `is_active` dos seus alunos — ok
-- Frontend bloqueia o botão durante a mutation
-- Toast com feedback claro (sucesso/erro)
+### Entregáveis
+- `src/hooks/usePersistedState.ts`
+- `src/hooks/useWorkoutDraft.ts` (montagem do personal)
+- `src/hooks/useWorkoutSession.ts` (estendido para persistir tudo do treino do aluno)
+- Ajustes em `WorkoutDayView`, `TreinosManager`, `ExercicioDialog`, `WorkoutBlockDialog`.
 
 ---
 
-## Ordem de implementação
+## Frente 2 — Notificações e feedbacks
 
-1. Migration dos 3 campos em `student_access_logs`
-2. Hook `useStudentAccess`
-3. `ManageAccessDialog` + `AccessControlPanel` + `AccessHistoryList`
-4. Integrar em `AlunoDetalhes.tsx` (remover toggle e botão duplicado)
-5. Auditar e limpar usos em `AlunosManager`, `PersonalDashboardCards`, `HistoricoAlunoPersonal` (deixar só leitura)
-6. Refatorar `AcessoSuspenso.tsx` com motivo+mensagem
-7. Deletar `StudentActiveToggle.tsx`
+**Objetivo:** central de notificações sempre leva à ação certa, com nome do aluno correto e abre o modal/chat apropriado.
 
-## Resultado
+### O que será feito
+- **Padronizar payload** em `notificacoes.dados`:
+  ```json
+  { "aluno_id": "...", "aluno_nome": "...", "tipo_acao": "feedback|chat|treino|checkin", "ref_id": "..." }
+  ```
+- **Resolver nome do aluno na origem:** ao criar a notificação (no trigger ou na função que insere), buscar `profiles.nome` em vez de confiar em snapshot antigo.
+- **Roteamento correto no `NotificacoesDropdown`:**
+  - `feedback` → abre `FeedbackDetailModal` direto com o `ref_id`.
+  - `chat` → navega para `/aluno/:id?tab=chat` e abre o `ChatPanel`.
+  - `treino` / `checkin` → rota correspondente com tab pré-selecionada.
+- **Marcar como lida** ao abrir a ação (não apenas ao clicar no item).
+- **Sincronização:** subscription realtime já existe; garantir invalidação do React Query ao receber evento.
+- **Backfill:** script único para corrigir notificações antigas com `aluno_nome` ausente/errado (insert tool).
 
-- Um único fluxo profissional para controlar acesso, com motivo + mensagem + auditoria
-- Aluno bloqueado entende exatamente o porquê e tem ação clara
-- Zero `confirm()` nativos
-- Histórico visível e consultável
-- Listas e dashboards limpos (só leitura)
+### Entregáveis
+- Ajuste em `src/components/NotificacoesDropdown.tsx` (roteamento + marcar lida).
+- Ajuste em `src/hooks/useNotificacoes.ts` (resolver nome no insert).
+- Função SQL `criar_notificacao(...)` que padroniza payload (opcional, recomendado).
+- Pequenas mudanças em `FeedbackDetailModal` e `ChatPanel` para aceitar abrir via prop/URL.
+
+---
+
+## Frente 3 — Montagem de treino (estabilidade)
+
+**Objetivo:** montagem fluida, ordenação correta, drag-and-drop completo, sem perda de dados ou edições incorretas.
+
+### O que será feito
+- **Ordenação:**
+  - Garantir que toda inserção use o padrão de múltiplos de 10 (já documentado em memória).
+  - Função SQL `reordenar_exercicios` análoga a `reordenar_blocos` para evitar conflitos de ordem.
+- **Circuitos/conjugados:**
+  - Corrigir `criar_grupo_exercicios` para validar `ordem_no_grupo` sequencial e `tipo_agrupamento` válido.
+  - Modal único "Adicionar exercício" já consolidado — revisar fluxo de criação de grupo a partir de exercício existente.
+- **Edição renderizando dados errados:**
+  - Causa típica: estado inicial do dialog não reseta entre aberturas. Forçar `key={exercicio.id}` nos dialogs para remontar ao trocar item.
+  - Carregar dados frescos via React Query (`enabled: open && !!id`) em vez de reusar prop antiga.
+- **Exclusão com confirmação:**
+  - Adicionar `AlertDialog` em todos os botões de delete de exercícios, blocos e grupos.
+- **Drag-and-drop:**
+  - Estender DnD para reordenar **entre blocos** (mover exercício de um bloco para outro).
+  - Feedback visual durante o drag (placeholder + ghost).
+  - Persistir nova ordem com debounce para evitar muitas writes.
+- **Auto-save** (vem da Frente 1) cobre perda de progresso.
+
+### Entregáveis
+- Migration: função `reordenar_exercicios`, ajustes em `criar_grupo_exercicios`.
+- Ajuste em `SortableExercicioCard`, `SortableBlockCard`, `SortableGroupCard`.
+- `ConfirmDeleteDialog` reutilizável.
+- `key` props e refetch on open em `ExercicioDialog`, `WorkoutBlockDialog`, `ExerciseGroupDialog`.
+
+---
+
+## Ordem de execução sugerida
+
+1. **Frente 3** primeiro (resolve dor imediata da montagem do personal).
+2. **Frente 1** (auto-save + restauração — depende parcialmente da Frente 3 estar estável).
+3. **Frente 2** (notificações — independente, pode ser feita em paralelo).
+
+## Estimativa de escopo
+- Frente 1: ~6–8 arquivos, 1 migration opcional.
+- Frente 2: ~4 arquivos, 1 migration (função SQL) + 1 backfill.
+- Frente 3: ~8 arquivos, 1 migration.
+
+## Fora do escopo deste plano
+- Refatoração visual da UI.
+- Mudanças em autenticação, RLS ou cobrança.
+- Novas features (apenas correção do que já existe).
+
+---
+
+Confirma a ordem (3 → 1 → 2) ou prefere outra? Posso começar pela Frente 3 assim que aprovar.

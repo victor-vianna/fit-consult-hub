@@ -1638,6 +1638,7 @@ export function TreinosManager({
       {/* ============ DIALOGS ============ */}
       <>
         <ExercicioDialog
+          key={`ex-${exercicioEditando?.id || grupoEditando?.grupo_id || "new"}-${exercicioDialogOpen ? "open" : "closed"}`}
           open={exercicioDialogOpen}
           onOpenChange={(open) => {
             setExercicioDialogOpen(open);
@@ -1754,6 +1755,7 @@ export function TreinosManager({
 
         {/* DIALOG DE BLOCOS */}
         <WorkoutBlockDialog
+          key={`bl-${blocoEditando?.id || "new"}-${blockDialogOpen ? "open" : "closed"}`}
           open={blockDialogOpen}
           onOpenChange={(open) => {
             setBlockDialogOpen(open);

@@ -107,7 +107,13 @@ export function FeedbackReply({ checkinId, alunoId, personalId, alunoNome, theme
         tipo: "nova_mensagem",
         titulo: `${personalProfile?.nome || "Personal"} respondeu seu feedback`,
         mensagem: resposta.trim().substring(0, 100),
-        dados: { aluno_id: alunoId, profile_id: personalId, checkin_id: checkinId },
+        dados: {
+          aluno_id: alunoId,
+          aluno_nome: alunoNome,
+          profile_id: personalId,
+          checkin_id: checkinId,
+          tipo_acao: "chat",
+        },
       });
 
       toast({

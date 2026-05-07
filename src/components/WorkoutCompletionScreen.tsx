@@ -51,16 +51,24 @@ export function WorkoutCompletionScreen({
         .single();
 
       if (sessaoData?.personal_id) {
+        const { data: alunoProfile } = await supabase
+          .from("profiles")
+          .select("nome")
+          .eq("id", sessaoData.profile_id)
+          .single();
+
         await supabase.from("notificacoes").insert({
           destinatario_id: sessaoData.personal_id,
           tipo: "feedback_treino",
-          titulo: "📝 Feedback do Treino",
+          titulo: `📝 Feedback de ${alunoProfile?.nome || "aluno"}`,
           mensagem: `Avaliação: ${rating ? "⭐".repeat(rating) : "Sem nota"} - ${feedback || "Sem comentário"}`,
           dados: {
             treino_id: treinoId,
             rating,
             comentario: feedback,
             aluno_id: sessaoData.profile_id,
+            aluno_nome: alunoProfile?.nome || null,
+            tipo_acao: "feedback",
           },
           lida: false,
         });

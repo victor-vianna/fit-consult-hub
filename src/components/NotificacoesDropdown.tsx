@@ -1,5 +1,5 @@
 // components/NotificacoesDropdown.tsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bell, CheckCheck, X, User, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useNotificacoes } from "@/hooks/useNotificacoes";
+import { supabase } from "@/integrations/supabase/client";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -37,6 +38,7 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
   } = useNotificacoes(userId);
 
   const [grupoExpandido, setGrupoExpandido] = useState<string | null>(null);
+  const [nomesResolvidos, setNomesResolvidos] = useState<Record<string, string>>({});
   const [feedbackModal, setFeedbackModal] = useState<{
     open: boolean;
     feedbackId: string | null;
@@ -73,8 +75,44 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
 
   const getAlunoId = (n: any): string | null =>
     n.dados?.aluno_id || n.dados?.profile_id || null;
-  const getAlunoNome = (n: any): string | null =>
-    n.dados?.aluno_nome || n.dados?.nome_aluno || null;
+  const getAlunoNome = (n: any): string | null => {
+    const id = getAlunoId(n);
+    return (
+      n.dados?.aluno_nome ||
+      n.dados?.nome_aluno ||
+      (id ? nomesResolvidos[id] : null) ||
+      null
+    );
+  };
+
+  // Resolve nomes ausentes em background (notificações antigas sem aluno_nome)
+  useEffect(() => {
+    const idsFaltantes = Array.from(
+      new Set(
+        notificacoes
+          .filter((n: any) => {
+            const id = getAlunoId(n);
+            return id && !n.dados?.aluno_nome && !n.dados?.nome_aluno && !nomesResolvidos[id];
+          })
+          .map((n: any) => getAlunoId(n)!)
+      )
+    );
+    if (idsFaltantes.length === 0) return;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, nome")
+        .in("id", idsFaltantes);
+      if (data?.length) {
+        setNomesResolvidos((prev) => {
+          const next = { ...prev };
+          for (const p of data) next[p.id] = p.nome;
+          return next;
+        });
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notificacoes]);
 
   // Agrupa por aluno (quando houver), demais ficam em "Sistema"
   const grupos = useMemo(() => {

@@ -643,23 +643,29 @@ export function TreinosManager({
     }
   };
 
-  // 🔧 Função para deletar grupo
+  // 🔧 Função para deletar grupo (com confirmação)
   const handleDeleteGroup = async (grupoId: string) => {
     if (!grupoId) {
       toast.error("ID do grupo inválido");
       return;
     }
 
+    const grupo = Object.values(gruposPorTreino)
+      .flat()
+      .find((g: any) => g.grupo_id === grupoId);
+    const qtd = grupo?.exercicios?.length || 0;
+    if (!window.confirm(
+      qtd > 0
+        ? `Excluir este grupo com ${qtd} exercício(s)? Esta ação não pode ser desfeita.`
+        : "Excluir este grupo?"
+    )) return;
+
     try {
       setLoadingStates((prev) => ({ ...prev, removendo: true }));
-
       console.log("[TreinosManager] Deletando grupo:", grupoId);
-
-      // 🚀 React Query automaticamente atualiza o cache e a UI
       await deletarGrupo(grupoId);
     } catch (err) {
       console.error("[TreinosManager] Erro ao deletar grupo:", err);
-      // Toast já é exibido pelo hook
     } finally {
       setLoadingStates((prev) => ({ ...prev, removendo: false }));
     }
@@ -751,23 +757,20 @@ export function TreinosManager({
     }
   };
 
-  // 🆕 Função para deletar bloco
+  // 🆕 Função para deletar bloco (com confirmação)
   const handleDeleteBlock = async (blocoId: string) => {
     if (!blocoId) {
       toast.error("ID do bloco inválido");
       return;
     }
+    if (!window.confirm("Excluir este bloco? Esta ação não pode ser desfeita.")) return;
 
     try {
       setLoadingStates((prev) => ({ ...prev, removendo: true }));
-
       console.log("[TreinosManager] Deletando bloco:", blocoId);
-
-      // 🚀 React Query automaticamente atualiza o cache e a UI
       await deletarBloco(blocoId);
     } catch (err) {
       console.error("[TreinosManager] Erro ao deletar bloco:", err);
-      // Toast já é exibido pelo hook
     } finally {
       setLoadingStates((prev) => ({ ...prev, removendo: false }));
     }
@@ -1635,6 +1638,7 @@ export function TreinosManager({
       {/* ============ DIALOGS ============ */}
       <>
         <ExercicioDialog
+          key={`ex-${exercicioEditando?.id || grupoEditando?.grupo_id || "new"}-${exercicioDialogOpen ? "open" : "closed"}`}
           open={exercicioDialogOpen}
           onOpenChange={(open) => {
             setExercicioDialogOpen(open);
@@ -1751,6 +1755,7 @@ export function TreinosManager({
 
         {/* DIALOG DE BLOCOS */}
         <WorkoutBlockDialog
+          key={`bl-${blocoEditando?.id || "new"}-${blockDialogOpen ? "open" : "closed"}`}
           open={blockDialogOpen}
           onOpenChange={(open) => {
             setBlockDialogOpen(open);

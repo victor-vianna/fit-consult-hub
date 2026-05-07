@@ -63,12 +63,17 @@ export function BroadcastMessageDialog({ personalId, themeColor }: BroadcastMess
       if (msgError) throw msgError;
 
       // Create notifications for all students
-      const notificacoes = alunos.map((aluno) => ({
+      const notificacoes = alunos.map((aluno: any) => ({
         destinatario_id: aluno.id,
         tipo: "nova_mensagem",
         titulo: `Nova mensagem de ${personalProfile?.nome || "Personal"}`,
         mensagem: texto.trim().substring(0, 100),
-        dados: { aluno_id: aluno.id, profile_id: personalId },
+        dados: {
+          aluno_id: aluno.id,
+          aluno_nome: aluno.nome || null,
+          profile_id: personalId,
+          tipo_acao: "chat",
+        },
       }));
 
       await supabase.from("notificacoes").insert(notificacoes);

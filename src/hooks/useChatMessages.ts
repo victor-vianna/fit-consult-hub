@@ -98,19 +98,23 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
     });
 
     if (!error) {
-      // Criar notificação para o destinatário
-      const { data: remetenteProfile } = await supabase
-        .from("profiles")
-        .select("nome")
-        .eq("id", currentUserId)
-        .single();
+      // Buscar nome do remetente E do aluno (sempre incluir aluno_nome no payload)
+      const [{ data: remetenteProfile }, { data: alunoProfile }] = await Promise.all([
+        supabase.from("profiles").select("nome").eq("id", currentUserId).single(),
+        supabase.from("profiles").select("nome").eq("id", alunoId).single(),
+      ]);
 
       await supabase.from("notificacoes").insert({
         destinatario_id: destinatarioId,
         tipo: "nova_mensagem",
         titulo: `Nova mensagem de ${remetenteProfile?.nome || "Usuário"}`,
         mensagem: conteudo.trim().substring(0, 100),
-        dados: { aluno_id: alunoId, profile_id: currentUserId },
+        dados: {
+          aluno_id: alunoId,
+          aluno_nome: alunoProfile?.nome || null,
+          profile_id: currentUserId,
+          tipo_acao: "chat",
+        },
       });
     }
 

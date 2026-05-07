@@ -2536,6 +2536,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      reordenar_exercicios: {
+        Args: { p_ordem_ids: string[]; p_treino_semanal_id: string }
+        Returns: undefined
+      }
       update_subscription_status: { Args: never; Returns: undefined }
       verificar_anamnese_preenchida: {
         Args: { p_personal_id: string; p_profile_id: string }

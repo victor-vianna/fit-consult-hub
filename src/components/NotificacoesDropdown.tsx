@@ -1,5 +1,5 @@
 // components/NotificacoesDropdown.tsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bell, CheckCheck, X, User, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useNotificacoes } from "@/hooks/useNotificacoes";
+import { supabase } from "@/integrations/supabase/client";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";

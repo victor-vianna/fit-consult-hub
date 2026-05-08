@@ -672,7 +672,7 @@ export function TreinosManager({
   };
 
   // 🔧 Função para deletar grupo (com confirmação)
-  const handleDeleteGroup = async (grupoId: string) => {
+  const handleDeleteGroup = (grupoId: string) => {
     if (!grupoId) {
       toast.error("ID do grupo inválido");
       return;
@@ -682,21 +682,23 @@ export function TreinosManager({
       .flat()
       .find((g: any) => g.grupo_id === grupoId);
     const qtd = grupo?.exercicios?.length || 0;
-    if (!window.confirm(
-      qtd > 0
-        ? `Excluir este grupo com ${qtd} exercício(s)? Esta ação não pode ser desfeita.`
-        : "Excluir este grupo?"
-    )) return;
 
-    try {
-      setLoadingStates((prev) => ({ ...prev, removendo: true }));
-      console.log("[TreinosManager] Deletando grupo:", grupoId);
-      await deletarGrupo(grupoId);
-    } catch (err) {
-      console.error("[TreinosManager] Erro ao deletar grupo:", err);
-    } finally {
-      setLoadingStates((prev) => ({ ...prev, removendo: false }));
-    }
+    askConfirm(
+      "Excluir grupo de exercícios?",
+      qtd > 0
+        ? `Este grupo possui ${qtd} exercício(s). Todos serão removidos. Esta ação não pode ser desfeita.`
+        : "O grupo será removido. Esta ação não pode ser desfeita.",
+      async () => {
+        try {
+          setLoadingStates((prev) => ({ ...prev, removendo: true }));
+          await deletarGrupo(grupoId);
+        } catch (err) {
+          console.error("[TreinosManager] Erro ao deletar grupo:", err);
+        } finally {
+          setLoadingStates((prev) => ({ ...prev, removendo: false }));
+        }
+      }
+    );
   };
 
   // 1. Adicionar função para marcar grupo completo:

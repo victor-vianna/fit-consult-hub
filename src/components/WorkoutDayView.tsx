@@ -17,6 +17,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useWorkoutSession } from "@/hooks/useWorkoutSession";
 import { useExerciseProgress } from "@/hooks/useExerciseProgress";
+import { usePersistedState } from "@/hooks/usePersistedState";
 
 interface WorkoutDayViewProps {
   treinos: TreinoDia[];

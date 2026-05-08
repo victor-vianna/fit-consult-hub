@@ -1097,7 +1097,7 @@ export function TreinosManager({
       <Separator />
 
       {/* 🆕 TABS: Treinos da Semana | Modelos */}
-      <Tabs defaultValue="treinos" className="w-full">
+      <Tabs value={activeMainTab} onValueChange={setActiveMainTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2 max-w-md">
           <TabsTrigger value="treinos" className="flex items-center gap-2">
             <Dumbbell className="h-4 w-4" />

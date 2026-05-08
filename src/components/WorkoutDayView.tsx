@@ -369,7 +369,7 @@ export function WorkoutDayView({
       </div>
 
       {/* Tabs dos Dias */}
-      <Tabs defaultValue={String(primeiroDiaComConteudo)} className="w-full">
+      <Tabs value={diaAtivo} onValueChange={setDiaAtivo} className="w-full">
         <TabsList className="grid w-full grid-cols-7 h-auto p-1 bg-card/50 backdrop-blur-sm border shadow-lg rounded-xl">
           {diasSemana.map((dia, index) => {
             const treinosDoDia = localTreinos.filter((t) => t.dia === index + 1);

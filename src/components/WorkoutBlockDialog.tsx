@@ -374,6 +374,7 @@ export function WorkoutBlockDialog({
       }
 
       await onSave(bloco);
+      draft.clear();
       onOpenChange(false);
     } catch (error) {
       console.error("[WorkoutBlockDialog] Erro ao salvar:", error);

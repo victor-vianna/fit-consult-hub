@@ -63,6 +63,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useBlockDialogDraft } from "@/hooks/useBlockDialogDraft";
 
 interface WorkoutBlockDialogProps {
   open: boolean;

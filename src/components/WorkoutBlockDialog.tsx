@@ -399,6 +399,23 @@ export function WorkoutBlockDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {draft.draftAvailable && (
+          <div className="flex items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span>Encontramos um rascunho não salvo deste bloco.</span>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="ghost" onClick={() => draft.clear()}>
+                Descartar
+              </Button>
+              <Button size="sm" onClick={() => draft.restore()}>
+                Restaurar
+              </Button>
+            </div>
+          </div>
+        )}
+
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="template">

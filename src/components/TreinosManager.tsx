@@ -80,6 +80,7 @@ import { exportTreinoWord } from "@/utils/exportTreinoWord";
 import { exportTreinoPDF } from "@/utils/exportTreinoPDF";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { ExportTreinoDialog } from "@/components/ExportTreinoDialog";
+import { usePersistedState } from "@/hooks/usePersistedState";
 
 import {
   DndContext,

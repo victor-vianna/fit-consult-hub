@@ -286,6 +286,17 @@ export function TreinosManager({
     removendo: false,
   });
 
+  // Confirmação genérica para exclusões (substitui window.confirm)
+  const [confirmState, setConfirmState] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void | Promise<void>;
+  }>({ open: false, title: "", description: "", onConfirm: () => {} });
+
+  const askConfirm = (title: string, description: string, onConfirm: () => void | Promise<void>) =>
+    setConfirmState({ open: true, title, description, onConfirm });
+
   // 🆕 Estado para abrir dialog de agrupamento e blocos
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [grupoEditando, setGrupoEditando] = useState<{

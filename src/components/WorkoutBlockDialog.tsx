@@ -259,6 +259,51 @@ export function WorkoutBlockDialog({
     }
   };
 
+  // 🔧 Auto-save de rascunho (apenas para novos blocos, por personal)
+  const isEditing = !!blocoEditando?.id;
+  const collectDraft = () => ({
+    tipo, posicao, nome, descricao, duracaoMinutos, obrigatorio,
+    tipoCardio, modalidade, trabalhoSeg, descansoSeg, rounds,
+    velocidade, inclinacao, bpmMin, bpmMax,
+    intensidadeValor, intensidadeUnidade,
+    gruposMusculares, tipoAlongamento,
+    tipoAquecimento, atividades, links,
+  });
+  const applyDraft = (d: any) => {
+    if (!d) return;
+    if (d.tipo) setTipo(d.tipo);
+    if (d.posicao) setPosicao(d.posicao);
+    if (typeof d.nome === "string") setNome(d.nome);
+    if (typeof d.descricao === "string") setDescricao(d.descricao);
+    if (typeof d.duracaoMinutos === "number") setDuracaoMinutos(d.duracaoMinutos);
+    if (typeof d.obrigatorio === "boolean") setObrigatorio(d.obrigatorio);
+    if (d.tipoCardio) setTipoCardio(d.tipoCardio);
+    if (d.modalidade) setModalidade(d.modalidade);
+    if (typeof d.trabalhoSeg === "number") setTrabalhoSeg(d.trabalhoSeg);
+    if (typeof d.descansoSeg === "number") setDescansoSeg(d.descansoSeg);
+    if (typeof d.rounds === "number") setRounds(d.rounds);
+    if (typeof d.velocidade === "number") setVelocidade(d.velocidade);
+    if (typeof d.inclinacao === "number") setInclinacao(d.inclinacao);
+    if (typeof d.bpmMin === "number") setBpmMin(d.bpmMin);
+    if (typeof d.bpmMax === "number") setBpmMax(d.bpmMax);
+    if (typeof d.intensidadeValor === "number") setIntensidadeValor(d.intensidadeValor);
+    if (d.intensidadeUnidade) setIntensidadeUnidade(d.intensidadeUnidade);
+    if (typeof d.gruposMusculares === "string") setGruposMusculares(d.gruposMusculares);
+    if (d.tipoAlongamento) setTipoAlongamento(d.tipoAlongamento);
+    if (d.tipoAquecimento) setTipoAquecimento(d.tipoAquecimento);
+    if (typeof d.atividades === "string") setAtividades(d.atividades);
+    if (Array.isArray(d.links)) setLinks(d.links);
+    setActiveTab("manual");
+  };
+
+  const draft = useBlockDialogDraft({
+    scopeKey: personalId || "anon",
+    open,
+    isEditing,
+    collect: collectDraft,
+    apply: applyDraft,
+  });
+
   const handleSave = async () => {
     if (!nome.trim()) {
       alert("Nome do bloco é obrigatório");

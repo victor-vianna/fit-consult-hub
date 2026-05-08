@@ -80,6 +80,7 @@ import { exportTreinoWord } from "@/utils/exportTreinoWord";
 import { exportTreinoPDF } from "@/utils/exportTreinoPDF";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { ExportTreinoDialog } from "@/components/ExportTreinoDialog";
+import { usePersistedState } from "@/hooks/usePersistedState";
 
 import {
   DndContext,
@@ -266,7 +267,16 @@ export function TreinosManager({
   const [exercicioEditando, setExercicioEditando] =
     useState<DialogExercicio | null>(null);
   const [descricaoEditando, setDescricaoEditando] = useState("");
-  const [selectedTreinoId, setSelectedTreinoId] = useState<string | null>(null);
+  const [selectedTreinoId, setSelectedTreinoId] = usePersistedState<string | null>(
+    `tm-selected-treino:${profileId}`,
+    null,
+    { storage: "session" }
+  );
+  const [activeMainTab, setActiveMainTab] = usePersistedState<string>(
+    `tm-main-tab:${profileId}`,
+    "treinos",
+    { storage: "session" }
+  );
   const [exercicioTemp, setExercicioTemp] =
     useState<Partial<DialogExercicio> | null>(null);
   const [loadingStates, setLoadingStates] = useState({
@@ -1087,7 +1097,7 @@ export function TreinosManager({
       <Separator />
 
       {/* 🆕 TABS: Treinos da Semana | Modelos */}
-      <Tabs defaultValue="treinos" className="w-full">
+      <Tabs value={activeMainTab} onValueChange={setActiveMainTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2 max-w-md">
           <TabsTrigger value="treinos" className="flex items-center gap-2">
             <Dumbbell className="h-4 w-4" />

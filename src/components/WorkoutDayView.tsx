@@ -17,6 +17,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useWorkoutSession } from "@/hooks/useWorkoutSession";
 import { useExerciseProgress } from "@/hooks/useExerciseProgress";
+import { usePersistedState } from "@/hooks/usePersistedState";
 
 interface WorkoutDayViewProps {
   treinos: TreinoDia[];
@@ -331,6 +332,13 @@ export function WorkoutDayView({
       return t.exercicios.length > 0 || grupos.length > 0 || blocos.length > 0;
     })?.dia || 1;
 
+  // 🔧 Persistir aba do dia ativa por aluno+personal (sobrevive a navegação/reload)
+  const [diaAtivo, setDiaAtivo] = usePersistedState<string>(
+    `workout-day-tab:${profileId}:${personalId}`,
+    String(primeiroDiaComConteudo),
+    { storage: "local" }
+  );
+
   return (
     <div className="space-y-4 sm:space-y-6 pb-20">
       {/* Header Principal */}
@@ -361,7 +369,7 @@ export function WorkoutDayView({
       </div>
 
       {/* Tabs dos Dias */}
-      <Tabs defaultValue={String(primeiroDiaComConteudo)} className="w-full">
+      <Tabs value={diaAtivo} onValueChange={setDiaAtivo} className="w-full">
         <TabsList className="grid w-full grid-cols-7 h-auto p-1 bg-card/50 backdrop-blur-sm border shadow-lg rounded-xl">
           {diasSemana.map((dia, index) => {
             const treinosDoDia = localTreinos.filter((t) => t.dia === index + 1);

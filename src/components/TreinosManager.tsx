@@ -267,7 +267,16 @@ export function TreinosManager({
   const [exercicioEditando, setExercicioEditando] =
     useState<DialogExercicio | null>(null);
   const [descricaoEditando, setDescricaoEditando] = useState("");
-  const [selectedTreinoId, setSelectedTreinoId] = useState<string | null>(null);
+  const [selectedTreinoId, setSelectedTreinoId] = usePersistedState<string | null>(
+    `tm-selected-treino:${profileId}`,
+    null,
+    { storage: "session" }
+  );
+  const [activeMainTab, setActiveMainTab] = usePersistedState<string>(
+    `tm-main-tab:${profileId}`,
+    "treinos",
+    { storage: "session" }
+  );
   const [exercicioTemp, setExercicioTemp] =
     useState<Partial<DialogExercicio> | null>(null);
   const [loadingStates, setLoadingStates] = useState({

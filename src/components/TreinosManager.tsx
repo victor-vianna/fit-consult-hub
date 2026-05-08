@@ -541,15 +541,21 @@ export function TreinosManager({
     }
   };
 
-  const handleRemover = async (id: string) => {
-    try {
-      setLoadingStates((prev) => ({ ...prev, removendo: true }));
-      await removerExercicio(id);
-    } catch (error) {
-      console.error("[TreinosManager] Erro ao remover:", error);
-    } finally {
-      setLoadingStates((prev) => ({ ...prev, removendo: false }));
-    }
+  const handleRemover = (id: string) => {
+    askConfirm(
+      "Excluir exercício?",
+      "O exercício será removido do treino. Esta ação não pode ser desfeita.",
+      async () => {
+        try {
+          setLoadingStates((prev) => ({ ...prev, removendo: true }));
+          await removerExercicio(id);
+        } catch (error) {
+          console.error("[TreinosManager] Erro ao remover:", error);
+        } finally {
+          setLoadingStates((prev) => ({ ...prev, removendo: false }));
+        }
+      }
+    );
   };
 
   const calcularProgresso = (treino: TreinoDia) => {

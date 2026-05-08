@@ -81,6 +81,7 @@ import { exportTreinoPDF } from "@/utils/exportTreinoPDF";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { ExportTreinoDialog } from "@/components/ExportTreinoDialog";
 import { usePersistedState } from "@/hooks/usePersistedState";
+import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 
 import {
   DndContext,
@@ -284,6 +285,17 @@ export function TreinosManager({
     adicionando: false,
     removendo: false,
   });
+
+  // Confirmação genérica para exclusões (substitui window.confirm)
+  const [confirmState, setConfirmState] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void | Promise<void>;
+  }>({ open: false, title: "", description: "", onConfirm: () => {} });
+
+  const askConfirm = (title: string, description: string, onConfirm: () => void | Promise<void>) =>
+    setConfirmState({ open: true, title, description, onConfirm });
 
   // 🆕 Estado para abrir dialog de agrupamento e blocos
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
@@ -529,15 +541,21 @@ export function TreinosManager({
     }
   };
 
-  const handleRemover = async (id: string) => {
-    try {
-      setLoadingStates((prev) => ({ ...prev, removendo: true }));
-      await removerExercicio(id);
-    } catch (error) {
-      console.error("[TreinosManager] Erro ao remover:", error);
-    } finally {
-      setLoadingStates((prev) => ({ ...prev, removendo: false }));
-    }
+  const handleRemover = (id: string) => {
+    askConfirm(
+      "Excluir exercício?",
+      "O exercício será removido do treino. Esta ação não pode ser desfeita.",
+      async () => {
+        try {
+          setLoadingStates((prev) => ({ ...prev, removendo: true }));
+          await removerExercicio(id);
+        } catch (error) {
+          console.error("[TreinosManager] Erro ao remover:", error);
+        } finally {
+          setLoadingStates((prev) => ({ ...prev, removendo: false }));
+        }
+      }
+    );
   };
 
   const calcularProgresso = (treino: TreinoDia) => {
@@ -654,7 +672,7 @@ export function TreinosManager({
   };
 
   // 🔧 Função para deletar grupo (com confirmação)
-  const handleDeleteGroup = async (grupoId: string) => {
+  const handleDeleteGroup = (grupoId: string) => {
     if (!grupoId) {
       toast.error("ID do grupo inválido");
       return;
@@ -664,21 +682,23 @@ export function TreinosManager({
       .flat()
       .find((g: any) => g.grupo_id === grupoId);
     const qtd = grupo?.exercicios?.length || 0;
-    if (!window.confirm(
-      qtd > 0
-        ? `Excluir este grupo com ${qtd} exercício(s)? Esta ação não pode ser desfeita.`
-        : "Excluir este grupo?"
-    )) return;
 
-    try {
-      setLoadingStates((prev) => ({ ...prev, removendo: true }));
-      console.log("[TreinosManager] Deletando grupo:", grupoId);
-      await deletarGrupo(grupoId);
-    } catch (err) {
-      console.error("[TreinosManager] Erro ao deletar grupo:", err);
-    } finally {
-      setLoadingStates((prev) => ({ ...prev, removendo: false }));
-    }
+    askConfirm(
+      "Excluir grupo de exercícios?",
+      qtd > 0
+        ? `Este grupo possui ${qtd} exercício(s). Todos serão removidos. Esta ação não pode ser desfeita.`
+        : "O grupo será removido. Esta ação não pode ser desfeita.",
+      async () => {
+        try {
+          setLoadingStates((prev) => ({ ...prev, removendo: true }));
+          await deletarGrupo(grupoId);
+        } catch (err) {
+          console.error("[TreinosManager] Erro ao deletar grupo:", err);
+        } finally {
+          setLoadingStates((prev) => ({ ...prev, removendo: false }));
+        }
+      }
+    );
   };
 
   // 1. Adicionar função para marcar grupo completo:
@@ -768,22 +788,25 @@ export function TreinosManager({
   };
 
   // 🆕 Função para deletar bloco (com confirmação)
-  const handleDeleteBlock = async (blocoId: string) => {
+  const handleDeleteBlock = (blocoId: string) => {
     if (!blocoId) {
       toast.error("ID do bloco inválido");
       return;
     }
-    if (!window.confirm("Excluir este bloco? Esta ação não pode ser desfeita.")) return;
-
-    try {
-      setLoadingStates((prev) => ({ ...prev, removendo: true }));
-      console.log("[TreinosManager] Deletando bloco:", blocoId);
-      await deletarBloco(blocoId);
-    } catch (err) {
-      console.error("[TreinosManager] Erro ao deletar bloco:", err);
-    } finally {
-      setLoadingStates((prev) => ({ ...prev, removendo: false }));
-    }
+    askConfirm(
+      "Excluir bloco?",
+      "O bloco e todo o seu conteúdo serão removidos. Esta ação não pode ser desfeita.",
+      async () => {
+        try {
+          setLoadingStates((prev) => ({ ...prev, removendo: true }));
+          await deletarBloco(blocoId);
+        } catch (err) {
+          console.error("[TreinosManager] Erro ao deletar bloco:", err);
+        } finally {
+          setLoadingStates((prev) => ({ ...prev, removendo: false }));
+        }
+      }
+    );
   };
 
   if (loading || loadingGrupos || loadingBlocos) {
@@ -1845,6 +1868,13 @@ export function TreinosManager({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        <ConfirmDeleteDialog
+          open={confirmState.open}
+          onOpenChange={(open) => setConfirmState((s) => ({ ...s, open }))}
+          title={confirmState.title}
+          description={confirmState.description}
+          onConfirm={confirmState.onConfirm}
+        />
       </>
     </div>
   );

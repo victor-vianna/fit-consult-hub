@@ -63,6 +63,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useBlockDialogDraft } from "@/hooks/useBlockDialogDraft";
 
 interface WorkoutBlockDialogProps {
   open: boolean;
@@ -258,6 +259,51 @@ export function WorkoutBlockDialog({
     }
   };
 
+  // 🔧 Auto-save de rascunho (apenas para novos blocos, por personal)
+  const isEditing = !!blocoEditando?.id;
+  const collectDraft = () => ({
+    tipo, posicao, nome, descricao, duracaoMinutos, obrigatorio,
+    tipoCardio, modalidade, trabalhoSeg, descansoSeg, rounds,
+    velocidade, inclinacao, bpmMin, bpmMax,
+    intensidadeValor, intensidadeUnidade,
+    gruposMusculares, tipoAlongamento,
+    tipoAquecimento, atividades, links,
+  });
+  const applyDraft = (d: any) => {
+    if (!d) return;
+    if (d.tipo) setTipo(d.tipo);
+    if (d.posicao) setPosicao(d.posicao);
+    if (typeof d.nome === "string") setNome(d.nome);
+    if (typeof d.descricao === "string") setDescricao(d.descricao);
+    if (typeof d.duracaoMinutos === "number") setDuracaoMinutos(d.duracaoMinutos);
+    if (typeof d.obrigatorio === "boolean") setObrigatorio(d.obrigatorio);
+    if (d.tipoCardio) setTipoCardio(d.tipoCardio);
+    if (d.modalidade) setModalidade(d.modalidade);
+    if (typeof d.trabalhoSeg === "number") setTrabalhoSeg(d.trabalhoSeg);
+    if (typeof d.descansoSeg === "number") setDescansoSeg(d.descansoSeg);
+    if (typeof d.rounds === "number") setRounds(d.rounds);
+    if (typeof d.velocidade === "number") setVelocidade(d.velocidade);
+    if (typeof d.inclinacao === "number") setInclinacao(d.inclinacao);
+    if (typeof d.bpmMin === "number") setBpmMin(d.bpmMin);
+    if (typeof d.bpmMax === "number") setBpmMax(d.bpmMax);
+    if (typeof d.intensidadeValor === "number") setIntensidadeValor(d.intensidadeValor);
+    if (d.intensidadeUnidade) setIntensidadeUnidade(d.intensidadeUnidade);
+    if (typeof d.gruposMusculares === "string") setGruposMusculares(d.gruposMusculares);
+    if (d.tipoAlongamento) setTipoAlongamento(d.tipoAlongamento);
+    if (d.tipoAquecimento) setTipoAquecimento(d.tipoAquecimento);
+    if (typeof d.atividades === "string") setAtividades(d.atividades);
+    if (Array.isArray(d.links)) setLinks(d.links);
+    setActiveTab("manual");
+  };
+
+  const draft = useBlockDialogDraft({
+    scopeKey: personalId || "anon",
+    open,
+    isEditing,
+    collect: collectDraft,
+    apply: applyDraft,
+  });
+
   const handleSave = async () => {
     if (!nome.trim()) {
       alert("Nome do bloco é obrigatório");
@@ -328,6 +374,7 @@ export function WorkoutBlockDialog({
       }
 
       await onSave(bloco);
+      draft.clear();
       onOpenChange(false);
     } catch (error) {
       console.error("[WorkoutBlockDialog] Erro ao salvar:", error);
@@ -351,6 +398,23 @@ export function WorkoutBlockDialog({
             {tipoConfig.descricao}
           </DialogDescription>
         </DialogHeader>
+
+        {draft.draftAvailable && (
+          <div className="flex items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span>Encontramos um rascunho não salvo deste bloco.</span>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="ghost" onClick={() => draft.clear()}>
+                Descartar
+              </Button>
+              <Button size="sm" onClick={() => draft.restore()}>
+                Restaurar
+              </Button>
+            </div>
+          </div>
+        )}
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
           <TabsList className="grid w-full grid-cols-2">

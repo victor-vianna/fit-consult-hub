@@ -1868,6 +1868,13 @@ export function TreinosManager({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        <ConfirmDeleteDialog
+          open={confirmState.open}
+          onOpenChange={(open) => setConfirmState((s) => ({ ...s, open }))}
+          title={confirmState.title}
+          description={confirmState.description}
+          onConfirm={confirmState.onConfirm}
+        />
       </>
     </div>
   );

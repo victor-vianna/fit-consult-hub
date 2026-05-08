@@ -529,9 +529,10 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
     }) => {
       const diaValido = validarDiaSemana(dia);
 
+      // Usa múltiplos de 10 para evitar conflitos e permitir inserções intermediárias
       await Promise.all(
         exerciciosOrdenados.map((ex, index) =>
-          supabase.from("exercicios").update({ ordem: index }).eq("id", ex.id)
+          supabase.from("exercicios").update({ ordem: (index + 1) * 10 }).eq("id", ex.id)
         )
       );
       return { dia: diaValido, exerciciosOrdenados };

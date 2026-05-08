@@ -332,6 +332,13 @@ export function WorkoutDayView({
       return t.exercicios.length > 0 || grupos.length > 0 || blocos.length > 0;
     })?.dia || 1;
 
+  // 🔧 Persistir aba do dia ativa por aluno+personal (sobrevive a navegação/reload)
+  const [diaAtivo, setDiaAtivo] = usePersistedState<string>(
+    `workout-day-tab:${profileId}:${personalId}`,
+    String(primeiroDiaComConteudo),
+    { storage: "local" }
+  );
+
   return (
     <div className="space-y-4 sm:space-y-6 pb-20">
       {/* Header Principal */}

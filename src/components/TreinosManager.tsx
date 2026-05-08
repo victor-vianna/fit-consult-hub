@@ -788,22 +788,25 @@ export function TreinosManager({
   };
 
   // 🆕 Função para deletar bloco (com confirmação)
-  const handleDeleteBlock = async (blocoId: string) => {
+  const handleDeleteBlock = (blocoId: string) => {
     if (!blocoId) {
       toast.error("ID do bloco inválido");
       return;
     }
-    if (!window.confirm("Excluir este bloco? Esta ação não pode ser desfeita.")) return;
-
-    try {
-      setLoadingStates((prev) => ({ ...prev, removendo: true }));
-      console.log("[TreinosManager] Deletando bloco:", blocoId);
-      await deletarBloco(blocoId);
-    } catch (err) {
-      console.error("[TreinosManager] Erro ao deletar bloco:", err);
-    } finally {
-      setLoadingStates((prev) => ({ ...prev, removendo: false }));
-    }
+    askConfirm(
+      "Excluir bloco?",
+      "O bloco e todo o seu conteúdo serão removidos. Esta ação não pode ser desfeita.",
+      async () => {
+        try {
+          setLoadingStates((prev) => ({ ...prev, removendo: true }));
+          await deletarBloco(blocoId);
+        } catch (err) {
+          console.error("[TreinosManager] Erro ao deletar bloco:", err);
+        } finally {
+          setLoadingStates((prev) => ({ ...prev, removendo: false }));
+        }
+      }
+    );
   };
 
   if (loading || loadingGrupos || loadingBlocos) {

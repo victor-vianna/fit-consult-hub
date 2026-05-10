@@ -161,8 +161,32 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
     }
 
     // Mensagem → chat
-    if (n.tipo === "nova_mensagem" && alunoId) {
+    if ((n.tipo === "nova_mensagem" || n.tipo === "mensagem") && alunoId) {
       navigate(`/aluno/${alunoId}?tab=chat`);
+      return;
+    }
+
+    // Treino concluído → histórico do aluno
+    if (n.tipo === "treino_concluido" && alunoId) {
+      navigate(`/aluno/${alunoId}?tab=historico`);
+      return;
+    }
+
+    // Check-in semanal sem feedback dedicado → tab de check-ins
+    if (n.tipo === "checkin_semanal" && alunoId) {
+      navigate(`/aluno/${alunoId}?tab=checkins`);
+      return;
+    }
+
+    // Planilha (expira/expirou/lembrete) → tab de treinos do aluno
+    if (n.tipo?.startsWith("planilha_") && alunoId) {
+      navigate(`/aluno/${alunoId}?tab=treinos`);
+      return;
+    }
+
+    // Novo aluno → perfil
+    if (n.tipo === "novo_aluno" && alunoId) {
+      navigate(`/aluno/${alunoId}`);
       return;
     }
 

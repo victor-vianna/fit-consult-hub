@@ -557,10 +557,11 @@ export function useExerciseGroups({
 
       // Atualizar ordem de cada grupo (todos os exercícios do grupo)
       for (const grupo of grupos) {
-        await supabase
+        const { error } = await supabase
           .from("exercicios")
           .update({ ordem: grupo.ordem })
           .eq("grupo_id", grupo.grupo_id);
+        if (error) throw new Error(error.message);
       }
 
       return grupos;

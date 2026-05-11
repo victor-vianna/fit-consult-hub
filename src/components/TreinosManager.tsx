@@ -410,17 +410,15 @@ export function TreinosManager({
     const newOrder = arrayMove(unifiedList, oldIndex, newIndex);
 
     try {
-      // Batch update all items with new global ordem values
-      const exerciseUpdates: Promise<any>[] = [];
+      // Build target order maps
+      const exerciseTargets: { id: string; ordem: number }[] = [];
       const blockUpdates: { id: string; ordem: number }[] = [];
       const groupUpdates: { grupo_id: string; ordem: number }[] = [];
 
       newOrder.forEach((item, idx) => {
-        const globalOrdem = idx * 10; // Use multiples of 10 for spacing
+        const globalOrdem = (idx + 1) * 10; // Start at 10, multiples of 10
         if (item.type === "exercise") {
-          exerciseUpdates.push(
-            (async () => { await supabase.from("exercicios").update({ ordem: globalOrdem }).eq("id", item.data.id); })()
-          );
+          exerciseTargets.push({ id: item.data.id, ordem: globalOrdem });
         } else if (item.type === "block") {
           blockUpdates.push({ id: item.data.id, ordem: globalOrdem });
         } else if (item.type === "group") {
@@ -428,8 +426,18 @@ export function TreinosManager({
         }
       });
 
+      // Update isolated exercises (no unique constraint on exercicios.ordem)
+      const exerciseResults = await Promise.all(
+        exerciseTargets.map((t) =>
+          supabase.from("exercicios").update({ ordem: t.ordem }).eq("id", t.id)
+        )
+      );
+      const firstExError = exerciseResults.find((r) => r.error);
+      if (firstExError?.error) {
+        throw new Error(firstExError.error.message);
+      }
+
       await Promise.all([
-        ...exerciseUpdates,
         blockUpdates.length > 0 ? reordenarBlocos(blockUpdates) : Promise.resolve(),
         groupUpdates.length > 0 ? reordenarGrupos(groupUpdates) : Promise.resolve(),
       ]);

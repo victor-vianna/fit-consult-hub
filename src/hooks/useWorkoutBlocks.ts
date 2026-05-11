@@ -384,15 +384,33 @@ export function useWorkoutBlocks({
     }) => {
       console.log("[useWorkoutBlocks] Reordenando blocos:", blocos.length);
 
-      // Atualizar ordem de cada bloco
-      const updates = blocos.map((bloco) =>
-        supabase
-          .from("blocos_treino")
-          .update({ ordem: bloco.ordem })
-          .eq("id", bloco.id)
-      );
+      if (blocos.length === 0) return blocos;
 
-      await Promise.all(updates);
+      // Two-phase update to avoid unique constraint (treino_semanal_id, ordem, deleted_at)
+      // Phase 1: shift all involved rows to negative offsets to free their final slots
+      const phase1 = await Promise.all(
+        blocos.map((b, idx) =>
+          supabase
+            .from("blocos_treino")
+            .update({ ordem: -(idx + 1) })
+            .eq("id", b.id)
+        )
+      );
+      const err1 = phase1.find((r) => r.error);
+      if (err1?.error) throw new Error(err1.error.message);
+
+      // Phase 2: set the final ordem values
+      const phase2 = await Promise.all(
+        blocos.map((b) =>
+          supabase
+            .from("blocos_treino")
+            .update({ ordem: b.ordem })
+            .eq("id", b.id)
+        )
+      );
+      const err2 = phase2.find((r) => r.error);
+      if (err2?.error) throw new Error(err2.error.message);
+
       return blocos;
     },
     onSuccess: async () => {

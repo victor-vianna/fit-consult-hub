@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { usePersistedState } from "@/hooks/usePersistedState";
 import { extractMaterialPath, getMaterialSignedUrl, openMaterialInNewTab } from "@/utils/materiais";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -115,13 +116,26 @@ export default function AlunoDetalhes() {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const { settings: personalSettings } = usePersonalSettings(user?.id);
-  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "geral");
+  const [activeTab, setActiveTab] = usePersistedState<string>(
+    `aluno-detail-tab:${id || "anon"}`,
+    searchParams.get("tab") || "geral",
+    { storage: "session" }
+  );
   const [refreshKey, setRefreshKey] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
   const [editandoPerfil, setEditandoPerfil] = useState(false);
   const [editNome, setEditNome] = useState("");
   const [editTelefone, setEditTelefone] = useState("");
   const [salvandoPerfil, setSalvandoPerfil] = useState(false);
+
+  // 🔧 Se a URL especificar ?tab=, ela sobrescreve a aba persistida
+  useEffect(() => {
+    const urlTab = searchParams.get("tab");
+    if (urlTab && urlTab !== activeTab) {
+      setActiveTab(urlTab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Chat não lidas badge
   const chatHook = useChatMessages({

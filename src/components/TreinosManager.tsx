@@ -850,15 +850,28 @@ export function TreinosManager({
   }) => {
     if (selectedDia === null) return;
 
-    const treino = treinos.find((t) => t.dia === selectedDia);
-    if (!treino || treino.exercicios.length === 0) {
-      toast.error("Nenhum exercício para salvar");
-      return;
-    }
+    // Considerar o treino atualmente selecionado quando há múltiplos treinos no dia
+    const treinosDoDiaArr = treinosPorDia(selectedDia);
+    const treino = selectedTreinoId
+      ? treinosDoDiaArr.find((t) => t.treinoId === selectedTreinoId) ||
+        treinosDoDiaArr[0] ||
+        treinos.find((t) => t.dia === selectedDia)
+      : treinosDoDiaArr[0] || treinos.find((t) => t.dia === selectedDia);
 
-    const treinoId = getTreinoId(treino);
+    const treinoId = treino ? getTreinoId(treino) : null;
     const grupos = treinoId ? obterGruposDoTreino(treinoId) : [];
     const blocos = treinoId ? obterBlocos(treinoId) : [];
+
+    const totalExercicios = (treino?.exercicios?.length || 0);
+    const totalAgrupados = grupos.reduce(
+      (acc: number, g: any) => acc + (g.exercicios?.length || 0),
+      0
+    );
+
+    if (!treino || (totalExercicios === 0 && totalAgrupados === 0 && blocos.length === 0)) {
+      toast.error("Nenhum exercício ou bloco para salvar");
+      return;
+    }
 
     try {
       // Mapear exercícios isolados

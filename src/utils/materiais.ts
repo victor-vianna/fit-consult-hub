@@ -29,3 +29,9 @@ export async function getMaterialSignedUrl(urlOrPath: string): Promise<string> {
   }
   return data.signedUrl;
 }
+
+/** Opens a material file by resolving a signed URL first. */
+export async function openMaterialInNewTab(urlOrPath: string): Promise<void> {
+  const signed = await getMaterialSignedUrl(urlOrPath);
+  if (signed) window.open(signed, "_blank", "noopener,noreferrer");
+}

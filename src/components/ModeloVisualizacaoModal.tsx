@@ -106,8 +106,7 @@ export function ModeloVisualizacaoModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-3xl h-[92vh] max-h-[92vh] flex flex-col p-0 gap-0">
-        <div className="px-6 pt-6 pb-2 flex flex-col gap-2">
+      <DialogContent className="sm:max-w-3xl h-[92vh] max-h-[92vh] flex flex-col">
         <DialogHeader>
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">

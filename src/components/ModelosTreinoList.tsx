@@ -1,5 +1,6 @@
 // components/ModelosTreinoList.tsx
 import { useState, useMemo } from "react";
+import { usePersistedState } from "@/hooks/usePersistedState";
 import {
   Card,
   CardContent,
@@ -68,10 +69,24 @@ export function ModelosTreinoList({
   isAtualizando = false,
   isCriandoPasta = false,
 }: ModelosTreinoListProps) {
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [ordenacao, setOrdenacao] = useState<OrdenacaoTipo>("recentes");
-  const [tagFilter, setTagFilter] = useState<string>("");
+  // 🔧 Persistência: pasta atual + filtros se mantêm entre navegação/abas/sessões
+  const [currentFolderId, setCurrentFolderId] = usePersistedState<string | null>(
+    "modelos-current-folder",
+    null
+  );
+  const [searchQuery, setSearchQuery] = usePersistedState<string>(
+    "modelos-search",
+    "",
+    { storage: "session" }
+  );
+  const [ordenacao, setOrdenacao] = usePersistedState<OrdenacaoTipo>(
+    "modelos-ordenacao",
+    "recentes"
+  );
+  const [tagFilter, setTagFilter] = usePersistedState<string>(
+    "modelos-tag-filter",
+    ""
+  );
   const [modeloDeletar, setModeloDeletar] = useState<string | null>(null);
   const [deletando, setDeletando] = useState(false);
   const [modeloVisualizando, setModeloVisualizando] = useState<ModeloTreino | null>(null);

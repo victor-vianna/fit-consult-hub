@@ -1151,33 +1151,53 @@ export type Database = {
           conteudo: string
           conversa_key: string
           created_at: string | null
+          deleted_for: string[]
+          deleted_for_all: boolean
           destinatario_id: string
+          edited_at: string | null
           id: string
           lida: boolean | null
           remetente_id: string
+          reply_to: string | null
           tipo: string
         }
         Insert: {
           conteudo: string
           conversa_key: string
           created_at?: string | null
+          deleted_for?: string[]
+          deleted_for_all?: boolean
           destinatario_id: string
+          edited_at?: string | null
           id?: string
           lida?: boolean | null
           remetente_id: string
+          reply_to?: string | null
           tipo?: string
         }
         Update: {
           conteudo?: string
           conversa_key?: string
           created_at?: string | null
+          deleted_for?: string[]
+          deleted_for_all?: boolean
           destinatario_id?: string
+          edited_at?: string | null
           id?: string
           lida?: boolean | null
           remetente_id?: string
+          reply_to?: string | null
           tipo?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "mensagens_chat_reply_to_fkey"
+            columns: ["reply_to"]
+            isOneToOne: false
+            referencedRelation: "mensagens_chat"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       modelo_pastas: {
         Row: {

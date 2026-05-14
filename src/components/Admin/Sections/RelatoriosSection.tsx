@@ -291,72 +291,72 @@ export default function RelatoriosSection() {
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <div className="p-4 border rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
-                  <DollarSign className="h-4 w-4 text-green-600" />
+                  <DollarSign className="h-4 w-4 text-success" />
                   <span className="text-sm text-muted-foreground">
                     Receita Total
                   </span>
                 </div>
-                <div className="text-2xl font-bold text-green-600">
+                <div className="text-2xl font-bold text-success">
                   {formatCurrency(relatorioAnual.receita)}
                 </div>
               </div>
 
               <div className="p-4 border rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
-                  <Users className="h-4 w-4 text-blue-600" />
+                  <Users className="h-4 w-4 text-info" />
                   <span className="text-sm text-muted-foreground">
                     Novos Usuários
                   </span>
                 </div>
-                <div className="text-2xl font-bold text-blue-600">
+                <div className="text-2xl font-bold text-info">
                   {relatorioAnual.novosUsuarios}
                 </div>
               </div>
 
               <div className="p-4 border rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
-                  <TrendingUp className="h-4 w-4 text-purple-600" />
+                  <TrendingUp className="h-4 w-4 text-foreground" />
                   <span className="text-sm text-muted-foreground">
                     Novas Assinaturas
                   </span>
                 </div>
-                <div className="text-2xl font-bold text-purple-600">
+                <div className="text-2xl font-bold text-foreground">
                   {relatorioAnual.novasAssinaturas}
                 </div>
               </div>
 
               <div className="p-4 border rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
-                  <Activity className="h-4 w-4 text-red-600" />
+                  <Activity className="h-4 w-4 text-destructive" />
                   <span className="text-sm text-muted-foreground">
                     Cancelamentos
                   </span>
                 </div>
-                <div className="text-2xl font-bold text-red-600">
+                <div className="text-2xl font-bold text-destructive">
                   {relatorioAnual.cancelamentos}
                 </div>
               </div>
 
               <div className="p-4 border rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
-                  <Calendar className="h-4 w-4 text-orange-600" />
+                  <Calendar className="h-4 w-4 text-warning" />
                   <span className="text-sm text-muted-foreground">
                     Pagamentos
                   </span>
                 </div>
-                <div className="text-2xl font-bold text-orange-600">
+                <div className="text-2xl font-bold text-warning">
                   {relatorioAnual.pagamentosRecebidos}
                 </div>
               </div>
 
               <div className="p-4 border rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
-                  <BarChart3 className="h-4 w-4 text-yellow-600" />
+                  <BarChart3 className="h-4 w-4 text-warning" />
                   <span className="text-sm text-muted-foreground">
                     Taxa Churn
                   </span>
                 </div>
-                <div className="text-2xl font-bold text-yellow-600">
+                <div className="text-2xl font-bold text-warning">
                   {relatorioAnual.taxaChurn}%
                 </div>
               </div>
@@ -385,7 +385,7 @@ export default function RelatoriosSection() {
             {relatorioMensal.map((relatorio, index) => (
               <div
                 key={index}
-                className="p-4 border-2 rounded-lg hover:shadow-md transition-all"
+                className="p-4 rounded-lg hover:shadow-md transition-all"
               >
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-lg">{relatorio.periodo}</h3>
@@ -403,7 +403,7 @@ export default function RelatoriosSection() {
                     <p className="text-xs text-muted-foreground mb-1">
                       Receita
                     </p>
-                    <p className="font-bold text-green-600">
+                    <p className="font-bold text-success">
                       {formatCurrency(relatorio.receita)}
                     </p>
                   </div>
@@ -412,7 +412,7 @@ export default function RelatoriosSection() {
                     <p className="text-xs text-muted-foreground mb-1">
                       Novos Usuários
                     </p>
-                    <p className="font-bold text-blue-600">
+                    <p className="font-bold text-info">
                       {relatorio.novosUsuarios}
                     </p>
                   </div>
@@ -421,7 +421,7 @@ export default function RelatoriosSection() {
                     <p className="text-xs text-muted-foreground mb-1">
                       Novas Assinaturas
                     </p>
-                    <p className="font-bold text-purple-600">
+                    <p className="font-bold text-foreground">
                       {relatorio.novasAssinaturas}
                     </p>
                   </div>
@@ -430,7 +430,7 @@ export default function RelatoriosSection() {
                     <p className="text-xs text-muted-foreground mb-1">
                       Cancelamentos
                     </p>
-                    <p className="font-bold text-red-600">
+                    <p className="font-bold text-destructive">
                       {relatorio.cancelamentos}
                     </p>
                   </div>
@@ -439,7 +439,7 @@ export default function RelatoriosSection() {
                     <p className="text-xs text-muted-foreground mb-1">
                       Pagamentos
                     </p>
-                    <p className="font-bold text-orange-600">
+                    <p className="font-bold text-warning">
                       {relatorio.pagamentosRecebidos}
                     </p>
                   </div>

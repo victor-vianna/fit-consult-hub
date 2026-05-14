@@ -366,12 +366,12 @@ export default function PlanosManager() {
             <p className="text-xs text-muted-foreground">Total de Planos</p>
           </CardContent>
         </Card>
-        <Card className="border-green-200 bg-green-50/50">
+        <Card className="border-success/20 bg-success-muted/40">
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-green-700">
+            <div className="text-2xl font-bold text-success">
               {stats.ativos}
             </div>
-            <p className="text-xs text-green-700">Planos Ativos</p>
+            <p className="text-xs text-success">Planos Ativos</p>
           </CardContent>
         </Card>
         <Card className="border-gray-200 bg-gray-50/50">
@@ -382,12 +382,12 @@ export default function PlanosManager() {
             <p className="text-xs text-gray-700">Planos Inativos</p>
           </CardContent>
         </Card>
-        <Card className="border-blue-200 bg-blue-50/50">
+        <Card className="border-info/20 bg-info-muted/40">
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-blue-700">
+            <div className="text-2xl font-bold text-info">
               {stats.totalAssinaturas}
             </div>
-            <p className="text-xs text-blue-700">Total Assinaturas</p>
+            <p className="text-xs text-info">Total Assinaturas</p>
           </CardContent>
         </Card>
       </div>
@@ -408,7 +408,7 @@ export default function PlanosManager() {
             {planos.map((plano, index) => (
               <Card
                 key={plano.id}
-                className={`border-2 ${
+                className={`${
                   plano.ativo
                     ? "border-primary/20 hover:border-primary/50"
                     : "border-gray-200 opacity-75"
@@ -467,7 +467,7 @@ export default function PlanosManager() {
                             key={idx}
                             className="flex items-start gap-2 text-sm"
                           >
-                            <Check className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                            <Check className="h-4 w-4 text-success mt-0.5 flex-shrink-0" />
                             <span className="text-muted-foreground">
                               {feature}
                             </span>

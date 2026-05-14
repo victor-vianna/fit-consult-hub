@@ -152,31 +152,31 @@ export default function PagamentosManager() {
     switch (status) {
       case "pago":
         return {
-          color: "bg-green-100 text-green-800 border-green-200",
+          color: "bg-success-muted text-success border-success/20",
           icon: <CheckCircle className="h-4 w-4" />,
           label: "Pago",
         };
       case "pendente":
         return {
-          color: "bg-yellow-100 text-yellow-800 border-yellow-200",
+          color: "bg-warning-muted text-warning border-warning/20",
           icon: <Clock className="h-4 w-4" />,
           label: "Pendente",
         };
       case "atrasado":
         return {
-          color: "bg-red-100 text-red-800 border-red-200",
+          color: "bg-destructive/10 text-destructive border-destructive/20",
           icon: <AlertCircle className="h-4 w-4" />,
           label: "Atrasado",
         };
       case "cancelado":
         return {
-          color: "bg-gray-100 text-gray-800 border-gray-200",
+          color: "bg-muted text-muted-foreground border-border",
           icon: <XCircle className="h-4 w-4" />,
           label: "Cancelado",
         };
       default:
         return {
-          color: "bg-gray-100 text-gray-800 border-gray-200",
+          color: "bg-muted text-muted-foreground border-border",
           icon: null,
           label: status,
         };
@@ -267,31 +267,31 @@ export default function PagamentosManager() {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-yellow-200 bg-yellow-50/50">
+        <Card className="border-warning/20 bg-warning-muted/40">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs text-yellow-900">Pendentes</p>
-              <Clock className="h-4 w-4 text-yellow-600" />
+              <p className="text-xs text-warning">Pendentes</p>
+              <Clock className="h-4 w-4 text-warning" />
             </div>
-            <div className="text-2xl font-bold text-yellow-700">
+            <div className="text-2xl font-bold text-warning">
               {formatCurrency(stats.pendentes)}
             </div>
-            <p className="text-xs text-yellow-700 mt-1">
+            <p className="text-xs text-warning mt-1">
               {stats.quantidade.pendentes} pagamentos
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-red-200 bg-red-50/50">
+        <Card className="border-destructive/20 bg-destructive/5">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs text-red-900">Atrasados</p>
-              <AlertCircle className="h-4 w-4 text-red-600" />
+              <p className="text-xs text-destructive">Atrasados</p>
+              <AlertCircle className="h-4 w-4 text-destructive" />
             </div>
-            <div className="text-2xl font-bold text-red-700">
+            <div className="text-2xl font-bold text-destructive">
               {formatCurrency(stats.atrasados)}
             </div>
-            <p className="text-xs text-red-700 mt-1">
+            <p className="text-xs text-destructive mt-1">
               {stats.quantidade.atrasados} pagamentos
             </p>
           </CardContent>
@@ -420,7 +420,7 @@ export default function PagamentosManager() {
               return (
                 <div
                   key={pagamento.id}
-                  className="p-4 border-2 rounded-lg hover:shadow-md transition-all"
+                  className="p-4 rounded-lg hover:shadow-md transition-all"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">

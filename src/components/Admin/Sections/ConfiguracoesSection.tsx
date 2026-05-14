@@ -445,8 +445,8 @@ export default function ConfiguracoesSection() {
             <div className="p-4 border rounded-lg">
               <p className="text-sm text-muted-foreground mb-1">Status</p>
               <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <span className="font-semibold text-green-600">Online</span>
+                <CheckCircle className="h-4 w-4 text-success" />
+                <span className="font-semibold text-success">Online</span>
               </div>
             </div>
 
@@ -466,20 +466,20 @@ export default function ConfiguracoesSection() {
       </Card>
 
       {/* Zona de Perigo */}
-      <Card className="border-red-200">
+      <Card className="border-destructive/20">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-red-600">
+          <CardTitle className="flex items-center gap-2 text-destructive">
             <AlertCircle className="h-5 w-5" />
             Zona de Perigo
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="p-4 border border-red-200 rounded-lg bg-red-50/50">
-              <h4 className="font-semibold mb-2 text-red-900">
+            <div className="p-4 border border-destructive/20 rounded-lg bg-destructive/5">
+              <h4 className="font-semibold mb-2 text-destructive">
                 Resetar Configurações
               </h4>
-              <p className="text-sm text-red-700 mb-3">
+              <p className="text-sm text-destructive mb-3">
                 Restaura todas as configurações para os valores padrão
               </p>
               <Button variant="destructive" size="sm">
@@ -487,11 +487,11 @@ export default function ConfiguracoesSection() {
               </Button>
             </div>
 
-            <div className="p-4 border border-red-200 rounded-lg bg-red-50/50">
-              <h4 className="font-semibold mb-2 text-red-900">
+            <div className="p-4 border border-destructive/20 rounded-lg bg-destructive/5">
+              <h4 className="font-semibold mb-2 text-destructive">
                 Limpar Banco de Dados
               </h4>
-              <p className="text-sm text-red-700 mb-3">
+              <p className="text-sm text-destructive mb-3">
                 Remove todos os dados de teste (ação irreversível)
               </p>
               <Button variant="destructive" size="sm">

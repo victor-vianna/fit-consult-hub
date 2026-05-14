@@ -1,3 +1,4 @@
+import { lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,7 +8,7 @@ import { AuthGuard } from "./components/AuthGuard";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { InstallPWAPrompt } from "./components/InstallPWAPrompt";
 import Auth from "./pages/Auth";
-import Admin from "./pages/Admin";
+import AdminLayout from "./components/Admin/AdminLayout";
 import Personal from "./pages/Personal";
 import AlunoDetalhes from "./pages/AlunoDetalhes";
 import AreaAluno from "./pages/AreaAluno";
@@ -18,6 +19,18 @@ import Biblioteca from "./pages/Biblioteca";
 import ResetPassword from "./pages/ResetPassword";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import AlunosManager from "./pages/Alunos";
+
+// Seções do painel admin (lazy)
+const DashboardOverview = lazy(() => import("./components/Admin/Sections/DashboardOverview"));
+const UsuariosManager = lazy(() => import("./components/Admin/Sections/UsuariosManager"));
+const PersonalsManager = lazy(() => import("./components/Admin/Sections/PersonalsManager"));
+const AssinaturasManager = lazy(() => import("./components/Admin/Sections/AssinaturasManager"));
+const PagamentosManager = lazy(() => import("./components/Admin/Sections/PagamentosManager"));
+const PlanosManager = lazy(() => import("./components/Admin/Sections/PlanosManager"));
+const RelatoriosSection = lazy(() => import("./components/Admin/Sections/RelatoriosSection"));
+const AnalyticsSection = lazy(() => import("./components/Admin/Sections/AnalyticsSection"));
+const NotificacoesSection = lazy(() => import("./components/Admin/Sections/NotificacoesSection"));
+const ConfiguracoesSection = lazy(() => import("./components/Admin/Sections/ConfiguracoesSection"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,10 +57,21 @@ const App = () => (
                 path="/admin"
                 element={
                   <AuthGuard allowedRoles={["admin"]}>
-                    <Admin />
+                    <AdminLayout />
                   </AuthGuard>
                 }
-              />
+              >
+                <Route index element={<DashboardOverview />} />
+                <Route path="usuarios" element={<UsuariosManager />} />
+                <Route path="personals" element={<PersonalsManager />} />
+                <Route path="assinaturas" element={<AssinaturasManager />} />
+                <Route path="pagamentos" element={<PagamentosManager />} />
+                <Route path="planos" element={<PlanosManager />} />
+                <Route path="relatorios" element={<RelatoriosSection />} />
+                <Route path="analytics" element={<AnalyticsSection />} />
+                <Route path="notificacoes" element={<NotificacoesSection />} />
+                <Route path="configuracoes" element={<ConfiguracoesSection />} />
+              </Route>
               <Route
                 path="/"
                 element={

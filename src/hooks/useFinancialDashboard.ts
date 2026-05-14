@@ -171,7 +171,21 @@ export function useFinancialDashboard(personalId: string) {
         (s) => s.status_pagamento === "pago" && new Date(s.data_expiracao) > now
       ) || [];
 
-      const previsaoReceita = assinaturasAtivas.reduce((sum, s) => sum + s.valor, 0);
+      // Previsão mensal = receita já recebida no mês + valor esperado das
+      // assinaturas (ativas ou pendentes) que renovam dentro do mês atual e
+      // ainda não foram pagas neste mês.
+      const inicioMes = new Date(currentYear, currentMonth, 1);
+      const fimMes = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
+      const subsIdsPagasNoMes = new Set(currentMonthPayments.map((p) => p.subscription_id));
+      const aReceberNoMes = (subscriptions ?? [])
+        .filter((s) => {
+          if (s.status_pagamento === "atrasado") return true;
+          const exp = new Date(s.data_expiracao);
+          const venceNoMes = exp >= inicioMes && exp <= fimMes;
+          return venceNoMes && !subsIdsPagasNoMes.has(s.id);
+        })
+        .reduce((sum, s) => sum + (s.valor || 0), 0);
+      const previsaoReceita = receitaMesAtual + aReceberNoMes;
 
       const inadimplentes = subscriptions?.filter(
         (s) =>

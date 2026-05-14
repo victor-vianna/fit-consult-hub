@@ -53,7 +53,7 @@ import {
   Clock,
 } from "lucide-react";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
-import { format } from "date-fns";
+
 import { AppLayout } from "@/components/AppLayout";
 import { usePriorityStudents } from "@/hooks/usePriorityStudents";
 import { useAlunosQuickStatus } from "@/hooks/useAlunosQuickStatus";

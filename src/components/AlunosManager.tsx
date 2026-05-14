@@ -497,149 +497,143 @@ export default function AlunosManager() {
               const flags = flagsByStudent[aluno.id] || [];
               const hasHighPriority = flags.some((f) => f.severity === "alta");
               const hasPriority = flags.length > 0;
+              const status = statusByAluno[aluno.id];
+
+              const prioridade: "bloqueado" | "urgente" | "importante" | "ativo" = !aluno.is_active
+                ? "bloqueado"
+                : hasHighPriority
+                ? "urgente"
+                : hasPriority
+                ? "importante"
+                : "ativo";
+
+              const prioridadeStyles = {
+                bloqueado: { ring: "border-muted", bar: "bg-muted-foreground", chip: "bg-muted text-muted-foreground", icon: UserX, label: "Bloqueado" },
+                urgente:   { ring: "border-destructive/50 ring-1 ring-destructive/20", bar: "bg-destructive", chip: "bg-destructive text-destructive-foreground", icon: Flame, label: "Urgente" },
+                importante:{ ring: "border-orange-500/50", bar: "bg-orange-500", chip: "bg-orange-500 text-white", icon: AlertTriangle, label: "Importante" },
+                ativo:     { ring: "", bar: "bg-green-500", chip: "bg-green-600 text-white", icon: UserCheck, label: "Ativo" },
+              }[prioridade];
+
+              const PrioIcon = prioridadeStyles.icon;
 
               return (
-              <Card
-                key={aluno.id}
-                className={`group hover:shadow-xl transition-all duration-300 border-2 cursor-pointer relative overflow-hidden touch-target ${
-                  hasHighPriority
-                    ? "border-destructive/50 ring-1 ring-destructive/20"
-                    : hasPriority
-                    ? "border-orange-500/50"
-                    : ""
-                }`}
-                onClick={() => navigate(`/aluno/${aluno.id}`)}
-              >
-                <div
-                  className={`absolute left-0 top-0 bottom-0 w-1 ${
-                    hasHighPriority
-                      ? "bg-destructive"
-                      : hasPriority
-                      ? "bg-orange-500"
-                      : aluno.is_active
-                      ? "bg-green-500"
-                      : "bg-red-500"
-                  }`}
-                />
+                <Card
+                  key={aluno.id}
+                  className={`group hover:shadow-xl transition-all duration-300 border-2 cursor-pointer relative overflow-hidden touch-target ${prioridadeStyles.ring}`}
+                  onClick={() => navigate(`/aluno/${aluno.id}`)}
+                >
+                  <div className={`absolute left-0 top-0 bottom-0 w-1 ${prioridadeStyles.bar}`} />
 
-                <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
-                  {aluno.is_active ? (
-                    <Badge className="bg-green-600 hover:bg-green-700">
-                      <UserCheck className="h-3 w-3 mr-1" />
-                      Ativo
+                  <div className="absolute top-3 right-3 z-10">
+                    <Badge className={`${prioridadeStyles.chip} gap-1 text-[10px] py-0.5 px-2`}>
+                      <PrioIcon className="h-3 w-3" />
+                      {prioridadeStyles.label}
                     </Badge>
-                  ) : (
-                    <Badge variant="destructive">
-                      <UserX className="h-3 w-3 mr-1" />
-                      Bloqueado
-                    </Badge>
-                  )}
-                  {hasPriority && (
-                    <Badge
-                      variant={hasHighPriority ? "destructive" : "secondary"}
-                      className="gap-1"
-                    >
-                      <AlertTriangle className="h-3 w-3" />
-                      {flags.length} alerta{flags.length > 1 ? "s" : ""}
-                    </Badge>
-                  )}
-                </div>
-
-                <CardContent className="pt-6 pl-5">
-                  <div className="space-y-3">
-                    <div>
-                      <h3 className="font-bold text-lg group-hover:text-primary transition-colors">
-                        {aluno.nome}
-                      </h3>
-                      {hasPriority && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {flags.slice(0, 3).map((f, i) => (
-                            <Badge
-                              key={i}
-                              variant={f.severity === "alta" ? "destructive" : "secondary"}
-                              className="text-[10px] py-0 h-5"
-                            >
-                              {f.label}
-                              {f.detail && ` · ${f.detail}`}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-2 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <Mail className="h-4 w-4 flex-shrink-0" />
-                        <span className="truncate">{aluno.email}</span>
-                      </div>
-
-                      {aluno.telefone && (
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 flex-shrink-0" />
-                          <span>{aluno.telefone}</span>
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 flex-shrink-0" />
-                        <span>
-                          Cadastrado em{" "}
-                          {format(new Date(aluno.created_at), "dd/MM/yyyy")}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div
-                      className="pt-3 flex gap-2 border-t"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => navigate(`/aluno/${aluno.id}`)}
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        Ver Perfil
-                      </Button>
-
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="hover:bg-red-50 hover:border-red-300"
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>
-                              Confirmar Exclusão
-                            </AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Tem certeza que deseja remover{" "}
-                              <strong>{aluno.nome}</strong>? Esta ação não pode
-                              ser desfeita e todos os dados do aluno serão
-                              permanentemente excluídos.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDeleteAluno(aluno.id)}
-                              className="bg-destructive hover:bg-destructive/90"
-                            >
-                              Remover Aluno
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
                   </div>
-                </CardContent>
-              </Card>
+
+                  <CardContent className="pt-6 pl-5 pr-3">
+                    <div className="space-y-3">
+                      <div>
+                        <h3 className="font-bold text-base leading-tight pr-20 group-hover:text-primary transition-colors truncate">
+                          {aluno.nome}
+                        </h3>
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                          <Mail className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">{aluno.email}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5">
+                        <Badge
+                          variant="outline"
+                          className={`gap-1 text-[10px] py-0 h-5 ${status?.treinouHoje ? "border-green-500/50 text-green-700 dark:text-green-400" : ""}`}
+                        >
+                          <Dumbbell className="h-3 w-3" />
+                          {status?.treinouHoje ? "Treinou hoje" : "Sem treino hoje"}
+                        </Badge>
+
+                        {status?.diasDesdeUltimoTreino !== null && status?.diasDesdeUltimoTreino !== undefined && (
+                          <Badge variant="outline" className="gap-1 text-[10px] py-0 h-5">
+                            <Activity className="h-3 w-3" />
+                            {status.diasDesdeUltimoTreino === 0 ? "Ativo hoje" : `há ${status.diasDesdeUltimoTreino}d`}
+                          </Badge>
+                        )}
+
+                        {status && status.totalSemana > 0 && (
+                          <Badge variant="outline" className="gap-1 text-[10px] py-0 h-5">
+                            <Clock className="h-3 w-3" />
+                            {status.concluidosSemana}/{status.totalSemana} sem.
+                          </Badge>
+                        )}
+
+                        {flags.slice(0, 2).map((f, i) => (
+                          <Badge
+                            key={i}
+                            variant={f.severity === "alta" ? "destructive" : "secondary"}
+                            className="text-[10px] py-0 h-5"
+                          >
+                            {f.label}
+                            {f.detail && ` · ${f.detail}`}
+                          </Badge>
+                        ))}
+                      </div>
+
+                      <div
+                        className="pt-3 flex gap-2 border-t"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => navigate(`/aluno/${aluno.id}`)}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          Ver Perfil
+                        </Button>
+
+                        {aluno.telefone && (
+                          <Button variant="outline" size="sm" asChild title={aluno.telefone}>
+                            <a href={`tel:${aluno.telefone}`} onClick={(e) => e.stopPropagation()}>
+                              <Phone className="h-4 w-4" />
+                            </a>
+                          </Button>
+                        )}
+
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="hover:bg-red-50 hover:border-red-300"
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja remover <strong>{aluno.nome}</strong>?
+                                Esta ação não pode ser desfeita e todos os dados do aluno
+                                serão permanentemente excluídos.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteAluno(aluno.id)}
+                                className="bg-destructive hover:bg-destructive/90"
+                              >
+                                Remover Aluno
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               );
             })}
           </div>

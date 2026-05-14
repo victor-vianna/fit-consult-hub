@@ -84,10 +84,18 @@ export function WorkoutBlockDialog({
   personalId,
 }: WorkoutBlockDialogProps) {
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"manual" | "template">("template");
+  const [activeTab, setActiveTab] = usePersistedState<"manual" | "template">(
+    `wb-dialog-tab:${personalId || "anon"}`,
+    "template",
+    { storage: "session" }
+  );
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<BlocoTemplate | null>(null);
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [currentFolderId, setCurrentFolderId] = usePersistedState<string | null>(
+    `wb-dialog-folder:${personalId || "anon"}`,
+    null,
+    { storage: "local" }
+  );
   const [novaPastaNome, setNovaPastaNome] = useState("");
   const [showNovaPasta, setShowNovaPasta] = useState(false);
   const [novaPastaCor, setNovaPastaCor] = useState("#3b82f6");

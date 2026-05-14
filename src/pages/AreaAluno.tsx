@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getMaterialSignedUrl, openMaterialInNewTab } from "@/utils/materiais";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -137,9 +138,11 @@ export default function AreaAluno() {
     }
   };
 
-  const handleVisualizarMaterial = (material: Material) => {
+  const handleVisualizarMaterial = async (material: Material) => {
+    const signed = await getMaterialSignedUrl(material.arquivo_url);
+    if (!signed) return;
     setSelectedFile({
-      url: material.arquivo_url,
+      url: signed,
       name: material.arquivo_nome,
       type: material.arquivo_nome.split(".").pop() || "",
     });
@@ -538,19 +541,14 @@ export default function AreaAluno() {
                             <Button
                               variant="outline"
                               size="sm"
-                              asChild
+                              onClick={() => openMaterialInNewTab(material.arquivo_url)}
                               style={{
                                 borderColor: personalSettings?.theme_color
                                   ? `${personalSettings.theme_color}50`
                                   : undefined,
                               }}
                             >
-                              <a
-                                href={material.arquivo_url}
-                                download={material.arquivo_nome}
-                              >
-                                <Download className="h-4 w-4" />
-                              </a>
+                              <Download className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>

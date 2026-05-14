@@ -128,6 +128,15 @@ export default function AlunoDetalhes() {
   const [editTelefone, setEditTelefone] = useState("");
   const [salvandoPerfil, setSalvandoPerfil] = useState(false);
 
+  // 🔧 Se a URL especificar ?tab=, ela sobrescreve a aba persistida
+  useEffect(() => {
+    const urlTab = searchParams.get("tab");
+    if (urlTab && urlTab !== activeTab) {
+      setActiveTab(urlTab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   // Chat não lidas badge
   const chatHook = useChatMessages({
     personalId: user?.id || "",

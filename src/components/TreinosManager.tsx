@@ -319,8 +319,12 @@ export function TreinosManager({
 
   // DnD sensors
   const sensors = useSensors(
-    useSensor(PointerSensor, {
+    useSensor(MouseSensor, {
       activationConstraint: { distance: 8 },
+    }),
+    useSensor(TouchSensor, {
+      // pressionar e segurar 200ms para iniciar o arrasto sem conflitar com scroll
+      activationConstraint: { delay: 200, tolerance: 6 },
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,

@@ -116,7 +116,11 @@ export default function AlunoDetalhes() {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const { settings: personalSettings } = usePersonalSettings(user?.id);
-  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "geral");
+  const [activeTab, setActiveTab] = usePersistedState<string>(
+    `aluno-detail-tab:${id || "anon"}`,
+    searchParams.get("tab") || "geral",
+    { storage: "session" }
+  );
   const [refreshKey, setRefreshKey] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
   const [editandoPerfil, setEditandoPerfil] = useState(false);

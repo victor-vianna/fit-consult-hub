@@ -70,7 +70,11 @@ export default function AreaAluno() {
   const [profile, setProfile] = useState<any>(null);
   const [personalProfile, setPersonalProfile] = useState<any>(null);
   const [materiais, setMateriais] = useState<Material[]>([]);
-  const [activeSection, setActiveSection] = useState("inicio");
+  const [activeSection, setActiveSection] = usePersistedState<string>(
+    `aluno-active-section:${user?.id || "anon"}`,
+    "inicio",
+    { storage: "local" }
+  );
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [loading, setLoading] = useState(true);

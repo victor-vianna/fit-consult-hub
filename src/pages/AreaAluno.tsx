@@ -766,12 +766,27 @@ export default function AreaAluno() {
                 <div className="flex items-center gap-2">
                   <ThemeToggle />
                   {profile?.personal_id && personalProfile?.telefone && (
-                    <WhatsAppButton
-                      telefone={personalProfile.telefone}
-                      nome="Personal"
-                    />
+                    <>
+                      {/* Compacto no mobile */}
+                      <span className="sm:hidden">
+                        <WhatsAppButton
+                          telefone={personalProfile.telefone}
+                          nome={personalProfile.nome || "Personal"}
+                          iconOnly
+                        />
+                      </span>
+                      <span className="hidden sm:inline-flex">
+                        <WhatsAppButton
+                          telefone={personalProfile.telefone}
+                          nome={personalProfile.nome || "Personal"}
+                        />
+                      </span>
+                    </>
                   )}
-                  <Button variant="outline" onClick={signOut}>
+                  <Button variant="outline" size="icon" className="sm:hidden min-h-[44px] min-w-[44px]" onClick={signOut} aria-label="Sair">
+                    <LogOut className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" className="hidden sm:inline-flex" onClick={signOut}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Sair
                   </Button>

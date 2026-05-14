@@ -720,29 +720,45 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
   // 🆕 Mutation para deletar treino específico
   const deletarTreinoMutation = useMutation({
     mutationFn: async (treinoId: string) => {
-      // Primeiro deleta exercícios
-      await supabase.from("exercicios").delete().eq("treino_semanal_id", treinoId);
-      
+      // Primeiro deleta exercícios (captura erro de RLS/constraint)
+      const { error: errEx } = await supabase
+        .from("exercicios")
+        .delete()
+        .eq("treino_semanal_id", treinoId);
+      if (errEx) throw new Error(`Falha ao remover exercícios: ${errEx.message}`);
+
       // Depois deleta blocos
-      await supabase.from("blocos_treino").delete().eq("treino_semanal_id", treinoId);
-      
+      const { error: errBl } = await supabase
+        .from("blocos_treino")
+        .delete()
+        .eq("treino_semanal_id", treinoId);
+      if (errBl) throw new Error(`Falha ao remover blocos: ${errBl.message}`);
+
       // Finalmente deleta o treino
       const { error } = await supabase
         .from("treinos_semanais")
         .delete()
         .eq("id", treinoId);
 
-      if (error) throw error;
+      if (error) throw new Error(`Falha ao remover treino: ${error.message}`);
       return treinoId;
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: buildQueryKey(profileId, personalId, semanaParaBuscar),
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: buildQueryKey(profileId, personalId, semanaParaBuscar),
+        }),
+        queryClient.invalidateQueries({
+          predicate: (query) => {
+            const key = query.queryKey as string[];
+            return key[0] === "grupos-exercicios" || key[0] === "blocos-treino";
+          },
+        }),
+      ]);
       toast.success("Treino excluído!");
     },
-    onError: (err) => {
-      toast.error("Erro ao excluir treino");
+    onError: (err: any) => {
+      toast.error(err?.message || "Erro ao excluir treino");
       console.error("[useTreinos] deletarTreino error:", err);
     },
   });

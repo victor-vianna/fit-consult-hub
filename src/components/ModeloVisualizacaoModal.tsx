@@ -356,6 +356,7 @@ export function ModeloVisualizacaoModal({
           {editando ? (
             <>
               <Button
+                type="button"
                 variant="outline"
                 onClick={handleCancelarEdicao}
                 disabled={isAtualizando}

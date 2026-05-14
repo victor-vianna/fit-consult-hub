@@ -841,17 +841,22 @@ export function PersonalDashboardCards({
         </Button>
       </div>
 
-      {/* Seção de Alunos Prioritários */}
-      <PriorityStudentsSection
-        students={priorityStudents}
-        themeColor={themeColor}
-        loading={priorityLoading}
-      />
-
-      {/* Render cards in saved order */}
-      {cardConfig.filter((c) => !detailCardIds.includes(c.id) && c.visible).map((c) => (
-        <div key={c.id}>{cardSections[c.id]}</div>
-      ))}
+      {/* Render cards na ordem salva (Alunos Prioritários, Meus Alunos, Estatísticas, etc.) */}
+      {cardConfig
+        .filter((c) => !detailCardIds.includes(c.id) && c.visible)
+        .map((c) => {
+          if (c.id === "alunos-prioritarios") {
+            return (
+              <PriorityStudentsSection
+                key={c.id}
+                students={priorityStudents}
+                themeColor={themeColor}
+                loading={priorityLoading}
+              />
+            );
+          }
+          return <div key={c.id}>{cardSections[c.id]}</div>;
+        })}
 
       {/* Detail cards grid */}
       {orderedDetailCards.length > 0 && (

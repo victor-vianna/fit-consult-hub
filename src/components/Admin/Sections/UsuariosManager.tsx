@@ -284,7 +284,7 @@ export default function UsuariosManager() {
 
           <div className="space-y-3">
             {filteredUsuarios.map((usuario) => (
-              <div key={usuario.id} className="p-4 border-2 rounded-lg hover:shadow-md transition-all">
+              <div key={usuario.id} className="p-4 rounded-lg hover:shadow-md transition-all">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">

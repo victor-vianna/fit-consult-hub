@@ -327,7 +327,7 @@ export default function PersonalsManager() {
             {filteredPersonals.map((personal) => (
               <div
                 key={personal.id}
-                className="p-4 border-2 rounded-lg hover:shadow-md transition-all"
+                className="p-4 rounded-lg hover:shadow-md transition-all"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">

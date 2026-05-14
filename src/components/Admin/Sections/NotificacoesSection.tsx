@@ -240,9 +240,9 @@ export default function NotificacoesSection() {
   const getTipoColor = (tipo: string) => {
     switch (tipo) {
       case "alerta":
-        return "border-warning/20 bg-yellow-50/50";
+        return "border-warning/20 bg-warning-muted/40";
       case "erro":
-        return "border-destructive/20 bg-red-50/50";
+        return "border-destructive/20 bg-destructive/5";
       case "sucesso":
         return "border-success/20 bg-success-muted/40";
       default:
@@ -286,7 +286,7 @@ export default function NotificacoesSection() {
             <p className="text-xs text-info">Não Lidas</p>
           </CardContent>
         </Card>
-        <Card className="border-warning/20 bg-yellow-50/50">
+        <Card className="border-warning/20 bg-warning-muted/40">
           <CardContent className="pt-6">
             <div className="text-2xl font-bold text-warning">
               {stats.alertas}
@@ -344,7 +344,7 @@ export default function NotificacoesSection() {
             {filteredNotificacoes.map((notificacao) => (
               <div
                 key={notificacao.id}
-                className={`p-4 border-2 rounded-lg ${getTipoColor(
+                className={`p-4 rounded-lg ${getTipoColor(
                   notificacao.tipo
                 )} ${
                   notificacao.lida ? "opacity-60" : ""
@@ -434,7 +434,7 @@ export default function NotificacoesSection() {
             {alertas.map((alerta) => (
               <div
                 key={alerta.id}
-                className="p-4 border-2 rounded-lg hover:shadow-md transition-all"
+                className="p-4 rounded-lg hover:shadow-md transition-all"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">

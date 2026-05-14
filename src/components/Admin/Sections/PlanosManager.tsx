@@ -408,7 +408,7 @@ export default function PlanosManager() {
             {planos.map((plano, index) => (
               <Card
                 key={plano.id}
-                className={`border-2 ${
+                className={`${
                   plano.ativo
                     ? "border-primary/20 hover:border-primary/50"
                     : "border-gray-200 opacity-75"

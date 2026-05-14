@@ -267,10 +267,10 @@ export default function PagamentosManager() {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-warning/20 bg-yellow-50/50">
+        <Card className="border-warning/20 bg-warning-muted/40">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs text-yellow-900">Pendentes</p>
+              <p className="text-xs text-warning">Pendentes</p>
               <Clock className="h-4 w-4 text-warning" />
             </div>
             <div className="text-2xl font-bold text-warning">
@@ -282,10 +282,10 @@ export default function PagamentosManager() {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-destructive/20 bg-red-50/50">
+        <Card className="border-destructive/20 bg-destructive/5">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs text-red-900">Atrasados</p>
+              <p className="text-xs text-destructive">Atrasados</p>
               <AlertCircle className="h-4 w-4 text-destructive" />
             </div>
             <div className="text-2xl font-bold text-destructive">
@@ -420,7 +420,7 @@ export default function PagamentosManager() {
               return (
                 <div
                   key={pagamento.id}
-                  className="p-4 border-2 rounded-lg hover:shadow-md transition-all"
+                  className="p-4 rounded-lg hover:shadow-md transition-all"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">

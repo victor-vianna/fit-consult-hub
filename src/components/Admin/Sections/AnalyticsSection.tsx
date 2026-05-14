@@ -244,10 +244,10 @@ export default function AnalyticsSection() {
     <div className="space-y-6">
       {/* Métricas Principais */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-2 border-border bg-accent/40">
+        <Card className="border-border bg-accent/40">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-purple-900">LTV</span>
+              <span className="text-sm text-foreground">LTV</span>
               <Award className="h-5 w-5 text-foreground" />
             </div>
             <div className="text-2xl font-bold text-foreground">
@@ -257,10 +257,10 @@ export default function AnalyticsSection() {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-warning/20 bg-warning-muted/40">
+        <Card className="border-warning/20 bg-warning-muted/40">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-orange-900">CAC</span>
+              <span className="text-sm text-warning">CAC</span>
               <Target className="h-5 w-5 text-warning" />
             </div>
             <div className="text-2xl font-bold text-warning">
@@ -270,10 +270,10 @@ export default function AnalyticsSection() {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-success/20 bg-success-muted/40">
+        <Card className="border-success/20 bg-success-muted/40">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-green-900">Taxa Conversão</span>
+              <span className="text-sm text-success">Taxa Conversão</span>
               <Percent className="h-5 w-5 text-success" />
             </div>
             <div className="text-2xl font-bold text-success">
@@ -283,10 +283,10 @@ export default function AnalyticsSection() {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-info/20 bg-info-muted/40">
+        <Card className="border-info/20 bg-info-muted/40">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-blue-900">Permanência</span>
+              <span className="text-sm text-info">Permanência</span>
               <Clock className="h-5 w-5 text-info" />
             </div>
             <div className="text-2xl font-bold text-info">

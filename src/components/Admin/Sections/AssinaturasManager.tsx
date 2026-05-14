@@ -266,7 +266,7 @@ export default function AssinaturasManager() {
             <p className="text-xs text-info">Trial</p>
           </CardContent>
         </Card>
-        <Card className="border-destructive/20 bg-red-50/50">
+        <Card className="border-destructive/20 bg-destructive/5">
           <CardContent className="pt-6">
             <div className="text-2xl font-bold text-destructive">
               {stats.canceladas}
@@ -336,7 +336,7 @@ export default function AssinaturasManager() {
               return (
                 <div
                   key={assinatura.id}
-                  className="p-4 border-2 rounded-lg hover:shadow-md transition-all"
+                  className="p-4 rounded-lg hover:shadow-md transition-all"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">

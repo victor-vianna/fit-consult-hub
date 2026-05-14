@@ -475,8 +475,8 @@ export default function ConfiguracoesSection() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="p-4 border border-destructive/20 rounded-lg bg-red-50/50">
-              <h4 className="font-semibold mb-2 text-red-900">
+            <div className="p-4 border border-destructive/20 rounded-lg bg-destructive/5">
+              <h4 className="font-semibold mb-2 text-destructive">
                 Resetar Configurações
               </h4>
               <p className="text-sm text-destructive mb-3">
@@ -487,8 +487,8 @@ export default function ConfiguracoesSection() {
               </Button>
             </div>
 
-            <div className="p-4 border border-destructive/20 rounded-lg bg-red-50/50">
-              <h4 className="font-semibold mb-2 text-red-900">
+            <div className="p-4 border border-destructive/20 rounded-lg bg-destructive/5">
+              <h4 className="font-semibold mb-2 text-destructive">
                 Limpar Banco de Dados
               </h4>
               <p className="text-sm text-destructive mb-3">

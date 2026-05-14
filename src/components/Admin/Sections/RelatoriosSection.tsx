@@ -385,7 +385,7 @@ export default function RelatoriosSection() {
             {relatorioMensal.map((relatorio, index) => (
               <div
                 key={index}
-                className="p-4 border-2 rounded-lg hover:shadow-md transition-all"
+                className="p-4 rounded-lg hover:shadow-md transition-all"
               >
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-lg">{relatorio.periodo}</h3>

@@ -126,6 +126,40 @@ export function useNotificacoes(userId: string) {
           playNotificationSound();
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "notificacoes",
+          filter: `destinatario_id=eq.${userId}`,
+        },
+        (payload) => {
+          const atualizada = payload.new as Notificacao;
+          setNotificacoes((prev) => {
+            const next = prev.map((n) => (n.id === atualizada.id ? atualizada : n));
+            setNaoLidas(next.filter((n) => !n.lida).length);
+            return next;
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "notificacoes",
+          filter: `destinatario_id=eq.${userId}`,
+        },
+        (payload) => {
+          const removidaId = (payload.old as { id: string }).id;
+          setNotificacoes((prev) => {
+            const next = prev.filter((n) => n.id !== removidaId);
+            setNaoLidas(next.filter((n) => !n.lida).length);
+            return next;
+          });
+        }
+      )
       .subscribe();
 
     // Cleanup: desinscrever ao desmontar

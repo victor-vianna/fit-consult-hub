@@ -106,7 +106,7 @@ export function ModeloVisualizacaoModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-3xl h-[92vh] max-h-[92vh] flex flex-col">
         <DialogHeader>
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
@@ -214,7 +214,7 @@ export function ModeloVisualizacaoModal({
         <Separator />
 
         {/* Conteúdo */}
-        <ScrollArea className="flex-1 min-h-0 max-h-[50vh] -mx-6 px-6">
+        <ScrollArea className="flex-1 min-h-0 -mx-6 px-6">
           <div className="space-y-4 py-2">
             {/* Blocos */}
             {modelo.blocos && modelo.blocos.length > 0 && (

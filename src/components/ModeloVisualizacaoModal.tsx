@@ -1,5 +1,5 @@
 // components/ModeloVisualizacaoModal.tsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -58,15 +58,19 @@ export function ModeloVisualizacaoModal({
   const [categoria, setCategoria] = useState("");
   const [duracao, setDuracao] = useState<string>("");
 
-  // Sincronizar estado com modelo
-  const handleOpenChange = (isOpen: boolean) => {
-    if (isOpen && modelo) {
-      setNome(modelo.nome);
-      setDescricao(modelo.descricao || "");
-      setCategoria(modelo.categoria || "");
-      setDuracao(modelo.duracao_total_minutos?.toString() || "");
+  // Sincronizar estado com modelo sempre que abrir ou trocar de modelo
+  useEffect(() => {
+    if (open && modelo) {
+      setNome(modelo.nome ?? "");
+      setDescricao(modelo.descricao ?? "");
+      setCategoria(modelo.categoria ?? "");
+      setDuracao(modelo.duracao_total_minutos?.toString() ?? "");
       setEditando(false);
     }
+  }, [open, modelo?.id]);
+
+  const handleOpenChange = (isOpen: boolean) => {
+    if (!isOpen) setEditando(false);
     onOpenChange(isOpen);
   };
 
@@ -352,6 +356,7 @@ export function ModeloVisualizacaoModal({
           {editando ? (
             <>
               <Button
+                type="button"
                 variant="outline"
                 onClick={handleCancelarEdicao}
                 disabled={isAtualizando}

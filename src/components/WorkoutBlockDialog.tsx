@@ -304,6 +304,43 @@ export function WorkoutBlockDialog({
     apply: applyDraft,
   });
 
+  // 🔧 CRÍTICO: Re-popular o formulário sempre que abrir com um bloco diferente.
+  // Sem isso, ao editar um bloco (ex.: cardio Elíptico) o modal aparece vazio
+  // porque os useState só inicializam no primeiro mount.
+  useEffect(() => {
+    if (!open || !blocoEditando) return;
+    setTipo((blocoEditando.tipo as TipoBloco) ?? "cardio");
+    setPosicao((blocoEditando.posicao as PosicaoBloco) ?? "fim");
+    setNome(blocoEditando.nome ?? "");
+    setDescricao(blocoEditando.descricao ?? "");
+    setDuracaoMinutos(blocoEditando.duracao_estimada_minutos ?? 10);
+    setObrigatorio(blocoEditando.obrigatorio ?? false);
+    setLinks(blocoEditando.links ?? []);
+
+    const cc: any = blocoEditando.config_cardio ?? {};
+    setTipoCardio(cc.tipo ?? "bike");
+    setModalidade(cc.modalidade ?? "hiit");
+    setTrabalhoSeg(cc.trabalho_segundos ?? 30);
+    setDescansoSeg(cc.descanso_segundos ?? 30);
+    setRounds(cc.rounds ?? 10);
+    setVelocidade(cc.velocidade_kmh ?? 0);
+    setInclinacao(cc.inclinacao_percentual ?? 0);
+    setBpmMin(cc.batimentos_alvo?.minimo ?? 0);
+    setBpmMax(cc.batimentos_alvo?.maximo ?? 0);
+    setIntensidadeValor(cc.intensidade?.valor ?? 80);
+    setIntensidadeUnidade(cc.intensidade?.unidade ?? "percentual");
+
+    const ca: any = blocoEditando.config_alongamento ?? {};
+    setGruposMusculares(ca.grupos_musculares?.join(", ") ?? "");
+    setTipoAlongamento(ca.tipo ?? "estatico");
+
+    const caq: any = blocoEditando.config_aquecimento ?? {};
+    setTipoAquecimento(caq.tipo ?? "geral");
+    setAtividades(caq.atividades?.join(", ") ?? "");
+
+    setActiveTab("manual");
+  }, [open, blocoEditando?.id]);
+
   const handleSave = async () => {
     if (!nome.trim()) {
       alert("Nome do bloco é obrigatório");

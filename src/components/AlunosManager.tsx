@@ -44,16 +44,19 @@ import {
   Filter,
   Mail,
   Phone,
-  Calendar,
   Eye,
   Users,
-  FileText,
+  Dumbbell,
+  Activity,
+  AlertTriangle,
+  Flame,
+  Clock,
 } from "lucide-react";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { format } from "date-fns";
 import { AppLayout } from "@/components/AppLayout";
 import { usePriorityStudents } from "@/hooks/usePriorityStudents";
-import { AlertTriangle } from "lucide-react";
+import { useAlunosQuickStatus } from "@/hooks/useAlunosQuickStatus";
 
 interface Aluno {
   id: string;
@@ -99,6 +102,7 @@ export default function AlunosManager() {
 
   const { settings: personalSettings } = usePersonalSettings(user?.id);
   const { flagsByStudent } = usePriorityStudents(user?.id);
+  const { statusByAluno } = useAlunosQuickStatus(user?.id);
 
   // 🔧 Persistir filtros sempre que mudarem
   useEffect(() => {

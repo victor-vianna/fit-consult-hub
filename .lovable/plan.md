@@ -1,109 +1,95 @@
-# Plano de Correções do Sistema
+# Plano: Otimizar e Modernizar o Painel Admin
 
-Dividido em 3 frentes independentes que podem ser implementadas em sequência. Cada frente entrega valor sozinha.
+## Diagnóstico atual
 
----
+- **Mobile quebrado**: `AdminSidebar` é fixo (`w-64`/`w-20`), sem drawer/off-canvas. No mobile ocupa metade da tela.
+- **Sem rotas**: navegação por `useState` — não dá para compartilhar link, voltar pelo browser, nem abrir aba.
+- **Performance**: `DashboardOverview` faz **7+ queries em série** (incluindo loop de 6 meses para churn = 12 queries sequenciais). Carrega sempre tudo, sem cache.
+- **Cores hardcoded** violando design system: `bg-green-100`, `text-blue-700`, `border-orange-200`, etc. em todas as 10 seções → quebra dark mode e identidade visual.
+- **Sem KPIs visuais**: gráficos de churn estão como cards numéricos, não como gráfico de linha/área.
+- **Header redundante**: logo "FitConsult Admin" no header + "Admin Panel" na sidebar.
+- **Sem busca global**, sem atalhos, sem ações rápidas no dashboard.
+- **Layout das seções pesado**: cards com `border-2` em tudo, hierarquia visual fraca.
 
-## Frente 1 — Persistência de fluxo e cache (Aluno + Personal)
+## Escopo desta rodada
 
-**Objetivo:** o usuário sempre volta exatamente de onde parou, mesmo após trocar aba, navegar, recarregar ou suspender o app no celular.
+### 1. Arquitetura de navegação
+- Migrar para **rotas reais**: `/admin`, `/admin/usuarios`, `/admin/personals`, etc. usando `react-router` (já no projeto).
+- Substituir `AdminSidebar` por **shadcn `Sidebar`** com `SidebarProvider` + `collapsible="icon"`.
+- Mobile: sidebar vira **off-canvas drawer** (comportamento nativo do shadcn sidebar). `SidebarTrigger` no header sempre visível.
 
-### O que será feito
-- **Camada única de persistência** baseada em `localStorage` + `sessionStorage` com um hook `usePersistedState(key, value)` reutilizável.
-- **Treino em andamento (aluno):**
-  - Persistir `treinoId`, `exercicios concluídos`, `pesos executados`, `timer`, `bloco atual` em `localStorage` por aluno.
-  - Restaurar automaticamente ao reabrir a página `/aluno/treino/...`.
-  - Sobreviver ao `visibilitychange` (já temos rehidratação de sessão; estender para o estado do treino).
-- **Montagem de treino (personal):**
-  - Rascunho automático (auto-save a cada mudança, debounce 500ms) por `treinoId` em `localStorage`.
-  - Banner "Você tem alterações não salvas" ao reabrir.
-  - Confirmação antes de descartar (`beforeunload` + dialog interno em navegação SPA).
-- **Modais e abas:**
-  - Sincronizar tab ativa via query param (`?tab=`) — já é padrão; aplicar onde ainda usa estado local.
-  - Modais críticos (montagem, edição) viram rotas (`/aluno/:id?modal=editar-treino`) para sobreviver a refresh.
-  - Modais não-críticos persistem `open` em `sessionStorage`.
-- **Cache de queries:** revisar `staleTime` e `gcTime` do React Query para fluxos frequentes (treinos, exercícios, perfil) — manter por 5–10 min.
+### 2. Header enxuto e mobile-friendly
+- Remover duplicação (sidebar tem branding; header tem ações).
+- Header: `SidebarTrigger` + título da seção atual + busca global (cmd+k) + ThemeToggle + avatar/menu (perfil, sair).
+- Em mobile: título compacto, ações em menu de overflow.
 
-### Entregáveis
-- `src/hooks/usePersistedState.ts`
-- `src/hooks/useWorkoutDraft.ts` (montagem do personal)
-- `src/hooks/useWorkoutSession.ts` (estendido para persistir tudo do treino do aluno)
-- Ajustes em `WorkoutDayView`, `TreinosManager`, `ExercicioDialog`, `WorkoutBlockDialog`.
+### 3. Dashboard (DashboardOverview) — reescrita
+- **Paralelizar queries** com `Promise.all` (de ~12 sequenciais → 2 etapas paralelas).
+- Substituir loop de churn por chamada única à RPC `calcular_churn_mensal` (já existe) em paralelo para 6 meses.
+- Usar **`@tanstack/react-query`** para cache + revalidação (já instalado).
+- KPIs em **4 cards limpos** usando tokens semânticos (`bg-card`, `text-primary`, `text-muted-foreground`) — fim do `bg-green-100`.
+- Adicionar **gráfico de churn** (recharts, já instalado) — área chart 6 meses.
+- Adicionar **gráfico de receita** (linha) últimos 6 meses.
+- Seção "Ações rápidas": criar personal, ver pendências de pagamento, enviar notificação.
+- Skeleton loaders no lugar do spinner.
 
----
+### 4. Design system consistente em todas as seções
+- Remover **todas** as classes `bg-{cor}-{n}`, `text-{cor}-{n}`, `border-{cor}-{n}` hardcoded.
+- Adicionar tokens semânticos no `index.css` se faltarem: `--success`, `--warning`, `--info` (com variantes foreground/muted) — usar HSL.
+- Substituir `border-2` por `border` + `shadow-sm` para hierarquia mais leve.
+- Padrão de KPI card reutilizável: `<KpiCard title icon value trend />`.
 
-## Frente 2 — Notificações e feedbacks
+### 5. Tabelas das seções — mobile responsivo
+- Listas atuais (Usuários, Personals, Pagamentos, Assinaturas, Planos) usam tabelas que estouram no mobile.
+- Adicionar layout duplo: **tabela em ≥md, cards empilhados em <md**.
+- Garantir alvos de toque ≥44px (regra do projeto).
+- Busca + filtros sticky no topo.
 
-**Objetivo:** central de notificações sempre leva à ação certa, com nome do aluno correto e abre o modal/chat apropriado.
+### 6. Performance geral
+- React Query nas seções pesadas (DashboardOverview, Analytics, Relatorios, Pagamentos).
+- Lazy-load das seções com `React.lazy` + `Suspense` (rotas), evitando carregar 4.891 linhas no primeiro render.
+- Memoizar formatters (`formatCurrency`) com módulo de utils.
 
-### O que será feito
-- **Padronizar payload** em `notificacoes.dados`:
-  ```json
-  { "aluno_id": "...", "aluno_nome": "...", "tipo_acao": "feedback|chat|treino|checkin", "ref_id": "..." }
-  ```
-- **Resolver nome do aluno na origem:** ao criar a notificação (no trigger ou na função que insere), buscar `profiles.nome` em vez de confiar em snapshot antigo.
-- **Roteamento correto no `NotificacoesDropdown`:**
-  - `feedback` → abre `FeedbackDetailModal` direto com o `ref_id`.
-  - `chat` → navega para `/aluno/:id?tab=chat` e abre o `ChatPanel`.
-  - `treino` / `checkin` → rota correspondente com tab pré-selecionada.
-- **Marcar como lida** ao abrir a ação (não apenas ao clicar no item).
-- **Sincronização:** subscription realtime já existe; garantir invalidação do React Query ao receber evento.
-- **Backfill:** script único para corrigir notificações antigas com `aluno_nome` ausente/errado (insert tool).
+## Detalhes técnicos
 
-### Entregáveis
-- Ajuste em `src/components/NotificacoesDropdown.tsx` (roteamento + marcar lida).
-- Ajuste em `src/hooks/useNotificacoes.ts` (resolver nome no insert).
-- Função SQL `criar_notificacao(...)` que padroniza payload (opcional, recomendado).
-- Pequenas mudanças em `FeedbackDetailModal` e `ChatPanel` para aceitar abrir via prop/URL.
+- **Rotas novas**: adicionar children routes em `App.tsx` sob `/admin` envolvendo `AdminLayout` (Sidebar+Header+Outlet). Manter `AuthGuard` exigindo role admin.
+- **Sidebar**: novo `AppSidebar` com `NavLink`/`useLocation` para `isActive`. `collapsible="icon"`. `SidebarTrigger` no `<header>` (fora da sidebar) para garantir visibilidade no mobile.
+- **Tokens novos no `index.css`** (light + dark):
+  - `--success`, `--success-foreground`, `--success-muted`
+  - `--warning`, `--warning-foreground`, `--warning-muted`
+  - `--info`, `--info-foreground`, `--info-muted`
+  - registrar no `tailwind.config.ts`.
+- **KpiCard component** em `src/components/Admin/KpiCard.tsx` — props: `title`, `value`, `icon`, `tone` ('default'|'success'|'info'|'warning'), `hint`, `trend?`.
+- **Chart components**: `ChurnChart`, `RevenueChart` em `src/components/Admin/Charts/` usando recharts com cores via `hsl(var(--primary))`.
+- **DataTable responsivo**: criar `src/components/Admin/ResponsiveTable.tsx` com prop `mobileCard` para render em telas pequenas.
+- **React Query**: queries com `queryKey: ['admin','dashboard']`, `staleTime: 60_000`.
 
----
+## Arquivos previstos
 
-## Frente 3 — Montagem de treino (estabilidade)
+**Criar:**
+- `src/components/Admin/AdminLayout.tsx`
+- `src/components/Admin/AppSidebar.tsx` (substitui AdminSidebar)
+- `src/components/Admin/AdminHeader.tsx`
+- `src/components/Admin/KpiCard.tsx`
+- `src/components/Admin/Charts/ChurnChart.tsx`
+- `src/components/Admin/Charts/RevenueChart.tsx`
+- `src/components/Admin/ResponsiveTable.tsx`
+- `src/components/Admin/hooks/useAdminDashboard.ts`
 
-**Objetivo:** montagem fluida, ordenação correta, drag-and-drop completo, sem perda de dados ou edições incorretas.
+**Editar:**
+- `src/App.tsx` (rotas filhas do `/admin`)
+- `src/pages/Admin.tsx` (vira shell mínimo redirecionando para layout)
+- `src/components/Admin/AdminDashboard.tsx` (substituído pelo Layout)
+- `src/components/Admin/Sections/DashboardOverview.tsx` (reescrita)
+- `src/components/Admin/Sections/{Usuarios,Personals,Assinaturas,Pagamentos,Planos}Manager.tsx` (limpeza de cores + responsivo)
+- `src/components/Admin/Sections/{Analytics,Relatorios,Notificacoes,Configuracoes}Section.tsx` (limpeza de cores)
+- `src/index.css` (+ tokens semânticos)
+- `tailwind.config.ts` (+ cores semânticas)
 
-### O que será feito
-- **Ordenação:**
-  - Garantir que toda inserção use o padrão de múltiplos de 10 (já documentado em memória).
-  - Função SQL `reordenar_exercicios` análoga a `reordenar_blocos` para evitar conflitos de ordem.
-- **Circuitos/conjugados:**
-  - Corrigir `criar_grupo_exercicios` para validar `ordem_no_grupo` sequencial e `tipo_agrupamento` válido.
-  - Modal único "Adicionar exercício" já consolidado — revisar fluxo de criação de grupo a partir de exercício existente.
-- **Edição renderizando dados errados:**
-  - Causa típica: estado inicial do dialog não reseta entre aberturas. Forçar `key={exercicio.id}` nos dialogs para remontar ao trocar item.
-  - Carregar dados frescos via React Query (`enabled: open && !!id`) em vez de reusar prop antiga.
-- **Exclusão com confirmação:**
-  - Adicionar `AlertDialog` em todos os botões de delete de exercícios, blocos e grupos.
-- **Drag-and-drop:**
-  - Estender DnD para reordenar **entre blocos** (mover exercício de um bloco para outro).
-  - Feedback visual durante o drag (placeholder + ghost).
-  - Persistir nova ordem com debounce para evitar muitas writes.
-- **Auto-save** (vem da Frente 1) cobre perda de progresso.
+**Remover:**
+- `src/components/Admin/AdminSidebar.tsx` (substituído)
 
-### Entregáveis
-- Migration: função `reordenar_exercicios`, ajustes em `criar_grupo_exercicios`.
-- Ajuste em `SortableExercicioCard`, `SortableBlockCard`, `SortableGroupCard`.
-- `ConfirmDeleteDialog` reutilizável.
-- `key` props e refetch on open em `ExercicioDialog`, `WorkoutBlockDialog`, `ExerciseGroupDialog`.
-
----
-
-## Ordem de execução sugerida
-
-1. **Frente 3** primeiro (resolve dor imediata da montagem do personal).
-2. **Frente 1** (auto-save + restauração — depende parcialmente da Frente 3 estar estável).
-3. **Frente 2** (notificações — independente, pode ser feita em paralelo).
-
-## Estimativa de escopo
-- Frente 1: ~6–8 arquivos, 1 migration opcional.
-- Frente 2: ~4 arquivos, 1 migration (função SQL) + 1 backfill.
-- Frente 3: ~8 arquivos, 1 migration.
-
-## Fora do escopo deste plano
-- Refatoração visual da UI.
-- Mudanças em autenticação, RLS ou cobrança.
-- Novas features (apenas correção do que já existe).
-
----
-
-Confirma a ordem (3 → 1 → 2) ou prefere outra? Posso começar pela Frente 3 assim que aprovar.
+## Fora do escopo
+- Não alterar lógica de negócio das seções (CRUD de usuários, pagamentos, etc.) — só apresentação.
+- Não mexer em RLS / edge functions / dados.
+- Não adicionar novas features de admin (relatórios novos, exports) — focar em melhorar o que existe.

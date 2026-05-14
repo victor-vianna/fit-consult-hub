@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ChatMessage {
@@ -10,6 +10,10 @@ export interface ChatMessage {
   tipo: string;
   lida: boolean;
   created_at: string;
+  reply_to: string | null;
+  edited_at: string | null;
+  deleted_for_all: boolean;
+  deleted_for: string[];
 }
 
 interface UseChatMessagesProps {
@@ -25,7 +29,10 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
   const [naoLidas, setNaoLidas] = useState(0);
   const conversaKey = `${personalId}::${alunoId}`;
 
-  // Carregar mensagens
+  const visibleMensagens = mensagens.filter(
+    (m) => !(m.deleted_for || []).includes(currentUserId)
+  );
+
   const fetchMensagens = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -41,7 +48,6 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
     setLoading(false);
   }, [conversaKey]);
 
-  // Contar não lidas
   const fetchNaoLidas = useCallback(async () => {
     const { count } = await supabase
       .from("mensagens_chat")
@@ -53,7 +59,6 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
     setNaoLidas(count || 0);
   }, [conversaKey, currentUserId]);
 
-  // Marcar como lidas
   const marcarComoLidas = useCallback(async () => {
     await supabase
       .from("mensagens_chat")
@@ -63,65 +68,135 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
       .eq("lida", false);
 
     setNaoLidas(0);
-    setMensagens(prev => prev.map(m => 
-      m.destinatario_id === currentUserId ? { ...m, lida: true } : m
-    ));
+    setMensagens((prev) =>
+      prev.map((m) => (m.destinatario_id === currentUserId ? { ...m, lida: true } : m))
+    );
   }, [conversaKey, currentUserId]);
 
-  // Marcar uma mensagem específica como NÃO lida (manual, para o destinatário)
-  const marcarComoNaoLida = useCallback(async (mensagemId: string) => {
-    const { error } = await supabase
-      .from("mensagens_chat")
-      .update({ lida: false })
-      .eq("id", mensagemId)
-      .eq("destinatario_id", currentUserId);
+  const marcarComoNaoLida = useCallback(
+    async (mensagemId: string) => {
+      const { error } = await supabase
+        .from("mensagens_chat")
+        .update({ lida: false })
+        .eq("id", mensagemId)
+        .eq("destinatario_id", currentUserId);
 
-    if (!error) {
-      setMensagens(prev => prev.map(m => m.id === mensagemId ? { ...m, lida: false } : m));
-      setNaoLidas(prev => prev + 1);
-    }
-  }, [currentUserId]);
+      if (!error) {
+        setMensagens((prev) =>
+          prev.map((m) => (m.id === mensagemId ? { ...m, lida: false } : m))
+        );
+        setNaoLidas((prev) => prev + 1);
+      }
+    },
+    [currentUserId]
+  );
 
-  // Enviar mensagem
-  const enviarMensagem = useCallback(async (conteudo: string) => {
-    if (!conteudo.trim()) return;
-    setSending(true);
+  const enviarMensagem = useCallback(
+    async (conteudo: string, replyToId: string | null = null) => {
+      if (!conteudo.trim()) return;
+      setSending(true);
 
-    const destinatarioId = currentUserId === personalId ? alunoId : personalId;
+      const destinatarioId = currentUserId === personalId ? alunoId : personalId;
 
-    const { error } = await supabase.from("mensagens_chat").insert({
-      conversa_key: conversaKey,
-      remetente_id: currentUserId,
-      destinatario_id: destinatarioId,
-      conteudo: conteudo.trim(),
-      tipo: "texto",
-    });
-
-    if (!error) {
-      // Buscar nome do remetente E do aluno (sempre incluir aluno_nome no payload)
-      const [{ data: remetenteProfile }, { data: alunoProfile }] = await Promise.all([
-        supabase.from("profiles").select("nome").eq("id", currentUserId).single(),
-        supabase.from("profiles").select("nome").eq("id", alunoId).single(),
-      ]);
-
-      await supabase.from("notificacoes").insert({
+      const { error } = await supabase.from("mensagens_chat").insert({
+        conversa_key: conversaKey,
+        remetente_id: currentUserId,
         destinatario_id: destinatarioId,
-        tipo: "nova_mensagem",
-        titulo: `Nova mensagem de ${remetenteProfile?.nome || "Usuário"}`,
-        mensagem: conteudo.trim().substring(0, 100),
-        dados: {
-          aluno_id: alunoId,
-          aluno_nome: alunoProfile?.nome || null,
-          profile_id: currentUserId,
-          tipo_acao: "chat",
-        },
+        conteudo: conteudo.trim(),
+        tipo: "texto",
+        reply_to: replyToId,
       });
-    }
 
-    setSending(false);
-  }, [conversaKey, currentUserId, personalId, alunoId]);
+      if (!error) {
+        const [{ data: remetenteProfile }, { data: alunoProfile }] = await Promise.all([
+          supabase.from("profiles").select("nome").eq("id", currentUserId).single(),
+          supabase.from("profiles").select("nome").eq("id", alunoId).single(),
+        ]);
 
-  // Realtime subscription
+        await supabase.from("notificacoes").insert({
+          destinatario_id: destinatarioId,
+          tipo: "nova_mensagem",
+          titulo: `Nova mensagem de ${remetenteProfile?.nome || "Usuário"}`,
+          mensagem: conteudo.trim().substring(0, 100),
+          dados: {
+            aluno_id: alunoId,
+            aluno_nome: alunoProfile?.nome || null,
+            profile_id: currentUserId,
+            tipo_acao: "chat",
+          },
+        });
+      }
+
+      setSending(false);
+    },
+    [conversaKey, currentUserId, personalId, alunoId]
+  );
+
+  // Editar mensagem (apenas remetente)
+  const editarMensagem = useCallback(
+    async (mensagemId: string, novoConteudo: string) => {
+      if (!novoConteudo.trim()) return;
+      const { error } = await supabase
+        .from("mensagens_chat")
+        .update({ conteudo: novoConteudo.trim(), edited_at: new Date().toISOString() })
+        .eq("id", mensagemId)
+        .eq("remetente_id", currentUserId);
+
+      if (!error) {
+        setMensagens((prev) =>
+          prev.map((m) =>
+            m.id === mensagemId
+              ? { ...m, conteudo: novoConteudo.trim(), edited_at: new Date().toISOString() }
+              : m
+          )
+        );
+      }
+      return !error;
+    },
+    [currentUserId]
+  );
+
+  // Excluir só para mim (oculta da minha visão)
+  const excluirParaMim = useCallback(
+    async (mensagemId: string) => {
+      const msg = mensagens.find((m) => m.id === mensagemId);
+      if (!msg) return false;
+      const novoArray = Array.from(new Set([...(msg.deleted_for || []), currentUserId]));
+      const { error } = await supabase
+        .from("mensagens_chat")
+        .update({ deleted_for: novoArray })
+        .eq("id", mensagemId);
+      if (!error) {
+        setMensagens((prev) =>
+          prev.map((m) => (m.id === mensagemId ? { ...m, deleted_for: novoArray } : m))
+        );
+      }
+      return !error;
+    },
+    [mensagens, currentUserId]
+  );
+
+  // Excluir para todos (apenas remetente)
+  const excluirParaTodos = useCallback(
+    async (mensagemId: string) => {
+      const { error } = await supabase
+        .from("mensagens_chat")
+        .update({ deleted_for_all: true, conteudo: "" })
+        .eq("id", mensagemId)
+        .eq("remetente_id", currentUserId);
+
+      if (!error) {
+        setMensagens((prev) =>
+          prev.map((m) =>
+            m.id === mensagemId ? { ...m, deleted_for_all: true, conteudo: "" } : m
+          )
+        );
+      }
+      return !error;
+    },
+    [currentUserId]
+  );
+
   useEffect(() => {
     fetchMensagens();
     fetchNaoLidas();
@@ -138,19 +213,20 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
         },
         (payload) => {
           const newMsg = payload.new as ChatMessage;
-          setMensagens(prev => [...prev, newMsg]);
+          setMensagens((prev) => [...prev, newMsg]);
           if (newMsg.destinatario_id === currentUserId) {
-            // Se o painel está visível, marcar imediatamente como lida
             if (typeof document !== "undefined" && document.visibilityState === "visible") {
               supabase
                 .from("mensagens_chat")
                 .update({ lida: true })
                 .eq("id", newMsg.id)
                 .then(() => {
-                  setMensagens(prev => prev.map(m => m.id === newMsg.id ? { ...m, lida: true } : m));
+                  setMensagens((prev) =>
+                    prev.map((m) => (m.id === newMsg.id ? { ...m, lida: true } : m))
+                  );
                 });
             } else {
-              setNaoLidas(prev => prev + 1);
+              setNaoLidas((prev) => prev + 1);
             }
           }
         }
@@ -165,7 +241,7 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
         },
         (payload) => {
           const updated = payload.new as ChatMessage;
-          setMensagens(prev => prev.map(m => m.id === updated.id ? { ...m, lida: updated.lida } : m));
+          setMensagens((prev) => prev.map((m) => (m.id === updated.id ? { ...m, ...updated } : m)));
         }
       )
       .subscribe();
@@ -176,13 +252,16 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
   }, [conversaKey, fetchMensagens, fetchNaoLidas, currentUserId]);
 
   return {
-    mensagens,
+    mensagens: visibleMensagens,
     loading,
     sending,
     naoLidas,
     enviarMensagem,
     marcarComoLidas,
     marcarComoNaoLida,
+    editarMensagem,
+    excluirParaMim,
+    excluirParaTodos,
     fetchNaoLidas,
   };
 }
@@ -229,13 +308,14 @@ export function useChatNaoLidas(userId: string) {
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [userId]);
 
   return total;
 }
 
-// Hook que retorna a última mensagem da conversa (para preview no dashboard)
 export interface UltimaMensagemPreview {
   id: string;
   conteudo: string;
@@ -284,7 +364,9 @@ export function useUltimaMensagem(personalId: string, alunoId: string) {
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [conversaKey]);
 
   return { ultima, loading };

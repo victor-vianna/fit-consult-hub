@@ -124,7 +124,12 @@ export function PersonalDashboardCards({
   const [cardConfig, setCardConfig] = useState<DashboardCardConfig[]>(() => {
     try {
       const saved = localStorage.getItem(`dashboard-cards-${personalId}`);
-      return saved ? JSON.parse(saved) : DEFAULT_CARDS;
+      const parsed: DashboardCardConfig[] = saved ? JSON.parse(saved) : DEFAULT_CARDS;
+      // Migração: garante que todos os cards padrão estejam presentes
+      // (mantém ordem do usuário e adiciona novos no topo).
+      const existingIds = new Set(parsed.map((c) => c.id));
+      const missing = DEFAULT_CARDS.filter((c) => !existingIds.has(c.id));
+      return missing.length > 0 ? [...missing, ...parsed] : parsed;
     } catch {
       return DEFAULT_CARDS;
     }

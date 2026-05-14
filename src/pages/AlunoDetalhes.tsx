@@ -253,17 +253,14 @@ export default function AlunoDetalhes() {
 
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage
-        .from("materiais")
-        .getPublicUrl(fileName);
-
+      // Bucket é privado: armazenamos apenas o path; URLs assinadas são geradas no acesso
       const { error: dbError } = await supabase.from("materiais").insert({
         profile_id: id,
         personal_id: user.id,
         titulo: formData.get("titulo") as string,
         descricao: formData.get("descricao") as string,
         tipo: formData.get("tipo") as string,
-        arquivo_url: urlData.publicUrl,
+        arquivo_url: fileName,
         arquivo_nome: arquivo.name,
       });
 
@@ -292,10 +289,9 @@ export default function AlunoDetalhes() {
     arquivoUrl: string
   ) => {
     try {
-      const urlParts = arquivoUrl.split("/materiais/");
-      const filePath = urlParts[1];
+      const filePath = extractMaterialPath(arquivoUrl);
 
-      await supabase.storage.from("materiais").remove([filePath]);
+      if (filePath) await supabase.storage.from("materiais").remove([filePath]);
 
       const { error } = await supabase
         .from("materiais")
@@ -319,9 +315,17 @@ export default function AlunoDetalhes() {
     }
   };
 
-  const handleVisualizarMaterial = (material: Material) => {
+  const handleVisualizarMaterial = async (material: Material) => {
+    const signed = await getMaterialSignedUrl(material.arquivo_url);
+    if (!signed) {
+      toast({
+        title: "Não foi possível abrir o arquivo",
+        variant: "destructive",
+      });
+      return;
+    }
     setSelectedFile({
-      url: material.arquivo_url,
+      url: signed,
       name: material.arquivo_nome,
       type: material.arquivo_nome.split(".").pop() || "",
     });
@@ -960,7 +964,7 @@ export default function AlunoDetalhes() {
                                   variant="outline"
                                   size="sm"
                                   onClick={() =>
-                                    window.open(material.arquivo_url, "_blank")
+                                    openMaterialInNewTab(material.arquivo_url)
                                   }
                                   className="flex-1 md:flex-none"
                                 >

@@ -156,10 +156,10 @@ export default function UsuariosManager() {
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
-      case "admin": return "bg-purple-100 text-purple-800 border-purple-200";
-      case "personal": return "bg-blue-100 text-blue-800 border-blue-200";
-      case "aluno": return "bg-green-100 text-green-800 border-green-200";
-      default: return "bg-gray-100 text-gray-800 border-gray-200";
+      case "admin": return "bg-accent text-accent-foreground border-border";
+      case "personal": return "bg-info-muted text-info border-info/20";
+      case "aluno": return "bg-success-muted text-success border-success/20";
+      default: return "bg-muted text-muted-foreground border-border";
     }
   };
 
@@ -195,9 +195,9 @@ export default function UsuariosManager() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card><CardContent className="pt-6"><div className="text-2xl font-bold">{usuarios.length}</div><p className="text-xs text-muted-foreground">Total de Usuários</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-blue-600">{usuarios.filter((u) => u.roles.includes("personal")).length}</div><p className="text-xs text-muted-foreground">Personals</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-green-600">{usuarios.filter((u) => u.roles.includes("aluno")).length}</div><p className="text-xs text-muted-foreground">Alunos</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-purple-600">{usuarios.filter((u) => u.roles.includes("admin")).length}</div><p className="text-xs text-muted-foreground">Administradores</p></CardContent></Card>
+        <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-info">{usuarios.filter((u) => u.roles.includes("personal")).length}</div><p className="text-xs text-muted-foreground">Personals</p></CardContent></Card>
+        <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-success">{usuarios.filter((u) => u.roles.includes("aluno")).length}</div><p className="text-xs text-muted-foreground">Alunos</p></CardContent></Card>
+        <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-foreground">{usuarios.filter((u) => u.roles.includes("admin")).length}</div><p className="text-xs text-muted-foreground">Administradores</p></CardContent></Card>
       </div>
 
       {/* Filters + User list */}
@@ -289,7 +289,7 @@ export default function UsuariosManager() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <h4 className="font-semibold">{usuario.nome}</h4>
-                      {usuario.ativo ? <CheckCircle className="h-4 w-4 text-green-600" /> : <Ban className="h-4 w-4 text-red-600" />}
+                      {usuario.ativo ? <CheckCircle className="h-4 w-4 text-success" /> : <Ban className="h-4 w-4 text-destructive" />}
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                       <Mail className="h-4 w-4" /><span>{usuario.email}</span>

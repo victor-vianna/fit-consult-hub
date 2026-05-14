@@ -244,55 +244,55 @@ export default function AnalyticsSection() {
     <div className="space-y-6">
       {/* Métricas Principais */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-2 border-purple-200 bg-purple-50/50">
+        <Card className="border-2 border-border bg-accent/40">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-purple-900">LTV</span>
-              <Award className="h-5 w-5 text-purple-600" />
+              <Award className="h-5 w-5 text-foreground" />
             </div>
-            <div className="text-2xl font-bold text-purple-700">
+            <div className="text-2xl font-bold text-foreground">
               {formatCurrency(metricas.ltv)}
             </div>
-            <p className="text-xs text-purple-700 mt-1">Lifetime Value</p>
+            <p className="text-xs text-foreground mt-1">Lifetime Value</p>
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-orange-200 bg-orange-50/50">
+        <Card className="border-2 border-warning/20 bg-warning-muted/40">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-orange-900">CAC</span>
-              <Target className="h-5 w-5 text-orange-600" />
+              <Target className="h-5 w-5 text-warning" />
             </div>
-            <div className="text-2xl font-bold text-orange-700">
+            <div className="text-2xl font-bold text-warning">
               {formatCurrency(metricas.cac)}
             </div>
-            <p className="text-xs text-orange-700 mt-1">Custo de Aquisição</p>
+            <p className="text-xs text-warning mt-1">Custo de Aquisição</p>
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-green-200 bg-green-50/50">
+        <Card className="border-2 border-success/20 bg-success-muted/40">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-green-900">Taxa Conversão</span>
-              <Percent className="h-5 w-5 text-green-600" />
+              <Percent className="h-5 w-5 text-success" />
             </div>
-            <div className="text-2xl font-bold text-green-700">
+            <div className="text-2xl font-bold text-success">
               {metricas.taxaConversao.toFixed(1)}%
             </div>
-            <p className="text-xs text-green-700 mt-1">Trial → Pago</p>
+            <p className="text-xs text-success mt-1">Trial → Pago</p>
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-blue-200 bg-blue-50/50">
+        <Card className="border-2 border-info/20 bg-info-muted/40">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-blue-900">Permanência</span>
-              <Clock className="h-5 w-5 text-blue-600" />
+              <Clock className="h-5 w-5 text-info" />
             </div>
-            <div className="text-2xl font-bold text-blue-700">
+            <div className="text-2xl font-bold text-info">
               {metricas.tempoMedioPermanencia.toFixed(1)}
             </div>
-            <p className="text-xs text-blue-700 mt-1">meses (média)</p>
+            <p className="text-xs text-info mt-1">meses (média)</p>
           </CardContent>
         </Card>
       </div>
@@ -488,8 +488,8 @@ export default function AnalyticsSection() {
                 <div
                   className={`h-3 rounded-full ${
                     metricas.ltv / metricas.cac >= 3
-                      ? "bg-green-500"
-                      : "bg-red-500"
+                      ? "bg-success"
+                      : "bg-destructive"
                   }`}
                   style={{
                     width: `${Math.min(
@@ -518,8 +518,8 @@ export default function AnalyticsSection() {
                 <div
                   className={`h-3 rounded-full ${
                     metricas.taxaConversao >= 20
-                      ? "bg-green-500"
-                      : "bg-yellow-500"
+                      ? "bg-success"
+                      : "bg-warning"
                   }`}
                   style={{
                     width: `${Math.min(metricas.taxaConversao * 5, 100)}%`,
@@ -547,8 +547,8 @@ export default function AnalyticsSection() {
                 <div
                   className={`h-3 rounded-full ${
                     metricas.tempoMedioPermanencia >= 12
-                      ? "bg-green-500"
-                      : "bg-blue-500"
+                      ? "bg-success"
+                      : "bg-info"
                   }`}
                   style={{
                     width: `${Math.min(

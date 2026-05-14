@@ -227,26 +227,26 @@ export default function NotificacoesSection() {
   const getTipoIcon = (tipo: string) => {
     switch (tipo) {
       case "alerta":
-        return <AlertTriangle className="h-5 w-5 text-yellow-600" />;
+        return <AlertTriangle className="h-5 w-5 text-warning" />;
       case "erro":
-        return <AlertTriangle className="h-5 w-5 text-red-600" />;
+        return <AlertTriangle className="h-5 w-5 text-destructive" />;
       case "sucesso":
-        return <CheckCircle className="h-5 w-5 text-green-600" />;
+        return <CheckCircle className="h-5 w-5 text-success" />;
       default:
-        return <Bell className="h-5 w-5 text-blue-600" />;
+        return <Bell className="h-5 w-5 text-info" />;
     }
   };
 
   const getTipoColor = (tipo: string) => {
     switch (tipo) {
       case "alerta":
-        return "border-yellow-200 bg-yellow-50/50";
+        return "border-warning/20 bg-yellow-50/50";
       case "erro":
-        return "border-red-200 bg-red-50/50";
+        return "border-destructive/20 bg-red-50/50";
       case "sucesso":
-        return "border-green-200 bg-green-50/50";
+        return "border-success/20 bg-success-muted/40";
       default:
-        return "border-blue-200 bg-blue-50/50";
+        return "border-info/20 bg-info-muted/40";
     }
   };
 
@@ -278,28 +278,28 @@ export default function NotificacoesSection() {
             <p className="text-xs text-muted-foreground">Total</p>
           </CardContent>
         </Card>
-        <Card className="border-blue-200 bg-blue-50/50">
+        <Card className="border-info/20 bg-info-muted/40">
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-blue-700">
+            <div className="text-2xl font-bold text-info">
               {stats.naoLidas}
             </div>
-            <p className="text-xs text-blue-700">Não Lidas</p>
+            <p className="text-xs text-info">Não Lidas</p>
           </CardContent>
         </Card>
-        <Card className="border-yellow-200 bg-yellow-50/50">
+        <Card className="border-warning/20 bg-yellow-50/50">
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-yellow-700">
+            <div className="text-2xl font-bold text-warning">
               {stats.alertas}
             </div>
-            <p className="text-xs text-yellow-700">Alertas</p>
+            <p className="text-xs text-warning">Alertas</p>
           </CardContent>
         </Card>
-        <Card className="border-green-200 bg-green-50/50">
+        <Card className="border-success/20 bg-success-muted/40">
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-green-700">
+            <div className="text-2xl font-bold text-success">
               {stats.sucessos}
             </div>
-            <p className="text-xs text-green-700">Sucessos</p>
+            <p className="text-xs text-success">Sucessos</p>
           </CardContent>
         </Card>
       </div>

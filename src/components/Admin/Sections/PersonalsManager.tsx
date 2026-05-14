@@ -192,20 +192,20 @@ export default function PersonalsManager() {
     switch (assinatura.status) {
       case "ativa":
         return (
-          <Badge className="bg-green-100 text-green-800 border-green-200">
+          <Badge className="bg-success-muted text-success border-success/20">
             <CheckCircle className="h-3 w-3 mr-1" />
             Ativo
           </Badge>
         );
       case "trial":
         return (
-          <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+          <Badge className="bg-info-muted text-info border-info/20">
             Trial
           </Badge>
         );
       case "cancelada":
         return (
-          <Badge className="bg-red-100 text-red-800 border-red-200">
+          <Badge className="bg-destructive/10 text-destructive border-destructive/20">
             Cancelada
           </Badge>
         );
@@ -235,36 +235,36 @@ export default function PersonalsManager() {
             <p className="text-xs text-muted-foreground">Total</p>
           </CardContent>
         </Card>
-        <Card className="border-green-200 bg-green-50/50">
+        <Card className="border-success/20 bg-success-muted/40">
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-green-700">
+            <div className="text-2xl font-bold text-success">
               {stats.ativos}
             </div>
-            <p className="text-xs text-green-700">Ativos</p>
+            <p className="text-xs text-success">Ativos</p>
           </CardContent>
         </Card>
-        <Card className="border-blue-200 bg-blue-50/50">
+        <Card className="border-info/20 bg-info-muted/40">
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-blue-700">
+            <div className="text-2xl font-bold text-info">
               {stats.comAssinatura}
             </div>
-            <p className="text-xs text-blue-700">Com Assinatura</p>
+            <p className="text-xs text-info">Com Assinatura</p>
           </CardContent>
         </Card>
-        <Card className="border-orange-200 bg-orange-50/50">
+        <Card className="border-warning/20 bg-warning-muted/40">
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-orange-700">
+            <div className="text-2xl font-bold text-warning">
               {stats.semAssinatura}
             </div>
-            <p className="text-xs text-orange-700">Sem Assinatura</p>
+            <p className="text-xs text-warning">Sem Assinatura</p>
           </CardContent>
         </Card>
-        <Card className="border-purple-200 bg-purple-50/50">
+        <Card className="border-border bg-accent/40">
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-purple-700">
+            <div className="text-2xl font-bold text-foreground">
               {stats.totalAlunos}
             </div>
-            <p className="text-xs text-purple-700">Total Alunos</p>
+            <p className="text-xs text-foreground">Total Alunos</p>
           </CardContent>
         </Card>
         <Card>
@@ -390,7 +390,7 @@ export default function PersonalsManager() {
                         <p className="text-xs text-muted-foreground mb-1">
                           Alunos Ativos
                         </p>
-                        <p className="font-semibold text-sm text-green-600">
+                        <p className="font-semibold text-sm text-success">
                           {personal.estatisticas.alunosAtivos}
                         </p>
                       </div>

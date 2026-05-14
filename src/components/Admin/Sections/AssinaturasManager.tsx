@@ -125,31 +125,31 @@ export default function AssinaturasManager() {
     switch (status) {
       case "ativa":
         return {
-          color: "bg-green-100 text-green-800 border-green-200",
+          color: "bg-success-muted text-success border-success/20",
           icon: <CheckCircle2 className="h-4 w-4" />,
           label: "Ativa",
         };
       case "trial":
         return {
-          color: "bg-blue-100 text-blue-800 border-blue-200",
+          color: "bg-info-muted text-info border-info/20",
           icon: <Clock className="h-4 w-4" />,
           label: "Trial",
         };
       case "cancelada":
         return {
-          color: "bg-red-100 text-red-800 border-red-200",
+          color: "bg-destructive/10 text-destructive border-destructive/20",
           icon: <XCircle className="h-4 w-4" />,
           label: "Cancelada",
         };
       case "suspensa":
         return {
-          color: "bg-yellow-100 text-yellow-800 border-yellow-200",
+          color: "bg-warning-muted text-warning border-warning/20",
           icon: <AlertTriangle className="h-4 w-4" />,
           label: "Suspensa",
         };
       default:
         return {
-          color: "bg-gray-100 text-gray-800 border-gray-200",
+          color: "bg-muted text-muted-foreground border-border",
           icon: null,
           label: status,
         };
@@ -250,28 +250,28 @@ export default function AssinaturasManager() {
             <p className="text-xs text-muted-foreground">Total</p>
           </CardContent>
         </Card>
-        <Card className="border-green-200 bg-green-50/50">
+        <Card className="border-success/20 bg-success-muted/40">
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-green-700">
+            <div className="text-2xl font-bold text-success">
               {stats.ativas}
             </div>
-            <p className="text-xs text-green-700">Ativas</p>
+            <p className="text-xs text-success">Ativas</p>
           </CardContent>
         </Card>
-        <Card className="border-blue-200 bg-blue-50/50">
+        <Card className="border-info/20 bg-info-muted/40">
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-blue-700">
+            <div className="text-2xl font-bold text-info">
               {stats.trial}
             </div>
-            <p className="text-xs text-blue-700">Trial</p>
+            <p className="text-xs text-info">Trial</p>
           </CardContent>
         </Card>
-        <Card className="border-red-200 bg-red-50/50">
+        <Card className="border-destructive/20 bg-red-50/50">
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-red-700">
+            <div className="text-2xl font-bold text-destructive">
               {stats.canceladas}
             </div>
-            <p className="text-xs text-red-700">Canceladas</p>
+            <p className="text-xs text-destructive">Canceladas</p>
           </CardContent>
         </Card>
         <Card className="border-primary/20 bg-primary/5">

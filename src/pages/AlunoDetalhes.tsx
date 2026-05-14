@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { usePersistedState } from "@/hooks/usePersistedState";
 import { extractMaterialPath, getMaterialSignedUrl, openMaterialInNewTab } from "@/utils/materiais";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";

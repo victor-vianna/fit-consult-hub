@@ -124,7 +124,12 @@ export function PersonalDashboardCards({
   const [cardConfig, setCardConfig] = useState<DashboardCardConfig[]>(() => {
     try {
       const saved = localStorage.getItem(`dashboard-cards-${personalId}`);
-      return saved ? JSON.parse(saved) : DEFAULT_CARDS;
+      const parsed: DashboardCardConfig[] = saved ? JSON.parse(saved) : DEFAULT_CARDS;
+      // Migração: garante que todos os cards padrão estejam presentes
+      // (mantém ordem do usuário e adiciona novos no topo).
+      const existingIds = new Set(parsed.map((c) => c.id));
+      const missing = DEFAULT_CARDS.filter((c) => !existingIds.has(c.id));
+      return missing.length > 0 ? [...missing, ...parsed] : parsed;
     } catch {
       return DEFAULT_CARDS;
     }
@@ -836,17 +841,22 @@ export function PersonalDashboardCards({
         </Button>
       </div>
 
-      {/* Seção de Alunos Prioritários */}
-      <PriorityStudentsSection
-        students={priorityStudents}
-        themeColor={themeColor}
-        loading={priorityLoading}
-      />
-
-      {/* Render cards in saved order */}
-      {cardConfig.filter((c) => !detailCardIds.includes(c.id) && c.visible).map((c) => (
-        <div key={c.id}>{cardSections[c.id]}</div>
-      ))}
+      {/* Render cards na ordem salva (Alunos Prioritários, Meus Alunos, Estatísticas, etc.) */}
+      {cardConfig
+        .filter((c) => !detailCardIds.includes(c.id) && c.visible)
+        .map((c) => {
+          if (c.id === "alunos-prioritarios") {
+            return (
+              <PriorityStudentsSection
+                key={c.id}
+                students={priorityStudents}
+                themeColor={themeColor}
+                loading={priorityLoading}
+              />
+            );
+          }
+          return <div key={c.id}>{cardSections[c.id]}</div>;
+        })}
 
       {/* Detail cards grid */}
       {orderedDetailCards.length > 0 && (

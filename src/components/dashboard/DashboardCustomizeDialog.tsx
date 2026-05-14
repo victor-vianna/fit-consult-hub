@@ -34,6 +34,7 @@ export interface DashboardCardConfig {
 }
 
 export const DEFAULT_CARDS: DashboardCardConfig[] = [
+  { id: "alunos-prioritarios", label: "Alunos Prioritários", visible: true },
   { id: "meus-alunos", label: "Meus Alunos", visible: true },
   { id: "stats-grid", label: "Estatísticas Rápidas", visible: true },
   { id: "treinos-andamento", label: "Treinos em Andamento", visible: true },

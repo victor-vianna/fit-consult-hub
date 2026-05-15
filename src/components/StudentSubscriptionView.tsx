@@ -238,6 +238,40 @@ export function StudentSubscriptionView({
                 </p>
               </div>
             )}
+
+            {(activeSubscription as any).cancela_no_fim_do_ciclo && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
+                Sua assinatura será encerrada em{" "}
+                {format(new Date(activeSubscription.data_expiracao), "dd/MM/yyyy", { locale: ptBR })}.
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-2 pt-3 border-t">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleOpenPortal}
+                disabled={openingPortal}
+              >
+                {openingPortal ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                )}
+                Gerenciar pagamento
+              </Button>
+              {!(activeSubscription as any).cancela_no_fim_do_ciclo && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => setConfirmCancel(true)}
+                >
+                  <Ban className="h-4 w-4 mr-2" />
+                  Cancelar assinatura
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       ) : (

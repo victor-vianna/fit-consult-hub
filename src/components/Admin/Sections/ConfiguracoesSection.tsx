@@ -21,6 +21,7 @@ import {
   CheckCircle,
   FileText,
 } from "lucide-react";
+import { AdminAccessByPaymentToggle } from "@/components/Admin/AdminAccessByPaymentToggle";
 
 interface Configuracao {
   categoria: string;

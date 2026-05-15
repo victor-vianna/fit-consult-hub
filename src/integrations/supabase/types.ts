@@ -1383,6 +1383,8 @@ export type Database = {
           metodo_pagamento: string | null
           observacoes: string | null
           personal_id: string
+          stripe_invoice_id: string | null
+          stripe_payment_intent_id: string | null
           student_id: string
           subscription_id: string
           valor: number
@@ -1394,6 +1396,8 @@ export type Database = {
           metodo_pagamento?: string | null
           observacoes?: string | null
           personal_id: string
+          stripe_invoice_id?: string | null
+          stripe_payment_intent_id?: string | null
           student_id: string
           subscription_id: string
           valor: number
@@ -1405,6 +1409,8 @@ export type Database = {
           metodo_pagamento?: string | null
           observacoes?: string | null
           personal_id?: string
+          stripe_invoice_id?: string | null
+          stripe_payment_intent_id?: string | null
           student_id?: string
           subscription_id?: string
           valor?: number
@@ -1444,6 +1450,57 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "subscriptions"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      personal_plan_prices: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          personal_id: string
+          plano: Database["public"]["Enums"]["plano_tipo"]
+          stripe_price_id: string | null
+          stripe_product_id: string | null
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          personal_id: string
+          plano: Database["public"]["Enums"]["plano_tipo"]
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          updated_at?: string
+          valor: number
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          personal_id?: string
+          plano?: Database["public"]["Enums"]["plano_tipo"]
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personal_plan_prices_personal_id_fkey"
+            columns: ["personal_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personal_plan_prices_personal_id_fkey"
+            columns: ["personal_id"]
+            isOneToOne: false
+            referencedRelation: "v_status_checkins"
+            referencedColumns: ["profile_id"]
           },
         ]
       }
@@ -1805,6 +1862,8 @@ export type Database = {
       }
       subscriptions: {
         Row: {
+          cancela_no_fim_do_ciclo: boolean
+          cancelado_em: string | null
           created_at: string | null
           data_expiracao: string
           data_pagamento: string | null
@@ -1814,11 +1873,15 @@ export type Database = {
           personal_id: string
           plano: string
           status_pagamento: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
           student_id: string
           updated_at: string | null
           valor: number
         }
         Insert: {
+          cancela_no_fim_do_ciclo?: boolean
+          cancelado_em?: string | null
           created_at?: string | null
           data_expiracao: string
           data_pagamento?: string | null
@@ -1828,11 +1891,15 @@ export type Database = {
           personal_id: string
           plano: string
           status_pagamento?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           student_id: string
           updated_at?: string | null
           valor: number
         }
         Update: {
+          cancela_no_fim_do_ciclo?: boolean
+          cancelado_em?: string | null
           created_at?: string | null
           data_expiracao?: string
           data_pagamento?: string | null
@@ -1842,6 +1909,8 @@ export type Database = {
           personal_id?: string
           plano?: string
           status_pagamento?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           student_id?: string
           updated_at?: string | null
           valor?: number
@@ -2571,6 +2640,7 @@ export type Database = {
       }
     }
     Enums: {
+      plano_tipo: "mensal" | "trimestral" | "semestral" | "anual"
       user_role: "admin" | "personal" | "aluno"
     }
     CompositeTypes: {
@@ -2699,6 +2769,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      plano_tipo: ["mensal", "trimestral", "semestral", "anual"],
       user_role: ["admin", "personal", "aluno"],
     },
   },

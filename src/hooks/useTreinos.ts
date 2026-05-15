@@ -886,6 +886,8 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
       renomearTreinoMutation.mutateAsync({ treinoId, nomeTreino }),
     deletarTreino: (treinoId: string) =>
       deletarTreinoMutation.mutateAsync(treinoId),
+    marcarConcluidoTreino: (treinoId: string, concluido: boolean) =>
+      marcarConcluidoTreinoMutation.mutateAsync({ treinoId, concluido }),
     limparTreinoDia: (treinoId: string) =>
       limparTreinoDiaMutation.mutateAsync(treinoId),
     treinosPorDia,

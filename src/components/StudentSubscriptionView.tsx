@@ -39,11 +39,54 @@ export function StudentSubscriptionView({
   studentId,
   personalId,
 }: StudentSubscriptionViewProps) {
-  const { subscriptions, loading, getActiveSubscription } =
+  const { subscriptions, loading, getActiveSubscription, refetch } =
     useSubscriptions(studentId);
   const { settings: personalSettings } = usePersonalSettings(personalId);
+  const { toast } = useToast();
+  const [openingPortal, setOpeningPortal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   const activeSubscription = getActiveSubscription();
+
+  const handleOpenPortal = async () => {
+    setOpeningPortal(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("stripe-customer-portal");
+      if (error) throw error;
+      if (data?.url) window.location.href = data.url;
+    } catch (e: any) {
+      toast({
+        title: "Erro ao abrir o portal",
+        description: e?.message ?? "Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setOpeningPortal(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    setCancelling(true);
+    try {
+      const { error } = await supabase.functions.invoke("stripe-cancel-subscription");
+      if (error) throw error;
+      toast({
+        title: "Cancelamento agendado",
+        description: "Sua assinatura será encerrada ao fim do ciclo atual.",
+      });
+      await refetch();
+    } catch (e: any) {
+      toast({
+        title: "Erro ao cancelar",
+        description: e?.message ?? "Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setCancelling(false);
+      setConfirmCancel(false);
+    }
+  };
 
   const getStatusInfo = (status: string) => {
     switch (status) {

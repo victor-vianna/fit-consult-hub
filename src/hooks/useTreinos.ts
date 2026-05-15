@@ -720,21 +720,25 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
   // 🆕 Mutation para deletar treino específico
   const deletarTreinoMutation = useMutation({
     mutationFn: async (treinoId: string) => {
-      // Primeiro deleta exercícios (captura erro de RLS/constraint)
+      // Defensivo: remove sessões antes (FK agora é CASCADE, mas garantimos compat)
+      const { error: errSes } = await supabase
+        .from("treino_sessoes")
+        .delete()
+        .eq("treino_semanal_id", treinoId);
+      if (errSes) console.warn("[deletarTreino] sessoes:", errSes.message);
+
       const { error: errEx } = await supabase
         .from("exercicios")
         .delete()
         .eq("treino_semanal_id", treinoId);
       if (errEx) throw new Error(`Falha ao remover exercícios: ${errEx.message}`);
 
-      // Depois deleta blocos
       const { error: errBl } = await supabase
         .from("blocos_treino")
         .delete()
         .eq("treino_semanal_id", treinoId);
       if (errBl) throw new Error(`Falha ao remover blocos: ${errBl.message}`);
 
-      // Finalmente deleta o treino
       const { error } = await supabase
         .from("treinos_semanais")
         .delete()
@@ -810,6 +814,41 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
     },
   });
 
+  // 🆕 Marca um treino como concluído (e desmarca os irmãos do mesmo dia/semana)
+  const marcarConcluidoTreinoMutation = useMutation({
+    mutationFn: async ({ treinoId, concluido }: { treinoId: string; concluido: boolean }) => {
+      const alvo = treinos.find((t) => t.treinoId === treinoId);
+      if (!alvo) throw new Error("Treino não encontrado");
+
+      if (concluido) {
+        const irmaos = treinos
+          .filter((t) => t.dia === alvo.dia && t.treinoId && t.treinoId !== treinoId)
+          .map((t) => t.treinoId as string);
+        if (irmaos.length > 0) {
+          await supabase
+            .from("treinos_semanais")
+            .update({ concluido: false })
+            .in("id", irmaos);
+        }
+      }
+
+      const { error } = await supabase
+        .from("treinos_semanais")
+        .update({ concluido })
+        .eq("id", treinoId);
+      if (error) throw error;
+      return { treinoId, concluido };
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: buildQueryKey(profileId, personalId, semanaParaBuscar),
+      });
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Erro ao atualizar status do treino");
+    },
+  });
+
   // Helper para agrupar treinos por dia
   const treinosPorDia = (dia: number): TreinoDia[] => {
     return treinos.filter((t) => t.dia === dia);
@@ -847,6 +886,8 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
       renomearTreinoMutation.mutateAsync({ treinoId, nomeTreino }),
     deletarTreino: (treinoId: string) =>
       deletarTreinoMutation.mutateAsync(treinoId),
+    marcarConcluidoTreino: (treinoId: string, concluido: boolean) =>
+      marcarConcluidoTreinoMutation.mutateAsync({ treinoId, concluido }),
     limparTreinoDia: (treinoId: string) =>
       limparTreinoDiaMutation.mutateAsync(treinoId),
     treinosPorDia,

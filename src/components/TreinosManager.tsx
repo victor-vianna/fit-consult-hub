@@ -165,6 +165,7 @@ export function TreinosManager({
     criarTreinoNoDia,
     renomearTreino,
     deletarTreino,
+    marcarConcluidoTreino,
     treinosPorDia,
   } = useTreinos({ profileId, personalId });
 
@@ -1473,8 +1474,31 @@ export function TreinosManager({
                                 className="text-xs"
                               >
                                 {t.nome_treino || `Treino Principal`}
-                                {t.concluido && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
                               </Button>
+                              {/* Toggle de check (concluído) — personal escolhe qual treino fica marcado */}
+                              {!readOnly && isPersonal && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  title={t.concluido ? "Desmarcar como concluído" : "Marcar como concluído"}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (t.treinoId) {
+                                      marcarConcluidoTreino(t.treinoId, !t.concluido);
+                                    }
+                                  }}
+                                >
+                                  <CheckCircle2
+                                    className={cn(
+                                      "h-4 w-4 transition-colors",
+                                      t.concluido
+                                        ? "text-green-500"
+                                        : "text-muted-foreground/40 hover:text-green-500"
+                                    )}
+                                  />
+                                </Button>
+                              )}
                               {/* Botão de excluir treino individual */}
                               {!readOnly && isPersonal && (
                                 <Button

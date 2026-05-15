@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useSubscriptions } from "@/hooks/useSubscriptions";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -8,11 +10,25 @@ import {
   AlertCircle,
   XCircle,
   Calendar,
-  DollarSign,
   CreditCard,
+  ExternalLink,
+  Loader2,
+  Ban,
 } from "lucide-react";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { AlunoCheckoutPlanos } from "@/components/AlunoCheckoutPlanos";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface StudentSubscriptionViewProps {
   studentId: string;

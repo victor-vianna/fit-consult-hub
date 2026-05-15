@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useState, useRef } from "react";
-import { Navigate, useNavigate, useLocation } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth, UserRole } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -11,55 +11,59 @@ interface AuthGuardProps {
 export const AuthGuard = ({ children, allowedRoles }: AuthGuardProps) => {
   const { user, role, loading } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [isBlocked, setIsBlocked] = useState(false);
   const checkedRef = useRef(false);
 
   useEffect(() => {
     if (!loading) {
-      checkStudentAccess();
+      checkAccess();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, role, loading]);
 
-  const checkStudentAccess = async () => {
+  const checkAccess = async () => {
     if (!user || !role) {
       setCheckingAccess(false);
       return;
     }
 
-    // Only check is_active for students, and only once per mount
-    if (role === "aluno" && !checkedRef.current) {
-      checkedRef.current = true;
-      try {
-        const { data: profile, error } = await supabase
-          .from("profiles")
-          .select("is_active")
-          .eq("id", user.id)
-          .single();
+    // Admin nunca é bloqueado, sai cedo
+    if (role === "admin") {
+      setCheckingAccess(false);
+      return;
+    }
 
-        if (error) {
-          console.error("Erro ao verificar status do aluno:", error);
-          setCheckingAccess(false);
-          return;
-        }
+    if (checkedRef.current) {
+      setCheckingAccess(false);
+      return;
+    }
+    checkedRef.current = true;
 
-        if (profile && profile.is_active === false) {
-          console.log("Aluno bloqueado, redirecionando...");
-          setIsBlocked(true);
-          setCheckingAccess(false);
-          navigate("/acesso-suspenso", { replace: true });
-          return;
-        }
-      } catch (error) {
-        console.error("Erro ao verificar acesso:", error);
+    try {
+      const { data, error } = await supabase.rpc("pode_acessar_plataforma", {
+        _user_id: user.id,
+      });
+
+      if (error) {
+        console.error("pode_acessar_plataforma:", error);
+        setCheckingAccess(false);
+        return;
       }
+
+      if (data === false) {
+        setIsBlocked(true);
+        setCheckingAccess(false);
+        navigate("/acesso-suspenso", { replace: true });
+        return;
+      }
+    } catch (e) {
+      console.error("Erro ao verificar acesso:", e);
     }
 
     setCheckingAccess(false);
   };
 
-  // Loading
   if (loading || checkingAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -71,16 +75,12 @@ export const AuthGuard = ({ children, allowedRoles }: AuthGuardProps) => {
     );
   }
 
-  if (isBlocked) {
-    return null;
-  }
+  if (isBlocked) return null;
 
-  // Not authenticated
   if (!user || !role) {
     return <Navigate to="/auth" replace />;
   }
 
-  // Role check
   if (allowedRoles && !allowedRoles.includes(role)) {
     if (role === "admin") return <Navigate to="/admin" replace />;
     if (role === "personal") return <Navigate to="/" replace />;

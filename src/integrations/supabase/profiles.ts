@@ -3,7 +3,7 @@ import { supabase } from "./client";
 
 export type Profile = {
   id: string;
-  user_id: string;
+  user_id?: string;
   nome: string;
   email: string;
   telefone?: string;

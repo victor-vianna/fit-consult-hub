@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useFinancialDashboard } from "@/hooks/useFinancialDashboard";
 import { useAuth } from "@/hooks/useAuth";
+import { PersonalPlanPricingForm } from "@/components/PersonalPlanPricingForm";
 import {
   LineChart,
   Line,
@@ -86,6 +87,8 @@ export function FinancialDashboard() {
           Visão geral das suas finanças e pagamentos
         </h1>
       </div>
+
+      <PersonalPlanPricingForm />
 
       {/* Cards principais */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">

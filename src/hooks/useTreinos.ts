@@ -720,21 +720,25 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
   // 🆕 Mutation para deletar treino específico
   const deletarTreinoMutation = useMutation({
     mutationFn: async (treinoId: string) => {
-      // Primeiro deleta exercícios (captura erro de RLS/constraint)
+      // Defensivo: remove sessões antes (FK agora é CASCADE, mas garantimos compat)
+      const { error: errSes } = await supabase
+        .from("treino_sessoes")
+        .delete()
+        .eq("treino_semanal_id", treinoId);
+      if (errSes) console.warn("[deletarTreino] sessoes:", errSes.message);
+
       const { error: errEx } = await supabase
         .from("exercicios")
         .delete()
         .eq("treino_semanal_id", treinoId);
       if (errEx) throw new Error(`Falha ao remover exercícios: ${errEx.message}`);
 
-      // Depois deleta blocos
       const { error: errBl } = await supabase
         .from("blocos_treino")
         .delete()
         .eq("treino_semanal_id", treinoId);
       if (errBl) throw new Error(`Falha ao remover blocos: ${errBl.message}`);
 
-      // Finalmente deleta o treino
       const { error } = await supabase
         .from("treinos_semanais")
         .delete()

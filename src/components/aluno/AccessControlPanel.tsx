@@ -154,6 +154,10 @@ export function AccessControlPanel({ studentId, studentName }: Props) {
         </CardContent>
       </Card>
 
+      <div className="mt-4">
+        <StudentAccessByPaymentOverride studentId={studentId} />
+      </div>
+
       <ManageAccessDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}

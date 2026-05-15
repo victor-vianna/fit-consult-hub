@@ -12,6 +12,7 @@ import {
   CreditCard,
 } from "lucide-react";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
+import { AlunoCheckoutPlanos } from "@/components/AlunoCheckoutPlanos";
 
 interface StudentSubscriptionViewProps {
   studentId: string;
@@ -181,20 +182,22 @@ export function StudentSubscriptionView({
           </CardContent>
         </Card>
       ) : (
-        <Card className="border-yellow-500/50 bg-yellow-500/5">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-yellow-600">
-              <AlertCircle className="h-5 w-5" />
-              Nenhum Plano Ativo
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Você não possui um plano ativo no momento. Entre em contato com
-              seu personal trainer para mais informações.
-            </p>
-          </CardContent>
-        </Card>
+        <>
+          <Card className="border-yellow-500/50 bg-yellow-500/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-yellow-600">
+                <AlertCircle className="h-5 w-5" />
+                Nenhum Plano Ativo
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Você não possui um plano ativo no momento. Escolha um dos planos abaixo para começar.
+              </p>
+            </CardContent>
+          </Card>
+          {personalId && <AlunoCheckoutPlanos personalId={personalId} />}
+        </>
       )}
 
       {/* Histórico de Pagamentos */}

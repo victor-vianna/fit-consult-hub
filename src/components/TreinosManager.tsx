@@ -165,6 +165,7 @@ export function TreinosManager({
     criarTreinoNoDia,
     renomearTreino,
     deletarTreino,
+    marcarConcluidoTreino,
     treinosPorDia,
   } = useTreinos({ profileId, personalId });
 

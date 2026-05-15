@@ -21,6 +21,7 @@ import {
   CheckCircle,
   FileText,
 } from "lucide-react";
+import { AdminAccessByPaymentToggle } from "@/components/Admin/AdminAccessByPaymentToggle";
 
 interface Configuracao {
   categoria: string;
@@ -263,6 +264,8 @@ export default function ConfiguracoesSection() {
           </div>
         </CardHeader>
       </Card>
+
+      <AdminAccessByPaymentToggle />
 
       {/* Configurações por Categoria */}
       {configuracoes.map((categoria, catIndex) => (

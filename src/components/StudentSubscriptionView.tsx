@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useSubscriptions } from "@/hooks/useSubscriptions";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -8,11 +10,25 @@ import {
   AlertCircle,
   XCircle,
   Calendar,
-  DollarSign,
   CreditCard,
+  ExternalLink,
+  Loader2,
+  Ban,
 } from "lucide-react";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { AlunoCheckoutPlanos } from "@/components/AlunoCheckoutPlanos";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface StudentSubscriptionViewProps {
   studentId: string;
@@ -23,11 +39,54 @@ export function StudentSubscriptionView({
   studentId,
   personalId,
 }: StudentSubscriptionViewProps) {
-  const { subscriptions, loading, getActiveSubscription } =
+  const { subscriptions, loading, getActiveSubscription, refetch } =
     useSubscriptions(studentId);
   const { settings: personalSettings } = usePersonalSettings(personalId);
+  const { toast } = useToast();
+  const [openingPortal, setOpeningPortal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   const activeSubscription = getActiveSubscription();
+
+  const handleOpenPortal = async () => {
+    setOpeningPortal(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("stripe-customer-portal");
+      if (error) throw error;
+      if (data?.url) window.location.href = data.url;
+    } catch (e: any) {
+      toast({
+        title: "Erro ao abrir o portal",
+        description: e?.message ?? "Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setOpeningPortal(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    setCancelling(true);
+    try {
+      const { error } = await supabase.functions.invoke("stripe-cancel-subscription");
+      if (error) throw error;
+      toast({
+        title: "Cancelamento agendado",
+        description: "Sua assinatura será encerrada ao fim do ciclo atual.",
+      });
+      await refetch();
+    } catch (e: any) {
+      toast({
+        title: "Erro ao cancelar",
+        description: e?.message ?? "Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setCancelling(false);
+      setConfirmCancel(false);
+    }
+  };
 
   const getStatusInfo = (status: string) => {
     switch (status) {
@@ -179,6 +238,40 @@ export function StudentSubscriptionView({
                 </p>
               </div>
             )}
+
+            {(activeSubscription as any).cancela_no_fim_do_ciclo && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
+                Sua assinatura será encerrada em{" "}
+                {format(new Date(activeSubscription.data_expiracao), "dd/MM/yyyy", { locale: ptBR })}.
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-2 pt-3 border-t">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleOpenPortal}
+                disabled={openingPortal}
+              >
+                {openingPortal ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                )}
+                Gerenciar pagamento
+              </Button>
+              {!(activeSubscription as any).cancela_no_fim_do_ciclo && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => setConfirmCancel(true)}
+                >
+                  <Ban className="h-4 w-4 mr-2" />
+                  Cancelar assinatura
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       ) : (
@@ -276,6 +369,32 @@ export function StudentSubscriptionView({
           </CardContent>
         </Card>
       )}
+
+      <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar assinatura?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você manterá o acesso até o fim do ciclo atual. Após isso, a assinatura será encerrada
+              e você precisará assinar novamente para continuar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelling}>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleCancel();
+              }}
+              disabled={cancelling}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {cancelling && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Confirmar cancelamento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

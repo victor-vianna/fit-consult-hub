@@ -68,6 +68,27 @@ export type Database = {
           },
         ]
       }
+      admin_settings: {
+        Row: {
+          controle_acesso_personal_por_pagamento: boolean
+          id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          controle_acesso_personal_por_pagamento?: boolean
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          controle_acesso_personal_por_pagamento?: boolean
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       alertas_descartados: {
         Row: {
           descartado_em: string | null
@@ -1507,6 +1528,7 @@ export type Database = {
       personal_settings: {
         Row: {
           cards_visiveis: Json | null
+          controle_acesso_por_pagamento: boolean
           created_at: string | null
           display_name: string | null
           id: string
@@ -1523,6 +1545,7 @@ export type Database = {
         }
         Insert: {
           cards_visiveis?: Json | null
+          controle_acesso_por_pagamento?: boolean
           created_at?: string | null
           display_name?: string | null
           id?: string
@@ -1539,6 +1562,7 @@ export type Database = {
         }
         Update: {
           cards_visiveis?: Json | null
+          controle_acesso_por_pagamento?: boolean
           created_at?: string | null
           display_name?: string | null
           id?: string
@@ -1763,6 +1787,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          controle_acesso_por_pagamento: boolean | null
           created_at: string | null
           email: string
           id: string
@@ -1773,6 +1798,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          controle_acesso_por_pagamento?: boolean | null
           created_at?: string | null
           email: string
           id: string
@@ -1783,6 +1809,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          controle_acesso_por_pagamento?: boolean | null
           created_at?: string | null
           email?: string
           id?: string
@@ -2617,6 +2644,7 @@ export type Database = {
           tipo_agrupamento: string
         }[]
       }
+      pode_acessar_plataforma: { Args: { _user_id: string }; Returns: boolean }
       reordenar_blocos: {
         Args: {
           p_ordem_ids: string[]

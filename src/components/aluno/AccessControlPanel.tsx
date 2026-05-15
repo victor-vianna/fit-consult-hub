@@ -30,6 +30,7 @@ import {
 } from "@/hooks/useStudentAccess";
 import { ManageAccessDialog } from "./ManageAccessDialog";
 import { AccessHistoryList } from "./AccessHistoryList";
+import { StudentAccessByPaymentOverride } from "./StudentAccessByPaymentOverride";
 
 interface Props {
   studentId: string;
@@ -152,6 +153,10 @@ export function AccessControlPanel({ studentId, studentName }: Props) {
           </Collapsible>
         </CardContent>
       </Card>
+
+      <div className="mt-4">
+        <StudentAccessByPaymentOverride studentId={studentId} />
+      </div>
 
       <ManageAccessDialog
         open={dialogOpen}

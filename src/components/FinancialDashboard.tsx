@@ -16,6 +16,7 @@ import {
 import { useFinancialDashboard } from "@/hooks/useFinancialDashboard";
 import { useAuth } from "@/hooks/useAuth";
 import { PersonalPlanPricingForm } from "@/components/PersonalPlanPricingForm";
+import { AccessByPaymentToggle } from "@/components/AccessByPaymentToggle";
 import {
   LineChart,
   Line,

@@ -30,6 +30,7 @@ import {
 } from "@/hooks/useStudentAccess";
 import { ManageAccessDialog } from "./ManageAccessDialog";
 import { AccessHistoryList } from "./AccessHistoryList";
+import { StudentAccessByPaymentOverride } from "./StudentAccessByPaymentOverride";
 
 interface Props {
   studentId: string;

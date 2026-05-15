@@ -265,6 +265,8 @@ export default function ConfiguracoesSection() {
         </CardHeader>
       </Card>
 
+      <AdminAccessByPaymentToggle />
+
       {/* Configurações por Categoria */}
       {configuracoes.map((categoria, catIndex) => (
         <Card key={catIndex}>

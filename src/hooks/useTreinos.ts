@@ -814,6 +814,41 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
     },
   });
 
+  // 🆕 Marca um treino como concluído (e desmarca os irmãos do mesmo dia/semana)
+  const marcarConcluidoTreinoMutation = useMutation({
+    mutationFn: async ({ treinoId, concluido }: { treinoId: string; concluido: boolean }) => {
+      const alvo = treinos.find((t) => t.treinoId === treinoId);
+      if (!alvo) throw new Error("Treino não encontrado");
+
+      if (concluido) {
+        const irmaos = treinos
+          .filter((t) => t.dia === alvo.dia && t.treinoId && t.treinoId !== treinoId)
+          .map((t) => t.treinoId as string);
+        if (irmaos.length > 0) {
+          await supabase
+            .from("treinos_semanais")
+            .update({ concluido: false })
+            .in("id", irmaos);
+        }
+      }
+
+      const { error } = await supabase
+        .from("treinos_semanais")
+        .update({ concluido })
+        .eq("id", treinoId);
+      if (error) throw error;
+      return { treinoId, concluido };
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: buildQueryKey(profileId, personalId, semanaParaBuscar),
+      });
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Erro ao atualizar status do treino");
+    },
+  });
+
   // Helper para agrupar treinos por dia
   const treinosPorDia = (dia: number): TreinoDia[] => {
     return treinos.filter((t) => t.dia === dia);

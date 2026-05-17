@@ -88,36 +88,26 @@ export function StudentSubscriptionView({
     }
   };
 
-  const getStatusInfo = (status: string) => {
-    switch (status) {
+  const getStatusInfo = (sub: { status_pagamento: string; data_expiracao: string }) => {
+    const expired = new Date(sub.data_expiracao) < new Date();
+    if (sub.status_pagamento === "pago" && expired) {
+      return {
+        icon: XCircle,
+        color: "text-red-500",
+        bgColor: "bg-red-500",
+        label: "Expirado",
+        subtext: "Acesso encerrado",
+      };
+    }
+    switch (sub.status_pagamento) {
       case "pago":
-        return {
-          icon: CheckCircle,
-          color: "text-green-500",
-          bgColor: "bg-green-500",
-          label: "Pago",
-        };
+        return { icon: CheckCircle, color: "text-green-500", bgColor: "bg-green-500", label: "Ativo", subtext: null };
       case "pendente":
-        return {
-          icon: AlertCircle,
-          color: "text-yellow-500",
-          bgColor: "bg-yellow-500",
-          label: "Pendente",
-        };
+        return { icon: AlertCircle, color: "text-yellow-500", bgColor: "bg-yellow-500", label: "Pendente", subtext: null };
       case "atrasado":
-        return {
-          icon: XCircle,
-          color: "text-red-500",
-          bgColor: "bg-red-500",
-          label: "Atrasado",
-        };
+        return { icon: XCircle, color: "text-red-500", bgColor: "bg-red-500", label: "Atrasado", subtext: null };
       default:
-        return {
-          icon: AlertCircle,
-          color: "text-gray-500",
-          bgColor: "bg-gray-500",
-          label: "Desconhecido",
-        };
+        return { icon: AlertCircle, color: "text-gray-500", bgColor: "bg-gray-500", label: "Desconhecido", subtext: null };
     }
   };
 
@@ -128,6 +118,12 @@ export function StudentSubscriptionView({
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
   };
+
+  const diasParaExpirar = activeSubscription
+    ? getDaysUntilExpiration(activeSubscription.data_expiracao)
+    : null;
+  const mostrarAlertaVencimento =
+    diasParaExpirar !== null && diasParaExpirar >= 1 && diasParaExpirar <= 3;
 
   if (loading) {
     return (

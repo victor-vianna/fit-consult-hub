@@ -731,12 +731,6 @@ export default function AlunoDetalhes() {
 
             {/* Aba Geral */}
             <TabsContent value="geral" className="space-y-6">
-              {/* Painel de controle de acesso */}
-              <AccessControlPanel
-                studentId={aluno.id}
-                studentName={aluno.nome}
-              />
-
               {/* Card de status da planilha */}
               {user && (
                 <PlanilhaStatusCard

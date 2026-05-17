@@ -1107,6 +1107,10 @@ export default function AlunoDetalhes() {
 
             {/* Aba Financeiro */}
             <TabsContent value="financeiro" className="space-y-4">
+              <AccessControlPanel
+                studentId={aluno.id}
+                studentName={aluno.nome}
+              />
               <SubscriptionManager
                 studentId={id!}
                 personalId={user!.id}

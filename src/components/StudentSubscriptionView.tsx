@@ -298,7 +298,7 @@ export function StudentSubscriptionView({
           <CardContent>
             <div className="space-y-3">
               {subscriptions.map((sub) => {
-                const statusInfo = getStatusInfo(sub.status_pagamento);
+                const statusInfo = getStatusInfo(sub);
                 const StatusIcon = statusInfo.icon;
 
                 return (
@@ -315,6 +315,11 @@ export function StudentSubscriptionView({
                               {statusInfo.label}
                             </Badge>
                           </div>
+                          {statusInfo.subtext && (
+                            <p className="text-xs text-red-600 dark:text-red-400 font-medium">
+                              {statusInfo.subtext}
+                            </p>
+                          )}
                           <p className="text-sm text-muted-foreground">
                             R$ {sub.valor.toFixed(2)}
                           </p>

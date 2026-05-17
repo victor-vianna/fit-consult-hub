@@ -181,11 +181,22 @@ export function FinancialDashboard() {
             </p>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={monthlyRevenue}>
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={monthlyRevenue} margin={{ top: 10, right: 20, left: 10, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="mes" tick={{ fontSize: 11 }} tickMargin={10} angle={-30} />
-                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `R$ ${v}`} />
+                <XAxis dataKey="mes" tick={{ fontSize: 12 }} tickMargin={10} angle={-30} height={60} interval={0} />
+                <YAxis
+                  tick={{ fontSize: 12 }}
+                  width={80}
+                  tickFormatter={(v) =>
+                    new Intl.NumberFormat("pt-BR", {
+                      style: "currency",
+                      currency: "BRL",
+                      notation: "compact",
+                      maximumFractionDigits: 1,
+                    }).format(v)
+                  }
+                />
                 <Tooltip
                   formatter={(value: number, name: string) => [
                     formatCurrency(value),
@@ -220,11 +231,11 @@ export function FinancialDashboard() {
             <CardTitle className="text-lg">Número de Pagamentos</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={monthlyRevenue}>
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={monthlyRevenue} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="mes" tick={{ fontSize: 11 }} tickMargin={10} angle={-30} />
-                <YAxis tick={{ fontSize: 12 }} />
+                <XAxis dataKey="mes" tick={{ fontSize: 12 }} tickMargin={10} angle={-30} height={60} interval={0} />
+                <YAxis tick={{ fontSize: 12 }} width={40} allowDecimals={false} />
                 <Tooltip formatter={(value: number) => [value, "Pagamentos"]} />
                 <Bar dataKey="pagamentos" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
               </BarChart>

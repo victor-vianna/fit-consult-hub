@@ -88,36 +88,26 @@ export function StudentSubscriptionView({
     }
   };
 
-  const getStatusInfo = (status: string) => {
-    switch (status) {
+  const getStatusInfo = (sub: { status_pagamento: string; data_expiracao: string }) => {
+    const expired = new Date(sub.data_expiracao) < new Date();
+    if (sub.status_pagamento === "pago" && expired) {
+      return {
+        icon: XCircle,
+        color: "text-red-500",
+        bgColor: "bg-red-500",
+        label: "Expirado",
+        subtext: "Acesso encerrado",
+      };
+    }
+    switch (sub.status_pagamento) {
       case "pago":
-        return {
-          icon: CheckCircle,
-          color: "text-green-500",
-          bgColor: "bg-green-500",
-          label: "Pago",
-        };
+        return { icon: CheckCircle, color: "text-green-500", bgColor: "bg-green-500", label: "Ativo", subtext: null };
       case "pendente":
-        return {
-          icon: AlertCircle,
-          color: "text-yellow-500",
-          bgColor: "bg-yellow-500",
-          label: "Pendente",
-        };
+        return { icon: AlertCircle, color: "text-yellow-500", bgColor: "bg-yellow-500", label: "Pendente", subtext: null };
       case "atrasado":
-        return {
-          icon: XCircle,
-          color: "text-red-500",
-          bgColor: "bg-red-500",
-          label: "Atrasado",
-        };
+        return { icon: XCircle, color: "text-red-500", bgColor: "bg-red-500", label: "Atrasado", subtext: null };
       default:
-        return {
-          icon: AlertCircle,
-          color: "text-gray-500",
-          bgColor: "bg-gray-500",
-          label: "Desconhecido",
-        };
+        return { icon: AlertCircle, color: "text-gray-500", bgColor: "bg-gray-500", label: "Desconhecido", subtext: null };
     }
   };
 
@@ -128,6 +118,12 @@ export function StudentSubscriptionView({
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
   };
+
+  const diasParaExpirar = activeSubscription
+    ? getDaysUntilExpiration(activeSubscription.data_expiracao)
+    : null;
+  const mostrarAlertaVencimento =
+    diasParaExpirar !== null && diasParaExpirar >= 1 && diasParaExpirar <= 3;
 
   if (loading) {
     return (
@@ -143,6 +139,21 @@ export function StudentSubscriptionView({
 
   return (
     <div className="space-y-4">
+      {mostrarAlertaVencimento && (
+        <Card className="border-amber-500/60 bg-amber-500/10">
+          <CardContent className="pt-4 pb-4 flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-semibold text-amber-700 dark:text-amber-400">
+                Seu acesso expira em {diasParaExpirar} dia{diasParaExpirar === 1 ? "" : "s"}
+              </p>
+              <p className="text-amber-700/80 dark:text-amber-400/80">
+                Renove para continuar treinando sem interrupções.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       {/* Status do Plano Ativo */}
       {activeSubscription ? (
         <Card
@@ -302,7 +313,7 @@ export function StudentSubscriptionView({
           <CardContent>
             <div className="space-y-3">
               {subscriptions.map((sub) => {
-                const statusInfo = getStatusInfo(sub.status_pagamento);
+                const statusInfo = getStatusInfo(sub);
                 const StatusIcon = statusInfo.icon;
 
                 return (
@@ -319,6 +330,11 @@ export function StudentSubscriptionView({
                               {statusInfo.label}
                             </Badge>
                           </div>
+                          {statusInfo.subtext && (
+                            <p className="text-xs text-red-600 dark:text-red-400 font-medium">
+                              {statusInfo.subtext}
+                            </p>
+                          )}
                           <p className="text-sm text-muted-foreground">
                             R$ {sub.valor.toFixed(2)}
                           </p>

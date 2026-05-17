@@ -139,6 +139,21 @@ export function StudentSubscriptionView({
 
   return (
     <div className="space-y-4">
+      {mostrarAlertaVencimento && (
+        <Card className="border-amber-500/60 bg-amber-500/10">
+          <CardContent className="pt-4 pb-4 flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-semibold text-amber-700 dark:text-amber-400">
+                Seu acesso expira em {diasParaExpirar} dia{diasParaExpirar === 1 ? "" : "s"}
+              </p>
+              <p className="text-amber-700/80 dark:text-amber-400/80">
+                Renove para continuar treinando sem interrupções.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       {/* Status do Plano Ativo */}
       {activeSubscription ? (
         <Card

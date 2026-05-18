@@ -51,7 +51,14 @@ import {
   AlertTriangle,
   Flame,
   Clock,
+  FileWarning,
+  Palette,
 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 
 import { AppLayout } from "@/components/AppLayout";
@@ -103,6 +110,27 @@ export default function AlunosManager() {
   const { settings: personalSettings } = usePersonalSettings(user?.id);
   const { flagsByStudent } = usePriorityStudents(user?.id);
   const { statusByAluno } = useAlunosQuickStatus(user?.id);
+
+  // 🎨 Cores customizadas por aluno (persistidas em localStorage)
+  const COLOR_KEY = "alunos-card-colors";
+  const [coresCustom, setCoresCustom] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(COLOR_KEY) || "{}");
+    } catch {
+      return {};
+    }
+  });
+  const setCorAluno = (id: string, cor: string | null) => {
+    setCoresCustom((prev) => {
+      const next = { ...prev };
+      if (!cor) delete next[id];
+      else next[id] = cor;
+      try {
+        localStorage.setItem(COLOR_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
 
   // 🔧 Persistir filtros sempre que mudarem
   useEffect(() => {
@@ -303,7 +331,7 @@ export default function AlunosManager() {
             : undefined,
         }}
       >
-        <div className="container mx-auto px-6 py-4">
+        <div className="container mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold">
@@ -402,43 +430,43 @@ export default function AlunosManager() {
         </div>
       </header>
 
-      <main className="container mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <main className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="grid grid-cols-3 md:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total de Alunos
+            <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6">
+              <CardTitle className="text-[11px] sm:text-sm font-medium leading-tight">
+                Total
               </CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{alunos.length}</div>
+            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+              <div className="text-xl sm:text-2xl font-bold">{alunos.length}</div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                Alunos Ativos
+            <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6">
+              <CardTitle className="text-[11px] sm:text-sm font-medium leading-tight">
+                Ativos
               </CardTitle>
-              <UserCheck className="h-4 w-4 text-green-600" />
+              <UserCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-600" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
+            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+              <div className="text-xl sm:text-2xl font-bold text-green-600">
                 {alunosAtivos}
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                Alunos Inativos
+            <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6">
+              <CardTitle className="text-[11px] sm:text-sm font-medium leading-tight">
+                Bloqueados
               </CardTitle>
-              <UserX className="h-4 w-4 text-red-600" />
+              <UserX className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-600" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">
+            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+              <div className="text-xl sm:text-2xl font-bold text-red-600">
                 {alunosInativos}
               </div>
             </CardContent>
@@ -446,8 +474,8 @@ export default function AlunosManager() {
         </div>
 
         <Card className="mb-6 border-2">
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <CardContent className="p-4 sm:pt-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -492,17 +520,23 @@ export default function AlunosManager() {
         </Card>
 
         {alunosFiltrados.length > 0 ? (
-          <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {alunosFiltrados.map((aluno) => {
               const flags = flagsByStudent[aluno.id] || [];
               const hasHighPriority = flags.some((f) => f.severity === "alta");
+              const hasPlanilha = flags.some(
+                (f) => f.reason === "planilha_vencendo" || f.reason === "planilha_vencida"
+              );
               const hasPriority = flags.length > 0;
               const status = statusByAluno[aluno.id];
+              const corCustom = coresCustom[aluno.id];
 
-              const prioridade: "bloqueado" | "urgente" | "importante" | "ativo" = !aluno.is_active
+              const prioridade: "bloqueado" | "urgente" | "atencao" | "importante" | "ativo" = !aluno.is_active
                 ? "bloqueado"
                 : hasHighPriority
                 ? "urgente"
+                : hasPlanilha
+                ? "atencao"
                 : hasPriority
                 ? "importante"
                 : "ativo";
@@ -510,31 +544,67 @@ export default function AlunosManager() {
               const prioridadeStyles = {
                 bloqueado: { ring: "border-muted", bar: "bg-muted-foreground", chip: "bg-muted text-muted-foreground", icon: UserX, label: "Bloqueado" },
                 urgente:   { ring: "border-destructive/50 ring-1 ring-destructive/20", bar: "bg-destructive", chip: "bg-destructive text-destructive-foreground", icon: Flame, label: "Urgente" },
+                atencao:   { ring: "border-yellow-500/60 ring-1 ring-yellow-500/20", bar: "bg-yellow-500", chip: "bg-yellow-500 text-black", icon: FileWarning, label: "Atenção" },
                 importante:{ ring: "border-orange-500/50", bar: "bg-orange-500", chip: "bg-orange-500 text-white", icon: AlertTriangle, label: "Importante" },
                 ativo:     { ring: "", bar: "bg-green-500", chip: "bg-green-600 text-white", icon: UserCheck, label: "Ativo" },
               }[prioridade];
 
               const PrioIcon = prioridadeStyles.icon;
+              const corPalette = ["#ef4444", "#f59e0b", "#eab308", "#22c55e", "#06b6d4", "#3b82f6", "#a855f7", "#ec4899"];
 
               return (
                 <Card
                   key={aluno.id}
-                  className={`group hover:shadow-xl transition-all duration-300 border-2 cursor-pointer relative overflow-hidden touch-target ${prioridadeStyles.ring}`}
+                  className={`group hover:shadow-xl transition-all duration-300 border-2 cursor-pointer relative overflow-hidden touch-target ${corCustom ? "" : prioridadeStyles.ring}`}
+                  style={corCustom ? { borderColor: corCustom, boxShadow: `0 0 0 1px ${corCustom}33` } : undefined}
                   onClick={() => navigate(`/aluno/${aluno.id}`)}
                 >
-                  <div className={`absolute left-0 top-0 bottom-0 w-1 ${prioridadeStyles.bar}`} />
+                  <div
+                    className={`absolute left-0 top-0 bottom-0 w-1 ${corCustom ? "" : prioridadeStyles.bar}`}
+                    style={corCustom ? { backgroundColor: corCustom } : undefined}
+                  />
 
-                  <div className="absolute top-3 right-3 z-10">
+                  <div className="absolute top-2 right-2 z-10 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     <Badge className={`${prioridadeStyles.chip} gap-1 text-[10px] py-0.5 px-2`}>
                       <PrioIcon className="h-3 w-3" />
                       {prioridadeStyles.label}
                     </Badge>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" title="Personalizar cor">
+                          <Palette className="h-3.5 w-3.5" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-2" align="end">
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {corPalette.map((c) => (
+                            <button
+                              key={c}
+                              onClick={() => setCorAluno(aluno.id, c)}
+                              className="h-6 w-6 rounded-full border-2 border-background hover:scale-110 transition-transform"
+                              style={{ backgroundColor: c }}
+                              aria-label={`Cor ${c}`}
+                            />
+                          ))}
+                        </div>
+                        {corCustom && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full mt-2 h-7 text-xs"
+                            onClick={() => setCorAluno(aluno.id, null)}
+                          >
+                            Remover cor
+                          </Button>
+                        )}
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
-                  <CardContent className="pt-6 pl-5 pr-3">
+                  <CardContent className="pt-10 pl-4 sm:pl-5 pr-3 pb-4">
                     <div className="space-y-3">
                       <div>
-                        <h3 className="font-bold text-base leading-tight pr-20 group-hover:text-primary transition-colors truncate">
+                        <h3 className="font-bold text-base leading-tight pr-2 group-hover:text-primary transition-colors truncate">
                           {aluno.nome}
                         </h3>
                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">

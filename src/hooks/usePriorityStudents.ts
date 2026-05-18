@@ -8,7 +8,9 @@ export type PriorityReason =
   | "plano_vencido"
   | "pagamento_pendente"
   | "feedback_nao_respondido"
-  | "mensagem_nao_lida";
+  | "mensagem_nao_lida"
+  | "planilha_vencendo"
+  | "planilha_vencida";
 
 export interface PriorityFlag {
   reason: PriorityReason;
@@ -93,6 +95,42 @@ export function usePriorityStudents(personalId?: string) {
           reason: "pagamento_pendente",
           label: s.status_pagamento === "atrasado" ? "Pagamento atrasado" : "Pagamento pendente",
           severity: "alta",
+        });
+      }
+    });
+
+    // 2.b Planilhas de treino — vencendo / vencidas (status ativa)
+    const { data: planilhas } = await supabase
+      .from("planilhas_treino")
+      .select("profile_id, data_prevista_fim, status")
+      .eq("personal_id", personalId)
+      .eq("status", "ativa");
+
+    const planilhaPorAluno = new Map<string, any>();
+    (planilhas || []).forEach((p: any) => {
+      const existing = planilhaPorAluno.get(p.profile_id);
+      if (!existing || parseISO(p.data_prevista_fim) > parseISO(existing.data_prevista_fim)) {
+        planilhaPorAluno.set(p.profile_id, p);
+      }
+    });
+
+    planilhaPorAluno.forEach((p: any, studentId) => {
+      if (!map[studentId] || !p.data_prevista_fim) return;
+      const fim = startOfDay(parseISO(p.data_prevista_fim));
+      const dias = differenceInCalendarDays(fim, today);
+      if (dias < 0) {
+        map[studentId].flags.push({
+          reason: "planilha_vencida",
+          label: "Planilha vencida",
+          detail: `há ${Math.abs(dias)}d`,
+          severity: "alta",
+        });
+      } else if (dias <= 7) {
+        map[studentId].flags.push({
+          reason: "planilha_vencendo",
+          label: "Planilha expira",
+          detail: dias === 0 ? "hoje" : `${dias}d`,
+          severity: dias <= 3 ? "alta" : "media",
         });
       }
     });

@@ -82,6 +82,7 @@ interface ExercicioDialogProps {
   exercicio?: ExercicioItem | null;
   grupoEditando?: GrupoEditando | null;
   diaNome?: string;
+  draftKey?: string;
 }
 
 const defaultExercicio = (): Omit<ExercicioItem, "id"> => ({

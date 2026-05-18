@@ -387,12 +387,14 @@ export function useWorkoutBlocks({
       if (blocos.length === 0) return blocos;
 
       // Two-phase update to avoid unique constraint (treino_semanal_id, ordem, deleted_at)
-      // Phase 1: shift all involved rows to negative offsets to free their final slots
+      // Phase 1: shift all involved rows to large positive offsets to free their final slots.
+      // Use positive values to respect the check constraint `check_ordem_positiva` (ordem > 0).
+      const TEMP_OFFSET = 1_000_000;
       const phase1 = await Promise.all(
         blocos.map((b, idx) =>
           supabase
             .from("blocos_treino")
-            .update({ ordem: -(idx + 1) })
+            .update({ ordem: TEMP_OFFSET + idx + 1 })
             .eq("id", b.id)
         )
       );

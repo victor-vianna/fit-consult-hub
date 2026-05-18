@@ -1796,6 +1796,7 @@ export function TreinosManager({
           diaNome={
             selectedDia !== null ? diasSemana[selectedDia - 1].nome : undefined
           }
+          draftKey={`${profileId}:${selectedDia ?? "x"}`}
         />
 
         <Dialog open={editDescricaoOpen} onOpenChange={setEditDescricaoOpen}>

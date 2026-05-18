@@ -53,12 +53,17 @@ import {
   Clock,
   FileWarning,
   Palette,
+  Bell,
+  Settings as SettingsIcon,
+  CreditCard,
+  MessageSquare,
 } from "lucide-react";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 
 import { AppLayout } from "@/components/AppLayout";

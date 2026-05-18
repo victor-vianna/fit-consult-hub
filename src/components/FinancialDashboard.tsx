@@ -207,18 +207,18 @@ export function FinancialDashboard() {
                 <Line
                   type="monotone"
                   dataKey="receita"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={2}
-                  dot={{ fill: "hsl(var(--primary))", r: 3 }}
+                  stroke="hsl(var(--info))"
+                  strokeWidth={2.5}
+                  dot={{ fill: "hsl(var(--info))", r: 3 }}
                   activeDot={{ r: 5 }}
                 />
                 <Line
                   type="monotone"
                   dataKey="receitaAnoAnterior"
-                  stroke="hsl(var(--muted-foreground))"
-                  strokeWidth={1.5}
+                  stroke="hsl(var(--warning))"
+                  strokeWidth={2}
                   strokeDasharray="5 5"
-                  dot={{ fill: "hsl(var(--muted-foreground))", r: 2 }}
+                  dot={{ fill: "hsl(var(--warning))", r: 2 }}
                   activeDot={{ r: 4 }}
                 />
               </LineChart>
@@ -237,7 +237,7 @@ export function FinancialDashboard() {
                 <XAxis dataKey="mes" tick={{ fontSize: 12 }} tickMargin={10} angle={-30} height={60} interval={0} />
                 <YAxis tick={{ fontSize: 12 }} width={40} allowDecimals={false} />
                 <Tooltip formatter={(value: number) => [value, "Pagamentos"]} />
-                <Bar dataKey="pagamentos" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="pagamentos" fill="hsl(var(--info))" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>

@@ -45,6 +45,8 @@ interface WorkoutBlockCardProps {
   onDelete?: () => void;
   onToggleConcluido?: (id: string, concluido: boolean) => void;
   onSaveAsTemplate?: (bloco: BlocoTreino, nome: string) => Promise<unknown>;
+  dragListeners?: any;
+  dragAttributes?: any;
 }
 
 export function WorkoutBlockCard({
@@ -55,6 +57,8 @@ export function WorkoutBlockCard({
   onDelete,
   onToggleConcluido,
   onSaveAsTemplate,
+  dragListeners,
+  dragAttributes,
 }: WorkoutBlockCardProps) {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [templateName, setTemplateName] = useState(bloco.nome);

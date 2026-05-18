@@ -132,6 +132,38 @@ export default function AlunosManager() {
     });
   };
 
+  // 🔔 Preferências de notificações exibidas nos cards (persistidas)
+  const NOTIF_PREFS_KEY = "alunos-card-notif-prefs";
+  const NOTIF_TYPES: { id: string; label: string }[] = [
+    { id: "treino_hoje", label: "Treinou hoje / Sem treino" },
+    { id: "dias_ultimo_treino", label: "Dias desde último treino" },
+    { id: "semana_treinos", label: "Treinos concluídos na semana" },
+    { id: "plano_vencendo", label: "Plano vencendo" },
+    { id: "plano_vencido", label: "Plano vencido" },
+    { id: "pagamento_pendente", label: "Pagamento pendente/atrasado" },
+    { id: "planilha_vencendo", label: "Planilha expirando" },
+    { id: "planilha_vencida", label: "Planilha vencida" },
+    { id: "feedback_nao_respondido", label: "Feedback sem resposta" },
+    { id: "mensagem_nao_lida", label: "Mensagem não lida" },
+  ];
+  const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>(() => {
+    try {
+      const raw = localStorage.getItem(NOTIF_PREFS_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return Object.fromEntries(NOTIF_TYPES.map((n) => [n.id, true]));
+  });
+  const [openNotifSettings, setOpenNotifSettings] = useState(false);
+  const toggleNotifPref = (id: string) => {
+    setNotifPrefs((prev) => {
+      const next = { ...prev, [id]: !prev[id] };
+      try {
+        localStorage.setItem(NOTIF_PREFS_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
   // 🔧 Persistir filtros sempre que mudarem
   useEffect(() => {
     try {

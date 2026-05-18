@@ -498,6 +498,7 @@ export default function AlunosManager() {
                 </div>
               </DialogContent>
             </Dialog>
+            </div>
           </div>
         </div>
       </header>

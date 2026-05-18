@@ -73,6 +73,8 @@ interface GroupedExerciseCardProps {
     grupoId: string,
     concluido: boolean
   ) => Promise<void> | void;
+  dragListeners?: any;
+  dragAttributes?: any;
 }
 
 export function GroupedExerciseCard({
@@ -83,6 +85,8 @@ export function GroupedExerciseCard({
   onDelete,
   onToggleConcluido,
   onToggleGrupoConcluido,
+  dragListeners,
+  dragAttributes,
 }: GroupedExerciseCardProps) {
   // Estado local para updates otimistas
   const [localExercicios, setLocalExercicios] = useState<ExercicioAgrupado[]>(
@@ -234,7 +238,14 @@ export function GroupedExerciseCard({
             {/* Grip + Número (apenas para Personal) */}
             <div className="flex flex-col items-center gap-1 pt-1">
               {!readOnly && (
-                <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+                <div
+                  {...dragListeners}
+                  {...dragAttributes}
+                  className="cursor-grab active:cursor-grabbing touch-none p-1 -m-1"
+                  title="Arrastar para reordenar"
+                >
+                  <GripVertical className="h-4 w-4 text-muted-foreground" />
+                </div>
               )}
               <Badge variant="outline" className="text-xs font-mono">
                 {index + 1}

@@ -45,6 +45,8 @@ interface WorkoutBlockCardProps {
   onDelete?: () => void;
   onToggleConcluido?: (id: string, concluido: boolean) => void;
   onSaveAsTemplate?: (bloco: BlocoTreino, nome: string) => Promise<unknown>;
+  dragListeners?: any;
+  dragAttributes?: any;
 }
 
 export function WorkoutBlockCard({
@@ -55,6 +57,8 @@ export function WorkoutBlockCard({
   onDelete,
   onToggleConcluido,
   onSaveAsTemplate,
+  dragListeners,
+  dragAttributes,
 }: WorkoutBlockCardProps) {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [templateName, setTemplateName] = useState(bloco.nome);
@@ -153,7 +157,14 @@ export function WorkoutBlockCard({
             {/* Grip + Checkbox/Index */}
             <div className="flex flex-col items-center gap-1 pt-1">
               {!readOnly && (
-                <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+                <div
+                  {...dragListeners}
+                  {...dragAttributes}
+                  className="cursor-grab active:cursor-grabbing touch-none p-1 -m-1"
+                  title="Arrastar para reordenar"
+                >
+                  <GripVertical className="h-4 w-4 text-muted-foreground" />
+                </div>
               )}
 
               {readOnly && onToggleConcluido ? (

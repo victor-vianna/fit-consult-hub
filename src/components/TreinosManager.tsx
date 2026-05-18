@@ -264,10 +264,18 @@ export function TreinosManager({
     enabled: true,
   });
 
-  const [exercicioDialogOpen, setExercicioDialogOpen] = useState(false);
+  const [exercicioDialogOpen, setExercicioDialogOpen] = usePersistedState<boolean>(
+    `tm-exdlg-open:${profileId}`,
+    false,
+    { storage: "session" }
+  );
   const [editDescricaoOpen, setEditDescricaoOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [selectedDia, setSelectedDia] = useState<number | null>(null);
+  const [selectedDia, setSelectedDia] = usePersistedState<number | null>(
+    `tm-exdlg-dia:${profileId}`,
+    null,
+    { storage: "session" }
+  );
   const [exercicioEditando, setExercicioEditando] =
     useState<DialogExercicio | null>(null);
   const [descricaoEditando, setDescricaoEditando] = useState("");
@@ -1788,6 +1796,7 @@ export function TreinosManager({
           diaNome={
             selectedDia !== null ? diasSemana[selectedDia - 1].nome : undefined
           }
+          draftKey={`${profileId}:${selectedDia ?? "x"}`}
         />
 
         <Dialog open={editDescricaoOpen} onOpenChange={setEditDescricaoOpen}>

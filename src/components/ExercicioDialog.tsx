@@ -82,6 +82,7 @@ interface ExercicioDialogProps {
   exercicio?: ExercicioItem | null;
   grupoEditando?: GrupoEditando | null;
   diaNome?: string;
+  draftKey?: string;
 }
 
 const defaultExercicio = (): Omit<ExercicioItem, "id"> => ({
@@ -103,6 +104,7 @@ export function ExercicioDialog({
   exercicio,
   grupoEditando,
   diaNome,
+  draftKey,
 }: ExercicioDialogProps) {
   // Modo: "simple" ou "group"
   const [modo, setModo] = useState<"simple" | "group">("simple");
@@ -120,6 +122,9 @@ export function ExercicioDialog({
   const [pickerTargetIndex, setPickerTargetIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const isNewSimple = !exercicio && !grupoEditando;
+  const storageKey = draftKey ? `pf:exdlg-draft:${draftKey}:v1` : null;
 
   // Preenche o form ao abrir
   useEffect(() => {
@@ -154,15 +159,57 @@ export function ExercicioDialog({
           observacoes: exercicio.observacoes || "",
         });
       } else {
-        setModo("simple");
-        setFormData(defaultExercicio());
-        setGrupoExercicios([]);
-        setTipoAgrupamento("bi-set");
-        setDescansoEntreGrupos(90);
+        // Novo: tentar restaurar rascunho da sessionStorage
+        let restored = false;
+        if (storageKey) {
+          try {
+            const raw = sessionStorage.getItem(storageKey);
+            if (raw) {
+              const draft = JSON.parse(raw);
+              setModo(draft.modo || "simple");
+              setFormData(draft.formData || defaultExercicio());
+              setGrupoExercicios(draft.grupoExercicios || []);
+              setTipoAgrupamento(draft.tipoAgrupamento || "bi-set");
+              setDescansoEntreGrupos(draft.descansoEntreGrupos ?? 90);
+              restored = true;
+            }
+          } catch {
+            // ignora
+          }
+        }
+        if (!restored) {
+          setModo("simple");
+          setFormData(defaultExercicio());
+          setGrupoExercicios([]);
+          setTipoAgrupamento("bi-set");
+          setDescansoEntreGrupos(90);
+        }
       }
       setErrors({});
     }
   }, [open, exercicio, grupoEditando]);
+
+  // Auto-save rascunho enquanto o dialog está aberto (apenas em criação)
+  useEffect(() => {
+    if (!open || !storageKey || !isNewSimple) return;
+    try {
+      sessionStorage.setItem(
+        storageKey,
+        JSON.stringify({ modo, formData, grupoExercicios, tipoAgrupamento, descansoEntreGrupos })
+      );
+    } catch {
+      // ignora quota
+    }
+  }, [open, storageKey, isNewSimple, modo, formData, grupoExercicios, tipoAgrupamento, descansoEntreGrupos]);
+
+  const clearDraft = () => {
+    if (!storageKey) return;
+    try {
+      sessionStorage.removeItem(storageKey);
+    } catch {
+      // ignora
+    }
+  };
 
   // Validação
   const validarExercicio = (ex: Omit<ExercicioItem, "id">, prefix = ""): Record<string, string> => {
@@ -219,6 +266,7 @@ export function ExercicioDialog({
           exercicios: grupoExercicios,
         });
       }
+      clearDraft();
       onOpenChange(false);
     } catch (error) {
       console.error("Erro ao salvar exercício:", error);
@@ -528,7 +576,10 @@ export function ExercicioDialog({
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => {
+                clearDraft();
+                onOpenChange(false);
+              }}
               disabled={loading}
             >
               Cancelar

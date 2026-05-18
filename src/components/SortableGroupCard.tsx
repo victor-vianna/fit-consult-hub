@@ -49,7 +49,7 @@ export function SortableGroupCard({
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...(readOnly ? {} : { ...attributes, ...listeners })}>
+    <div ref={setNodeRef} style={style}>
       <GroupedExerciseCard
         grupo={grupo}
         index={index}
@@ -58,6 +58,8 @@ export function SortableGroupCard({
         onDelete={onDelete}
         onToggleConcluido={onToggleConcluido}
         onToggleGrupoConcluido={onToggleGrupoConcluido}
+        dragListeners={readOnly ? undefined : listeners}
+        dragAttributes={readOnly ? undefined : attributes}
       />
     </div>
   );

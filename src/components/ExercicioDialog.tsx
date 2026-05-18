@@ -104,6 +104,7 @@ export function ExercicioDialog({
   exercicio,
   grupoEditando,
   diaNome,
+  draftKey,
 }: ExercicioDialogProps) {
   // Modo: "simple" ou "group"
   const [modo, setModo] = useState<"simple" | "group">("simple");

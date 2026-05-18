@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, ChevronRight, CreditCard, MessageSquare, Calendar, AlertCircle } from "lucide-react";
+import { AlertTriangle, ChevronRight, CreditCard, MessageSquare, Calendar, AlertCircle, FileWarning } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { PriorityFlag, PriorityStudent } from "@/hooks/usePriorityStudents";
@@ -18,6 +18,8 @@ const ICON_BY_REASON: Record<PriorityFlag["reason"], React.ComponentType<{ class
   pagamento_pendente: CreditCard,
   feedback_nao_respondido: MessageSquare,
   mensagem_nao_lida: MessageSquare,
+  planilha_vencendo: FileWarning,
+  planilha_vencida: FileWarning,
 };
 
 function FlagBadge({ flag }: { flag: PriorityFlag }) {

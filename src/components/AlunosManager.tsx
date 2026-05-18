@@ -716,7 +716,7 @@ export default function AlunosManager() {
                           });
                         }
                         const flagIcon: Record<string, any> = {
-                          plano_vencendo: Calendar => Calendar,
+                          plano_vencendo: Calendar,
                           plano_vencido: AlertTriangle,
                           pagamento_pendente: CreditCard,
                           planilha_vencendo: FileWarning,

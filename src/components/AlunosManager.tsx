@@ -601,10 +601,10 @@ export default function AlunosManager() {
                     </Popover>
                   </div>
 
-                  <CardContent className="pt-6 pl-5 pr-3">
+                  <CardContent className="pt-10 pl-4 sm:pl-5 pr-3 pb-4">
                     <div className="space-y-3">
                       <div>
-                        <h3 className="font-bold text-base leading-tight pr-20 group-hover:text-primary transition-colors truncate">
+                        <h3 className="font-bold text-base leading-tight pr-2 group-hover:text-primary transition-colors truncate">
                           {aluno.nome}
                         </h3>
                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">

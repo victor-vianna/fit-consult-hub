@@ -379,7 +379,42 @@ export default function AlunosManager() {
               </p>
             </div>
 
-            <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+            <div className="flex items-center gap-2">
+              <Dialog open={openNotifSettings} onOpenChange={setOpenNotifSettings}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="default" title="Gerenciar notificações dos cards">
+                    <SettingsIcon className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Notificações</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Notificações exibidas nos cards</DialogTitle>
+                  </DialogHeader>
+                  <p className="text-sm text-muted-foreground">
+                    Selecione quais informações devem aparecer ao clicar em "Notificações" no card de cada aluno.
+                  </p>
+                  <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                    {NOTIF_TYPES.map((t) => (
+                      <div
+                        key={t.id}
+                        className="flex items-center justify-between gap-3 p-2 rounded-md hover:bg-muted/40"
+                      >
+                        <Label htmlFor={`notif-${t.id}`} className="text-sm font-normal cursor-pointer">
+                          {t.label}
+                        </Label>
+                        <Switch
+                          id={`notif-${t.id}`}
+                          checked={!!notifPrefs[t.id]}
+                          onCheckedChange={() => toggleNotifPref(t.id)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={openDialog} onOpenChange={setOpenDialog}>
               <DialogTrigger asChild>
                 <Button
                   size="default"

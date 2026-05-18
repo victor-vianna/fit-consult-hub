@@ -219,8 +219,19 @@ export function SubscriptionManager({
     setSubscriptionToDelete(null);
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+  const getStatusBadge = (sub: Subscription) => {
+    const expirada = new Date(sub.data_expiracao) < new Date();
+    // Se a assinatura está marcada como paga mas a data já passou,
+    // exibe "Não renovado" em vez de "Pago".
+    if (sub.status_pagamento === "pago" && expirada) {
+      return (
+        <Badge className="bg-orange-500">
+          <AlertCircle className="h-3 w-3 mr-1" />
+          Não renovado
+        </Badge>
+      );
+    }
+    switch (sub.status_pagamento) {
       case "pago":
         return (
           <Badge className="bg-green-500">

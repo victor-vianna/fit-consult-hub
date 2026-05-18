@@ -85,6 +85,8 @@ export function GroupedExerciseCard({
   onDelete,
   onToggleConcluido,
   onToggleGrupoConcluido,
+  dragListeners,
+  dragAttributes,
 }: GroupedExerciseCardProps) {
   // Estado local para updates otimistas
   const [localExercicios, setLocalExercicios] = useState<ExercicioAgrupado[]>(

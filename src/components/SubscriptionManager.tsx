@@ -396,7 +396,7 @@ export function SubscriptionManager({
                         <span className="font-semibold capitalize">
                           {sub.plano}
                         </span>
-                        {getStatusBadge(sub.status_pagamento)}
+                        {getStatusBadge(sub)}
                       </div>
                       <p className="text-sm text-muted-foreground">
                         R$ {sub.valor.toFixed(2)}

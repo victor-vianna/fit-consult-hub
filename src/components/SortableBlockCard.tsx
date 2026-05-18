@@ -42,7 +42,7 @@ export function SortableBlockCard({
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...(readOnly ? {} : { ...attributes, ...listeners })}>
+    <div ref={setNodeRef} style={style}>
       <WorkoutBlockCard
         bloco={bloco}
         index={index}
@@ -51,6 +51,8 @@ export function SortableBlockCard({
         onDelete={onDelete}
         onToggleConcluido={onToggleConcluido}
         onSaveAsTemplate={onSaveAsTemplate}
+        dragListeners={readOnly ? undefined : listeners}
+        dragAttributes={readOnly ? undefined : attributes}
       />
     </div>
   );

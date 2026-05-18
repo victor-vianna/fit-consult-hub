@@ -471,11 +471,11 @@ export default function AlunoDetalhes() {
             <div className="flex items-center justify-between">
               <Button
                 variant="ghost"
-                onClick={() => navigate("/")}
+                onClick={() => navigate("/alunos")}
                 className="hover:bg-accent/50"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                {isMobile ? "Voltar" : "Voltar ao Dashboard"}
+                {isMobile ? "Voltar" : "Voltar para Meus Alunos"}
               </Button>
 
               {!isMobile && (

@@ -149,7 +149,8 @@ export function ExercicioCard({
               <div
                 {...dragListeners}
                 {...dragAttributes}
-                className="cursor-grab active:cursor-grabbing"
+                className="cursor-grab active:cursor-grabbing touch-none p-1 -m-1"
+                title="Arrastar para reordenar"
               >
                 <GripVertical className="h-4 w-4 text-muted-foreground" />
               </div>

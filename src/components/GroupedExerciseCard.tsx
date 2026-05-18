@@ -73,6 +73,8 @@ interface GroupedExerciseCardProps {
     grupoId: string,
     concluido: boolean
   ) => Promise<void> | void;
+  dragListeners?: any;
+  dragAttributes?: any;
 }
 
 export function GroupedExerciseCard({

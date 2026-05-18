@@ -51,7 +51,14 @@ import {
   AlertTriangle,
   Flame,
   Clock,
+  FileWarning,
+  Palette,
 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 
 import { AppLayout } from "@/components/AppLayout";

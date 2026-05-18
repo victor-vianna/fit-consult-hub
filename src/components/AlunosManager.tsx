@@ -111,6 +111,27 @@ export default function AlunosManager() {
   const { flagsByStudent } = usePriorityStudents(user?.id);
   const { statusByAluno } = useAlunosQuickStatus(user?.id);
 
+  // 🎨 Cores customizadas por aluno (persistidas em localStorage)
+  const COLOR_KEY = "alunos-card-colors";
+  const [coresCustom, setCoresCustom] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(COLOR_KEY) || "{}");
+    } catch {
+      return {};
+    }
+  });
+  const setCorAluno = (id: string, cor: string | null) => {
+    setCoresCustom((prev) => {
+      const next = { ...prev };
+      if (!cor) delete next[id];
+      else next[id] = cor;
+      try {
+        localStorage.setItem(COLOR_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
   // 🔧 Persistir filtros sempre que mudarem
   useEffect(() => {
     try {

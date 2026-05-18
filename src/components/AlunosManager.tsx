@@ -51,6 +51,7 @@ import {
   AlertTriangle,
   Flame,
   Clock,
+  Calendar,
   FileWarning,
   Palette,
   Bell,

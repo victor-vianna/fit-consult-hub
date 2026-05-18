@@ -266,6 +266,7 @@ export function ExercicioDialog({
           exercicios: grupoExercicios,
         });
       }
+      clearDraft();
       onOpenChange(false);
     } catch (error) {
       console.error("Erro ao salvar exercício:", error);

@@ -167,14 +167,46 @@ export function SubscriptionManager({
   const handleUpdateSubscription = async () => {
     if (!subscriptionToEdit || !editValor) return;
 
+    const novaDataPagamento = editDataPagamento
+      ? new Date(editDataPagamento).toISOString()
+      : null;
+
     await updateSubscription(subscriptionToEdit.id, {
       plano: editPlano as any,
       valor: parseFloat(editValor),
       data_expiracao: new Date(editDataExpiracao).toISOString(),
-      data_pagamento: editDataPagamento ? new Date(editDataPagamento).toISOString() : null,
+      data_pagamento: novaDataPagamento,
       status_pagamento: editStatus as any,
       observacoes: editObservacoes || null,
     });
+
+    // Se o status passou a "pago" e há data de pagamento informada, garantir
+    // que exista um registro correspondente no histórico de pagamentos.
+    if (editStatus === "pago" && novaDataPagamento) {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const dataDia = novaDataPagamento.split("T")[0];
+        const { data: existentes } = await supabase
+          .from("payment_history")
+          .select("id, data_pagamento")
+          .eq("subscription_id", subscriptionToEdit.id);
+        const jaExiste = (existentes ?? []).some(
+          (p) => (p.data_pagamento || "").split("T")[0] === dataDia
+        );
+        if (!jaExiste) {
+          await supabase.from("payment_history").insert({
+            subscription_id: subscriptionToEdit.id,
+            student_id: subscriptionToEdit.student_id,
+            personal_id: subscriptionToEdit.personal_id,
+            valor: parseFloat(editValor),
+            data_pagamento: novaDataPagamento,
+            observacoes: editObservacoes || "Pagamento registrado via edição da assinatura",
+          });
+        }
+      } catch (e) {
+        console.error("Falha ao sincronizar histórico de pagamentos:", e);
+      }
+    }
 
     setEditDialogOpen(false);
     setSubscriptionToEdit(null);

@@ -66,10 +66,25 @@ const STATUS_META: Record<
 export function AccessControlPanel({ studentId, studentName }: Props) {
   const { status, lastLog, logs, loading, mutate, isMutating, profile } =
     useStudentAccess(studentId);
+  const { allowed: platformAllowed, loading: accessLoading } =
+    usePlatformAccess(studentId);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  const meta = STATUS_META[status];
+  // Quando o controle manual está "ativo" mas o RPC bloqueia (por
+  // pagamento expirado/ausente), exibimos um estado dedicado.
+  const bloqueadoPorPagamento =
+    status === "ativo" && !accessLoading && platformAllowed === false;
+
+  const meta = bloqueadoPorPagamento
+    ? {
+        label: "Inativo - Sem pagamento",
+        icon: ShieldAlert,
+        classes:
+          "text-destructive bg-destructive/10 border-destructive/30",
+        desc: "O aluno está bloqueado porque não há assinatura paga e ativa. Registre o pagamento ou ajuste a regra de acesso por pagamento.",
+      }
+    : STATUS_META[status];
   const StatusIcon = meta.icon;
 
   const motivoLabel =

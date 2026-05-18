@@ -576,7 +576,10 @@ export function ExercicioDialog({
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => {
+                clearDraft();
+                onOpenChange(false);
+              }}
               disabled={loading}
             >
               Cancelar

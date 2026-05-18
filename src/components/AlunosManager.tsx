@@ -520,17 +520,23 @@ export default function AlunosManager() {
         </Card>
 
         {alunosFiltrados.length > 0 ? (
-          <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {alunosFiltrados.map((aluno) => {
               const flags = flagsByStudent[aluno.id] || [];
               const hasHighPriority = flags.some((f) => f.severity === "alta");
+              const hasPlanilha = flags.some(
+                (f) => f.reason === "planilha_vencendo" || f.reason === "planilha_vencida"
+              );
               const hasPriority = flags.length > 0;
               const status = statusByAluno[aluno.id];
+              const corCustom = coresCustom[aluno.id];
 
-              const prioridade: "bloqueado" | "urgente" | "importante" | "ativo" = !aluno.is_active
+              const prioridade: "bloqueado" | "urgente" | "atencao" | "importante" | "ativo" = !aluno.is_active
                 ? "bloqueado"
                 : hasHighPriority
                 ? "urgente"
+                : hasPlanilha
+                ? "atencao"
                 : hasPriority
                 ? "importante"
                 : "ativo";
@@ -538,25 +544,61 @@ export default function AlunosManager() {
               const prioridadeStyles = {
                 bloqueado: { ring: "border-muted", bar: "bg-muted-foreground", chip: "bg-muted text-muted-foreground", icon: UserX, label: "Bloqueado" },
                 urgente:   { ring: "border-destructive/50 ring-1 ring-destructive/20", bar: "bg-destructive", chip: "bg-destructive text-destructive-foreground", icon: Flame, label: "Urgente" },
+                atencao:   { ring: "border-yellow-500/60 ring-1 ring-yellow-500/20", bar: "bg-yellow-500", chip: "bg-yellow-500 text-black", icon: FileWarning, label: "Atenção" },
                 importante:{ ring: "border-orange-500/50", bar: "bg-orange-500", chip: "bg-orange-500 text-white", icon: AlertTriangle, label: "Importante" },
                 ativo:     { ring: "", bar: "bg-green-500", chip: "bg-green-600 text-white", icon: UserCheck, label: "Ativo" },
               }[prioridade];
 
               const PrioIcon = prioridadeStyles.icon;
+              const corPalette = ["#ef4444", "#f59e0b", "#eab308", "#22c55e", "#06b6d4", "#3b82f6", "#a855f7", "#ec4899"];
 
               return (
                 <Card
                   key={aluno.id}
-                  className={`group hover:shadow-xl transition-all duration-300 border-2 cursor-pointer relative overflow-hidden touch-target ${prioridadeStyles.ring}`}
+                  className={`group hover:shadow-xl transition-all duration-300 border-2 cursor-pointer relative overflow-hidden touch-target ${corCustom ? "" : prioridadeStyles.ring}`}
+                  style={corCustom ? { borderColor: corCustom, boxShadow: `0 0 0 1px ${corCustom}33` } : undefined}
                   onClick={() => navigate(`/aluno/${aluno.id}`)}
                 >
-                  <div className={`absolute left-0 top-0 bottom-0 w-1 ${prioridadeStyles.bar}`} />
+                  <div
+                    className={`absolute left-0 top-0 bottom-0 w-1 ${corCustom ? "" : prioridadeStyles.bar}`}
+                    style={corCustom ? { backgroundColor: corCustom } : undefined}
+                  />
 
-                  <div className="absolute top-3 right-3 z-10">
+                  <div className="absolute top-2 right-2 z-10 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     <Badge className={`${prioridadeStyles.chip} gap-1 text-[10px] py-0.5 px-2`}>
                       <PrioIcon className="h-3 w-3" />
                       {prioridadeStyles.label}
                     </Badge>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" title="Personalizar cor">
+                          <Palette className="h-3.5 w-3.5" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-2" align="end">
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {corPalette.map((c) => (
+                            <button
+                              key={c}
+                              onClick={() => setCorAluno(aluno.id, c)}
+                              className="h-6 w-6 rounded-full border-2 border-background hover:scale-110 transition-transform"
+                              style={{ backgroundColor: c }}
+                              aria-label={`Cor ${c}`}
+                            />
+                          ))}
+                        </div>
+                        {corCustom && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full mt-2 h-7 text-xs"
+                            onClick={() => setCorAluno(aluno.id, null)}
+                          >
+                            Remover cor
+                          </Button>
+                        )}
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
                   <CardContent className="pt-6 pl-5 pr-3">

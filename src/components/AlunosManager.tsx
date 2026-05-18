@@ -686,40 +686,115 @@ export default function AlunosManager() {
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap gap-1.5">
-                        <Badge
-                          variant="outline"
-                          className={`gap-1 text-[10px] py-0 h-5 ${status?.treinouHoje ? "border-green-500/50 text-green-700 dark:text-green-400" : ""}`}
-                        >
-                          <Dumbbell className="h-3 w-3" />
-                          {status?.treinouHoje ? "Treinou hoje" : "Sem treino hoje"}
-                        </Badge>
+                      {(() => {
+                        // Montar lista de notificações ativas conforme preferências
+                        type Item = { id: string; label: string; detail?: string; tone: "ok" | "info" | "warn" | "alert"; icon: any };
+                        const items: Item[] = [];
+                        if (notifPrefs.treino_hoje) {
+                          items.push({
+                            id: "treino_hoje",
+                            label: status?.treinouHoje ? "Treinou hoje" : "Sem treino hoje",
+                            tone: status?.treinouHoje ? "ok" : "info",
+                            icon: Dumbbell,
+                          });
+                        }
+                        if (notifPrefs.dias_ultimo_treino && status?.diasDesdeUltimoTreino != null) {
+                          items.push({
+                            id: "dias_ultimo_treino",
+                            label: status.diasDesdeUltimoTreino === 0 ? "Ativo hoje" : `Último treino há ${status.diasDesdeUltimoTreino}d`,
+                            tone: "info",
+                            icon: Activity,
+                          });
+                        }
+                        if (notifPrefs.semana_treinos && status && status.totalSemana > 0) {
+                          items.push({
+                            id: "semana_treinos",
+                            label: `${status.concluidosSemana}/${status.totalSemana} treinos na semana`,
+                            tone: "info",
+                            icon: Clock,
+                          });
+                        }
+                        const flagIcon: Record<string, any> = {
+                          plano_vencendo: Calendar => Calendar,
+                          plano_vencido: AlertTriangle,
+                          pagamento_pendente: CreditCard,
+                          planilha_vencendo: FileWarning,
+                          planilha_vencida: FileWarning,
+                          feedback_nao_respondido: MessageSquare,
+                          mensagem_nao_lida: MessageSquare,
+                        };
+                        flags.forEach((f) => {
+                          if (!notifPrefs[f.reason]) return;
+                          items.push({
+                            id: f.reason,
+                            label: f.label,
+                            detail: f.detail,
+                            tone: f.severity === "alta" ? "alert" : "warn",
+                            icon: flagIcon[f.reason] || AlertTriangle,
+                          });
+                        });
 
-                        {status?.diasDesdeUltimoTreino !== null && status?.diasDesdeUltimoTreino !== undefined && (
-                          <Badge variant="outline" className="gap-1 text-[10px] py-0 h-5">
-                            <Activity className="h-3 w-3" />
-                            {status.diasDesdeUltimoTreino === 0 ? "Ativo hoje" : `há ${status.diasDesdeUltimoTreino}d`}
-                          </Badge>
-                        )}
+                        const toneClass: Record<Item["tone"], string> = {
+                          ok: "text-green-700 dark:text-green-400",
+                          info: "text-muted-foreground",
+                          warn: "text-orange-600 dark:text-orange-400",
+                          alert: "text-destructive",
+                        };
+                        const count = items.length;
+                        const hasAlert = items.some((i) => i.tone === "alert");
+                        const hasWarn = items.some((i) => i.tone === "warn");
 
-                        {status && status.totalSemana > 0 && (
-                          <Badge variant="outline" className="gap-1 text-[10px] py-0 h-5">
-                            <Clock className="h-3 w-3" />
-                            {status.concluidosSemana}/{status.totalSemana} sem.
-                          </Badge>
-                        )}
-
-                        {flags.slice(0, 2).map((f, i) => (
-                          <Badge
-                            key={i}
-                            variant={f.severity === "alta" ? "destructive" : "secondary"}
-                            className="text-[10px] py-0 h-5"
-                          >
-                            {f.label}
-                            {f.detail && ` · ${f.detail}`}
-                          </Badge>
-                        ))}
-                      </div>
+                        return (
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className={`w-full justify-start gap-2 h-8 ${
+                                    hasAlert ? "border-destructive/40" : hasWarn ? "border-orange-500/40" : ""
+                                  }`}
+                                >
+                                  <Bell className={`h-3.5 w-3.5 ${hasAlert ? "text-destructive" : hasWarn ? "text-orange-500" : ""}`} />
+                                  <span className="text-xs">Notificações</span>
+                                  <Badge
+                                    variant={hasAlert ? "destructive" : "secondary"}
+                                    className="ml-auto h-4 px-1.5 text-[10px]"
+                                  >
+                                    {count}
+                                  </Badge>
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-72 p-0" align="start">
+                                <div className="p-3 border-b">
+                                  <p className="text-sm font-semibold">Notificações de {aluno.nome.split(" ")[0]}</p>
+                                  <p className="text-xs text-muted-foreground">{count} item{count === 1 ? "" : "s"}</p>
+                                </div>
+                                <div className="max-h-72 overflow-y-auto">
+                                  {count === 0 ? (
+                                    <p className="p-4 text-sm text-muted-foreground text-center">Nenhuma notificação ativa</p>
+                                  ) : (
+                                    items.map((it, i) => {
+                                      const Icon = it.icon;
+                                      return (
+                                        <div key={`${it.id}-${i}`} className="flex items-start gap-2 px-3 py-2 border-b last:border-0">
+                                          <Icon className={`h-4 w-4 mt-0.5 flex-shrink-0 ${toneClass[it.tone]}`} />
+                                          <div className="flex-1 min-w-0">
+                                            <p className={`text-xs font-medium ${toneClass[it.tone]}`}>{it.label}</p>
+                                            {it.detail && (
+                                              <p className="text-[11px] text-muted-foreground">{it.detail}</p>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })
+                                  )}
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        );
+                      })()}
 
                       <div
                         className="pt-3 flex gap-2 border-t"

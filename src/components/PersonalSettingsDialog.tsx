@@ -148,7 +148,7 @@ export function PersonalSettingsDialog({ personalId }: Props) {
           Personalizar
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Personalização do Dashboard</DialogTitle>
         </DialogHeader>

@@ -8,7 +8,9 @@ export type PriorityReason =
   | "plano_vencido"
   | "pagamento_pendente"
   | "feedback_nao_respondido"
-  | "mensagem_nao_lida";
+  | "mensagem_nao_lida"
+  | "planilha_vencendo"
+  | "planilha_vencida";
 
 export interface PriorityFlag {
   reason: PriorityReason;

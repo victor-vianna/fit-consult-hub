@@ -64,6 +64,7 @@ export function WorkoutBlockCard({
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [templateName, setTemplateName] = useState(bloco.nome);
   const [isSaving, setIsSaving] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const tipoConfig = TIPOS_BLOCO[bloco.tipo];
   const cor = getCorTipoBloco(bloco.tipo);
   const tipoChave = bloco.tipo as TipoBloco;

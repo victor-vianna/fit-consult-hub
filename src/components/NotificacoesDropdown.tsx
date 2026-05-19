@@ -46,6 +46,14 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
     alunoId: string;
     alunoNome: string;
   }>({ open: false, feedbackId: null, alunoId: "", alunoNome: "" });
+  const [treinoFeedbackModal, setTreinoFeedbackModal] = useState<{
+    open: boolean;
+    alunoId: string;
+    alunoNome: string;
+    rating: number | null;
+    comentario: string | null;
+    treinoId: string | null;
+  }>({ open: false, alunoId: "", alunoNome: "", rating: null, comentario: null, treinoId: null });
 
   const getIcone = (tipo: string) => {
     switch (tipo) {

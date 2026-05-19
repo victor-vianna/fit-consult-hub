@@ -470,12 +470,14 @@ export function WorkoutBlockCard({
               size="icon"
               variant="ghost"
               onClick={() => setExpanded((v) => !v)}
-              className="shrink-0 h-10 w-10 md:h-9 md:w-9"
+              aria-expanded={expanded}
+              aria-label={expanded ? "Recolher" : "Expandir"}
+              className="shrink-0 h-11 w-11 min-h-[44px] min-w-[44px]"
               title={expanded ? "Recolher" : "Expandir"}
             >
               <ChevronDown
                 className={cn(
-                  "h-5 w-5 md:h-4 md:w-4 transition-transform",
+                  "h-5 w-5 transition-transform duration-200",
                   expanded && "rotate-180"
                 )}
               />

@@ -157,7 +157,20 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
     const alunoId = getAlunoId(n);
     const alunoNome = getAlunoNome(n) || "Aluno";
 
-    // Feedback → abre modal
+    // Feedback de treino → modal dedicado com rating/comentário inline
+    if (n.tipo === "feedback_treino" && alunoId) {
+      setTreinoFeedbackModal({
+        open: true,
+        alunoId,
+        alunoNome,
+        rating: n.dados?.rating ?? null,
+        comentario: n.dados?.comentario ?? null,
+        treinoId: n.dados?.treino_id ?? null,
+      });
+      return;
+    }
+
+    // Feedback semanal / check-in → abre modal
     if (FEEDBACK_TYPES.includes(n.tipo) && alunoId) {
       const feedbackId = n.dados?.checkin_id || n.dados?.feedback_id || null;
       if (feedbackId) {

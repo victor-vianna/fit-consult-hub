@@ -229,6 +229,7 @@ export function WorkoutBlockCard({
               )}
 
               {/* Detalhes por tipo */}
+              {(!readOnly || expanded) && (
               <div className="space-y-2">
                 {/* CARDIO */}
                 {bloco.tipo === "cardio" && bloco.config_cardio && (

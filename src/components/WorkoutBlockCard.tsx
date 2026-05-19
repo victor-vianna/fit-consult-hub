@@ -464,6 +464,24 @@ export function WorkoutBlockCard({
           </div>
 
 
+          {/* Botão expandir (aluno) */}
+          {readOnly && !bloco.concluido && (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setExpanded((v) => !v)}
+              className="shrink-0 h-10 w-10 md:h-9 md:w-9"
+              title={expanded ? "Recolher" : "Expandir"}
+            >
+              <ChevronDown
+                className={cn(
+                  "h-5 w-5 md:h-4 md:w-4 transition-transform",
+                  expanded && "rotate-180"
+                )}
+              />
+            </Button>
+          )}
+
           {/* Ações (só para Personal) */}
           {!readOnly && (
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

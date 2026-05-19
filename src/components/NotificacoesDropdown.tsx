@@ -18,12 +18,13 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { FeedbackDetailModal } from "@/components/dashboard/FeedbackDetailModal";
+import { TreinoFeedbackModal } from "@/components/dashboard/TreinoFeedbackModal";
 
 interface NotificacoesDropdownProps {
   userId: string;
 }
 
-const FEEDBACK_TYPES = ["feedback_semanal", "checkin_semanal", "feedback_treino"];
+const FEEDBACK_TYPES = ["feedback_semanal", "checkin_semanal"];
 
 export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
   const navigate = useNavigate();
@@ -45,6 +46,14 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
     alunoId: string;
     alunoNome: string;
   }>({ open: false, feedbackId: null, alunoId: "", alunoNome: "" });
+  const [treinoFeedbackModal, setTreinoFeedbackModal] = useState<{
+    open: boolean;
+    alunoId: string;
+    alunoNome: string;
+    rating: number | null;
+    comentario: string | null;
+    treinoId: string | null;
+  }>({ open: false, alunoId: "", alunoNome: "", rating: null, comentario: null, treinoId: null });
 
   const getIcone = (tipo: string) => {
     switch (tipo) {
@@ -148,7 +157,20 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
     const alunoId = getAlunoId(n);
     const alunoNome = getAlunoNome(n) || "Aluno";
 
-    // Feedback → abre modal
+    // Feedback de treino → modal dedicado com rating/comentário inline
+    if (n.tipo === "feedback_treino" && alunoId) {
+      setTreinoFeedbackModal({
+        open: true,
+        alunoId,
+        alunoNome,
+        rating: n.dados?.rating ?? null,
+        comentario: n.dados?.comentario ?? null,
+        treinoId: n.dados?.treino_id ?? null,
+      });
+      return;
+    }
+
+    // Feedback semanal / check-in → abre modal
     if (FEEDBACK_TYPES.includes(n.tipo) && alunoId) {
       const feedbackId = n.dados?.checkin_id || n.dados?.feedback_id || null;
       if (feedbackId) {
@@ -364,6 +386,20 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
         alunoNome={feedbackModal.alunoNome}
         personalId={userId}
         themeColor={settings?.theme_color}
+      />
+
+      <TreinoFeedbackModal
+        open={treinoFeedbackModal.open}
+        onOpenChange={(open) =>
+          setTreinoFeedbackModal((prev) => ({ ...prev, open }))
+        }
+        alunoId={treinoFeedbackModal.alunoId}
+        alunoNome={treinoFeedbackModal.alunoNome}
+        personalId={userId}
+        themeColor={settings?.theme_color}
+        rating={treinoFeedbackModal.rating}
+        comentario={treinoFeedbackModal.comentario}
+        treinoId={treinoFeedbackModal.treinoId}
       />
     </>
   );

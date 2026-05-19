@@ -98,81 +98,81 @@ export function CalendarioTreinosMensal({
   return (
     <>
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+        <CardHeader className="pb-3 space-y-3">
+          <div className="flex items-center justify-between gap-2">
             <CardTitle
-              className="text-2xl md:text-xl"
+              className="text-base md:text-lg"
               style={{ color: themeColor || undefined }}
             >
               Histórico de Treinos
             </CardTitle>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="icon" 
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="icon"
                 onClick={mesAnterior}
-                className="h-10 w-10 md:h-9 md:w-9 touch-target"
+                className="h-8 w-8"
               >
-                <ChevronLeft className="h-5 w-5 md:h-4 md:w-4" />
+                <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="font-semibold min-w-[150px] text-center capitalize text-base md:text-sm">
+              <span className="font-semibold min-w-[110px] text-center capitalize text-xs md:text-sm">
                 {format(mesAtual, "MMMM yyyy", { locale: ptBR })}
               </span>
-              <Button 
-                variant="outline" 
-                size="icon" 
+              <Button
+                variant="outline"
+                size="icon"
                 onClick={proximoMes}
-                className="h-10 w-10 md:h-9 md:w-9 touch-target"
+                className="h-8 w-8"
               >
-                <ChevronRight className="h-5 w-5 md:h-4 md:w-4" />
+                <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
 
-          {/* Estatísticas */}
-          <div className="grid grid-cols-3 gap-4 md:gap-3 mt-4">
-            <div className="text-center p-4 md:p-3 bg-muted rounded-lg">
-              <div className="text-3xl md:text-2xl font-bold">{stats.total}</div>
-              <div className="text-sm md:text-xs text-muted-foreground">
-                Treinos Planejados
+          {/* Estatísticas compactas */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="text-center p-1.5 bg-muted rounded-md">
+              <div className="text-base md:text-lg font-bold leading-tight">{stats.total}</div>
+              <div className="text-[10px] md:text-xs text-muted-foreground leading-tight">
+                Planejados
               </div>
             </div>
-            <div className="text-center p-4 md:p-3 bg-muted rounded-lg">
+            <div className="text-center p-1.5 bg-muted rounded-md">
               <div
-                className="text-3xl md:text-2xl font-bold"
+                className="text-base md:text-lg font-bold leading-tight"
                 style={{ color: themeColor || undefined }}
               >
                 {stats.concluidos}
               </div>
-              <div className="text-sm md:text-xs text-muted-foreground">
-                Treinos Concluídos
+              <div className="text-[10px] md:text-xs text-muted-foreground leading-tight">
+                Concluídos
               </div>
             </div>
-            <div className="text-center p-4 md:p-3 bg-muted rounded-lg">
-              <div className="text-3xl md:text-2xl font-bold">{stats.percentual}%</div>
-              <div className="text-sm md:text-xs text-muted-foreground">Frequência</div>
+            <div className="text-center p-1.5 bg-muted rounded-md">
+              <div className="text-base md:text-lg font-bold leading-tight">{stats.percentual}%</div>
+              <div className="text-[10px] md:text-xs text-muted-foreground leading-tight">Frequência</div>
             </div>
           </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="pt-0">
           {/* Cabeçalho dos dias da semana */}
-          <div className="grid grid-cols-7 gap-3 md:gap-2 mb-3 md:mb-2">
+          <div className="grid grid-cols-7 gap-1 mb-1">
             {diasSemana.map((dia) => (
               <div
                 key={dia}
-                className="text-center text-base md:text-sm font-semibold text-muted-foreground py-2"
+                className="text-center text-[10px] md:text-xs font-semibold text-muted-foreground"
               >
                 {dia}
               </div>
             ))}
           </div>
 
-          {/* Grid do calendário */}
-          <div className="grid grid-cols-7 gap-3 md:gap-2">
+          {/* Grid do calendário compacto */}
+          <div className="grid grid-cols-7 gap-1">
             {/* Dias vazios no início */}
             {Array.from({ length: diasVaziosInicio }).map((_, index) => (
-              <div key={`empty-${index}`} className="aspect-square" />
+              <div key={`empty-${index}`} className="h-10 md:h-11" />
             ))}
 
             {/* Dias do mês */}
@@ -192,7 +192,7 @@ export function CalendarioTreinosMensal({
                   onClick={() => temTreino && setDiaSelecionado(dia)}
                   disabled={!temTreino}
                   className={`
-                    aspect-square p-3 md:p-2 rounded-lg border-2 transition-all touch-target
+                    h-10 md:h-11 p-0.5 rounded-md border transition-all
                     ${
                       temTreino
                         ? "cursor-pointer hover:scale-105"
@@ -217,21 +217,21 @@ export function CalendarioTreinosMensal({
                       : undefined
                   }
                 >
-                  <div className="flex flex-col items-center justify-center h-full">
-                    <span className="text-base md:text-sm font-semibold">
+                  <div className="flex flex-col items-center justify-center h-full leading-none">
+                    <span className="text-xs md:text-sm font-semibold">
                       {format(dia, "d")}
                     </span>
                     {temTreino && (
-                      <div className="flex gap-1 mt-1">
+                      <div className="mt-0.5">
                         {todosCompletos ? (
                           <CheckCircle2
-                            className="h-4 w-4 md:h-3 md:w-3"
+                            className="h-3 w-3"
                             style={{ color: themeColor || "#22c55e" }}
                           />
                         ) : algunsCompletos ? (
-                          <Circle className="h-4 w-4 md:h-3 md:w-3 text-yellow-500" />
+                          <Circle className="h-3 w-3 text-yellow-500" />
                         ) : (
-                          <Circle className="h-4 w-4 md:h-3 md:w-3 text-muted-foreground" />
+                          <Circle className="h-3 w-3 text-muted-foreground" />
                         )}
                       </div>
                     )}
@@ -241,21 +241,21 @@ export function CalendarioTreinosMensal({
             })}
           </div>
 
-          {/* Legenda */}
-          <div className="flex items-center justify-center gap-6 md:gap-4 mt-6 text-base md:text-sm">
-            <div className="flex items-center gap-2">
+          {/* Legenda compacta */}
+          <div className="flex items-center justify-center gap-4 mt-3 text-[11px] md:text-xs">
+            <div className="flex items-center gap-1">
               <CheckCircle2
-                className="h-5 w-5 md:h-4 md:w-4"
+                className="h-3 w-3"
                 style={{ color: themeColor || "#22c55e" }}
               />
               <span>Concluído</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Circle className="h-5 w-5 md:h-4 md:w-4 text-yellow-500" />
+            <div className="flex items-center gap-1">
+              <Circle className="h-3 w-3 text-yellow-500" />
               <span>Parcial</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Circle className="h-5 w-5 md:h-4 md:w-4 text-muted-foreground" />
+            <div className="flex items-center gap-1">
+              <Circle className="h-3 w-3 text-muted-foreground" />
               <span>Pendente</span>
             </div>
           </div>

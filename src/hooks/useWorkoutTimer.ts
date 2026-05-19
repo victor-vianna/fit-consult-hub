@@ -790,20 +790,14 @@ export function useWorkoutTimer({
         destinatario_id: personalId,
         tipo: "treino_concluido",
         titulo: "🎉 Treino Concluído",
-        mensagem: `${nomeAluno} finalizou o treino em ${formatTime(tempoFinal)} (descanso: ${formatTime(tempoDescansoCalculado)})`,
+        mensagem: `${nomeAluno} finalizou o treino em ${formatTime(tempoFinal)}`,
         dados: {
           sessao_id: sessaoId,
           treino_id: treinoId,
           aluno_nome: nomeAluno,
           aluno_id: profileId,
           duracao_total: tempoFinal,
-          duracao_descanso: tempoDescansoCalculado,
           duracao_pausas: pausasTotalSegundos,
-          total_descansos: descansosFinais?.length || 0,
-          descansos: descansosFinais?.map((d: any) => ({
-            tipo: d.tipo,
-            duracao: d.duracao_segundos || 0,
-          })) || [],
         },
         lida: false,
       });

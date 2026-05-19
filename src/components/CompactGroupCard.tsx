@@ -63,7 +63,7 @@ export function CompactGroupCard({
   const algumConcluido = localExercicios.some((e) => e.concluido);
   const concluidosCount = localExercicios.filter((e) => e.concluido).length;
 
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   const handleToggleGrupo = async () => {
     if (!onToggleGrupoConcluido) return;

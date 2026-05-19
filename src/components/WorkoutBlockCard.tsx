@@ -25,6 +25,7 @@ import {
   Gauge,
   Save,
   ExternalLink,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -63,6 +64,7 @@ export function WorkoutBlockCard({
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [templateName, setTemplateName] = useState(bloco.nome);
   const [isSaving, setIsSaving] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const tipoConfig = TIPOS_BLOCO[bloco.tipo];
   const cor = getCorTipoBloco(bloco.tipo);
   const tipoChave = bloco.tipo as TipoBloco;
@@ -227,6 +229,7 @@ export function WorkoutBlockCard({
               )}
 
               {/* Detalhes por tipo */}
+              {(!readOnly || expanded) && (
               <div className="space-y-2">
                 {/* CARDIO */}
                 {bloco.tipo === "cardio" && bloco.config_cardio && (
@@ -456,8 +459,28 @@ export function WorkoutBlockCard({
                   </div>
                 )}
               </div>
+              )}
             </div>
           </div>
+
+
+          {/* Botão expandir (aluno) */}
+          {readOnly && !bloco.concluido && (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setExpanded((v) => !v)}
+              className="shrink-0 h-10 w-10 md:h-9 md:w-9"
+              title={expanded ? "Recolher" : "Expandir"}
+            >
+              <ChevronDown
+                className={cn(
+                  "h-5 w-5 md:h-4 md:w-4 transition-transform",
+                  expanded && "rotate-180"
+                )}
+              />
+            </Button>
+          )}
 
           {/* Ações (só para Personal) */}
           {!readOnly && (

@@ -459,8 +459,10 @@ export function WorkoutBlockCard({
                   </div>
                 )}
               </div>
+              )}
             </div>
           </div>
+
 
           {/* Ações (só para Personal) */}
           {!readOnly && (

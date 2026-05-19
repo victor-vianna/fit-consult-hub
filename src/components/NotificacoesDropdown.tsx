@@ -24,7 +24,7 @@ interface NotificacoesDropdownProps {
   userId: string;
 }
 
-const FEEDBACK_TYPES = ["feedback_semanal", "checkin_semanal", "feedback_treino"];
+const FEEDBACK_TYPES = ["feedback_semanal", "checkin_semanal"];
 
 export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
   const navigate = useNavigate();

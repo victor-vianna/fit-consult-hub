@@ -387,6 +387,20 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
         personalId={userId}
         themeColor={settings?.theme_color}
       />
+
+      <TreinoFeedbackModal
+        open={treinoFeedbackModal.open}
+        onOpenChange={(open) =>
+          setTreinoFeedbackModal((prev) => ({ ...prev, open }))
+        }
+        alunoId={treinoFeedbackModal.alunoId}
+        alunoNome={treinoFeedbackModal.alunoNome}
+        personalId={userId}
+        themeColor={settings?.theme_color}
+        rating={treinoFeedbackModal.rating}
+        comentario={treinoFeedbackModal.comentario}
+        treinoId={treinoFeedbackModal.treinoId}
+      />
     </>
   );
 }

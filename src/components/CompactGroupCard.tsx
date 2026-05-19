@@ -92,15 +92,19 @@ export function CompactGroupCard({
       <CardContent className="p-0">
         {/* Header */}
         <div className={cn(
-          "flex items-center gap-3 p-3",
+          "flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3",
           todosConcluidos
             ? "bg-green-50/30 dark:bg-green-950/10"
             : "bg-blue-50/50 dark:bg-blue-950/20"
         )}>
           {onToggleGrupoConcluido && (
             <button
-              onClick={handleToggleGrupo}
-              className="shrink-0 transition-transform hover:scale-110"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleToggleGrupo();
+              }}
+              aria-label="Marcar grupo como concluído"
+              className="shrink-0 inline-flex items-center justify-center min-w-[44px] min-h-[44px] -m-1 transition-transform active:scale-95"
             >
               {todosConcluidos ? (
                 <CheckCircle2 className="h-6 w-6 text-green-600" />
@@ -111,19 +115,24 @@ export function CompactGroupCard({
           )}
 
           <div className={cn(
-            "w-12 h-12 rounded-lg flex items-center justify-center shrink-0",
+            "w-11 h-11 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center shrink-0",
             todosConcluidos
               ? "bg-green-100 dark:bg-green-900/30"
               : "bg-blue-100 dark:bg-blue-900/30"
           )}>
             <LinkIcon className={cn(
-              "h-6 w-6",
+              "h-5 w-5 sm:h-6 sm:w-6",
               todosConcluidos ? "text-green-600" : "text-blue-600"
             )} />
           </div>
 
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setCollapsed(!collapsed)}
+            aria-expanded={!collapsed}
+            className="flex-1 min-w-0 text-left py-1 -my-1"
+          >
+            <div className="flex items-center gap-1.5 flex-wrap">
               <Badge variant="secondary" className="font-semibold text-xs">
                 {tipoConfig.icon} {tipoConfig.label}
               </Badge>
@@ -135,24 +144,25 @@ export function CompactGroupCard({
                 </Badge>
               ) : null}
             </div>
-            {/* Show exercise names in header */}
             <p className={cn(
-              "text-xs text-muted-foreground mt-0.5",
+              "text-xs sm:text-sm text-muted-foreground mt-1 break-words leading-snug",
               todosConcluidos && "line-through"
             )}>
               {localExercicios.map((e) => e.nome).join(" → ")}
             </p>
-          </div>
+          </button>
 
           <Button
-            size="sm"
+            size="icon"
             variant="ghost"
             onClick={() => setCollapsed(!collapsed)}
-            className="shrink-0"
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? "Expandir" : "Recolher"}
+            className="shrink-0 h-11 w-11 min-h-[44px] min-w-[44px]"
           >
             <ChevronDown
               className={cn(
-                "h-4 w-4 transition-transform",
+                "h-5 w-5 transition-transform duration-200",
                 !collapsed && "rotate-180"
               )}
             />

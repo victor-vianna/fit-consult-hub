@@ -117,17 +117,21 @@ export function CompactExerciseCard({
         ) : (
           <>
             {/* Header Compacto */}
-            <div className="flex items-center gap-3 p-3">
+            <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3">
               {/* Checkbox */}
               <button
-                onClick={handleToggle}
-                className="shrink-0 transition-transform hover:scale-110 touch-target"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggle();
+                }}
+                aria-label="Marcar exercício como concluído"
+                className="shrink-0 inline-flex items-center justify-center min-w-[44px] min-h-[44px] -m-1 transition-transform active:scale-95"
               >
                 <Circle className="h-6 w-6 text-muted-foreground" />
               </button>
 
               {/* Thumbnail */}
-              <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted shrink-0">
+              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-lg overflow-hidden bg-muted shrink-0">
                 {exercicio.thumbnail ? (
                   <img
                     src={exercicio.thumbnail}
@@ -141,46 +145,57 @@ export function CompactExerciseCard({
                 )}
               </div>
 
-              {/* Nome + Info Rápida */}
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-base break-words leading-tight">
+              {/* Nome + Info Rápida - área clicável para expandir */}
+              <button
+                type="button"
+                onClick={() => setExpanded(!expanded)}
+                aria-expanded={expanded}
+                className="flex-1 min-w-0 text-left py-1 -my-1"
+              >
+                <p className="font-semibold text-sm sm:text-base break-words leading-snug">
                   {exercicio.nome}
                 </p>
-                <div className="flex items-center gap-2 text-sm md:text-xs text-muted-foreground mt-0.5">
+                <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground mt-1">
                   <span className="flex items-center gap-1">
                     <Dumbbell className="h-3 w-3" />
                     {exercicio.series || 3}x{exercicio.repeticoes || "12"}
                   </span>
-                  <InlinePesoInput
-                    exercicioId={exercicio.id}
-                    pesoRecomendado={exercicio.carga || null}
-                    pesoExecutado={exercicio.peso_executado || null}
-                    onSave={handleSavePeso}
-                  />
+                  <span onClick={(e) => e.stopPropagation()}>
+                    <InlinePesoInput
+                      exercicioId={exercicio.id}
+                      pesoRecomendado={exercicio.carga || null}
+                      pesoExecutado={exercicio.peso_executado || null}
+                      onSave={handleSavePeso}
+                    />
+                  </span>
                 </div>
                 {/* Referência de peso anterior */}
                 {ultimoPeso && !exercicio.peso_executado && (
-                  <WeightHistoryBadge
-                    ultimoPeso={ultimoPeso}
-                    ultimaData={ultimaData}
-                    historico={historico}
-                    exercicioNome={exercicio.nome}
-                    loading={loadingHistory}
-                    compact
-                  />
+                  <span onClick={(e) => e.stopPropagation()} className="block mt-1">
+                    <WeightHistoryBadge
+                      ultimoPeso={ultimoPeso}
+                      ultimaData={ultimaData}
+                      historico={historico}
+                      exercicioNome={exercicio.nome}
+                      loading={loadingHistory}
+                      compact
+                    />
+                  </span>
                 )}
-              </div>
+              </button>
 
               {/* Botão Expandir */}
               <Button
                 size="icon"
                 variant="ghost"
                 onClick={() => setExpanded(!expanded)}
-                className="shrink-0 h-10 w-10 md:h-9 md:w-9 touch-target"
+                aria-expanded={expanded}
+                aria-label={expanded ? "Recolher" : "Expandir"}
+                className="shrink-0 h-11 w-11 min-h-[44px] min-w-[44px]"
               >
                 <ChevronDown
                   className={cn(
-                    "h-5 w-5 md:h-4 md:w-4 transition-transform",
+                    "h-5 w-5 transition-transform duration-200",
                     expanded && "rotate-180"
                   )}
                 />

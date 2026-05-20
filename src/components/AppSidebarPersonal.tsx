@@ -49,7 +49,7 @@ export function AppSidebarPersonal() {
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
-      navigate("/login");
+      navigate("/auth");
       toast.success("Logout realizado com sucesso!");
     } catch (error) {
       console.error("Erro ao fazer logout:", error);

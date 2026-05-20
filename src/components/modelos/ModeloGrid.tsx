@@ -144,7 +144,19 @@ function ModeloCard({
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <CardTitle className="text-base line-clamp-1">{modelo.nome}</CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base line-clamp-1">
+                {modelo.nome}
+              </CardTitle>
+              {modelo.is_global && (
+                <Badge
+                  variant="outline"
+                  className="border-primary/40 text-primary"
+                >
+                  Global
+                </Badge>
+              )}
+            </div>
             {modelo.categoria && (
               <div className="mt-1.5">
                 <Badge variant="secondary" className="text-xs">
@@ -169,6 +181,7 @@ function ModeloCard({
                 <Eye className="h-4 w-4 mr-2" />
                 Ver detalhes
               </DropdownMenuItem>
+              {!modelo.is_global && (
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger onClick={(e) => e.stopPropagation()}>
                   <FolderInput className="h-4 w-4 mr-2" />
@@ -204,17 +217,22 @@ function ModeloCard({
                     ))}
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDeletar(modelo.id);
-                }}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Deletar
-              </DropdownMenuItem>
+              )}
+              {!modelo.is_global && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeletar(modelo.id);
+                    }}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Deletar
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

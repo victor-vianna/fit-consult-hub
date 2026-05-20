@@ -44,7 +44,7 @@ export function MobileMenuDrawerPersonal({
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    navigate("/login");
+    navigate("/auth");
   };
 
   const handleMenuItemClick = (onClick: () => void) => {

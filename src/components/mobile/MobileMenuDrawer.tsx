@@ -52,7 +52,7 @@ export function MobileMenuDrawer({
 
   const handleNavigateToExercises = () => {
     light();
-    navigate("/exercicios");
+    onSectionChange("biblioteca");
     onOpenChange(false);
   };
 

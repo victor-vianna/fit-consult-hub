@@ -976,7 +976,7 @@ export type Database = {
           grupo_muscular: string
           id: string
           imagem_thumbnail: string | null
-          is_global: boolean | null
+          is_global: boolean
           link_youtube: string | null
           nivel_dificuldade: string | null
           nome: string
@@ -990,7 +990,7 @@ export type Database = {
           grupo_muscular: string
           id?: string
           imagem_thumbnail?: string | null
-          is_global?: boolean | null
+          is_global?: boolean
           link_youtube?: string | null
           nivel_dificuldade?: string | null
           nome: string
@@ -1004,7 +1004,7 @@ export type Database = {
           grupo_muscular?: string
           id?: string
           imagem_thumbnail?: string | null
-          is_global?: boolean | null
+          is_global?: boolean
           link_youtube?: string | null
           nivel_dificuldade?: string | null
           nome?: string
@@ -2162,6 +2162,7 @@ export type Database = {
           descricao: string | null
           duracao_total_minutos: number | null
           id: string
+          is_global: boolean
           nome: string
           pasta_id: string | null
           personal_id: string
@@ -2173,6 +2174,7 @@ export type Database = {
           descricao?: string | null
           duracao_total_minutos?: number | null
           id?: string
+          is_global?: boolean
           nome: string
           pasta_id?: string | null
           personal_id: string
@@ -2184,6 +2186,7 @@ export type Database = {
           descricao?: string | null
           duracao_total_minutos?: number | null
           id?: string
+          is_global?: boolean
           nome?: string
           pasta_id?: string | null
           personal_id?: string

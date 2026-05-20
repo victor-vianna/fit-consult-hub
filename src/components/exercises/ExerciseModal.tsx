@@ -41,7 +41,7 @@ export default function ExerciseModal({
   onSuccess,
   exercise,
 }: ExerciseModalProps) {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const [loading, setLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
 
@@ -53,6 +53,7 @@ export default function ExerciseModal({
     nivel_dificuldade: "",
     link_youtube: "",
     imagem_thumbnail: "",
+    is_global: false,
   });
 
   // ✅ Preview da imagem
@@ -69,6 +70,7 @@ export default function ExerciseModal({
         nivel_dificuldade: exercise.nivel_dificuldade || "",
         link_youtube: exercise.link_youtube || "",
         imagem_thumbnail: exercise.imagem_thumbnail || "",
+        is_global: Boolean(exercise.is_global),
       });
       setImagePreview(exercise.imagem_thumbnail || "");
       setSelectedFile(null);
@@ -81,6 +83,7 @@ export default function ExerciseModal({
         nivel_dificuldade: "",
         link_youtube: "",
         imagem_thumbnail: "",
+        is_global: false,
       });
       setImagePreview("");
       setSelectedFile(null);
@@ -186,6 +189,7 @@ export default function ExerciseModal({
         nivel_dificuldade: formData.nivel_dificuldade || null,
         link_youtube: formData.link_youtube || null,
         imagem_thumbnail: thumbnailUrl || null,
+        ...(role === "admin" ? { is_global: formData.is_global } : {}),
       };
 
       if (exercise?.id) {
@@ -385,6 +389,27 @@ export default function ExerciseModal({
               placeholder="https://youtube.com/..."
             />
           </div>
+
+          {role === "admin" && (
+            <label className="flex items-start gap-3 rounded-lg border p-3">
+              <input
+                type="checkbox"
+                checked={formData.is_global}
+                onChange={(e) =>
+                  setFormData({ ...formData, is_global: e.target.checked })
+                }
+                className="mt-1 h-4 w-4"
+              />
+              <span>
+                <span className="block text-sm font-medium">
+                  Conteudo global
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Disponibiliza este exercicio para todos os personals com plano compativel.
+                </span>
+              </span>
+            </label>
+          )}
 
           <DialogFooter>
             <Button

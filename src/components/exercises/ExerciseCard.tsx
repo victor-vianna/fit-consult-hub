@@ -79,9 +79,19 @@ export default function ExerciseCard({
       <CardHeader className="pb-3 p-4 md:p-6">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <CardTitle className="text-base md:text-lg line-clamp-2">
-              {exercise.nome}
-            </CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base md:text-lg line-clamp-2">
+                {exercise.nome}
+              </CardTitle>
+              {exercise.is_global && (
+                <Badge
+                  variant="outline"
+                  className="border-primary/40 text-primary"
+                >
+                  Global
+                </Badge>
+              )}
+            </div>
             <CardDescription className="mt-1 capitalize text-sm md:text-xs">
               {exercise.grupo_muscular?.replace("_", " ")}
             </CardDescription>

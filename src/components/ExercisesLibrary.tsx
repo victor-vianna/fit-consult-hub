@@ -279,7 +279,9 @@ export default function ExercisesLibrary() {
                 <ExerciseCard
                   key={exercise.id}
                   exercise={exercise}
-                  showActions={exercise.created_by === user?.id}
+                  showActions={
+                    userRole === "admin" || exercise.created_by === user?.id
+                  }
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                 />

@@ -48,6 +48,7 @@ export interface ModeloTreino {
   categoria?: string | null;
   pasta_id?: string | null;
   duracao_total_minutos?: number | null;
+  is_global?: boolean;
   created_at: string;
   updated_at: string;
   exercicios?: ModeloTreinoExercicio[];
@@ -87,7 +88,7 @@ export function useModelosTreino({
         personalId
       );
 
-      const { data: modelosData, error: modelosError } = await supabase
+      const { data: modelosProprios, error: modelosError } = await (supabase as any)
         .from("treino_modelos")
         .select("*")
         .eq("personal_id", personalId)
@@ -102,15 +103,37 @@ export function useModelosTreino({
       }
 
       // Buscar exercícios e blocos de cada modelo
+      const { data: modelosGlobais, error: modelosGlobaisError } =
+        await (supabase as any)
+          .from("treino_modelos")
+          .select("*")
+          .eq("is_global", true)
+          .order("created_at", { ascending: false });
+
+      if (modelosGlobaisError) {
+        console.warn(
+          "[useModelosTreino] Modelos globais indisponiveis:",
+          modelosGlobaisError
+        );
+      }
+
+      const modelosData = [
+        ...(modelosProprios || []),
+        ...((modelosGlobais || []).filter(
+          (modelo: any) =>
+            !(modelosProprios || []).some((item: any) => item.id === modelo.id)
+        )),
+      ];
+
       const modelosCompletos = await Promise.all(
         (modelosData || []).map(async (modelo) => {
           const [exerciciosData, blocosData] = await Promise.all([
-            supabase
+            (supabase as any)
               .from("treino_modelo_exercicios")
               .select("*")
               .eq("modelo_id", modelo.id)
               .order("ordem"),
-            supabase
+            (supabase as any)
               .from("treino_modelo_blocos")
               .select("*")
               .eq("modelo_id", modelo.id)

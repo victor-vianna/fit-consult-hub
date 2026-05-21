@@ -128,6 +128,9 @@ export default function AreaAluno() {
           .single();
 
         setPersonalProfile(personalData);
+
+        // Dispara mensagem automática de boas-vindas no chat (apenas no 1º acesso)
+        supabase.rpc("enviar_mensagem_boas_vindas_chat" as any).then(() => {});
       }
 
       const { data: materiaisData } = await supabase

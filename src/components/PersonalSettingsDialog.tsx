@@ -13,7 +13,8 @@ import { Settings, Upload, X, FileImage } from "lucide-react";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "@/hooks/use-toast";
-import { AlunoDashboardCustomizeDialog } from "@/components/AlunoDashboardCustomizeDialog";
+import { AlunoDashboardCustomizeForm } from "@/components/AlunoDashboardCustomizeForm";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Props {
   personalId: string;

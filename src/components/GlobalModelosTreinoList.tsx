@@ -17,12 +17,16 @@ import { useGlobalModelosTreino } from "@/hooks/useGlobalModelosTreino";
 import type { GlobalModeloPasta } from "@/hooks/useGlobalModelosTreino";
 import type { ModeloPasta } from "@/hooks/useModeloPastas";
 import type { ModeloTreino } from "@/hooks/useModelosTreino";
-import { usePersonalPlanFeatures } from "@/hooks/usePersonalPlanFeatures";
+import {
+  GLOBAL_RESOURCES_MIN_PLAN_LEVEL,
+  usePersonalPlanFeatures,
+} from "@/hooks/usePersonalPlanFeatures";
 import { copyModeloTreino } from "@/utils/modeloCopies";
 import {
   ArrowUp,
   BookTemplate,
   Crown,
+  Lock,
   FolderOpen,
   Home,
   Loader2,
@@ -49,7 +53,11 @@ export function GlobalModelosTreinoList({
   pastasDestino,
 }: GlobalModelosTreinoListProps) {
   const queryClient = useQueryClient();
-  const { planLevel, loading: loadingPlan } = usePersonalPlanFeatures(personalId);
+  const {
+    canUseGlobalModels,
+    planLevel,
+    loading: loadingPlan,
+  } = usePersonalPlanFeatures(personalId);
   const { data, isLoading } = useGlobalModelosTreino(true);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -135,6 +143,28 @@ export function GlobalModelosTreinoList({
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="text-muted-foreground">Carregando modelos globais...</p>
       </div>
+    );
+  }
+
+  if (!canUseGlobalModels || planLevel < GLOBAL_RESOURCES_MIN_PLAN_LEVEL) {
+    return (
+      <Card className="border-warning/30 bg-warning/5">
+        <CardContent className="flex flex-col items-center justify-center gap-4 py-14 text-center">
+          <div className="rounded-full bg-warning/10 p-4 text-warning">
+            <Lock className="h-8 w-8" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold">Modelos globais bloqueados</h3>
+            <p className="max-w-md text-sm text-muted-foreground">
+              Este recurso esta disponivel a partir do plano Profissional.
+              Atualize o plano para acessar os modelos globais de treino.
+            </p>
+          </div>
+          <Badge variant="outline">
+            Plano recomendado: {planLabel(GLOBAL_RESOURCES_MIN_PLAN_LEVEL)}
+          </Badge>
+        </CardContent>
+      </Card>
     );
   }
 

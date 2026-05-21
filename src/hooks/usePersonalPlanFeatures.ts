@@ -15,6 +15,8 @@ export const DEFAULT_PLAN_RESOURCES: PlanResourceFlags = {
   modelos_globais: false,
 };
 
+export const GLOBAL_RESOURCES_MIN_PLAN_LEVEL = 3;
+
 const ACTIVE_SUBSCRIPTION_STATUSES = ["ativa", "ativo", "trial"];
 
 const normalizePlanName = (name?: string | null) =>
@@ -118,8 +120,19 @@ export function usePersonalPlanFeatures(personalId?: string | null) {
       return { ...DEFAULT_PLAN_RESOURCES, acesso_plataforma: false };
     }
 
-    const plano = assinatura?.plano;
-    return parsePlanResources(plano?.features, plano?.nome);
+    const plano = assinatura?.plano as any;
+    const level =
+      typeof plano?.nivel === "number"
+        ? plano.nivel
+        : inferPlanLevelFromName(plano?.nome);
+    const parsed = parsePlanResources(plano?.features, plano?.nome);
+    const canUseGlobalResources = level >= GLOBAL_RESOURCES_MIN_PLAN_LEVEL;
+
+    return {
+      ...parsed,
+      biblioteca_global: parsed.biblioteca_global && canUseGlobalResources,
+      modelos_globais: parsed.modelos_globais && canUseGlobalResources,
+    };
   }, [query.data, role]);
 
   const planLevel = useMemo(() => {

@@ -18,15 +18,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search, Filter, Loader2 } from "lucide-react";
+import { Plus, Search, Filter, Loader2, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { usePersonalPlanFeatures } from "@/hooks/usePersonalPlanFeatures";
+import {
+  GLOBAL_RESOURCES_MIN_PLAN_LEVEL,
+  usePersonalPlanFeatures,
+} from "@/hooks/usePersonalPlanFeatures";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 export default function ExercisesLibrary() {
   const { user } = useAuth();
-  const { canUseGlobalLibrary, loading: loadingPlanFeatures } =
+  const { canUseGlobalLibrary, loading: loadingPlanFeatures, planLevel } =
     usePersonalPlanFeatures(user?.id);
   const location = useLocation();
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -192,6 +197,32 @@ export default function ExercisesLibrary() {
               </Button>
             )}
           </div>
+
+          {userRole === "personal" &&
+            (!canUseGlobalLibrary ||
+              planLevel < GLOBAL_RESOURCES_MIN_PLAN_LEVEL) && (
+              <Card className="border-warning/30 bg-warning/5">
+                <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-full bg-warning/10 p-2 text-warning">
+                      <Lock className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">
+                        Biblioteca global bloqueada
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Exercicios globais ficam disponiveis a partir do plano
+                        Profissional.
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="w-fit">
+                    Plano recomendado: Profissional
+                  </Badge>
+                </CardContent>
+              </Card>
+            )}
 
           {/* Filtros */}
           <div className="bg-muted rounded-xl border border-border shadow-sm p-5">

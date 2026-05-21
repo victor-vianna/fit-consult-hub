@@ -22,9 +22,12 @@ import { Plus, Search, Filter, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { usePersonalPlanFeatures } from "@/hooks/usePersonalPlanFeatures";
 
 export default function ExercisesLibrary() {
   const { user } = useAuth();
+  const { canUseGlobalLibrary, loading: loadingPlanFeatures } =
+    usePersonalPlanFeatures(user?.id);
   const location = useLocation();
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [filteredExercises, setFilteredExercises] = useState<Exercise[]>([]);
@@ -66,7 +69,15 @@ export default function ExercisesLibrary() {
 
   useEffect(() => {
     applyFilters();
-  }, [exercises, searchTerm, grupoFilter, equipamentoFilter, nivelFilter]);
+  }, [
+    exercises,
+    searchTerm,
+    grupoFilter,
+    equipamentoFilter,
+    nivelFilter,
+    userRole,
+    canUseGlobalLibrary,
+  ]);
 
   const fetchExercises = async () => {
     try {
@@ -88,6 +99,10 @@ export default function ExercisesLibrary() {
 
   const applyFilters = () => {
     let filtered = [...exercises];
+
+    if (userRole === "personal" && !canUseGlobalLibrary) {
+      filtered = filtered.filter((ex) => !ex.is_global);
+    }
 
     if (searchTerm)
       filtered = filtered.filter((ex) =>
@@ -145,7 +160,7 @@ export default function ExercisesLibrary() {
     setNivelFilter("todos");
   };
 
-  if (loading) {
+  if (loading || (userRole === "personal" && loadingPlanFeatures)) {
     return (
       <div className="flex items-center justify-center min-h-screen text-muted-foreground">
         <Loader2 className="animate-spin w-6 h-6 mr-2" />

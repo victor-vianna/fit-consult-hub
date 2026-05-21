@@ -2,6 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { usePersonalPlanFeatures } from "@/hooks/usePersonalPlanFeatures";
 
 export interface LinkDemonstracao {
   label: string;
@@ -74,6 +75,8 @@ export function useModelosTreino({
   enabled = true,
 }: UseModelosTreinoProps) {
   const queryClient = useQueryClient();
+  const { canUseGlobalModels, loading: loadingPlanFeatures } =
+    usePersonalPlanFeatures(personalId);
 
   // 🔍 Buscar todos os modelos do personal
   const {
@@ -81,7 +84,7 @@ export function useModelosTreino({
     isLoading: loading,
     error,
   } = useQuery({
-    queryKey: ["modelos-treino", personalId],
+    queryKey: ["modelos-treino", personalId, canUseGlobalModels],
     queryFn: async (): Promise<ModeloTreino[]> => {
       console.log(
         "[useModelosTreino] Buscando modelos do personal:",
@@ -103,18 +106,22 @@ export function useModelosTreino({
       }
 
       // Buscar exercícios e blocos de cada modelo
-      const { data: modelosGlobais, error: modelosGlobaisError } =
-        await (supabase as any)
+      let modelosGlobais: any[] = [];
+      if (canUseGlobalModels) {
+        const { data, error: modelosGlobaisError } = await (supabase as any)
           .from("treino_modelos")
           .select("*")
           .eq("is_global", true)
           .order("created_at", { ascending: false });
 
-      if (modelosGlobaisError) {
-        console.warn(
-          "[useModelosTreino] Modelos globais indisponiveis:",
-          modelosGlobaisError
-        );
+        if (modelosGlobaisError) {
+          console.warn(
+            "[useModelosTreino] Modelos globais indisponiveis:",
+            modelosGlobaisError
+          );
+        } else {
+          modelosGlobais = data || [];
+        }
       }
 
       const modelosData = [
@@ -166,7 +173,7 @@ export function useModelosTreino({
       );
       return modelosCompletos;
     },
-    enabled: enabled && !!personalId,
+    enabled: enabled && !!personalId && !loadingPlanFeatures,
     staleTime: 1000 * 60 * 5, // 5 minutos
   });
 
@@ -335,7 +342,7 @@ export function useModelosTreino({
 
   return {
     modelos,
-    loading,
+    loading: loading || loadingPlanFeatures,
     error,
     criarModelo: (input: CriarModeloInput) =>
       criarModeloMutation.mutateAsync(input),

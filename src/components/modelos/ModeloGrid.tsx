@@ -54,7 +54,9 @@ export function ModeloGrid({
   // Filtrar modelos da pasta atual (ou todos se showAll)
   const modelosVisiveis = showAll
     ? modelos
-    : modelos.filter((m) => m.pasta_id === currentFolderId);
+    : modelos.filter(
+        (m) => m.pasta_id === currentFolderId || (m.is_global && currentFolderId === null)
+      );
 
   if (modelosVisiveis.length === 0) {
     return (

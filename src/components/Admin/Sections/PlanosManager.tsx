@@ -4,8 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import {
+  DEFAULT_PLAN_RESOURCES,
+  PlanResourceFlags,
+  parsePlanResources,
+} from "@/hooks/usePersonalPlanFeatures";
 import {
   Package,
   Plus,
@@ -27,10 +33,26 @@ interface Plano {
   preco_mensal: number;
   max_alunos: number;
   features: string[];
+  recursos: PlanResourceFlags;
   ativo: boolean;
   created_at: string;
   assinaturas_count: number;
 }
+
+const parseFeatureItems = (features: unknown): string[] => {
+  if (Array.isArray(features)) return features.map(String);
+  if (!features || typeof features !== "object") return [];
+
+  const items = (features as { items?: unknown; itens?: unknown }).items ??
+    (features as { itens?: unknown }).itens;
+
+  return Array.isArray(items) ? items.map(String) : [];
+};
+
+const buildFeaturesPayload = (plano: Plano) => ({
+  items: plano.features,
+  recursos: plano.recursos,
+});
 
 export default function PlanosManager() {
   const { toast } = useToast();
@@ -62,9 +84,11 @@ export default function PlanosManager() {
       const planosComContagem: Plano[] =
         planosData?.map((plano) => ({
           ...plano,
-          features: Array.isArray(plano.features)
-            ? plano.features.map(String)
-            : [],
+          descricao: plano.descricao || "",
+          max_alunos: plano.max_alunos || 0,
+          ativo: plano.ativo ?? true,
+          features: parseFeatureItems(plano.features),
+          recursos: parsePlanResources(plano.features, plano.nome),
           assinaturas_count:
             assinaturasData?.filter((a) => a.plano_id === plano.id).length || 0,
         })) || [];
@@ -90,6 +114,7 @@ export default function PlanosManager() {
       preco_mensal: 0,
       max_alunos: 10,
       features: [],
+      recursos: { ...DEFAULT_PLAN_RESOURCES },
       ativo: true,
       created_at: new Date().toISOString(),
       assinaturas_count: 0,
@@ -115,7 +140,7 @@ export default function PlanosManager() {
             descricao: editingPlano.descricao,
             preco_mensal: editingPlano.preco_mensal,
             max_alunos: editingPlano.max_alunos,
-            features: editingPlano.features,
+            features: buildFeaturesPayload(editingPlano),
             ativo: editingPlano.ativo,
           })
           .eq("id", editingPlano.id);
@@ -133,7 +158,7 @@ export default function PlanosManager() {
           descricao: editingPlano.descricao,
           preco_mensal: editingPlano.preco_mensal,
           max_alunos: editingPlano.max_alunos,
-          features: editingPlano.features,
+          features: buildFeaturesPayload(editingPlano),
           ativo: editingPlano.ativo,
         });
 
@@ -324,6 +349,60 @@ export default function PlanosManager() {
             />
           </div>
 
+          <div className="rounded-lg border p-4 space-y-3">
+            <div>
+              <p className="text-sm font-medium">Recursos do plano</p>
+              <p className="text-xs text-muted-foreground">
+                Estes flags liberam funcionalidades para personals neste plano.
+              </p>
+            </div>
+
+            {[
+              {
+                key: "acesso_plataforma" as const,
+                label: "Acesso a plataforma",
+                description: "Permite entrada normal no painel do personal.",
+              },
+              {
+                key: "biblioteca_global" as const,
+                label: "Biblioteca global de exercicios",
+                description: "Mostra exercicios globais criados pelo admin.",
+              },
+              {
+                key: "modelos_globais" as const,
+                label: "Modelos globais de treino",
+                description: "Mostra modelos globais criados pelo admin.",
+              },
+            ].map((recurso) => (
+              <label
+                key={recurso.key}
+                className="flex items-start gap-3 rounded-md border p-3"
+              >
+                <Checkbox
+                  checked={editingPlano.recursos[recurso.key]}
+                  onCheckedChange={(checked) =>
+                    setEditingPlano({
+                      ...editingPlano,
+                      recursos: {
+                        ...editingPlano.recursos,
+                        [recurso.key]: checked === true,
+                      },
+                    })
+                  }
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="block text-sm font-medium">
+                    {recurso.label}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {recurso.description}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -455,6 +534,31 @@ export default function PlanosManager() {
                         Assinaturas:
                       </span>
                       <Badge variant="outline">{plano.assinaturas_count}</Badge>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold">Recursos:</p>
+                    <div className="space-y-1">
+                      {[
+                        ["Plataforma", plano.recursos.acesso_plataforma],
+                        ["Biblioteca global", plano.recursos.biblioteca_global],
+                        ["Modelos globais", plano.recursos.modelos_globais],
+                      ].map(([label, enabled]) => (
+                        <div
+                          key={String(label)}
+                          className="flex items-center gap-2 text-sm"
+                        >
+                          {enabled ? (
+                            <Check className="h-4 w-4 text-success" />
+                          ) : (
+                            <X className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          <span className="text-muted-foreground">
+                            {label}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
 

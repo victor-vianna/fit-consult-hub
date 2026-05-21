@@ -1534,6 +1534,7 @@ export type Database = {
       personal_settings: {
         Row: {
           cards_visiveis: Json | null
+          chat_welcome_message: string | null
           controle_acesso_por_pagamento: boolean
           created_at: string | null
           display_name: string | null
@@ -1551,6 +1552,7 @@ export type Database = {
         }
         Insert: {
           cards_visiveis?: Json | null
+          chat_welcome_message?: string | null
           controle_acesso_por_pagamento?: boolean
           created_at?: string | null
           display_name?: string | null
@@ -1568,6 +1570,7 @@ export type Database = {
         }
         Update: {
           cards_visiveis?: Json | null
+          chat_welcome_message?: string | null
           controle_acesso_por_pagamento?: boolean
           created_at?: string | null
           display_name?: string | null
@@ -2629,6 +2632,7 @@ export type Database = {
         Args: { p_grupo_id: string }
         Returns: undefined
       }
+      enviar_mensagem_boas_vindas_chat: { Args: never; Returns: undefined }
       get_user_personal_id: { Args: never; Returns: string }
       has_role: {
         Args: {

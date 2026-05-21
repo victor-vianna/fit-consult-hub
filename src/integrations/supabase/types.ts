@@ -1226,6 +1226,8 @@ export type Database = {
           cor: string | null
           created_at: string | null
           id: string
+          is_global: boolean
+          min_plan_level: number
           nivel: number | null
           nome: string
           ordem: number | null
@@ -1239,6 +1241,8 @@ export type Database = {
           cor?: string | null
           created_at?: string | null
           id?: string
+          is_global?: boolean
+          min_plan_level?: number
           nivel?: number | null
           nome: string
           ordem?: number | null
@@ -1252,6 +1256,8 @@ export type Database = {
           cor?: string | null
           created_at?: string | null
           id?: string
+          is_global?: boolean
+          min_plan_level?: number
           nivel?: number | null
           nome?: string
           ordem?: number | null
@@ -1694,6 +1700,7 @@ export type Database = {
           features: Json | null
           id: string
           max_alunos: number | null
+          nivel: number
           nome: string
           preco_mensal: number
         }
@@ -1704,6 +1711,7 @@ export type Database = {
           features?: Json | null
           id?: string
           max_alunos?: number | null
+          nivel?: number
           nome: string
           preco_mensal: number
         }
@@ -1714,6 +1722,7 @@ export type Database = {
           features?: Json | null
           id?: string
           max_alunos?: number | null
+          nivel?: number
           nome?: string
           preco_mensal?: number
         }
@@ -2163,9 +2172,11 @@ export type Database = {
           duracao_total_minutos: number | null
           id: string
           is_global: boolean
+          min_plan_level: number
           nome: string
           pasta_id: string | null
           personal_id: string
+          source_modelo_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -2175,9 +2186,11 @@ export type Database = {
           duracao_total_minutos?: number | null
           id?: string
           is_global?: boolean
+          min_plan_level?: number
           nome: string
           pasta_id?: string | null
           personal_id: string
+          source_modelo_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -2187,9 +2200,11 @@ export type Database = {
           duracao_total_minutos?: number | null
           id?: string
           is_global?: boolean
+          min_plan_level?: number
           nome?: string
           pasta_id?: string | null
           personal_id?: string
+          source_modelo_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -2213,6 +2228,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_status_checkins"
             referencedColumns: ["profile_id"]
+          },
+          {
+            foreignKeyName: "treino_modelos_source_modelo_id_fkey"
+            columns: ["source_modelo_id"]
+            isOneToOne: false
+            referencedRelation: "treino_modelos"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2616,6 +2638,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_global_treino_modelo: {
+        Args: { _modelo_id: string }
+        Returns: boolean
+      }
       is_personal: { Args: { _user_id: string }; Returns: boolean }
       log_activity: {
         Args: {

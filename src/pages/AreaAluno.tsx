@@ -53,6 +53,7 @@ import { useChatNaoLidas, useUltimaMensagem } from "@/hooks/useChatMessages";
 import { DEFAULT_CARDS_VISIVEIS } from "@/hooks/usePersonalSettings";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { MaterialFileExplorer } from "@/components/materials/MaterialFileExplorer";
 
 interface Material {
   id: string;
@@ -468,7 +469,17 @@ export default function AreaAluno() {
       case "materiais":
         return (
           <div className="space-y-6 animate-fade-in">
-            <Card>
+            <MaterialFileExplorer
+              materiais={materiais}
+              title="Meus Materiais"
+              description="Arquivos enviados pelo seu personal trainer"
+              themeColor={personalSettings?.theme_color}
+              onView={handleVisualizarMaterial}
+              onDownload={(material) => openMaterialInNewTab(material.arquivo_url)}
+              emptyTitle="Nenhum material recebido ainda"
+              emptyDescription="Quando seu personal enviar arquivos, eles aparecem aqui em pastas por categoria."
+            />
+            <Card className="hidden">
               <CardHeader>
                 <CardTitle
                   className="text-2xl"

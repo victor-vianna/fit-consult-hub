@@ -80,6 +80,7 @@ import { ChatPanel } from "@/components/chat/ChatPanel";
 import { BroadcastMessageDialog } from "@/components/chat/BroadcastMessageDialog";
 import { useChatMessages } from "@/hooks/useChatMessages";
 import { WeightProgressionPanel } from "@/components/WeightProgressionPanel";
+import { MaterialFileExplorer } from "@/components/materials/MaterialFileExplorer";
 
 interface Material {
   id: string;
@@ -778,7 +779,34 @@ export default function AlunoDetalhes() {
 
             {/* Aba Materiais - Design Premium */}
             <TabsContent value="materiais" className="space-y-6">
-              <Card className="border-2 shadow-md">
+              <MaterialFileExplorer
+                materiais={materiais}
+                title="Materiais do aluno"
+                description={`${materiais.length} ${
+                  materiais.length === 1 ? "material enviado" : "materiais enviados"
+                }`}
+                themeColor={personalSettings?.theme_color}
+                canDelete
+                onView={handleVisualizarMaterial}
+                onDownload={(material) => openMaterialInNewTab(material.arquivo_url)}
+                onDelete={(material) =>
+                  handleRemoverMaterial(material.id, material.arquivo_url)
+                }
+                emptyTitle="Nenhum material enviado"
+                emptyDescription="Comece enviando materiais de treino, dieta ou avaliacoes para este aluno."
+                action={
+                  <Button
+                    size={isMobile ? "sm" : "default"}
+                    variant="secondary"
+                    className="shadow-sm"
+                    onClick={() => setOpenDialog(true)}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    {isMobile ? "Enviar" : "Enviar Material"}
+                  </Button>
+                }
+              />
+              <Card className="hidden border-2 shadow-md">
                 <CardHeader className="bg-gradient-to-r from-card to-muted/20">
                   <div className="flex items-center justify-between">
                     <div>

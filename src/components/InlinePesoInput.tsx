@@ -94,7 +94,9 @@ export function InlinePesoInput({
               : `Peso executado: ${pesoExecutado}kg`
         }
       >
-        <span>{displayValue}kg</span>
+        <span>
+          {pesoExecutado ? `Ultima ${displayValue}kg` : `${displayValue}kg`}
+        </span>
         <Edit2 className="h-4 w-4 md:h-3 md:w-3 opacity-60" />
       </button>
     );

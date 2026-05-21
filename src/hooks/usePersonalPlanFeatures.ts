@@ -23,6 +23,15 @@ const normalizePlanName = (name?: string | null) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 
+export const inferPlanLevelFromName = (planName?: string | null): number => {
+  const normalized = normalizePlanName(planName);
+  if (normalized.includes("premium")) return 4;
+  if (normalized.includes("profissional") || normalized.includes("pro")) return 3;
+  if (normalized.includes("basico")) return 2;
+  if (normalized.includes("gratuito") || normalized.includes("free")) return 1;
+  return 1;
+};
+
 export const inferResourcesFromPlanName = (
   planName?: string | null
 ): PlanResourceFlags => {
@@ -77,9 +86,9 @@ export function usePersonalPlanFeatures(personalId?: string | null) {
     queryFn: async () => {
       if (!personalId) return null;
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("assinaturas")
-        .select("status, plano:planos(nome, features)")
+        .select("status, plano:planos(nome, features, nivel)")
         .eq("personal_id", personalId)
         .maybeSingle();
 
@@ -113,8 +122,26 @@ export function usePersonalPlanFeatures(personalId?: string | null) {
     return parsePlanResources(plano?.features, plano?.nome);
   }, [query.data, role]);
 
+  const planLevel = useMemo(() => {
+    if (role === "admin") return 4;
+
+    const assinatura = query.data;
+    const status = assinatura?.status;
+    const isActive = status
+      ? ACTIVE_SUBSCRIPTION_STATUSES.includes(status)
+      : false;
+
+    if (!isActive) return 0;
+
+    const plano = assinatura?.plano as any;
+    return typeof plano?.nivel === "number"
+      ? plano.nivel
+      : inferPlanLevelFromName(plano?.nome);
+  }, [query.data, role]);
+
   return {
     features,
+    planLevel,
     loading: query.isLoading,
     error: query.error,
     canAccessPlatform: features.acesso_plataforma,

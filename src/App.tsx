@@ -31,6 +31,7 @@ const RelatoriosSection = lazy(() => import("./components/Admin/Sections/Relator
 const AnalyticsSection = lazy(() => import("./components/Admin/Sections/AnalyticsSection"));
 const NotificacoesSection = lazy(() => import("./components/Admin/Sections/NotificacoesSection"));
 const ConfiguracoesSection = lazy(() => import("./components/Admin/Sections/ConfiguracoesSection"));
+const ConteudosGlobaisSection = lazy(() => import("./components/Admin/Sections/ConteudosGlobaisSection"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -70,6 +71,7 @@ const App = () => (
                 <Route path="relatorios" element={<RelatoriosSection />} />
                 <Route path="analytics" element={<AnalyticsSection />} />
                 <Route path="notificacoes" element={<NotificacoesSection />} />
+                <Route path="conteudos-globais" element={<ConteudosGlobaisSection />} />
                 <Route path="configuracoes" element={<ConfiguracoesSection />} />
               </Route>
               <Route

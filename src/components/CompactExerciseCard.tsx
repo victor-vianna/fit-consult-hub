@@ -49,6 +49,9 @@ export function CompactExerciseCard({
   const [localConcluido, setLocalConcluido] = useState(
     exercicio.concluido || false
   );
+  const [localPesoExecutado, setLocalPesoExecutado] = useState(
+    exercicio.peso_executado || null
+  );
   const { abrirExercicioNaBiblioteca } = useExerciseLibrary();
   const { ultimoPeso, ultimaData, historico, loading: loadingHistory } = useWeightHistory(
     exercicio.nome,
@@ -78,6 +81,7 @@ export function CompactExerciseCard({
         .eq("id", exercicioId);
 
       if (error) throw error;
+      setLocalPesoExecutado(peso);
     } catch (error) {
       console.error("Erro ao atualizar peso:", error);
       throw error;
@@ -85,6 +89,11 @@ export function CompactExerciseCard({
   };
 
   // Auto-collapse when completed
+  useEffect(() => {
+    setLocalConcluido(exercicio.concluido || false);
+    setLocalPesoExecutado(exercicio.peso_executado || null);
+  }, [exercicio.id, exercicio.concluido, exercicio.peso_executado]);
+
   useEffect(() => {
     if (localConcluido) {
       setExpanded(false);
@@ -164,13 +173,13 @@ export function CompactExerciseCard({
                     <InlinePesoInput
                       exercicioId={exercicio.id}
                       pesoRecomendado={exercicio.carga || null}
-                      pesoExecutado={exercicio.peso_executado || null}
+                      pesoExecutado={localPesoExecutado}
                       onSave={handleSavePeso}
                     />
                   </span>
                 </div>
                 {/* Referência de peso anterior */}
-                {ultimoPeso && !exercicio.peso_executado && (
+                {ultimoPeso && !localPesoExecutado && (
                   <span onClick={(e) => e.stopPropagation()} className="block mt-1">
                     <WeightHistoryBadge
                       ultimoPeso={ultimoPeso}
@@ -259,7 +268,7 @@ export function CompactExerciseCard({
                     <InlinePesoInput
                       exercicioId={exercicio.id}
                       pesoRecomendado={exercicio.carga || null}
-                      pesoExecutado={exercicio.peso_executado || null}
+                      pesoExecutado={localPesoExecutado}
                       onSave={handleSavePeso}
                     />
                   </div>

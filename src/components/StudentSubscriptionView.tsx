@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useSubscriptions } from "@/hooks/useSubscriptions";
-import { format } from "date-fns";
+import { differenceInCalendarDays, format, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   CheckCircle,
@@ -40,7 +40,7 @@ export function StudentSubscriptionView({
   personalId,
 }: StudentSubscriptionViewProps) {
   const { subscriptions, loading, getActiveSubscription, refetch } =
-    useSubscriptions(studentId);
+    useSubscriptions(studentId, personalId);
   const { settings: personalSettings } = usePersonalSettings(personalId);
   const { toast } = useToast();
   const [openingPortal, setOpeningPortal] = useState(false);
@@ -112,11 +112,10 @@ export function StudentSubscriptionView({
   };
 
   const getDaysUntilExpiration = (expirationDate: string) => {
-    const today = new Date();
-    const expiration = new Date(expirationDate);
-    const diffTime = expiration.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+    return differenceInCalendarDays(
+      startOfDay(new Date(expirationDate)),
+      startOfDay(new Date())
+    );
   };
 
   const diasParaExpirar = activeSubscription
@@ -189,7 +188,10 @@ export function StudentSubscriptionView({
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Valor</p>
                 <p className="text-lg font-semibold">
-                  R$ {activeSubscription.valor.toFixed(2)}
+                  {activeSubscription.valor.toLocaleString("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  })}
                 </p>
               </div>
             </div>
@@ -315,6 +317,7 @@ export function StudentSubscriptionView({
               {subscriptions.map((sub) => {
                 const statusInfo = getStatusInfo(sub);
                 const StatusIcon = statusInfo.icon;
+                const isRealPaid = statusInfo.label === "Ativo";
 
                 return (
                   <Card key={sub.id} className="border">
@@ -336,7 +339,10 @@ export function StudentSubscriptionView({
                             </p>
                           )}
                           <p className="text-sm text-muted-foreground">
-                            R$ {sub.valor.toFixed(2)}
+                            {sub.valor.toLocaleString("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            })}
                           </p>
                         </div>
                       </div>
@@ -359,7 +365,7 @@ export function StudentSubscriptionView({
                         <div className="flex items-center gap-2 text-muted-foreground">
                           <Calendar className="h-3 w-3" />
                           <span>
-                            {sub.status_pagamento === "pago"
+                            {isRealPaid
                               ? "Válido até"
                               : "Vence em"}
                             :{" "}

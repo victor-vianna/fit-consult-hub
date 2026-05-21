@@ -34,6 +34,7 @@ const mainItems = [
   { title: "Assinaturas", url: "/admin/assinaturas", icon: CreditCard },
   { title: "Pagamentos", url: "/admin/pagamentos", icon: DollarSign },
   { title: "Planos", url: "/admin/planos", icon: Package },
+  { title: "Conteudos Globais", url: "/admin/conteudos-globais", icon: Dumbbell },
 ];
 
 const insightsItems = [

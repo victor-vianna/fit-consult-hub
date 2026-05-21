@@ -1,7 +1,15 @@
 // src/hooks/useTreinosHistorico.ts
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { startOfMonth, endOfMonth, format } from "date-fns";
+import {
+  addDays,
+  endOfMonth,
+  format,
+  isWithinInterval,
+  parseISO,
+  startOfMonth,
+  subDays,
+} from "date-fns";
 import { WORKOUT_EVENTS } from "@/constants/workoutStatus";
 
 interface TreinoSemanal {
@@ -56,7 +64,7 @@ export function useTreinosHistorico(profileId: string, mes?: Date) {
         .from("treinos_semanais")
         .select("*")
         .eq("profile_id", profileId)
-        .gte("semana", format(inicioMes, "yyyy-MM-dd"))
+        .gte("semana", format(subDays(inicioMes, 6), "yyyy-MM-dd"))
         .lte("semana", format(fimMes, "yyyy-MM-dd"))
         .order("semana", { ascending: true })
         .order("dia_semana", { ascending: true });
@@ -85,11 +93,19 @@ export function useTreinosHistorico(profileId: string, mes?: Date) {
         duracao_segundos: sessoesDuracao[t.id] || null,
       }));
 
-      setTreinos(treinosComDuracao);
+      const treinosDoMes = treinosComDuracao.filter((treino) => {
+        const dataTreino = addDays(
+          parseISO(treino.semana),
+          treino.dia_semana - 1
+        );
+        return isWithinInterval(dataTreino, { start: inicioMes, end: fimMes });
+      });
+
+      setTreinos(treinosDoMes);
 
       // Calcular estatísticas
-      const total = treinosComDuracao?.length || 0;
-      const concluidos = treinosComDuracao?.filter((t) => t.concluido).length || 0;
+      const total = treinosDoMes.length;
+      const concluidos = treinosDoMes.filter((t) => t.concluido).length;
       const percentual = total > 0 ? Math.round((concluidos / total) * 100) : 0;
 
       setStats({ total, concluidos, percentual });

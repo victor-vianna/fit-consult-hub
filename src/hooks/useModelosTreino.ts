@@ -2,7 +2,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { usePersonalPlanFeatures } from "@/hooks/usePersonalPlanFeatures";
 
 export interface LinkDemonstracao {
   label: string;
@@ -50,6 +49,8 @@ export interface ModeloTreino {
   pasta_id?: string | null;
   duracao_total_minutos?: number | null;
   is_global?: boolean;
+  min_plan_level?: number | null;
+  source_modelo_id?: string | null;
   created_at: string;
   updated_at: string;
   exercicios?: ModeloTreinoExercicio[];
@@ -75,8 +76,6 @@ export function useModelosTreino({
   enabled = true,
 }: UseModelosTreinoProps) {
   const queryClient = useQueryClient();
-  const { canUseGlobalModels, loading: loadingPlanFeatures } =
-    usePersonalPlanFeatures(personalId);
 
   // 🔍 Buscar todos os modelos do personal
   const {
@@ -84,7 +83,7 @@ export function useModelosTreino({
     isLoading: loading,
     error,
   } = useQuery({
-    queryKey: ["modelos-treino", personalId, canUseGlobalModels],
+    queryKey: ["modelos-treino", personalId],
     queryFn: async (): Promise<ModeloTreino[]> => {
       console.log(
         "[useModelosTreino] Buscando modelos do personal:",
@@ -95,6 +94,7 @@ export function useModelosTreino({
         .from("treino_modelos")
         .select("*")
         .eq("personal_id", personalId)
+        .eq("is_global", false)
         .order("created_at", { ascending: false });
 
       if (modelosError) {
@@ -106,31 +106,7 @@ export function useModelosTreino({
       }
 
       // Buscar exercícios e blocos de cada modelo
-      let modelosGlobais: any[] = [];
-      if (canUseGlobalModels) {
-        const { data, error: modelosGlobaisError } = await (supabase as any)
-          .from("treino_modelos")
-          .select("*")
-          .eq("is_global", true)
-          .order("created_at", { ascending: false });
-
-        if (modelosGlobaisError) {
-          console.warn(
-            "[useModelosTreino] Modelos globais indisponiveis:",
-            modelosGlobaisError
-          );
-        } else {
-          modelosGlobais = data || [];
-        }
-      }
-
-      const modelosData = [
-        ...(modelosProprios || []),
-        ...((modelosGlobais || []).filter(
-          (modelo: any) =>
-            !(modelosProprios || []).some((item: any) => item.id === modelo.id)
-        )),
-      ];
+      const modelosData = modelosProprios || [];
 
       const modelosCompletos = await Promise.all(
         (modelosData || []).map(async (modelo) => {
@@ -173,7 +149,7 @@ export function useModelosTreino({
       );
       return modelosCompletos;
     },
-    enabled: enabled && !!personalId && !loadingPlanFeatures,
+    enabled: enabled && !!personalId,
     staleTime: 1000 * 60 * 5, // 5 minutos
   });
 
@@ -342,7 +318,7 @@ export function useModelosTreino({
 
   return {
     modelos,
-    loading: loading || loadingPlanFeatures,
+    loading,
     error,
     criarModelo: (input: CriarModeloInput) =>
       criarModeloMutation.mutateAsync(input),

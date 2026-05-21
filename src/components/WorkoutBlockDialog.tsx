@@ -476,16 +476,21 @@ export function WorkoutBlockDialog({
             <div className="space-y-4">
               {/* MEUS TEMPLATES SALVOS - COM PASTAS */}
               {personalId && (meusTemplates.length > 0 || pastas.length > 0) && (
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-sm font-semibold flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      Meus Templates
-                    </h4>
+                <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
+                  <div className="flex items-center justify-between gap-3 bg-primary px-3 py-3 text-primary-foreground">
+                    <div>
+                      <h4 className="flex items-center gap-2 text-sm font-semibold">
+                        <User className="h-4 w-4" />
+                        Meus Templates
+                      </h4>
+                      <p className="text-xs text-primary-foreground/80">
+                        {pastas.length} pastas, {meusTemplates.length} templates
+                      </p>
+                    </div>
                     <Button
-                      variant="ghost"
+                      variant="secondary"
                       size="sm"
-                      className="h-7 text-xs"
+                      className="h-8 text-xs"
                       onClick={() => setShowNovaPasta(!showNovaPasta)}
                     >
                       <FolderPlus className="h-3.5 w-3.5 mr-1" />
@@ -495,7 +500,7 @@ export function WorkoutBlockDialog({
 
                   {/* Criar nova pasta */}
                   {showNovaPasta && (
-                    <div className="flex gap-2 mb-3">
+                    <div className="flex gap-2 border-b bg-muted/30 p-3">
                       <Input
                         placeholder="Nome da pasta (ex: HIIT, Intervalado...)"
                         value={novaPastaNome}
@@ -525,7 +530,7 @@ export function WorkoutBlockDialog({
 
                   {/* Breadcrumb navigation */}
                   {currentFolderId && (
-                    <div className="flex items-center gap-1 mb-2 text-sm">
+                    <div className="flex items-center gap-1 border-b bg-muted/30 px-3 py-2 text-sm">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -554,23 +559,29 @@ export function WorkoutBlockDialog({
 
                   {/* Subpastas da pasta atual */}
                   {(() => {
-                    const subpastas = pastas.filter(p => p.parent_id === currentFolderId);
+                    const subpastas = pastas
+                      .filter(p => p.parent_id === currentFolderId)
+                      .sort((a, b) =>
+                        a.nome.localeCompare(b.nome, "pt-BR", {
+                          sensitivity: "base",
+                        })
+                      );
                     if (subpastas.length === 0) return null;
                     return (
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
+                      <div className="grid grid-cols-2 gap-3 p-3 md:grid-cols-3">
                         {subpastas.map(pasta => {
                           const count = meusTemplates.filter(t => t.pasta_id === pasta.id).length;
                           const subCount = pastas.filter(p => p.parent_id === pasta.id).length;
                           return (
                             <div
                               key={pasta.id}
-                              className="flex items-center gap-2 p-2.5 rounded-lg border bg-card hover:bg-accent/50 cursor-pointer transition-colors group"
+                              className="group relative flex min-h-[116px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border bg-background p-3 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
                               onClick={() => setCurrentFolderId(pasta.id)}
                             >
-                              <Folder className="h-5 w-5 shrink-0" style={{ color: pasta.cor }} />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{pasta.nome}</p>
-                                <p className="text-xs text-muted-foreground">
+                              <Folder className="h-12 w-12 shrink-0 fill-sky-100" style={{ color: pasta.cor }} />
+                              <div className="min-w-0">
+                                <p className="line-clamp-2 text-xs font-semibold">{pasta.nome}</p>
+                                <p className="mt-1 text-xs text-muted-foreground">
                                   {count} template{count !== 1 ? "s" : ""}
                                   {subCount > 0 && ` • ${subCount} subpasta${subCount !== 1 ? "s" : ""}`}
                                 </p>
@@ -606,14 +617,14 @@ export function WorkoutBlockDialog({
                     const templatesNaPasta = meusTemplates.filter(t => t.pasta_id === currentFolderId);
                     if (templatesNaPasta.length === 0 && pastas.filter(p => p.parent_id === currentFolderId).length === 0) {
                       return (
-                        <div className="text-center py-4 text-muted-foreground text-sm">
+                        <div className="p-3 text-center text-sm text-muted-foreground">
                           {currentFolderId ? "Nenhum template nesta pasta" : "Nenhum template salvo"}
                         </div>
                       );
                     }
                     if (templatesNaPasta.length === 0) return null;
                     return (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-2">
                         {templatesNaPasta.map((template) => (
                           <Card
                             key={template.id}
@@ -647,7 +658,14 @@ export function WorkoutBlockDialog({
                                         >
                                           📂 Raiz (sem pasta)
                                         </DropdownMenuItem>
-                                        {pastas.filter(p => p.id !== template.pasta_id).map(p => (
+                                        {pastas
+                                          .filter(p => p.id !== template.pasta_id)
+                                          .sort((a, b) =>
+                                            a.nome.localeCompare(b.nome, "pt-BR", {
+                                              sensitivity: "base",
+                                            })
+                                          )
+                                          .map(p => (
                                           <DropdownMenuItem
                                             key={p.id}
                                             onClick={(e) => { e.stopPropagation(); moverTemplate(template.id, p.id); }}
@@ -687,7 +705,7 @@ export function WorkoutBlockDialog({
                     );
                   })()}
 
-                  <Separator className="my-4" />
+                  <Separator />
                 </div>
               )}
 

@@ -99,6 +99,9 @@ export function FolderExplorer({
   const [newFolderCor, setNewFolderCor] = useState("#3b82f6");
   const [newFolderTag, setNewFolderTag] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [folderSort, setFolderSort] = useState<"alfabetica" | "manual">(
+    "alfabetica"
+  );
 
   // Count total models in a folder + all subfolders recursively
   const contarModelosTotais = useMemo(() => {
@@ -125,14 +128,18 @@ export function FolderExplorer({
   const subpastas = useMemo(() => {
     let subs = pastas
       .filter((p) => p.parent_id === currentFolderId)
-      .sort((a, b) => a.ordem - b.ordem);
+      .sort((a, b) =>
+        folderSort === "alfabetica"
+          ? a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" })
+          : a.ordem - b.ordem
+      );
     
     if (tagFilter) {
       subs = subs.filter(p => p.tag === tagFilter);
     }
 
     return subs;
-  }, [pastas, currentFolderId, tagFilter]);
+  }, [pastas, currentFolderId, tagFilter, folderSort]);
 
   // Obter pasta atual e ancestrais para breadcrumb
   const { currentFolder, breadcrumb } = useMemo(() => {
@@ -203,53 +210,94 @@ export function FolderExplorer({
   };
 
   return (
-    <div className={cn("space-y-3", className)}>
-      {/* Breadcrumb Navigation */}
-      <div className="flex items-center gap-1.5 flex-wrap text-sm">
-        <Button
-          variant="ghost"
-          size="sm"
-          className={cn(
-            "h-7 px-2 gap-1",
-            currentFolderId === null && "bg-primary/10 text-primary"
-          )}
-          onClick={() => onNavigate(null)}
-        >
-          <Home className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Raiz</span>
-        </Button>
-
-        {breadcrumb.map((folder, index) => (
-          <div key={folder.id} className="flex items-center gap-1">
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "h-7 px-2 gap-1",
-                index === breadcrumb.length - 1 && "bg-primary/10 text-primary"
-              )}
-              onClick={() => onNavigate(folder.id)}
+    <div className={cn("overflow-hidden rounded-lg border bg-card shadow-sm", className)}>
+      <div className="bg-primary px-3 py-3 text-primary-foreground">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">Modelos de treino</p>
+            <p className="text-xs text-primary-foreground/80">
+              {pastas.length} pastas, {modelos.length} modelos
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Select
+              value={folderSort}
+              onValueChange={(value) =>
+                setFolderSort(value as "alfabetica" | "manual")
+              }
             >
-              <Folder className="h-3.5 w-3.5" style={{ color: folder.cor }} />
-              <span className="max-w-[120px] truncate">{folder.nome}</span>
-              {folder.tag && (
-                <Badge variant="outline" className="text-[9px] h-4 px-1 ml-0.5">
-                  {folder.tag === "masculino" ? "M" : "F"}
-                </Badge>
-              )}
+              <SelectTrigger className="h-8 w-[150px] border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="alfabetica">A-Z</SelectItem>
+                <SelectItem value="manual">Ordem manual</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="gap-2"
+              onClick={() => setCreateDialogOpen(true)}
+            >
+              <FolderPlus className="h-4 w-4" />
+              Nova Pasta
             </Button>
           </div>
-        ))}
+        </div>
+      </div>
+
+      <div className="border-b bg-muted/30 p-3">
+        <div className="flex items-center gap-1.5 overflow-x-auto text-sm">
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "h-8 px-2 gap-1.5",
+              currentFolderId === null && "bg-background text-primary"
+            )}
+            onClick={() => onNavigate(null)}
+          >
+            <Home className="h-4 w-4" />
+            <span>Raiz</span>
+          </Button>
+
+          {breadcrumb.map((folder, index) => (
+            <div key={folder.id} className="flex items-center gap-1">
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-8 px-2 gap-1.5",
+                  index === breadcrumb.length - 1 &&
+                    "bg-background text-primary"
+                )}
+                onClick={() => onNavigate(folder.id)}
+              >
+                <Folder className="h-4 w-4" style={{ color: folder.cor }} />
+                <span className="max-w-[140px] truncate">{folder.nome}</span>
+                {folder.tag && (
+                  <Badge
+                    variant="outline"
+                    className="ml-0.5 h-4 px-1 text-[9px]"
+                  >
+                    {folder.tag === "masculino" ? "M" : "F"}
+                  </Badge>
+                )}
+              </Button>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Folder Grid/List */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
         {/* Up button (if not at root) */}
         {currentFolderId !== null && (
           <button
             onClick={navigateUp}
-            className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg border border-dashed hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground min-h-[90px]"
+            className="flex min-h-[118px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-3 text-muted-foreground transition-all hover:-translate-y-0.5 hover:bg-muted/50 hover:text-foreground hover:shadow-sm"
           >
             <ArrowUp className="h-8 w-8" />
             <span className="text-xs font-medium">Voltar</span>
@@ -263,12 +311,12 @@ export function FolderExplorer({
           return (
             <div
               key={pasta.id}
-              className="group relative flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer min-h-[90px]"
+              className="group relative flex min-h-[118px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border bg-background p-3 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
               onClick={() => onNavigate(pasta.id)}
             >
               <div className="relative">
                 <FolderOpen
-                  className="h-10 w-10"
+                  className="h-12 w-12 fill-sky-100"
                   style={{ color: pasta.cor }}
                 />
                 {totalModelos > 0 && (
@@ -280,7 +328,7 @@ export function FolderExplorer({
                   </Badge>
                 )}
               </div>
-              <span className="text-xs font-medium text-center line-clamp-2 max-w-full">
+              <span className="line-clamp-2 max-w-full text-xs font-semibold">
                 {pasta.nome}
               </span>
               {pasta.tag && (
@@ -322,18 +370,19 @@ export function FolderExplorer({
           );
         })}
 
-        {/* Create new folder button */}
-        <button
-          onClick={() => setCreateDialogOpen(true)}
-          className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg border border-dashed hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground min-h-[90px]"
-        >
-          <FolderPlus className="h-8 w-8" />
-          <span className="text-xs font-medium">Nova Pasta</span>
-        </button>
+        {subpastas.length === 0 && currentFolderId === null && (
+          <button
+            onClick={() => setCreateDialogOpen(true)}
+            className="flex min-h-[118px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-3 text-muted-foreground transition-all hover:-translate-y-0.5 hover:bg-muted/50 hover:text-foreground hover:shadow-sm"
+          >
+            <FolderPlus className="h-9 w-9" />
+            <span className="text-xs font-medium">Nova Pasta</span>
+          </button>
+        )}
       </div>
 
       {/* Stats */}
-      <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2 border-t">
+      <div className="flex items-center gap-4 border-t px-3 py-2 text-xs text-muted-foreground">
         <span>{subpastas.length} pasta{subpastas.length !== 1 ? "s" : ""}</span>
         <span>
           {currentFolderId === null ? modelosSemPasta : modelosNaPastaAtual} modelo

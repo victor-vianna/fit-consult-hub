@@ -68,7 +68,8 @@ import { useBlocoTemplates } from "@/hooks/useBlocoTemplates";
 import { SalvarComoModeloDialog } from "@/components/SalvarComoModeloDialog";
 import { AplicarModeloDialog } from "@/components/AplicarModeloDialog";
 import { ModelosTreinoList } from "@/components/ModelosTreinoList";
-import { BookTemplate, FileDown, Download } from "lucide-react";
+import { GlobalModelosTreinoList } from "@/components/GlobalModelosTreinoList";
+import { BookTemplate, FileDown, Download, Star } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DropdownMenu,
@@ -1157,7 +1158,7 @@ export function TreinosManager({
 
       {/* 🆕 TABS: Treinos da Semana | Modelos */}
       <Tabs value={activeMainTab} onValueChange={setActiveMainTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
+        <TabsList className={cn("grid w-full max-w-2xl", isPersonal ? "grid-cols-3" : "grid-cols-2")}>
           <TabsTrigger value="treinos" className="flex items-center gap-2">
             <Dumbbell className="h-4 w-4" />
             Treinos da Semana
@@ -1171,6 +1172,12 @@ export function TreinosManager({
               </Badge>
             )}
           </TabsTrigger>
+          {isPersonal && (
+            <TabsTrigger value="modelos-globais" className="flex items-center gap-2">
+              <Star className="h-4 w-4" />
+              Modelos Globais
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* ============ ABA: TREINOS DA SEMANA ============ */}
@@ -1725,6 +1732,15 @@ export function TreinosManager({
             isAtualizando={isAtualizandoModelo}
           />
         </TabsContent>
+
+        {isPersonal && (
+          <TabsContent value="modelos-globais" className="space-y-6 mt-6">
+            <GlobalModelosTreinoList
+              personalId={personalId}
+              pastasDestino={pastas}
+            />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* ============ DIALOGS ============ */}

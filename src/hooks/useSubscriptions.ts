@@ -28,7 +28,7 @@ export interface PaymentHistory {
   created_at: string;
 }
 
-export function useSubscriptions(studentId?: string) {
+export function useSubscriptions(studentId?: string, personalId?: string) {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -37,18 +37,24 @@ export function useSubscriptions(studentId?: string) {
     if (studentId) {
       fetchSubscriptions();
     }
-  }, [studentId]);
+  }, [studentId, personalId]);
 
   const fetchSubscriptions = async () => {
     if (!studentId) return;
 
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from("subscriptions")
         .select("*")
         .eq("student_id", studentId)
         .order("created_at", { ascending: false });
+
+      if (personalId) {
+        query = query.eq("personal_id", personalId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setSubscriptions((data || []) as Subscription[]);
@@ -237,11 +243,17 @@ export function useSubscriptions(studentId?: string) {
   };
 
   const getActiveSubscription = () => {
-    return subscriptions.find(
-      (sub) =>
-        sub.status_pagamento === "pago" &&
-        new Date(sub.data_expiracao) > new Date()
-    );
+    return [...subscriptions]
+      .filter(
+        (sub) =>
+          sub.status_pagamento === "pago" &&
+          new Date(sub.data_expiracao) > new Date()
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.data_expiracao).getTime() -
+          new Date(a.data_expiracao).getTime()
+      )[0];
   };
 
   return {

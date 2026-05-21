@@ -42,6 +42,8 @@ interface ModeloVisualizacaoModalProps {
     dados: { nome?: string; descricao?: string; categoria?: string; duracao_total_minutos?: number | null }
   ) => Promise<unknown>;
   isAtualizando?: boolean;
+  canEdit?: boolean;
+  applyLabel?: string;
 }
 
 export function ModeloVisualizacaoModal({
@@ -51,6 +53,8 @@ export function ModeloVisualizacaoModal({
   onAplicar,
   onAtualizar,
   isAtualizando = false,
+  canEdit = true,
+  applyLabel = "Aplicar Modelo",
 }: ModeloVisualizacaoModalProps) {
   const [editando, setEditando] = useState(false);
   const [nome, setNome] = useState("");
@@ -125,7 +129,7 @@ export function ModeloVisualizacaoModal({
                 <DialogTitle className="text-xl">{modelo.nome}</DialogTitle>
               )}
             </div>
-            {!editando && (
+            {!editando && canEdit && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -383,7 +387,7 @@ export function ModeloVisualizacaoModal({
               </Button>
               <Button onClick={() => onAplicar(modelo)}>
                 <Calendar className="h-4 w-4 mr-2" />
-                Aplicar Modelo
+                {applyLabel}
               </Button>
             </>
           )}

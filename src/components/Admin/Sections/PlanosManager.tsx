@@ -54,6 +54,18 @@ const buildFeaturesPayload = (plano: Plano) => ({
   recursos: plano.recursos,
 });
 
+const isUnlimitedStudents = (maxAlunos?: number | null) =>
+  maxAlunos === null || maxAlunos === 0;
+
+const formatMaxAlunos = (maxAlunos?: number | null) =>
+  isUnlimitedStudents(maxAlunos) ? "Ilimitado" : String(maxAlunos);
+
+const parseIntegerInput = (value: string) => {
+  if (value.trim() === "") return 0;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+};
+
 export default function PlanosManager() {
   const { toast } = useToast();
   const [planos, setPlanos] = useState<Plano[]>([]);
@@ -85,7 +97,7 @@ export default function PlanosManager() {
         planosData?.map((plano) => ({
           ...plano,
           descricao: plano.descricao || "",
-          max_alunos: plano.max_alunos || 0,
+          max_alunos: plano.max_alunos ?? 0,
           ativo: plano.ativo ?? true,
           features: parseFeatureItems(plano.features),
           recursos: parsePlanResources(plano.features, plano.nome),
@@ -139,7 +151,7 @@ export default function PlanosManager() {
             nome: editingPlano.nome,
             descricao: editingPlano.descricao,
             preco_mensal: editingPlano.preco_mensal,
-            max_alunos: editingPlano.max_alunos,
+            max_alunos: editingPlano.max_alunos ?? 0,
             features: buildFeaturesPayload(editingPlano),
             ativo: editingPlano.ativo,
           })
@@ -157,7 +169,7 @@ export default function PlanosManager() {
           nome: editingPlano.nome,
           descricao: editingPlano.descricao,
           preco_mensal: editingPlano.preco_mensal,
-          max_alunos: editingPlano.max_alunos,
+          max_alunos: editingPlano.max_alunos ?? 0,
           features: buildFeaturesPayload(editingPlano),
           ativo: editingPlano.ativo,
         });
@@ -320,15 +332,19 @@ export default function PlanosManager() {
               <label className="text-sm font-medium">Máximo de Alunos</label>
               <Input
                 type="number"
+                min={0}
                 value={editingPlano.max_alunos}
                 onChange={(e) =>
                   setEditingPlano({
                     ...editingPlano,
-                    max_alunos: parseInt(e.target.value),
+                    max_alunos: parseIntegerInput(e.target.value),
                   })
                 }
-                placeholder="10"
+                placeholder="0 para ilimitado"
               />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Use 0 para deixar o plano sem limite de alunos.
+              </p>
             </div>
           </div>
 
@@ -527,7 +543,9 @@ export default function PlanosManager() {
                       <span className="text-muted-foreground">
                         Máx. Alunos:
                       </span>
-                      <span className="font-semibold">{plano.max_alunos}</span>
+                      <span className="font-semibold">
+                        {formatMaxAlunos(plano.max_alunos)}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">

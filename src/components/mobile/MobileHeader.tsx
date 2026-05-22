@@ -1,5 +1,6 @@
-import { Dumbbell, Bell } from 'lucide-react';
+import { Dumbbell } from 'lucide-react';
 import { getTimeGreeting } from '@/utils/timeGreeting';
+import { MobileAccountMenu } from '@/components/mobile/MobileAccountMenu';
 
 interface MobileHeaderProps {
   userName?: string;
@@ -15,7 +16,7 @@ export function MobileHeader({ userName }: MobileHeaderProps) {
           <Dumbbell className="h-6 w-6 text-primary" />
           <span className="font-bold text-lg">FitConsult</span>
         </div>
-        <Bell className="h-5 w-5 text-muted-foreground" />
+        <MobileAccountMenu userName={userName} />
       </div>
       {userName && (
         <div className="px-4 pb-3">

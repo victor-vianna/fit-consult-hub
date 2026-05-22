@@ -152,9 +152,25 @@ export function usePersonalPlanFeatures(personalId?: string | null) {
       : inferPlanLevelFromName(plano?.nome);
   }, [query.data, role]);
 
+  const planName = useMemo(() => {
+    if (role === "admin") return "Admin";
+
+    const assinatura = query.data;
+    const status = assinatura?.status;
+    const isActive = status
+      ? ACTIVE_SUBSCRIPTION_STATUSES.includes(status)
+      : false;
+
+    if (!isActive) return null;
+
+    const plano = assinatura?.plano as any;
+    return plano?.nome ?? null;
+  }, [query.data, role]);
+
   return {
     features,
     planLevel,
+    planName,
     loading: query.isLoading,
     error: query.error,
     canAccessPlatform: features.acesso_plataforma,

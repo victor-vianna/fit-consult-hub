@@ -19,15 +19,23 @@ const TITLES: Record<string, string> = {
   "/admin/configuracoes": "Configurações",
 };
 
-export function AdminHeader() {
+interface AdminHeaderProps {
+  showSidebarTrigger?: boolean;
+}
+
+export function AdminHeader({ showSidebarTrigger = true }: AdminHeaderProps) {
   const { signOut } = useAuth();
   const { pathname } = useLocation();
   const title = TITLES[pathname] ?? "Admin";
 
   return (
     <header className="sticky top-0 z-30 flex topbar-safe-mobile-compact items-center gap-2 border-b bg-card/80 backdrop-blur-xl px-3 md:px-4">
-      <SidebarTrigger className="touch-target" />
-      <Separator orientation="vertical" className="h-6" />
+      {showSidebarTrigger && (
+        <>
+          <SidebarTrigger className="touch-target" />
+          <Separator orientation="vertical" className="h-6" />
+        </>
+      )}
       <h1 className="text-sm md:text-base font-semibold truncate flex-1">
         {title}
       </h1>

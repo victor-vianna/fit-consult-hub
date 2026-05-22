@@ -14,7 +14,6 @@ import { PersonalSettingsDialog } from "@/components/PersonalSettingsDialog";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { MobileHeaderPersonal } from "@/components/mobile/MobileHeaderPersonal";
 import { BottomNavigationPersonal } from "@/components/mobile/BottomNavigationPersonal";
-import { MobileMenuDrawerPersonal } from "@/components/mobile/MobileMenuDrawerPersonal";
 import { AppLayout } from "@/components/AppLayout";
 import { PersonalDashboardCards } from "@/components/dashboard/PersonalDashboardCards";
 import { LojaPlaceholder } from "@/components/loja/LojaPlaceholder";
@@ -39,7 +38,6 @@ export default function Personal() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const {
     settings: personalSettings
@@ -169,7 +167,7 @@ export default function Personal() {
   if (isMobile) {
     return <AppLayout>
         <div className="flex flex-col min-h-screen bg-background">
-          <MobileHeaderPersonal onMenuClick={() => setMenuOpen(true)} personalId={user?.id} personalSettings={personalSettings} profileName={profile?.nome} userId={user?.id} />
+          <MobileHeaderPersonal personalId={user?.id} personalSettings={personalSettings} profileName={profile?.nome} userId={user?.id} />
 
           <main className="flex-1 overflow-auto pb-20 px-4 pt-4 space-y-4">
             {/* Dashboard Cards para Mobile (já inclui o card Meus Alunos) */}
@@ -179,9 +177,7 @@ export default function Personal() {
             <LojaPlaceholder isPersonal={true} themeColor={personalSettings?.theme_color} />
           </main>
 
-          <BottomNavigationPersonal onMenuClick={() => setMenuOpen(true)} themeColor={personalSettings?.theme_color} />
-
-          <MobileMenuDrawerPersonal open={menuOpen} onOpenChange={setMenuOpen} personalSettings={personalSettings} onSignOut={signOut} />
+          <BottomNavigationPersonal themeColor={personalSettings?.theme_color} />
         </div>
       </AppLayout>;
   }

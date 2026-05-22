@@ -8,8 +8,20 @@ import { FinancialDashboard } from "@/components/FinancialDashboard";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { AppLayout } from "@/components/AppLayout";
+import { PersonalMobilePageLayout } from "@/components/mobile/PersonalMobilePageLayout";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function Financeiro() {
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return (
+      <PersonalMobilePageLayout>
+        <FinancialDashboard />
+      </PersonalMobilePageLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <SidebarProvider>

@@ -1,8 +1,6 @@
-import { Home, MessageCircle, Menu } from 'lucide-react';
-import { useState } from 'react';
-import { MobileMenuDrawer } from './MobileMenuDrawer';
-import { useHaptic } from '@/hooks/useHaptic';
-import { cn } from '@/lib/utils';
+import { CreditCard, Dumbbell, FileText, Home, MessageCircle } from "lucide-react";
+import { useHaptic } from "@/hooks/useHaptic";
+import { cn } from "@/lib/utils";
 
 interface BottomNavigationProps {
   activeSection: string;
@@ -12,14 +10,11 @@ interface BottomNavigationProps {
   chatNaoLidas?: number;
 }
 
-export function BottomNavigation({ 
-  activeSection, 
-  onSectionChange, 
-  onSignOut,
-  personalWhatsApp,
+export function BottomNavigation({
+  activeSection,
+  onSectionChange,
   chatNaoLidas = 0,
 }: BottomNavigationProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const { light } = useHaptic();
 
   const handleSectionChange = (section: string) => {
@@ -27,79 +22,51 @@ export function BottomNavigation({
     onSectionChange(section);
   };
 
+  const navItems = [
+    { section: "inicio", label: "Inicio", icon: Home },
+    { section: "treinos", label: "Treinos", icon: Dumbbell },
+    { section: "materiais", label: "Materiais", icon: FileText },
+    { section: "chat", label: "Chat", icon: MessageCircle },
+    { section: "financeiro", label: "Planos", icon: CreditCard },
+  ];
+
   return (
-    <>
-      <nav className="fixed bottom-0 left-0 right-0 z-30 bg-card border-t backdrop-blur-sm safe-area-bottom">
-        <div className="flex items-center justify-around px-4 py-3">
-          <button
-            onClick={() => handleSectionChange('inicio')}
-            className={cn(
-              "flex flex-col items-center gap-1 px-6 py-2 rounded-lg",
-              "transition-all duration-300 ease-in-out",
-              "active:scale-95",
-              "touch-target",
-              activeSection === 'inicio' 
-                ? 'text-primary bg-primary/10 scale-105' 
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-          >
-            <Home className="h-6 w-6 transition-transform" />
-            <span className="text-xs font-medium">Início</span>
-          </button>
+    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-card border-t backdrop-blur-sm safe-area-bottom">
+      <div className="flex items-center justify-around px-1 py-2">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeSection === item.section;
+          const isChat = item.section === "chat";
 
-          <button
-            onClick={() => handleSectionChange('chat')}
-            className={cn(
-              "flex flex-col items-center gap-1 px-6 py-2 rounded-lg relative",
-              "transition-all duration-300 ease-in-out",
-              "active:scale-95",
-              "touch-target",
-              activeSection === 'chat' 
-                ? 'text-primary bg-primary/10 scale-105' 
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-          >
-            <div className="relative">
-              <MessageCircle className="h-6 w-6 transition-transform" />
-              {chatNaoLidas > 0 && (
-                <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center animate-pulse">
-                  {chatNaoLidas > 9 ? "9+" : chatNaoLidas}
-                </span>
+          return (
+            <button
+              key={item.section}
+              onClick={() => handleSectionChange(item.section)}
+              className={cn(
+                "flex min-w-0 flex-1 flex-col items-center gap-1 rounded-lg px-1.5 py-2",
+                "transition-all duration-300 ease-in-out",
+                "active:scale-95",
+                "touch-target",
+                isActive
+                  ? "text-primary bg-primary/10 scale-105"
+                  : "text-muted-foreground hover:text-foreground"
               )}
-            </div>
-            <span className="text-xs font-medium">Chat</span>
-          </button>
-
-          <button
-            onClick={() => {
-              light();
-              setMenuOpen(true);
-            }}
-            className={cn(
-              "flex flex-col items-center gap-1 px-6 py-2 rounded-lg",
-              "transition-all duration-300 ease-in-out",
-              "active:scale-95",
-              "touch-target",
-              "text-muted-foreground hover:text-primary"
-            )}
-          >
-            <Menu className="h-6 w-6 transition-transform" />
-            <span className="text-xs font-medium">Menu</span>
-          </button>
-        </div>
-      </nav>
-
-      <MobileMenuDrawer
-        open={menuOpen}
-        onOpenChange={setMenuOpen}
-        activeSection={activeSection}
-        onSectionChange={(section) => {
-          onSectionChange(section);
-          setMenuOpen(false);
-        }}
-        onSignOut={onSignOut}
-      />
-    </>
+            >
+              <span className="relative">
+                <Icon className="h-5 w-5 transition-transform" />
+                {isChat && chatNaoLidas > 0 && (
+                  <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center animate-pulse">
+                    {chatNaoLidas > 9 ? "9+" : chatNaoLidas}
+                  </span>
+                )}
+              </span>
+              <span className="max-w-full truncate text-[11px] font-medium">
+                {item.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
-

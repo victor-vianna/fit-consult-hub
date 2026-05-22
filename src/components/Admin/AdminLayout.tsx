@@ -3,7 +3,9 @@ import { Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { AdminHeader } from "./AdminHeader";
+import { AdminMobileBottomNavigation } from "./AdminMobileBottomNavigation";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 function SectionFallback() {
   return (
@@ -20,6 +22,24 @@ function SectionFallback() {
 }
 
 export default function AdminLayout() {
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return (
+      <div className="min-h-screen bg-background">
+        <AdminHeader showSidebarTrigger={false} />
+        <main className="flex-1 overflow-y-auto pb-24">
+          <div className="container-mobile py-4 max-w-7xl mx-auto">
+            <Suspense fallback={<SectionFallback />}>
+              <Outlet />
+            </Suspense>
+          </div>
+        </main>
+        <AdminMobileBottomNavigation />
+      </div>
+    );
+  }
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">

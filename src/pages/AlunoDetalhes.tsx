@@ -81,6 +81,7 @@ import { BroadcastMessageDialog } from "@/components/chat/BroadcastMessageDialog
 import { useChatMessages } from "@/hooks/useChatMessages";
 import { WeightProgressionPanel } from "@/components/WeightProgressionPanel";
 import { MaterialFileExplorer } from "@/components/materials/MaterialFileExplorer";
+import { MobileAccountMenu } from "@/components/mobile/MobileAccountMenu";
 
 interface Material {
   id: string;
@@ -107,7 +108,7 @@ export default function AlunoDetalhes() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { toast } = useToast();
   const [aluno, setAluno] = useState<Aluno | null>(null);
   const [personalProfile, setPersonalProfile] = useState<any>(null);
@@ -483,7 +484,9 @@ export default function AlunoDetalhes() {
                 {isMobile ? "Voltar" : "Voltar para Meus Alunos"}
               </Button>
 
-              {!isMobile && (
+              {isMobile ? (
+                <MobileAccountMenu userName={profile?.nome} />
+              ) : (
                 <div className="flex items-center gap-2">
                   <AccessStatusBadge studentId={aluno.id} />
                 </div>

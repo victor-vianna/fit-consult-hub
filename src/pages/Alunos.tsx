@@ -8,8 +8,20 @@ import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { AppLayout } from "@/components/AppLayout";
 import AlunosManager from "@/components/AlunosManager";
+import { PersonalMobilePageLayout } from "@/components/mobile/PersonalMobilePageLayout";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function Alunos() {
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return (
+      <PersonalMobilePageLayout showHeader={false} className="px-0 pt-0">
+        <AlunosManager />
+      </PersonalMobilePageLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <SidebarProvider>

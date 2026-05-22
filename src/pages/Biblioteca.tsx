@@ -8,8 +8,20 @@ import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import ExercisesLibrary from "@/components/ExercisesLibrary";
 import { AppLayout } from "@/components/AppLayout";
+import { PersonalMobilePageLayout } from "@/components/mobile/PersonalMobilePageLayout";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function Biblioteca() {
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return (
+      <PersonalMobilePageLayout>
+        <ExercisesLibrary />
+      </PersonalMobilePageLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <SidebarProvider>

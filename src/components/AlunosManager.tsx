@@ -70,6 +70,8 @@ import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { AppLayout } from "@/components/AppLayout";
 import { usePriorityStudents } from "@/hooks/usePriorityStudents";
 import { useAlunosQuickStatus } from "@/hooks/useAlunosQuickStatus";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileAccountMenu } from "@/components/mobile/MobileAccountMenu";
 
 interface Aluno {
   id: string;
@@ -82,7 +84,8 @@ interface Aluno {
 
 export default function AlunosManager() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const isMobile = useIsMobile();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -381,6 +384,7 @@ export default function AlunosManager() {
             </div>
 
             <div className="flex items-center gap-2">
+              {isMobile && <MobileAccountMenu userName={profile?.nome} />}
               <Dialog open={openNotifSettings} onOpenChange={setOpenNotifSettings}>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="default" title="Gerenciar notificações dos cards">

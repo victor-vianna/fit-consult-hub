@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { PersonalSettingsDialog } from "@/components/PersonalSettingsDialog";
 import { NotificacoesDropdown } from "@/components/NotificacoesDropdown";
+import { MobileAccountMenu } from "@/components/mobile/MobileAccountMenu";
 
 interface MobileHeaderPersonalProps {
-  onMenuClick: () => void;
+  onMenuClick?: () => void;
   personalId?: string;
   personalSettings?: {
     logo_url?: string;
@@ -37,14 +38,16 @@ export function MobileHeaderPersonal({
     >
       <div className="flex items-center justify-between px-4 header-safe-top-compact pb-3">
         <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onMenuClick}
-            className="h-9 w-9"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
+          {onMenuClick && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onMenuClick}
+              className="h-9 w-9"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          )}
 
           {personalSettings?.logo_url && (
             <img
@@ -74,6 +77,7 @@ export function MobileHeaderPersonal({
           {userId && <NotificacoesDropdown userId={userId} />}
           {personalId && <PersonalSettingsDialog personalId={personalId} />}
           <ThemeToggle />
+          <MobileAccountMenu userName={profileName} />
         </div>
       </div>
     </header>

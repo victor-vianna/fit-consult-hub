@@ -21,6 +21,7 @@ import {
   GLOBAL_RESOURCES_MIN_PLAN_LEVEL,
   usePersonalPlanFeatures,
 } from "@/hooks/usePersonalPlanFeatures";
+import { cn } from "@/lib/utils";
 import { copyModeloTreino } from "@/utils/modeloCopies";
 import {
   ArrowUp,
@@ -169,7 +170,7 @@ export function GlobalModelosTreinoList({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="max-w-full space-y-4 overflow-hidden">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -196,7 +197,7 @@ export function GlobalModelosTreinoList({
       </div>
 
       {!search.trim() && (
-        <Card className="overflow-hidden">
+        <Card className="max-w-full overflow-hidden">
           <div className="bg-primary px-3 py-3 text-primary-foreground">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
@@ -213,11 +214,14 @@ export function GlobalModelosTreinoList({
           </div>
 
           <div className="border-b bg-muted/30 p-3">
-            <div className="flex items-center gap-1.5 overflow-x-auto text-sm">
+            <div className="flex max-w-full items-center gap-1.5 overflow-x-auto text-sm">
               <Button
                 variant="ghost"
                 size="sm"
-                className={currentFolderId === null ? "bg-background text-primary" : ""}
+                className={cn(
+                  "shrink-0",
+                  currentFolderId === null ? "bg-background text-primary" : ""
+                )}
                 onClick={() => setCurrentFolderId(null)}
               >
                 <Home className="mr-1.5 h-4 w-4" />
@@ -228,11 +232,14 @@ export function GlobalModelosTreinoList({
                   key={folder.id}
                   variant="ghost"
                   size="sm"
-                  className={folder.id === currentFolderId ? "bg-background text-primary" : ""}
+                  className={cn(
+                    "max-w-[170px] shrink-0",
+                    folder.id === currentFolderId ? "bg-background text-primary" : ""
+                  )}
                   onClick={() => setCurrentFolderId(folder.id)}
                 >
-                  <FolderOpen className="mr-1.5 h-4 w-4" />
-                  {folder.nome}
+                  <FolderOpen className="mr-1.5 h-4 w-4 shrink-0" />
+                  <span className="truncate">{folder.nome}</span>
                 </Button>
               ))}
             </div>
@@ -270,16 +277,16 @@ export function GlobalModelosTreinoList({
         </Card>
       )}
 
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="grid min-w-0 gap-3 lg:grid-cols-2">
         {modelosNaPasta.map((modelo) => {
           const minLevel = effectiveLevel(modelo);
           const locked = planLevel < minLevel;
           return (
-            <Card key={modelo.id}>
+            <Card key={modelo.id} className="min-w-0 overflow-hidden">
               <CardHeader className="pb-3">
-                <CardTitle className="flex items-start justify-between gap-3 text-base">
+                <CardTitle className="flex min-w-0 flex-col gap-2 text-base sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                   <span className="flex min-w-0 items-start gap-3">
-                    <span className="rounded-md bg-primary/10 p-2 text-primary">
+                    <span className="shrink-0 rounded-md bg-primary/10 p-2 text-primary">
                       <BookTemplate className="h-5 w-5" />
                     </span>
                     <span className="min-w-0">
@@ -289,7 +296,7 @@ export function GlobalModelosTreinoList({
                       </span>
                     </span>
                   </span>
-                  <Badge className="shrink-0">
+                  <Badge className="w-fit shrink-0">
                     <Star className="mr-1 h-3 w-3" />
                     Global
                   </Badge>
@@ -313,7 +320,7 @@ export function GlobalModelosTreinoList({
                     para salvar uma copia.
                   </p>
                 )}
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <Button
                     variant="outline"
                     className="flex-1"

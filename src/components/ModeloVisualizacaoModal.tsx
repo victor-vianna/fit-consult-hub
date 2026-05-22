@@ -114,10 +114,10 @@ export function ModeloVisualizacaoModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-3xl h-[92vh] max-h-[92vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="flex h-[92vh] max-h-[92vh] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-col overflow-hidden px-4 sm:max-w-3xl sm:px-6">
+        <DialogHeader className="min-w-0">
           <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
               {editando ? (
                 <Input
                   value={nome}
@@ -126,7 +126,7 @@ export function ModeloVisualizacaoModal({
                   placeholder="Nome do modelo"
                 />
               ) : (
-                <DialogTitle className="text-xl">{modelo.nome}</DialogTitle>
+                <DialogTitle className="break-words text-lg sm:text-xl">{modelo.nome}</DialogTitle>
               )}
             </div>
             {!editando && canEdit && (
@@ -154,7 +154,7 @@ export function ModeloVisualizacaoModal({
                   rows={2}
                 />
               </div>
-              <div className="flex gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <div className="flex-1">
                   <label className="text-xs text-muted-foreground mb-1 block">
                     Categoria
@@ -165,7 +165,7 @@ export function ModeloVisualizacaoModal({
                     placeholder="Ex: Hipertrofia, Força..."
                   />
                 </div>
-                <div className="w-32">
+                <div className="sm:w-32">
                   <label className="text-xs text-muted-foreground mb-1 block">
                     Duração (min)
                   </label>
@@ -182,7 +182,7 @@ export function ModeloVisualizacaoModal({
           ) : (
             <>
               {modelo.descricao && (
-                <DialogDescription>{modelo.descricao}</DialogDescription>
+                <DialogDescription className="break-words">{modelo.descricao}</DialogDescription>
               )}
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 {modelo.categoria && (
@@ -206,7 +206,7 @@ export function ModeloVisualizacaoModal({
         <Separator />
 
         {/* Estatísticas */}
-        <div className="flex items-center gap-6 py-2">
+        <div className="flex flex-wrap items-center gap-3 py-2 sm:gap-6">
           <div className="flex items-center gap-2 text-sm">
             <Dumbbell className="h-4 w-4 text-primary" />
             <span className="font-medium">{totalExercicios}</span>
@@ -222,7 +222,7 @@ export function ModeloVisualizacaoModal({
         <Separator />
 
         {/* Conteúdo */}
-        <ScrollArea className="flex-1 min-h-0 -mx-6 px-6">
+        <ScrollArea className="min-h-0 flex-1 -mx-4 px-4 sm:-mx-6 sm:px-6">
           <div className="space-y-4 py-2">
             {/* Blocos */}
             {modelo.blocos && modelo.blocos.length > 0 && (
@@ -235,14 +235,14 @@ export function ModeloVisualizacaoModal({
                   {modelo.blocos.map((bloco, idx) => (
                     <div
                       key={bloco.id || idx}
-                      className="flex items-center gap-3 p-3 rounded-lg border bg-card"
+                      className="flex min-w-0 items-center gap-3 rounded-lg border bg-card p-3"
                     >
                       <Badge variant="outline" className="shrink-0">
                         {idx + 1}
                       </Badge>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{bloco.nome}</p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <p className="break-words font-medium">{bloco.nome}</p>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                           <Badge variant="secondary" className="text-xs">
                             {bloco.tipo}
                           </Badge>
@@ -286,21 +286,22 @@ export function ModeloVisualizacaoModal({
               const renderExercicio = (ex: typeof isolados[0], idx: number) => {
                 const links = ex.links_demonstracao || (ex.link_video ? [{ label: "Vídeo", url: ex.link_video }] : []);
                 return (
-                  <div key={ex.id || idx} className="flex items-start gap-3 p-3 rounded-lg border bg-card">
+                  <div key={ex.id || idx} className="flex min-w-0 max-w-full items-start gap-3 overflow-hidden rounded-lg border bg-card p-3">
                     <Badge variant="outline" className="shrink-0 mt-0.5">{idx + 1}</Badge>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{ex.nome}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <p className="break-words font-medium">{ex.nome}</p>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                         <span>{ex.series}x{ex.repeticoes}</span>
                         {ex.carga && <span>• {ex.carga}</span>}
                         <span>• {ex.descanso}s descanso</span>
                       </div>
-                      {ex.observacoes && <p className="text-xs text-muted-foreground mt-1 italic">{ex.observacoes}</p>}
+                      {ex.observacoes && <p className="mt-1 break-words text-xs italic text-muted-foreground">{ex.observacoes}</p>}
                       {links.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mt-1.5">
                           {links.map((link, linkIdx) => (
-                            <a key={linkIdx} href={link.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
-                              <ExternalLink className="h-3 w-3" />{link.label}
+                            <a key={linkIdx} href={link.url} target="_blank" rel="noopener noreferrer" className="inline-flex max-w-full items-center gap-1 text-xs text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+                              <ExternalLink className="h-3 w-3 shrink-0" />
+                              <span className="truncate">{link.label}</span>
                             </a>
                           ))}
                         </div>
@@ -326,7 +327,7 @@ export function ModeloVisualizacaoModal({
                       if (item.type === "grupo" && item.exercicios) {
                         const label = item.tipoAgrupamento === "bi_set" ? "Bi-Set" : item.tipoAgrupamento === "tri_set" ? "Tri-Set" : item.tipoAgrupamento === "drop_set" ? "Drop-Set" : "Super-Set";
                         return (
-                          <div key={item.grupoId} className="border-2 border-primary/20 rounded-lg p-2 space-y-2">
+                          <div key={item.grupoId} className="min-w-0 max-w-full space-y-2 overflow-hidden rounded-lg border-2 border-primary/20 p-2">
                             <Badge variant="secondary" className="text-xs">{label}</Badge>
                             {item.exercicios.map(ex => {
                               globalIdx++;

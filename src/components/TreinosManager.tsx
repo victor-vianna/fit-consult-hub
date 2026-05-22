@@ -1158,24 +1158,41 @@ export function TreinosManager({
 
       {/* 🆕 TABS: Treinos da Semana | Modelos */}
       <Tabs value={activeMainTab} onValueChange={setActiveMainTab} className="w-full">
-        <TabsList className={cn("grid w-full max-w-2xl", isPersonal ? "grid-cols-3" : "grid-cols-2")}>
-          <TabsTrigger value="treinos" className="flex items-center gap-2">
-            <Dumbbell className="h-4 w-4" />
-            Treinos da Semana
+        <TabsList
+          className={cn(
+            "grid h-auto w-full max-w-2xl gap-1 p-1",
+            isPersonal ? "grid-cols-3" : "grid-cols-2"
+          )}
+        >
+          <TabsTrigger
+            value="treinos"
+            className="min-w-0 flex-col gap-1 px-1.5 py-2 text-[11px] leading-tight sm:flex-row sm:gap-2 sm:px-3 sm:text-sm"
+          >
+            <Dumbbell className="h-4 w-4 shrink-0" />
+            <span className="truncate sm:hidden">Semana</span>
+            <span className="hidden truncate sm:inline">Treinos da Semana</span>
           </TabsTrigger>
-          <TabsTrigger value="modelos" className="flex items-center gap-2">
-            <BookTemplate className="h-4 w-4" />
-            Meus Modelos
+          <TabsTrigger
+            value="modelos"
+            className="min-w-0 flex-col gap-1 px-1.5 py-2 text-[11px] leading-tight sm:flex-row sm:gap-2 sm:px-3 sm:text-sm"
+          >
+            <BookTemplate className="h-4 w-4 shrink-0" />
+            <span className="truncate sm:hidden">Meus</span>
+            <span className="hidden truncate sm:inline">Meus Modelos</span>
             {modelos.length > 0 && (
-              <Badge variant="secondary" className="ml-1">
+              <Badge variant="secondary" className="h-4 px-1 text-[10px] sm:ml-1 sm:h-5 sm:px-2 sm:text-xs">
                 {modelos.length}
               </Badge>
             )}
           </TabsTrigger>
           {isPersonal && (
-            <TabsTrigger value="modelos-globais" className="flex items-center gap-2">
-              <Star className="h-4 w-4" />
-              Modelos Globais
+            <TabsTrigger
+              value="modelos-globais"
+              className="min-w-0 flex-col gap-1 px-1.5 py-2 text-[11px] leading-tight sm:flex-row sm:gap-2 sm:px-3 sm:text-sm"
+            >
+              <Star className="h-4 w-4 shrink-0" />
+              <span className="truncate sm:hidden">Globais</span>
+              <span className="hidden truncate sm:inline">Modelos Globais</span>
             </TabsTrigger>
           )}
         </TabsList>

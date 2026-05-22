@@ -197,7 +197,7 @@ export default function Personal() {
             backgroundColor: personalSettings?.theme_color ? `${personalSettings.theme_color}10` : "hsl(var(--card) / 0.5)",
             borderColor: personalSettings?.theme_color ? `${personalSettings.theme_color}30` : "hsl(var(--border))"
           }}>
-              <div className="flex items-center justify-between px-4 py-4">
+              <div className="flex items-center justify-between px-4 header-safe-top pb-4">
                 <div className="flex items-center gap-3">
                   <SidebarTrigger />
 

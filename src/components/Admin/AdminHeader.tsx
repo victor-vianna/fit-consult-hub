@@ -25,7 +25,7 @@ export function AdminHeader() {
   const title = TITLES[pathname] ?? "Admin";
 
   return (
-    <header className="sticky top-0 z-30 h-14 flex items-center gap-2 border-b bg-card/80 backdrop-blur-xl px-3 md:px-4">
+    <header className="sticky top-0 z-30 flex topbar-safe-mobile-compact items-center gap-2 border-b bg-card/80 backdrop-blur-xl px-3 md:px-4">
       <SidebarTrigger className="touch-target" />
       <Separator orientation="vertical" className="h-6" />
       <h1 className="text-sm md:text-base font-semibold truncate flex-1">

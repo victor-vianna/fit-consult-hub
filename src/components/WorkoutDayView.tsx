@@ -545,20 +545,8 @@ function TreinoCard({
 
   return (
     <Card className="border-primary/30 shadow-xl bg-card/50 backdrop-blur-sm">
-      <CardContent className="p-4 sm:p-6 space-y-6">
-        <WorkoutDayHeader
-          diaNome={hasMultiple && treino.nome_treino 
-            ? `${diaInfo.nome} — ${treino.nome_treino}` 
-            : diaInfo.nome}
-          descricao={treino.descricao}
-          totalExercicios={totalItens}
-          totalGrupos={grupos.length}
-          totalBlocos={blocos.length}
-          progresso={progresso}
-          treinoIniciado={isDiaIniciado}
-        />
-
-        {/* Timer inline */}
+      <CardContent className="p-3 sm:p-5 space-y-4">
+        {/* Timer inline em destaque no topo */}
         {treinoId && (
           <WorkoutTimer
             treinoId={treinoId}
@@ -572,6 +560,19 @@ function TreinoCard({
             onWorkoutCancel={() => marcarTreinoFinalizado(treinoId, treino.dia)}
           />
         )}
+
+        <WorkoutDayHeader
+          diaNome={hasMultiple && treino.nome_treino 
+            ? `${diaInfo.nome} — ${treino.nome_treino}` 
+            : diaInfo.nome}
+          descricao={treino.descricao}
+          totalExercicios={totalItens}
+          totalGrupos={grupos.length}
+          totalBlocos={blocos.length}
+          progresso={progresso}
+          treinoIniciado={isDiaIniciado}
+        />
+
 
         {!treinoTemConteudo ? (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">

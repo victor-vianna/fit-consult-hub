@@ -18,9 +18,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Props {
   personalId: string;
+  iconOnly?: boolean;
 }
 
-export function PersonalSettingsDialog({ personalId }: Props) {
+export function PersonalSettingsDialog({ personalId, iconOnly = false }: Props) {
   const {
     settings,
     loading,
@@ -144,10 +145,22 @@ export function PersonalSettingsDialog({ personalId }: Props) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Settings className="h-4 w-4 mr-2" />
-          Personalizar
-        </Button>
+        {iconOnly ? (
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-9 w-9 shrink-0"
+            aria-label="Personalizar"
+            title="Personalizar"
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm">
+            <Settings className="h-4 w-4 mr-2" />
+            Personalizar
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>

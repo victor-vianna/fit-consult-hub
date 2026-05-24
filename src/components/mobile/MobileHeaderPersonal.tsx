@@ -36,14 +36,14 @@ export function MobileHeaderPersonal({
           : "hsl(var(--border))",
       }}
     >
-      <div className="flex items-center justify-between px-4 header-safe-top-compact pb-3">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-2 px-3 header-safe-top-compact pb-3">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           {onMenuClick && (
             <Button
               variant="ghost"
               size="icon"
               onClick={onMenuClick}
-              className="h-9 w-9"
+              className="h-9 w-9 shrink-0"
             >
               <Menu className="h-5 w-5" />
             </Button>
@@ -53,30 +53,35 @@ export function MobileHeaderPersonal({
             <img
               src={personalSettings.logo_url}
               alt="Logo"
-              className="h-10 w-10 rounded-full object-cover border-2"
+              className="h-8 w-8 rounded-full object-cover border-2 shrink-0"
               style={{
                 borderColor: personalSettings.theme_color || "#3b82f6",
               }}
             />
           )}
 
-          <div>
+          <div className="min-w-0 flex-1">
             <h1
-              className="text-lg font-bold"
+              className="text-base font-bold truncate leading-tight"
               style={{
                 color: personalSettings?.theme_color || "inherit",
               }}
             >
               {personalSettings?.display_name || "FitConsult"}
             </h1>
-            <p className="text-xs text-muted-foreground">{profileName}</p>
+            {profileName && (
+              <p className="text-[11px] text-muted-foreground truncate leading-tight">
+                {profileName}
+              </p>
+            )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 shrink-0">
           {userId && <NotificacoesDropdown userId={userId} />}
-          {personalId && <PersonalSettingsDialog personalId={personalId} />}
-          <ThemeToggle />
+          {personalId && (
+            <PersonalSettingsDialog personalId={personalId} iconOnly />
+          )}
           <MobileAccountMenu userName={profileName} />
         </div>
       </div>

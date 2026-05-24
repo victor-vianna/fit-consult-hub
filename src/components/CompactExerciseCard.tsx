@@ -164,20 +164,33 @@ export function CompactExerciseCard({
                 <p className="font-semibold text-sm sm:text-base break-words leading-snug">
                   {exercicio.nome}
                 </p>
-                <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground mt-1">
-                  <span className="flex items-center gap-1">
-                    <Dumbbell className="h-3 w-3" />
-                    {exercicio.series || 3}x{exercicio.repeticoes || "12"}
+                <div className="flex flex-col gap-0.5 text-xs text-muted-foreground mt-1">
+                  <span className="flex items-center gap-1.5">
+                    <Dumbbell className="h-3 w-3 shrink-0" />
+                    <span className="font-medium">Séries:</span>
+                    <span>{exercicio.series || 3}x{exercicio.repeticoes || "12"}</span>
                   </span>
-                  <span onClick={(e) => e.stopPropagation()}>
-                    <InlinePesoInput
-                      exercicioId={exercicio.id}
-                      pesoRecomendado={exercicio.carga || null}
-                      pesoExecutado={localPesoExecutado}
-                      onSave={handleSavePeso}
-                    />
+                  <span className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                    <Weight className="h-3 w-3 shrink-0" />
+                    <span className="font-medium">Carga:</span>
+                    <span className="scale-90 origin-left inline-block">
+                      <InlinePesoInput
+                        exercicioId={exercicio.id}
+                        pesoRecomendado={exercicio.carga || null}
+                        pesoExecutado={localPesoExecutado}
+                        onSave={handleSavePeso}
+                      />
+                    </span>
                   </span>
+                  {exercicio.descanso && exercicio.descanso > 0 ? (
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="h-3 w-3 shrink-0" />
+                      <span className="font-medium">Tempo entre séries:</span>
+                      <span>{exercicio.descanso}s</span>
+                    </span>
+                  ) : null}
                 </div>
+
                 {/* Referência de peso anterior */}
                 {ultimoPeso && !localPesoExecutado && (
                   <span onClick={(e) => e.stopPropagation()} className="block mt-1">

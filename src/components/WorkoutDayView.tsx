@@ -340,33 +340,27 @@ export function WorkoutDayView({
   );
 
   return (
-    <div className="space-y-4 sm:space-y-6 pb-20">
-      {/* Header Principal */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-primary/10 rounded-xl shadow-lg">
-            <Dumbbell className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-              Meus Treinos
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Acompanhe seu progresso semanal
-            </p>
-          </div>
+    <div className="space-y-3 sm:space-y-4 pb-20">
+      {/* Header Compacto */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Dumbbell className="h-4 w-4 text-primary" />
+          <h1 className="text-base font-semibold text-foreground">
+            Meus Treinos
+          </h1>
         </div>
 
         {/* Indicador de Semana Ativa */}
         {semanaAtiva?.semana_inicio && (
-          <Badge variant="outline" className="gap-2 px-3 py-1.5">
+          <Badge variant="outline" className="gap-1 px-2 py-0.5 text-[10px]">
             <CalendarDays className="h-3 w-3" />
-            <span className="text-xs">
-              Semana: {format(new Date(semanaAtiva.semana_inicio), "dd/MM", { locale: ptBR })}
+            <span>
+              {format(new Date(semanaAtiva.semana_inicio), "dd/MM", { locale: ptBR })}
             </span>
           </Badge>
         )}
       </div>
+
 
       {/* Tabs dos Dias */}
       <Tabs value={diaAtivo} onValueChange={setDiaAtivo} className="w-full">
@@ -551,20 +545,8 @@ function TreinoCard({
 
   return (
     <Card className="border-primary/30 shadow-xl bg-card/50 backdrop-blur-sm">
-      <CardContent className="p-4 sm:p-6 space-y-6">
-        <WorkoutDayHeader
-          diaNome={hasMultiple && treino.nome_treino 
-            ? `${diaInfo.nome} — ${treino.nome_treino}` 
-            : diaInfo.nome}
-          descricao={treino.descricao}
-          totalExercicios={totalItens}
-          totalGrupos={grupos.length}
-          totalBlocos={blocos.length}
-          progresso={progresso}
-          treinoIniciado={isDiaIniciado}
-        />
-
-        {/* Timer inline */}
+      <CardContent className="p-3 sm:p-5 space-y-4">
+        {/* Timer inline em destaque no topo */}
         {treinoId && (
           <WorkoutTimer
             treinoId={treinoId}
@@ -578,6 +560,19 @@ function TreinoCard({
             onWorkoutCancel={() => marcarTreinoFinalizado(treinoId, treino.dia)}
           />
         )}
+
+        <WorkoutDayHeader
+          diaNome={hasMultiple && treino.nome_treino 
+            ? `${diaInfo.nome} — ${treino.nome_treino}` 
+            : diaInfo.nome}
+          descricao={treino.descricao}
+          totalExercicios={totalItens}
+          totalGrupos={grupos.length}
+          totalBlocos={blocos.length}
+          progresso={progresso}
+          treinoIniciado={isDiaIniciado}
+        />
+
 
         {!treinoTemConteudo ? (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">

@@ -1,5 +1,4 @@
 import { Dumbbell } from 'lucide-react';
-import { getTimeGreeting } from '@/utils/timeGreeting';
 import { MobileAccountMenu } from '@/components/mobile/MobileAccountMenu';
 
 interface MobileHeaderProps {
@@ -7,23 +6,15 @@ interface MobileHeaderProps {
 }
 
 export function MobileHeader({ userName }: MobileHeaderProps) {
-  const greeting = getTimeGreeting();
-
   return (
     <header className="sticky top-0 z-20 bg-card border-b backdrop-blur-sm">
-      <div className="flex items-center justify-between px-4 header-safe-top pb-4">
+      <div className="flex items-center justify-between px-4 header-safe-top pb-3">
         <div className="flex items-center gap-2">
           <Dumbbell className="h-6 w-6 text-primary" />
           <span className="font-bold text-lg">FitConsult</span>
         </div>
         <MobileAccountMenu userName={userName} />
       </div>
-      {userName && (
-        <div className="px-4 pb-3">
-          <p className="text-sm text-muted-foreground">{greeting},</p>
-          <p className="font-semibold text-lg">{userName}! 👋</p>
-        </div>
-      )}
     </header>
   );
 }

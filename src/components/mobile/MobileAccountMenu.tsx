@@ -1,4 +1,4 @@
-import { LogOut, UserCircle } from "lucide-react";
+import { LogOut, Monitor, Moon, Sun, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -7,9 +7,15 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
 import { usePersonalPlanFeatures } from "@/hooks/usePersonalPlanFeatures";
+import { useTheme } from "@/components/ThemeProvider";
 
 interface MobileAccountMenuProps {
   userName?: string | null;
@@ -21,6 +27,7 @@ export function MobileAccountMenu({ userName }: MobileAccountMenuProps) {
     role === "personal" ? user?.id : null
   );
   const shouldShowPlan = role === "personal";
+  const { theme, setTheme } = useTheme();
 
   return (
     <DropdownMenu>
@@ -51,6 +58,29 @@ export function MobileAccountMenu({ userName }: MobileAccountMenuProps) {
             </span>
           )}
         </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="h-11">
+            <Sun className="mr-2 h-4 w-4" />
+            <span>Aparência</span>
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            <DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
+              <DropdownMenuRadioItem value="light">
+                <Sun className="mr-2 h-4 w-4" />
+                Claro
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="dark">
+                <Moon className="mr-2 h-4 w-4" />
+                Escuro
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="system">
+                <Monitor className="mr-2 h-4 w-4" />
+                Sistema
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={signOut}

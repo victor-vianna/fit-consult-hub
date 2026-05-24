@@ -1,4 +1,4 @@
-import { LogOut, UserCircle } from "lucide-react";
+import { LogOut, Monitor, Moon, Sun, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,

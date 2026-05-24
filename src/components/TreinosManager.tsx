@@ -115,6 +115,7 @@ interface TreinosManagerProps {
   profileId: string;
   personalId: string;
   readOnly?: boolean;
+  onWorkoutFinished?: () => void;
 }
 
 type DialogExercicio = {
@@ -142,6 +143,7 @@ export function TreinosManager({
   profileId,
   personalId,
   readOnly = false,
+  onWorkoutFinished,
 }: TreinosManagerProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -854,6 +856,7 @@ export function TreinosManager({
         onToggleConcluido={marcarExercicioConcluido}
         onToggleGrupoConcluido={handleToggleGrupoConcluido}
         onToggleBlocoConcluido={marcarBlocoConcluido}
+        onWorkoutFinished={onWorkoutFinished}
       />
     );
   }

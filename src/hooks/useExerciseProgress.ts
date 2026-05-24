@@ -307,6 +307,32 @@ export function useExerciseProgress(profileId: string) {
     }
   }, []);
 
+  const limparProgressoLocal = useCallback((exercicioIds: string[] = [], blocoIds: string[] = []) => {
+    try {
+      if (exercicioIds.length > 0) {
+        const stored = localStorage.getItem(EXERCISE_PROGRESS_KEY);
+        if (stored) {
+          const progress: ProgressRecord = JSON.parse(stored);
+          exercicioIds.forEach((id) => delete progress[id]);
+          localStorage.setItem(EXERCISE_PROGRESS_KEY, JSON.stringify(progress));
+          setPendingSync((prev) => prev.filter((id) => !exercicioIds.includes(id)));
+        }
+      }
+
+      if (blocoIds.length > 0) {
+        const stored = localStorage.getItem(BLOCK_PROGRESS_KEY);
+        if (stored) {
+          const progress: ProgressRecord = JSON.parse(stored);
+          blocoIds.forEach((id) => delete progress[id]);
+          localStorage.setItem(BLOCK_PROGRESS_KEY, JSON.stringify(progress));
+          setPendingBlockSync((prev) => prev.filter((id) => !blocoIds.includes(id)));
+        }
+      }
+    } catch (error) {
+      console.error("[useExerciseProgress] Erro ao limpar progresso local:", error);
+    }
+  }, []);
+
   // 🔧 Limpar progresso antigo (mais de 7 dias)
   const limparProgressoAntigo = useCallback(() => {
     try {
@@ -360,6 +386,7 @@ export function useExerciseProgress(profileId: string) {
     marcarSincronizado,
     obterProgressoLocal,
     mesclarProgressoExercicios,
+    limparProgressoLocal,
     pendingSync,
     
     // Blocos

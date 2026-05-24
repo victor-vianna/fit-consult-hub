@@ -124,6 +124,150 @@ export function WorkoutBlockCard({
 
   const corClass = corClasses[cor] || corClasses.gray;
 
+  if (readOnly) {
+    if (bloco.concluido && onToggleConcluido) {
+      return (
+        <Card className="overflow-hidden rounded-none border-x-0 border-t-0 bg-green-50/50 shadow-none transition-colors dark:bg-green-950/10">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleToggleBloco}
+                aria-label={`Desmarcar ${bloco.nome}`}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-transform active:scale-95"
+              >
+                <CheckCircle2 className="h-6 w-6 text-green-600" />
+              </button>
+
+              <p className="min-w-0 flex-1 break-words text-sm font-semibold leading-snug text-muted-foreground line-through sm:text-base">
+                {bloco.nome}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    const duration =
+      bloco.config_cardio?.duracao_minutos ??
+      bloco.config_alongamento?.duracao_minutos ??
+      bloco.config_aquecimento?.duracao_minutos ??
+      bloco.duracao_estimada_minutos;
+
+    const mainDetails: string[] = [];
+
+    if (bloco.tipo === "cardio" && bloco.config_cardio) {
+      mainDetails.push(bloco.config_cardio.tipo.replace("-", " "));
+      mainDetails.push(bloco.config_cardio.modalidade);
+      if (
+        bloco.config_cardio.modalidade === "hiit" ||
+        bloco.config_cardio.modalidade === "intervalado"
+      ) {
+        mainDetails.push(formatarIntensidadeCardio(bloco.config_cardio));
+      } else if (bloco.config_cardio.intensidade) {
+        mainDetails.push(formatarIntensidadeCardio(bloco.config_cardio));
+      }
+    }
+
+    if (
+      (bloco.tipo === "alongamento" || bloco.tipo === "mobilidade") &&
+      bloco.config_alongamento
+    ) {
+      mainDetails.push(bloco.config_alongamento.tipo);
+      mainDetails.push(...bloco.config_alongamento.grupos_musculares.slice(0, 3));
+    }
+
+    if (bloco.tipo === "aquecimento" && bloco.config_aquecimento) {
+      mainDetails.push(bloco.config_aquecimento.tipo);
+      mainDetails.push(...bloco.config_aquecimento.atividades.slice(0, 2));
+    }
+
+    const description =
+      bloco.descricao ||
+      bloco.config_alongamento?.observacoes ||
+      bloco.config_aquecimento?.observacoes ||
+      null;
+
+    return (
+      <Card
+        className={cn(
+          "overflow-hidden rounded-none border-x-0 border-t-0 shadow-none transition-colors",
+          corClass,
+          bloco.concluido && "opacity-80"
+        )}
+      >
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex items-center gap-3">
+            {onToggleConcluido ? (
+              <button
+                type="button"
+                onClick={handleToggleBloco}
+                aria-label={
+                  bloco.concluido
+                    ? `Desmarcar ${bloco.nome}`
+                    : `Marcar ${bloco.nome} como concluido`
+                }
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-transform active:scale-95"
+              >
+                {bloco.concluido ? (
+                  <CheckCircle2 className="h-6 w-6 text-green-600" />
+                ) : (
+                  <Circle className="h-6 w-6 text-muted-foreground" />
+                )}
+              </button>
+            ) : (
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-background/70">
+                <span className="text-lg">{tipoConfig.icon}</span>
+              </div>
+            )}
+
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {onToggleConcluido && (
+                  <span className="text-lg">{tipoConfig.icon}</span>
+                )}
+                <Badge variant="secondary" className="text-xs">
+                  {tipoConfig.label}
+                </Badge>
+                {bloco.obrigatorio && (
+                  <Badge variant="destructive" className="text-xs">
+                    Obrigatório
+                  </Badge>
+                )}
+              </div>
+
+              <p
+                className={cn(
+                  "break-words text-sm font-semibold leading-snug text-foreground sm:text-base",
+                  bloco.concluido && "line-through text-muted-foreground"
+                )}
+              >
+                {bloco.nome}
+              </p>
+
+              <div className="space-y-1 text-xs leading-tight text-muted-foreground sm:text-sm">
+                {duration ? (
+                  <p className="flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5 shrink-0" />
+                    <span>Duração: {formatarDuracao(duration)}</span>
+                  </p>
+                ) : null}
+
+                {mainDetails.length > 0 ? (
+                  <p className="capitalize">{mainDetails.filter(Boolean).join(" • ")}</p>
+                ) : null}
+
+                {description ? (
+                  <p className="line-clamp-2 italic">{description}</p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card
       className={cn(

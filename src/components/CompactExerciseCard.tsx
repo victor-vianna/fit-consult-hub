@@ -1,23 +1,11 @@
 // components/CompactExerciseCard.tsx
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
-  ChevronDown,
-  CheckCircle2,
-  Circle,
-  Play,
-  Clock,
-  Dumbbell,
-  Weight,
-  BookOpen,
-} from "lucide-react";
+import { CheckCircle2, Circle, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import { InlinePesoInput } from "@/components/InlinePesoInput";
-import { WeightHistoryBadge } from "@/components/WeightHistoryBadge";
-import { useExerciseLibrary } from "@/hooks/useExerciseLibrary";
-import { useWeightHistory } from "@/hooks/useWeightHistory";
+import { ExerciseVideoPreview } from "@/components/ExerciseVideoPreview";
+import { RestCountdownDialog } from "@/components/RestCountdownDialog";
 import { supabase } from "@/integrations/supabase/client";
 
 interface CompactExerciseCardProps {
@@ -36,27 +24,22 @@ interface CompactExerciseCardProps {
   };
   index: number;
   onToggleConcluido?: (id: string, concluido: boolean) => Promise<any>;
+  isWorkoutActive?: boolean;
   profileId?: string;
 }
 
 export function CompactExerciseCard({
   exercicio,
-  index,
   onToggleConcluido,
-  profileId,
 }: CompactExerciseCardProps) {
-  const [expanded, setExpanded] = useState(false);
   const [localConcluido, setLocalConcluido] = useState(
     exercicio.concluido || false
   );
   const [localPesoExecutado, setLocalPesoExecutado] = useState(
     exercicio.peso_executado || null
   );
-  const { abrirExercicioNaBiblioteca } = useExerciseLibrary();
-  const { ultimoPeso, ultimaData, historico, loading: loadingHistory } = useWeightHistory(
-    exercicio.nome,
-    profileId || null
-  );
+  const [restDialogOpen, setRestDialogOpen] = useState(false);
+
   const handleToggle = async () => {
     const novoValor = !localConcluido;
     setLocalConcluido(novoValor);
@@ -68,7 +51,7 @@ export function CompactExerciseCard({
     try {
       await onToggleConcluido?.(exercicio.id, novoValor);
     } catch (error) {
-      console.error("Erro ao marcar exercício:", error);
+      console.error("Erro ao marcar exercicio:", error);
       setLocalConcluido(!novoValor);
     }
   };
@@ -88,232 +71,127 @@ export function CompactExerciseCard({
     }
   };
 
-  // Auto-collapse when completed
   useEffect(() => {
     setLocalConcluido(exercicio.concluido || false);
     setLocalPesoExecutado(exercicio.peso_executado || null);
   }, [exercicio.id, exercicio.concluido, exercicio.peso_executado]);
 
-  useEffect(() => {
-    if (localConcluido) {
-      setExpanded(false);
-    }
-  }, [localConcluido]);
+  if (localConcluido && onToggleConcluido) {
+    return (
+      <Card className="overflow-hidden rounded-none border-x-0 border-t-0 bg-green-50/50 shadow-none transition-colors dark:bg-green-950/10">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                handleToggle();
+              }}
+              aria-label={`Desmarcar ${exercicio.nome}`}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-transform active:scale-95"
+            >
+              <CheckCircle2 className="h-6 w-6 text-green-600" />
+            </button>
+
+            <p className="min-w-0 flex-1 break-words text-sm font-semibold leading-snug text-muted-foreground line-through sm:text-base">
+              {exercicio.nome}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card
       className={cn(
-        "overflow-hidden transition-all duration-300",
+        "overflow-hidden rounded-none border-x-0 border-t-0 shadow-none transition-colors",
         localConcluido
-          ? "bg-green-50/50 dark:bg-green-950/10 border-green-200/50"
-          : "border-border hover:shadow-sm"
+          ? "bg-green-50/50 dark:bg-green-950/10"
+          : "bg-card hover:bg-muted/20"
       )}
     >
-      <CardContent className="p-0">
-        {/* Minimized view when completed */}
-        {localConcluido ? (
-          <div className="flex items-center gap-3 px-3 py-2.5">
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-center gap-3">
+          {onToggleConcluido && (
             <button
-              onClick={handleToggle}
-              className="shrink-0 transition-transform hover:scale-110 touch-target"
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                handleToggle();
+              }}
+              aria-label={
+                localConcluido
+                  ? `Desmarcar ${exercicio.nome}`
+                  : `Marcar ${exercicio.nome} como concluido`
+              }
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-transform active:scale-95"
             >
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              {localConcluido ? (
+                <CheckCircle2 className="h-6 w-6 text-green-600" />
+              ) : (
+                <Circle className="h-6 w-6 text-muted-foreground" />
+              )}
             </button>
-            <p className="flex-1 min-w-0 text-sm text-muted-foreground line-through break-words">
+          )}
+
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <p
+              className={cn(
+                "break-words text-sm font-semibold leading-snug text-foreground sm:text-base",
+                localConcluido && "line-through text-muted-foreground"
+              )}
+            >
               {exercicio.nome}
             </p>
-          </div>
-        ) : (
-          <>
-            {/* Header Compacto */}
-            <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3">
-              {/* Checkbox */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleToggle();
-                }}
-                aria-label="Marcar exercício como concluído"
-                className="shrink-0 inline-flex items-center justify-center min-w-[44px] min-h-[44px] -m-1 transition-transform active:scale-95"
-              >
-                <Circle className="h-6 w-6 text-muted-foreground" />
-              </button>
 
-              {/* Thumbnail */}
-              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-lg overflow-hidden bg-muted shrink-0">
-                {exercicio.thumbnail ? (
-                  <img
-                    src={exercicio.thumbnail}
-                    alt={exercicio.nome}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Dumbbell className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                )}
-              </div>
+            <div className="space-y-1 text-xs leading-tight text-muted-foreground sm:text-sm">
+              <p>
+                <span className="font-medium text-foreground/80">Series:</span>{" "}
+                {exercicio.series || 3}/{exercicio.repeticoes || "12"}
+              </p>
 
-              {/* Nome + Info Rápida - área clicável para expandir */}
-              <button
-                type="button"
-                onClick={() => setExpanded(!expanded)}
-                aria-expanded={expanded}
-                className="flex-1 min-w-0 text-left py-1 -my-1"
-              >
-                <p className="font-semibold text-sm sm:text-base break-words leading-snug">
-                  {exercicio.nome}
-                </p>
-                <div className="flex flex-col gap-0.5 text-xs text-muted-foreground mt-1">
-                  <span className="flex items-center gap-1.5">
-                    <Dumbbell className="h-3 w-3 shrink-0" />
-                    <span className="font-medium">Séries:</span>
-                    <span>{exercicio.series || 3}x{exercicio.repeticoes || "12"}</span>
-                  </span>
-                  <span className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                    <Weight className="h-3 w-3 shrink-0" />
-                    <span className="font-medium">Carga:</span>
-                    <span className="scale-90 origin-left inline-block">
-                      <InlinePesoInput
-                        exercicioId={exercicio.id}
-                        pesoRecomendado={exercicio.carga || null}
-                        pesoExecutado={localPesoExecutado}
-                        onSave={handleSavePeso}
-                      />
-                    </span>
-                  </span>
-                  {exercicio.descanso && exercicio.descanso > 0 ? (
-                    <span className="flex items-center gap-1.5">
-                      <Clock className="h-3 w-3 shrink-0" />
-                      <span className="font-medium">Tempo entre séries:</span>
-                      <span>{exercicio.descanso}s</span>
-                    </span>
-                  ) : null}
-                </div>
-
-                {/* Referência de peso anterior */}
-                {ultimoPeso && !localPesoExecutado && (
-                  <span onClick={(e) => e.stopPropagation()} className="block mt-1">
-                    <WeightHistoryBadge
-                      ultimoPeso={ultimoPeso}
-                      ultimaData={ultimaData}
-                      historico={historico}
-                      exercicioNome={exercicio.nome}
-                      loading={loadingHistory}
-                      compact
-                    />
-                  </span>
-                )}
-              </button>
-
-              {/* Botão Expandir */}
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => setExpanded(!expanded)}
-                aria-expanded={expanded}
-                aria-label={expanded ? "Recolher" : "Expandir"}
-                className="shrink-0 h-11 w-11 min-h-[44px] min-w-[44px]"
-              >
-                <ChevronDown
-                  className={cn(
-                    "h-5 w-5 transition-transform duration-200",
-                    expanded && "rotate-180"
-                  )}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="font-medium text-foreground/80">Carga:</span>
+                <InlinePesoInput
+                  exercicioId={exercicio.id}
+                  pesoRecomendado={exercicio.carga || null}
+                  pesoExecutado={localPesoExecutado}
+                  onSave={handleSavePeso}
+                  compact
                 />
-              </Button>
-            </div>
-
-            {/* Detalhes Expandidos */}
-            {expanded && (
-              <div className="px-3 pb-3 pt-0 space-y-3 border-t">
-                {/* Links */}
-                <div className="flex flex-wrap gap-2 pt-3">
-                  {exercicio.link_video && (
-                    <a
-                      href={exercicio.link_video}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm md:text-xs text-blue-600 hover:underline flex items-center gap-1 touch-target"
-                    >
-                      <Play className="h-4 w-4 md:h-3 md:w-3" />
-                      Ver demonstração
-                    </a>
-                  )}
-                  <button
-                    onClick={() => abrirExercicioNaBiblioteca(exercicio.nome)}
-                    className="text-sm md:text-xs text-purple-600 hover:underline flex items-center gap-1 touch-target"
-                  >
-                    <BookOpen className="h-4 w-4 md:h-3 md:w-3" />
-                    Ver na biblioteca
-                  </button>
-                </div>
-
-                {/* Detalhes Completos */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm md:text-xs text-muted-foreground">Séries:</span>
-                    <Badge variant="outline">{exercicio.series || 3}</Badge>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm md:text-xs text-muted-foreground">
-                      Repetições:
-                    </span>
-                    <Badge variant="outline">{exercicio.repeticoes || "12"}</Badge>
-                  </div>
-
-                  {exercicio.descanso && exercicio.descanso > 0 && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm md:text-xs text-muted-foreground flex items-center gap-1">
-                        <Clock className="h-4 w-4 md:h-3 md:w-3" />
-                        Descanso:
-                      </span>
-                      <Badge variant="outline">{exercicio.descanso}s</Badge>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm md:text-xs text-muted-foreground flex items-center gap-1">
-                      <Weight className="h-4 w-4 md:h-3 md:w-3" />
-                      {exercicio.carga ? "Carga:" : "Peso executado:"}
-                    </span>
-                    <InlinePesoInput
-                      exercicioId={exercicio.id}
-                      pesoRecomendado={exercicio.carga || null}
-                      pesoExecutado={localPesoExecutado}
-                      onSave={handleSavePeso}
-                    />
-                  </div>
-
-                  {/* Histórico de peso */}
-                  {ultimoPeso && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm md:text-xs text-muted-foreground">Histórico:</span>
-                      <WeightHistoryBadge
-                        ultimoPeso={ultimoPeso}
-                        ultimaData={ultimaData}
-                        historico={historico}
-                        exercicioNome={exercicio.nome}
-                        loading={loadingHistory}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Observações */}
-                {exercicio.observacoes && (
-                  <div className="p-2 bg-muted/50 rounded-lg">
-                    <p className="text-sm md:text-xs text-muted-foreground italic">
-                      💡 {exercicio.observacoes}
-                    </p>
-                  </div>
-                )}
               </div>
-            )}
-          </>
-        )}
+
+              {exercicio.descanso && exercicio.descanso > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setRestDialogOpen(true)}
+                  className="flex items-center gap-1 text-left text-cyan-700 underline decoration-cyan-700/30 underline-offset-2 dark:text-cyan-300"
+                >
+                  <Clock className="h-3.5 w-3.5 shrink-0" />
+                  <span>Tempo entre séries: {exercicio.descanso}s</span>
+                </button>
+              ) : null}
+
+              {exercicio.observacoes ? (
+                <p className="line-clamp-2 italic">{exercicio.observacoes}</p>
+              ) : null}
+            </div>
+          </div>
+
+          <ExerciseVideoPreview
+            videoUrl={exercicio.link_video}
+            fallbackImage={exercicio.thumbnail}
+            title={exercicio.nome}
+          />
+        </div>
       </CardContent>
+
+      <RestCountdownDialog
+        open={restDialogOpen}
+        seconds={exercicio.descanso || 0}
+        onOpenChange={setRestDialogOpen}
+      />
     </Card>
   );
 }

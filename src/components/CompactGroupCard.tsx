@@ -1,27 +1,25 @@
 // components/CompactGroupCard.tsx
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
-  ChevronDown,
+  ArrowDown,
   CheckCircle2,
   Circle,
-  Link as LinkIcon,
   Clock,
+  Link as LinkIcon,
   Repeat,
-  ArrowDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CompactExerciseCard } from "./CompactExerciseCard";
 
 const TIPOS_AGRUPAMENTO = {
-  normal: { label: "Normal", icon: "🏋️" },
-  "bi-set": { label: "Bi-Set", icon: "🔄" },
-  "tri-set": { label: "Tri-Set", icon: "🔄🔄" },
-  "drop-set": { label: "Drop-Set", icon: "📉" },
-  superset: { label: "Super-Set", icon: "⚡" },
-  circuito: { label: "Circuito", icon: "🔁" },
+  normal: { label: "Normal", icon: "" },
+  "bi-set": { label: "Bi-Set", icon: "" },
+  "tri-set": { label: "Tri-Set", icon: "" },
+  "drop-set": { label: "Drop-Set", icon: "" },
+  superset: { label: "Super-Set", icon: "" },
+  circuito: { label: "Circuito", icon: "" },
 } as const;
 
 interface CompactGroupCardProps {
@@ -37,14 +35,15 @@ interface CompactGroupCardProps {
     grupoId: string,
     concluido: boolean
   ) => Promise<void>;
+  isWorkoutActive?: boolean;
   profileId?: string;
 }
 
 export function CompactGroupCard({
   grupo,
-  index,
   onToggleConcluido,
   onToggleGrupoConcluido,
+  isWorkoutActive = false,
   profileId,
 }: CompactGroupCardProps) {
   const [localExercicios, setLocalExercicios] = useState(grupo.exercicios);
@@ -62,8 +61,6 @@ export function CompactGroupCard({
     localExercicios.length > 0 && localExercicios.every((e) => e.concluido);
   const algumConcluido = localExercicios.some((e) => e.concluido);
   const concluidosCount = localExercicios.filter((e) => e.concluido).length;
-
-  const [collapsed, setCollapsed] = useState(true);
 
   const handleToggleGrupo = async () => {
     if (!onToggleGrupoConcluido) return;
@@ -84,27 +81,29 @@ export function CompactGroupCard({
   return (
     <Card
       className={cn(
-        "overflow-hidden transition-all duration-300",
+        "overflow-hidden transition-colors",
         todosConcluidos && "bg-green-50/50 dark:bg-green-950/10 border-green-200/50",
         algumConcluido && !todosConcluidos && "border-yellow-500/50"
       )}
     >
       <CardContent className="p-0">
-        {/* Header */}
-        <div className={cn(
-          "flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3",
-          todosConcluidos
-            ? "bg-green-50/30 dark:bg-green-950/10"
-            : "bg-blue-50/50 dark:bg-blue-950/20"
-        )}>
-          {onToggleGrupoConcluido && (
+        <div
+          className={cn(
+            "flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3",
+            todosConcluidos
+              ? "bg-green-50/30 dark:bg-green-950/10"
+              : "bg-blue-50/50 dark:bg-blue-950/20"
+          )}
+        >
+          {isWorkoutActive && onToggleGrupoConcluido && (
             <button
-              onClick={(e) => {
-                e.stopPropagation();
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
                 handleToggleGrupo();
               }}
-              aria-label="Marcar grupo como concluído"
-              className="shrink-0 inline-flex items-center justify-center min-w-[44px] min-h-[44px] -m-1 transition-transform active:scale-95"
+              aria-label="Marcar grupo como concluido"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-transform active:scale-95"
             >
               {todosConcluidos ? (
                 <CheckCircle2 className="h-6 w-6 text-green-600" />
@@ -114,100 +113,85 @@ export function CompactGroupCard({
             </button>
           )}
 
-          <div className={cn(
-            "w-11 h-11 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center shrink-0",
-            todosConcluidos
-              ? "bg-green-100 dark:bg-green-900/30"
-              : "bg-blue-100 dark:bg-blue-900/30"
-          )}>
-            <LinkIcon className={cn(
-              "h-5 w-5 sm:h-6 sm:w-6",
-              todosConcluidos ? "text-green-600" : "text-blue-600"
-            )} />
+          <div
+            className={cn(
+              "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg sm:h-12 sm:w-12",
+              todosConcluidos
+                ? "bg-green-100 dark:bg-green-900/30"
+                : "bg-blue-100 dark:bg-blue-900/30"
+            )}
+          >
+            <LinkIcon
+              className={cn(
+                "h-5 w-5 sm:h-6 sm:w-6",
+                todosConcluidos ? "text-green-600" : "text-blue-600"
+              )}
+            />
           </div>
 
-          <button
-            type="button"
-            onClick={() => setCollapsed(!collapsed)}
-            aria-expanded={!collapsed}
-            className="flex-1 min-w-0 text-left py-1 -my-1"
-          >
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <Badge variant="secondary" className="font-semibold text-xs">
-                {tipoConfig.icon} {tipoConfig.label}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Badge variant="secondary" className="text-xs font-semibold">
+                {tipoConfig.label}
               </Badge>
               {todosConcluidos ? (
-                <Badge className="bg-green-600 text-xs">✓ Completo</Badge>
+                <Badge className="bg-green-600 text-xs">Completo</Badge>
               ) : algumConcluido ? (
-                <Badge variant="outline" className="text-xs text-yellow-700 border-yellow-500">
+                <Badge
+                  variant="outline"
+                  className="text-xs text-yellow-700 border-yellow-500"
+                >
                   {concluidosCount}/{localExercicios.length}
                 </Badge>
               ) : null}
             </div>
-            <p className={cn(
-              "text-xs sm:text-sm text-muted-foreground mt-1 break-words leading-snug",
-              todosConcluidos && "line-through"
-            )}>
-              {localExercicios.map((e) => e.nome).join(" → ")}
-            </p>
-          </button>
-
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => setCollapsed(!collapsed)}
-            aria-expanded={!collapsed}
-            aria-label={collapsed ? "Expandir" : "Recolher"}
-            className="shrink-0 h-11 w-11 min-h-[44px] min-w-[44px]"
-          >
-            <ChevronDown
+            <p
               className={cn(
-                "h-5 w-5 transition-transform duration-200",
-                !collapsed && "rotate-180"
+                "mt-1 break-words text-xs leading-snug text-muted-foreground sm:text-sm",
+                todosConcluidos && "line-through"
               )}
-            />
-          </Button>
+            >
+              {localExercicios.map((e) => e.nome).join(" -> ")}
+            </p>
+          </div>
         </div>
 
-        {/* Exercícios - visible by default, can be collapsed */}
-        {!collapsed && (
-          <div className="p-3 space-y-2 border-t">
-            {/* Instrução */}
-            {!todosConcluidos && (
-              <div className="flex items-start gap-2 p-2 bg-primary/5 border border-primary/20 rounded-lg mb-1">
-                <div className="flex flex-col items-center gap-1 mt-0.5">
-                  <Repeat className="h-3.5 w-3.5 text-primary" />
-                  <ArrowDown className="h-2.5 w-2.5 text-primary/60" />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Execute em sequência, depois descanse{" "}
-                  <strong>{grupo.descanso_entre_grupos || 60}s</strong>
-                </p>
+        <div className="space-y-2 border-t p-3">
+          {!todosConcluidos && (
+            <div className="mb-1 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 p-2">
+              <div className="mt-0.5 flex flex-col items-center gap-1">
+                <Repeat className="h-3.5 w-3.5 text-primary" />
+                <ArrowDown className="h-2.5 w-2.5 text-primary/60" />
               </div>
-            )}
+              <p className="text-xs text-muted-foreground">
+                Execute em sequencia, depois descanse{" "}
+                <strong>{grupo.descanso_entre_grupos || 60}s</strong>
+              </p>
+            </div>
+          )}
 
-            {/* Exercícios do Grupo - individually configurable */}
-            {localExercicios.map((exercicio, idx) => (
-              <CompactExerciseCard
-                key={exercicio.id}
-                exercicio={exercicio}
-                index={idx}
-                onToggleConcluido={onToggleConcluido}
-                profileId={profileId}
-              />
-            ))}
+          {localExercicios.map((exercicio, idx) => (
+            <CompactExerciseCard
+              key={exercicio.id}
+              exercicio={exercicio}
+              index={idx}
+              onToggleConcluido={onToggleConcluido}
+              isWorkoutActive={isWorkoutActive}
+              profileId={profileId}
+            />
+          ))}
 
-            {/* Descanso entre grupos */}
-            {grupo.descanso_entre_grupos && grupo.descanso_entre_grupos > 0 && !todosConcluidos && (
-              <div className="flex items-center justify-center gap-2 p-2 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+          {grupo.descanso_entre_grupos &&
+            grupo.descanso_entre_grupos > 0 &&
+            !todosConcluidos && (
+              <div className="flex items-center justify-center gap-2 rounded-lg border border-yellow-200 bg-yellow-50 p-2 dark:border-yellow-800 dark:bg-yellow-950/20">
                 <Clock className="h-4 w-4 text-yellow-700 dark:text-yellow-400" />
                 <span className="text-xs font-medium text-yellow-700 dark:text-yellow-400">
-                  Descanse {grupo.descanso_entre_grupos}s após este grupo
+                  Descanse {grupo.descanso_entre_grupos}s apos este grupo
                 </span>
               </div>
             )}
-          </div>
-        )}
+        </div>
       </CardContent>
     </Card>
   );

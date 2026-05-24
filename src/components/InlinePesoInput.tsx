@@ -11,6 +11,7 @@ interface InlinePesoInputProps {
   pesoExecutado: string | null;
   onSave: (exercicioId: string, peso: string) => Promise<void>;
   disabled?: boolean;
+  compact?: boolean;
 }
 
 export function InlinePesoInput({
@@ -18,7 +19,8 @@ export function InlinePesoInput({
   pesoRecomendado,
   pesoExecutado,
   onSave,
-  disabled = false
+  disabled = false,
+  compact = false
 }: InlinePesoInputProps) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(pesoExecutado || pesoRecomendado || "");
@@ -62,14 +64,14 @@ export function InlinePesoInput({
           onClick={() => setEditing(true)}
           disabled={disabled}
           className={cn(
-            "flex items-center gap-1.5 px-3 py-2 rounded transition-all",
-            "font-medium text-sm md:text-xs touch-target",
+            "flex items-center rounded transition-all",
+            compact ? "gap-1 px-1.5 py-0.5 text-xs" : "gap-1.5 px-3 py-2 font-medium text-sm md:text-xs touch-target",
             "text-muted-foreground bg-muted/50 hover:bg-muted",
             disabled && "opacity-50 cursor-not-allowed"
           )}
         >
-          <Edit2 className="h-3.5 w-3.5 opacity-60" />
-          <span>Registrar peso</span>
+          <Edit2 className={cn("opacity-60", compact ? "h-3 w-3" : "h-3.5 w-3.5")} />
+          <span>{compact ? "Registrar" : "Registrar peso"}</span>
         </button>
       );
     }
@@ -79,8 +81,10 @@ export function InlinePesoInput({
         onClick={() => setEditing(true)}
         disabled={disabled}
         className={cn(
-          "flex items-center gap-1.5 px-3 py-2 rounded transition-all",
-          "font-mono font-semibold text-base md:text-sm touch-target",
+          "flex items-center rounded transition-all",
+          compact
+            ? "gap-1 px-1.5 py-0.5 font-mono text-xs font-semibold"
+            : "gap-1.5 px-3 py-2 font-mono font-semibold text-base md:text-sm touch-target",
           pesoExecutado && pesoExecutado !== pesoRecomendado
             ? "text-blue-700 bg-blue-100 hover:bg-blue-200 dark:text-blue-300 dark:bg-blue-950 dark:hover:bg-blue-900"
             : "text-primary bg-primary/10 hover:bg-primary/20",
@@ -95,9 +99,9 @@ export function InlinePesoInput({
         }
       >
         <span>
-          {pesoExecutado ? `Ultima ${displayValue}kg` : `${displayValue}kg`}
+          {compact ? `${displayValue}kg` : pesoExecutado ? `Ultima ${displayValue}kg` : `${displayValue}kg`}
         </span>
-        <Edit2 className="h-4 w-4 md:h-3 md:w-3 opacity-60" />
+        <Edit2 className={cn("opacity-60", compact ? "h-3 w-3" : "h-4 w-4 md:h-3 md:w-3")} />
       </button>
     );
   }
@@ -112,7 +116,12 @@ export function InlinePesoInput({
           if (e.key === "Enter") handleSave();
           if (e.key === "Escape") handleCancel();
         }}
-        className="h-11 md:h-9 w-24 md:w-20 px-3 md:px-2 text-base md:text-xs font-mono"
+        className={cn(
+          "font-mono",
+          compact
+            ? "h-8 w-16 px-2 text-xs"
+            : "h-11 md:h-9 w-24 md:w-20 px-3 md:px-2 text-base md:text-xs"
+        )}
         placeholder="kg"
         autoFocus
         disabled={saving}
@@ -122,18 +131,24 @@ export function InlinePesoInput({
         variant="ghost"
         onClick={handleSave}
         disabled={saving}
-        className="h-11 w-11 md:h-9 md:w-9 text-green-600 hover:bg-green-100 dark:hover:bg-green-950 touch-target"
+        className={cn(
+          "text-green-600 hover:bg-green-100 dark:hover:bg-green-950",
+          compact ? "h-8 w-8" : "h-11 w-11 md:h-9 md:w-9 touch-target"
+        )}
       >
-        <Check className="h-5 w-5 md:h-4 md:w-4" />
+        <Check className={cn(compact ? "h-4 w-4" : "h-5 w-5 md:h-4 md:w-4")} />
       </Button>
       <Button
         size="icon"
         variant="ghost"
         onClick={handleCancel}
         disabled={saving}
-        className="h-11 w-11 md:h-9 md:w-9 text-red-600 hover:bg-red-100 dark:hover:bg-red-950 touch-target"
+        className={cn(
+          "text-red-600 hover:bg-red-100 dark:hover:bg-red-950",
+          compact ? "h-8 w-8" : "h-11 w-11 md:h-9 md:w-9 touch-target"
+        )}
       >
-        <X className="h-5 w-5 md:h-4 md:w-4" />
+        <X className={cn(compact ? "h-4 w-4" : "h-5 w-5 md:h-4 md:w-4")} />
       </Button>
     </div>
   );

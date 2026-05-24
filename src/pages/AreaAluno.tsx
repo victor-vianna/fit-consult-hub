@@ -451,6 +451,7 @@ export default function AreaAluno() {
                 profileId={user!.id}
                 personalId={profile.personal_id}
                 readOnly={true}
+                onWorkoutFinished={() => setActiveSection("treinos")}
               />
             )}
           </div>

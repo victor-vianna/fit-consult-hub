@@ -246,7 +246,7 @@ export function WorkoutCompletionScreen({
                 disabled={isSubmitting}
               >
                 <Home className="h-5 w-5" />
-                {isSubmitting ? "Enviando..." : "Voltar ao Início"}
+                {isSubmitting ? "Enviando..." : "Finalizar"}
               </Button>
             </CardContent>
           </Card>

@@ -34,6 +34,7 @@ interface WorkoutDayViewProps {
     blocoId: string,
     concluido: boolean
   ) => Promise<void>;
+  onWorkoutFinished?: () => void;
 }
 
 const diasSemana = [
@@ -55,6 +56,7 @@ export function WorkoutDayView({
   onToggleConcluido,
   onToggleGrupoConcluido,
   onToggleBlocoConcluido,
+  onWorkoutFinished,
 }: WorkoutDayViewProps) {
   // Estado local para updates otimistas
   const [localTreinos, setLocalTreinos] = useState<TreinoDia[]>(treinos);
@@ -79,6 +81,7 @@ export function WorkoutDayView({
     salvarBlocoProgressoLocal,
     marcarBlocoSincronizado,
     mesclarProgressoBlocos,
+    limparProgressoLocal,
   } = useExerciseProgress(profileId);
 
   // Buscar semana ativa
@@ -316,6 +319,53 @@ export function WorkoutDayView({
     }
   };
 
+  const resetLocalProgressForTreino = useCallback((treinoId: string) => {
+    const treinoAtual = localTreinos.find((treino) => getTreinoId(treino) === treinoId);
+    const exercicioIds = [
+      ...(treinoAtual?.exercicios.map((ex) => ex.id) || []),
+      ...((localGrupos[treinoId] || []).flatMap((grupo) =>
+        grupo.exercicios.map((ex: any) => ex.id)
+      )),
+    ];
+    const blocoIds = (localBlocos[treinoId] || []).map((bloco) => bloco.id);
+
+    limparProgressoLocal(exercicioIds, blocoIds);
+
+    setLocalTreinos((prev) =>
+      prev.map((treino) =>
+        getTreinoId(treino) === treinoId
+          ? {
+              ...treino,
+              exercicios: treino.exercicios.map((ex) => ({
+                ...ex,
+                concluido: false,
+              })),
+            }
+          : treino
+      )
+    );
+
+    setLocalGrupos((prev) => ({
+      ...prev,
+      [treinoId]: (prev[treinoId] || []).map((grupo) => ({
+        ...grupo,
+        exercicios: grupo.exercicios.map((ex: any) => ({
+          ...ex,
+          concluido: false,
+        })),
+      })),
+    }));
+
+    setLocalBlocos((prev) => ({
+      ...prev,
+      [treinoId]: (prev[treinoId] || []).map((bloco) => ({
+        ...bloco,
+        concluido: false,
+        concluido_em: null,
+      })),
+    }));
+  }, [getTreinoId, limparProgressoLocal, localBlocos, localGrupos, localTreinos]);
+
   // Handler para iniciar treino - usa hook de persistência
   const handleIniciarTreino = (dia: number, treinoId: string | null) => {
     if (treinoId) {
@@ -479,6 +529,10 @@ export function WorkoutDayView({
                     personalId={personalId}
                     marcarTreinoIniciado={marcarTreinoIniciado}
                     marcarTreinoFinalizado={marcarTreinoFinalizado}
+                    onTreinoConcluido={(finishedTreinoId) => {
+                      resetLocalProgressForTreino(finishedTreinoId);
+                      onWorkoutFinished?.();
+                    }}
                     handleToggleExercicio={handleToggleExercicio}
                     handleToggleGrupo={handleToggleGrupo}
                     handleToggleBloco={handleToggleBloco}
@@ -513,6 +567,7 @@ function TreinoCard({
   personalId,
   marcarTreinoIniciado,
   marcarTreinoFinalizado,
+  onTreinoConcluido,
   handleToggleExercicio,
   handleToggleGrupo,
   handleToggleBloco,
@@ -535,6 +590,7 @@ function TreinoCard({
   personalId: string;
   marcarTreinoIniciado: (treinoId: string, dia: number) => void;
   marcarTreinoFinalizado: (treinoId: string, dia: number) => void;
+  onTreinoConcluido: (treinoId: string) => void;
   handleToggleExercicio: (id: string, concluido: boolean) => Promise<any>;
   handleToggleGrupo: (grupoId: string, concluido: boolean) => Promise<void>;
   handleToggleBloco: (blocoId: string, concluido: boolean) => Promise<void>;
@@ -556,7 +612,10 @@ function TreinoCard({
             progresso={progresso}
             finalizarRef={finalizarRef}
             onWorkoutStart={() => marcarTreinoIniciado(treinoId, treino.dia)}
-            onWorkoutComplete={() => marcarTreinoFinalizado(treinoId, treino.dia)}
+            onWorkoutComplete={() => {
+              marcarTreinoFinalizado(treinoId, treino.dia);
+              onTreinoConcluido(treinoId);
+            }}
             onWorkoutCancel={() => marcarTreinoFinalizado(treinoId, treino.dia)}
           />
         )}

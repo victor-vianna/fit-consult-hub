@@ -839,6 +839,18 @@ export function useWorkoutTimer({
 
       setCompletionData(dadosConclusao);
       setShowCompletionScreen(true);
+      toast.success("Treino concluído!");
+
+      await Promise.all([
+        supabase
+          .from("exercicios")
+          .update({ concluido: false })
+          .eq("treino_semanal_id", treinoId),
+        supabase
+          .from("blocos_treino")
+          .update({ concluido: false, concluido_em: null })
+          .eq("treino_semanal_id", treinoId),
+      ]);
 
       // 🔧 FIX: Dispatch centralized events for cross-component sync
       dispatchWorkoutEvent(WORKOUT_EVENTS.COMPLETED, { treinoId, profileId, personalId });
@@ -850,13 +862,18 @@ export function useWorkoutTimer({
       setIsRunning(false);
       setIsPaused(false);
       isPausedRef.current = false;
+      setSessaoId(null);
       setElapsedTime(0);
       setDescansos([]);
       setTempoDescansoTotal(0);
       setTempoPausadoTotal(0);
+      setRestElapsedTime(0);
+      setCurrentRestId(null);
+      setInicioTreino(null);
       startTimestampRef.current = 0;
       pausedTimestampRef.current = null;
       totalPausedMsRef.current = 0;
+      restStartTimestampRef.current = 0;
 
       return dadosConclusao;
     } catch (err) {

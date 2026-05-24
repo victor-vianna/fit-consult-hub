@@ -7,9 +7,15 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
 import { usePersonalPlanFeatures } from "@/hooks/usePersonalPlanFeatures";
+import { useTheme } from "@/components/ThemeProvider";
 
 interface MobileAccountMenuProps {
   userName?: string | null;

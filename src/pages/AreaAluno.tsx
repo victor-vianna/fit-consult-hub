@@ -162,6 +162,27 @@ export default function AreaAluno() {
     ? personalSettings.cards_visiveis
     : [...DEFAULT_CARDS_VISIVEIS]) as string[];
 
+  const ordenarCardsDashboard = (cards: string[]) => {
+    const ordenados = [...cards];
+    let historicoIndex = ordenados.indexOf("historico");
+    const chatIndex = ordenados.indexOf("chat");
+
+    if (historicoIndex >= 0 && chatIndex >= 0 && historicoIndex < chatIndex) {
+      ordenados[historicoIndex] = "chat";
+      ordenados[chatIndex] = "historico";
+    }
+
+    historicoIndex = ordenados.indexOf("historico");
+    const bibliotecaIndex = ordenados.indexOf("biblioteca");
+
+    if (historicoIndex >= 0 && bibliotecaIndex >= 0) {
+      ordenados[historicoIndex] = "biblioteca";
+      ordenados[bibliotecaIndex] = "historico";
+    }
+
+    return ordenados;
+  };
+
   const { ultima: ultimaMsg } = useUltimaMensagem(
     profile?.personal_id || "",
     user?.id || ""
@@ -230,18 +251,8 @@ export default function AreaAluno() {
         {/* Preview de mensagens */}
         {renderChatPreview()}
 
-        {/* Card de status da planilha */}
-        {profile?.personal_id && (
-          <PlanilhaStatusCard
-            profileId={user!.id}
-            personalId={profile.personal_id}
-            variant="aluno"
-            compact
-          />
-        )}
-
         <div className="grid grid-cols-2 gap-4 sm:gap-6 md:gap-4">
-          {cardsVisiveis.map((id) => {
+          {ordenarCardsDashboard(cardsVisiveis).map((id) => {
             const cfg = cardConfig[id];
             if (!cfg) return null;
             return (
@@ -344,15 +355,6 @@ export default function AreaAluno() {
       case "inicio":
         return (
           <div className="space-y-6 animate-fade-in">
-            {/* Card de status da planilha */}
-            {profile?.personal_id && (
-              <PlanilhaStatusCard
-                profileId={user!.id}
-                personalId={profile.personal_id}
-                variant="aluno"
-              />
-            )}
-
             {profile?.personal_id && (
               <CalendarioSemanal
                 profileId={user!.id}

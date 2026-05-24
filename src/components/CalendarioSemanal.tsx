@@ -1,13 +1,13 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { addDays, format, isSameDay, startOfWeek } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { addDays, format, isSameDay, parseISO, startOfWeek } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { Button } from "./ui/button";
-import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { getWeekStart } from "@/utils/weekUtils";
+import { cn } from "@/lib/utils";
 
 interface TreinoSemanal {
   id: string;
@@ -25,31 +25,29 @@ interface CalendarioSemanalProps {
   onTreinoAtualizado?: () => void;
 }
 
-const diasSemana = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+const diasSemana = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"];
 
 export function CalendarioSemanal({
   profileId,
-  personalId,
   themeColor,
-  onVerHistoricoCompleto,
   onTreinoAtualizado,
 }: CalendarioSemanalProps) {
   const [treinos, setTreinos] = useState<TreinoSemanal[]>([]);
-  // ✅ Segunda-feira como início da semana
   const [semanaAtual, setSemanaAtual] = useState<Date>(
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
   const { toast } = useToast();
+  const accentColor = themeColor || "hsl(var(--primary))";
 
   useEffect(() => {
     if (profileId) carregarTreinos();
   }, [profileId, semanaAtual]);
 
-  // ✅ Escutar evento de treino concluído para atualizar frequência
   useEffect(() => {
     const handleWorkoutCompleted = () => {
       if (profileId) carregarTreinos();
     };
+
     window.addEventListener("workout-completed", handleWorkoutCompleted);
     return () => {
       window.removeEventListener("workout-completed", handleWorkoutCompleted);
@@ -59,7 +57,7 @@ export function CalendarioSemanal({
   const carregarTreinos = async () => {
     try {
       const semanaFormatada = format(semanaAtual, "yyyy-MM-dd");
-      
+
       const { data, error } = await supabase
         .from("treinos_semanais")
         .select("*")
@@ -67,32 +65,31 @@ export function CalendarioSemanal({
         .eq("semana", semanaFormatada);
 
       if (error) throw error;
-
-      console.log("📅 Treinos da semana:", data);
       setTreinos(data || []);
     } catch (err) {
-      console.error("❌ Erro ao carregar treinos:", err);
+      console.error("[CalendarioSemanal] Erro ao carregar treinos:", err);
       toast({
         title: "Erro",
-        description: "Não foi possível carregar os treinos da semana",
+        description: "Nao foi possivel carregar os treinos da semana",
         variant: "destructive",
       });
     }
   };
 
   const irParaSemanaAnterior = () => {
-    setSemanaAtual(prev => addDays(prev, -7));
+    setSemanaAtual((prev) => addDays(prev, -7));
   };
 
   const irParaProximaSemana = () => {
-    setSemanaAtual(prev => addDays(prev, 7));
+    setSemanaAtual((prev) => addDays(prev, 7));
   };
 
   const irParaSemanaAtual = () => {
     setSemanaAtual(startOfWeek(new Date(), { weekStartsOn: 1 }));
   };
 
-  const isSemanaAtualSelecionada = format(semanaAtual, "yyyy-MM-dd") === getWeekStart();
+  const isSemanaAtualSelecionada =
+    format(semanaAtual, "yyyy-MM-dd") === getWeekStart();
 
   const toggleTreino = async (treinoId: string, concluido: boolean) => {
     const { error } = await supabase
@@ -106,7 +103,7 @@ export function CalendarioSemanal({
     if (error) {
       toast({
         title: "Erro",
-        description: "Não foi possível atualizar o treino",
+        description: "Nao foi possivel atualizar o treino",
         variant: "destructive",
       });
       return;
@@ -120,18 +117,34 @@ export function CalendarioSemanal({
   };
 
   return (
-    <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-xl md:text-lg">
-            Frequência de Treinos
-          </CardTitle>
-          <div className="flex items-center gap-1">
+    <Card
+      className="border bg-card shadow-sm"
+      style={{
+        borderColor: themeColor ? `${themeColor}26` : undefined,
+        background: themeColor
+          ? `linear-gradient(135deg, ${themeColor}08, ${themeColor}03)`
+          : undefined,
+      }}
+    >
+      <CardHeader className="space-y-2 p-3 sm:p-4">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <CardTitle className="text-sm font-semibold sm:text-base">
+              Frequencia de treinos
+            </CardTitle>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {format(semanaAtual, "dd/MM", { locale: ptBR })} -{" "}
+              {format(addDays(semanaAtual, 6), "dd/MM", { locale: ptBR })}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-0.5">
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-7 w-7"
               onClick={irParaSemanaAnterior}
+              aria-label="Semana anterior"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -139,7 +152,7 @@ export function CalendarioSemanal({
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 text-xs"
+                className="h-7 px-2 text-[11px]"
                 onClick={irParaSemanaAtual}
               >
                 Hoje
@@ -148,69 +161,80 @@ export function CalendarioSemanal({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-7 w-7"
               onClick={irParaProximaSemana}
+              aria-label="Proxima semana"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
         </div>
-        <p className="text-sm text-muted-foreground">
-          {format(semanaAtual, "dd/MM", { locale: ptBR })} - {format(addDays(semanaAtual, 6), "dd/MM/yyyy", { locale: ptBR })}
-        </p>
       </CardHeader>
-      <CardContent className="p-4 md:p-6">
-        <div className="grid grid-cols-7 gap-2 md:gap-3">
-          {diasSemana.map((dia, index) => {
-            // ✅ Dias começam em segunda (index 0 = segunda)
-            const diaMes = addDays(semanaAtual, index);
-            const diaSemanaDb = index + 1; // 1=segunda, 7=domingo
-            const treino = treinos.find((t) => t.dia_semana === diaSemanaDb);
 
+      <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+        <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+          {diasSemana.map((dia, index) => {
+            const diaMes = addDays(semanaAtual, index);
+            const diaSemanaDb = index + 1;
+            const treino = treinos.find((t) => t.dia_semana === diaSemanaDb);
             const isHoje = isSameDay(diaMes, new Date());
+            const isConcluido = !!treino?.concluido;
 
             return (
               <div
-                key={index}
-                className={`flex flex-col items-center p-3 md:p-2 rounded-lg border transition-all ${
-                  isHoje
-                    ? "border-primary bg-primary/15 shadow-md scale-105"
-                    : "border-border hover:border-primary/30"
-                }`}
+                key={dia}
+                className={cn(
+                  "flex min-h-[86px] flex-col items-center justify-between rounded-lg border bg-background/70 p-2.5 transition-colors",
+                  isHoje && "shadow-sm"
+                )}
+                style={{
+                  borderColor: isHoje
+                    ? `${accentColor}66`
+                    : isConcluido
+                    ? `${accentColor}40`
+                    : undefined,
+                  backgroundColor: isHoje
+                    ? `${accentColor}12`
+                    : isConcluido
+                    ? `${accentColor}08`
+                    : undefined,
+                }}
               >
-                <p className="text-sm md:text-xs font-semibold mb-1">{dia}</p>
-                <p className="text-sm md:text-xs text-muted-foreground mb-2">
-                  {format(diaMes, "d", { locale: ptBR })}
-                </p>
-                {treino && (
-                  <div className="flex items-center justify-center w-full touch-target">
-                    <Checkbox
-                      checked={treino.concluido}
-                      onCheckedChange={() =>
-                        toggleTreino(treino.id, treino.concluido)
-                      }
-                      className="h-6 w-6 md:h-5 md:w-5"
-                    />
-                  </div>
+                <div className="text-center space-y-1">
+                  <p className="text-[11px] font-semibold leading-tight">{dia}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {format(diaMes, "d", { locale: ptBR })}
+                  </p>
+                </div>
+
+                {treino ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleTreino(treino.id, treino.concluido)}
+                    aria-label={
+                      treino.concluido
+                        ? `Desmarcar treino de ${dia}`
+                        : `Marcar treino de ${dia} como concluido`
+                    }
+                    className="flex h-6 w-6 items-center justify-center rounded-full border transition-transform active:scale-95"
+                    style={{
+                      borderColor: treino.concluido ? accentColor : `${accentColor}66`,
+                      backgroundColor: treino.concluido ? accentColor : "transparent",
+                      color: treino.concluido ? "#fff" : accentColor,
+                    }}
+                  >
+                    {treino.concluido ? (
+                      <Check className="h-3.5 w-3.5" />
+                    ) : (
+                      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-60" />
+                    )}
+                  </button>
+                ) : (
+                  <span className="h-6 w-6 rounded-full border border-dashed opacity-30" />
                 )}
               </div>
             );
           })}
-        </div>
-
-        <div className="mt-6 pt-4 border-t">
-          <Button
-            variant="outline"
-            className="w-full h-12 md:h-10 text-base md:text-sm"
-            onClick={onVerHistoricoCompleto}
-            style={{
-              borderColor: themeColor ? `${themeColor}50` : undefined,
-              color: themeColor || undefined,
-            }}
-          >
-            <Calendar className="h-5 w-5 md:h-4 md:w-4 mr-2" />
-            Ver Calendário Completo
-          </Button>
         </div>
       </CardContent>
     </Card>

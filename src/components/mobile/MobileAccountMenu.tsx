@@ -27,6 +27,7 @@ export function MobileAccountMenu({ userName }: MobileAccountMenuProps) {
     role === "personal" ? user?.id : null
   );
   const shouldShowPlan = role === "personal";
+  const { theme, setTheme } = useTheme();
 
   return (
     <DropdownMenu>

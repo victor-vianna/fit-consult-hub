@@ -9,6 +9,14 @@ type PushStatus =
   | "granted"
   | "subscribed"
   | "error";
+type PushPhase =
+  | "idle"
+  | "permission"
+  | "service_worker"
+  | "subscription"
+  | "database"
+  | "done"
+  | "error";
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
 
@@ -52,8 +60,31 @@ function getPushSupportStatus(): PushStatus {
   return Notification.permission as PushStatus;
 }
 
+async function getServiceWorkerRegistration() {
+  const timeout = new Promise<null>((resolve) => {
+    window.setTimeout(() => resolve(null), 4000);
+  });
+  const readyRegistration = await Promise.race([navigator.serviceWorker.ready, timeout]);
+  if (readyRegistration) return readyRegistration;
+
+  const existing = await navigator.serviceWorker.getRegistration();
+  if (existing) return existing;
+
+  try {
+    return await navigator.serviceWorker.register("/sw.js");
+  } catch (error) {
+    throw new Error(
+      `Service worker nao registrado. Recarregue o app apos publicar a nova versao. Detalhe: ${
+        error instanceof Error ? error.message : "erro desconhecido"
+      }`
+    );
+  }
+}
+
 export function usePushNotifications(userId?: string | null) {
   const [status, setStatus] = useState<PushStatus>(() => getPushSupportStatus());
+  const [phase, setPhase] = useState<PushPhase>("idle");
+  const [lastError, setLastError] = useState<string | null>(null);
   const supported = useMemo(
     () => !["unsupported", "missing_key"].includes(status),
     [status]
@@ -62,6 +93,7 @@ export function usePushNotifications(userId?: string | null) {
   const syncSubscription = useCallback(
     async (subscription: PushSubscription) => {
       if (!userId) return;
+      setPhase("database");
       const json = subscription.toJSON();
       const endpoint = json.endpoint;
       const p256dh = json.keys?.p256dh;
@@ -85,52 +117,76 @@ export function usePushNotifications(userId?: string | null) {
         { onConflict: "endpoint" }
       );
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(`Falha ao salvar o dispositivo no Supabase: ${error.message}`);
+      }
     },
     [userId]
   );
 
   const enablePushNotifications = useCallback(
     async ({ requestPermission = true } = {}) => {
-      const currentStatus = getPushSupportStatus();
-      setStatus(currentStatus);
+      try {
+        setLastError(null);
+        const currentStatus = getPushSupportStatus();
+        setStatus(currentStatus);
 
-      if (!userId || currentStatus === "unsupported" || currentStatus === "missing_key") {
-        return false;
+        if (!userId) {
+          throw new Error("Usuario ainda nao autenticado para salvar este dispositivo.");
+        }
+
+        if (currentStatus === "unsupported") {
+          throw new Error("Este navegador ou modo de instalacao nao oferece suporte a Web Push.");
+        }
+
+        if (currentStatus === "missing_key") {
+          throw new Error("VITE_VAPID_PUBLIC_KEY nao esta disponivel no build do frontend.");
+        }
+
+        setPhase("permission");
+        let permission = Notification.permission;
+        if (permission === "default" && requestPermission) {
+          permission = await Notification.requestPermission();
+        }
+
+        if (permission !== "granted") {
+          setStatus(permission as PushStatus);
+          setPhase("idle");
+          return false;
+        }
+
+        setPhase("service_worker");
+        const registration = await getServiceWorkerRegistration();
+        let subscription = await registration.pushManager.getSubscription();
+        const expectedKey = normalizeVapidKey(VAPID_PUBLIC_KEY);
+        const currentKey = normalizeVapidKey(
+          subscription ? uint8ArrayToUrlBase64(subscription.options.applicationServerKey) : null
+        );
+
+        if (subscription && currentKey && currentKey !== expectedKey) {
+          await subscription.unsubscribe();
+          subscription = null;
+        }
+
+        setPhase("subscription");
+        if (!subscription) {
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY!),
+          });
+        }
+
+        await syncSubscription(subscription);
+        setStatus("subscribed");
+        setPhase("done");
+        return true;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Erro desconhecido ao ativar notificacoes.";
+        setLastError(message);
+        setStatus("error");
+        setPhase("error");
+        throw error;
       }
-
-      let permission = Notification.permission;
-      if (permission === "default" && requestPermission) {
-        permission = await Notification.requestPermission();
-      }
-
-      if (permission !== "granted") {
-        setStatus(permission as PushStatus);
-        return false;
-      }
-
-      const registration = await navigator.serviceWorker.ready;
-      let subscription = await registration.pushManager.getSubscription();
-      const expectedKey = normalizeVapidKey(VAPID_PUBLIC_KEY);
-      const currentKey = normalizeVapidKey(
-        subscription ? uint8ArrayToUrlBase64(subscription.options.applicationServerKey) : null
-      );
-
-      if (subscription && currentKey && currentKey !== expectedKey) {
-        await subscription.unsubscribe();
-        subscription = null;
-      }
-
-      if (!subscription) {
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY!),
-        });
-      }
-
-      await syncSubscription(subscription);
-      setStatus("subscribed");
-      return true;
     },
     [syncSubscription, userId]
   );
@@ -142,7 +198,6 @@ export function usePushNotifications(userId?: string | null) {
     if (userId && currentStatus === "granted") {
       enablePushNotifications({ requestPermission: false }).catch((error) => {
         console.error("Erro ao sincronizar notificacoes push:", error);
-        setStatus("error");
       });
     }
   }, [enablePushNotifications, userId]);
@@ -152,6 +207,8 @@ export function usePushNotifications(userId?: string | null) {
     supported,
     missingVapidKey: status === "missing_key",
     enabled: status === "subscribed",
+    phase,
+    lastError,
     enablePushNotifications,
   };
 }

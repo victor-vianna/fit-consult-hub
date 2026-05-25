@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useNotificacoes } from "@/hooks/useNotificacoes";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { supabase } from "@/integrations/supabase/client";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { formatDistanceToNow } from "date-fns";
@@ -37,6 +38,13 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
     marcarTodasComoLidas,
     deletarNotificacao,
   } = useNotificacoes(userId);
+  const {
+    status: pushStatus,
+    supported: pushSupported,
+    missingVapidKey,
+    enabled: pushEnabled,
+    enablePushNotifications,
+  } = usePushNotifications(userId);
 
   const [grupoExpandido, setGrupoExpandido] = useState<string | null>(null);
   const [nomesResolvidos, setNomesResolvidos] = useState<Record<string, string>>({});
@@ -252,6 +260,25 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
               </Button>
             )}
           </DropdownMenuLabel>
+
+          {pushSupported && !missingVapidKey && !pushEnabled && pushStatus !== "denied" && (
+            <div className="px-2 pb-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="w-full justify-start text-xs"
+                onClick={() =>
+                  enablePushNotifications().catch((error) => {
+                    console.error("Erro ao ativar notificacoes push:", error);
+                  })
+                }
+              >
+                <Bell className="mr-2 h-3.5 w-3.5" />
+                Ativar notificacoes com app fechado
+              </Button>
+            </div>
+          )}
 
           <DropdownMenuSeparator />
 

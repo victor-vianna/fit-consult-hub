@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -69,6 +70,7 @@ type InboxFilter = "all" | "unread" | "favorites" | "pinned";
 
 export default function Chat() {
   const { user, signOut } = useAuth();
+  const [searchParams] = useSearchParams();
   const { settings: personalSettings } = usePersonalSettings(user?.id);
   const [profile, setProfile] = useState<any>(null);
   const [students, setStudents] = useState<Student[]>([]);
@@ -96,6 +98,7 @@ export default function Chat() {
     () => (user?.id ? `pf:chat-selected-aluno:${user.id}:v1` : null),
     [user?.id]
   );
+  const alunoIdFromUrl = searchParams.get("aluno");
 
   const readStoredSelectedAlunoId = () => {
     if (!selectedAlunoStorageKey || typeof window === "undefined") return null;
@@ -121,6 +124,14 @@ export default function Chat() {
       // cache best-effort
     }
   }, [selectedAlunoStorageKey, selectedAlunoId]);
+
+  useEffect(() => {
+    if (!alunoIdFromUrl) return;
+    if (students.some((student) => student.id === alunoIdFromUrl)) {
+      setSelectedAlunoId(alunoIdFromUrl);
+      setManualUnreadIds((prev) => prev.filter((id) => id !== alunoIdFromUrl));
+    }
+  }, [alunoIdFromUrl, setManualUnreadIds, students]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -159,6 +170,9 @@ export default function Chat() {
     const fetchedStudents = (studentData || []) as Student[];
     const storedAlunoId = readStoredSelectedAlunoId();
     const nextSelectedAlunoId =
+      (alunoIdFromUrl && fetchedStudents.some((student) => student.id === alunoIdFromUrl)
+        ? alunoIdFromUrl
+        : null) ||
       (selectedAlunoId && fetchedStudents.some((student) => student.id === selectedAlunoId)
         ? selectedAlunoId
         : null) ||

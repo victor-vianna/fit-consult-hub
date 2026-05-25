@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { usePersistedState } from "@/hooks/usePersistedState";
 import { getMaterialSignedUrl, openMaterialInNewTab } from "@/utils/materiais";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,7 @@ interface Material {
 export default function AreaAluno() {
   const { user, signOut } = useAuth();
   const isMobile = useIsMobile();
+  const [searchParams] = useSearchParams();
   const [profile, setProfile] = useState<any>(null);
   const [personalProfile, setPersonalProfile] = useState<any>(null);
   const [materiais, setMateriais] = useState<Material[]>([]);
@@ -177,6 +179,14 @@ export default function AreaAluno() {
       setActiveSection("inicio");
     }
   }, [activeSection, cardsVisiveis.join("|"), setActiveSection]);
+
+  useEffect(() => {
+    const sectionFromUrl = searchParams.get("section");
+    const secoesPermitidas = ["inicio", ...cardsVisiveis];
+    if (sectionFromUrl && secoesPermitidas.includes(sectionFromUrl)) {
+      setActiveSection(sectionFromUrl);
+    }
+  }, [cardsVisiveis.join("|"), searchParams, setActiveSection]);
 
   const { ultima: ultimaMsg } = useUltimaMensagem(
     profile?.personal_id || "",

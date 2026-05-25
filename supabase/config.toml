@@ -9,5 +9,8 @@ verify_jwt = true
 [functions.verificar-planilhas-expirando]
 verify_jwt = false
 
+[functions.send-push-notification]
+verify_jwt = true
+
 [functions.stripe-webhook]
 verify_jwt = false

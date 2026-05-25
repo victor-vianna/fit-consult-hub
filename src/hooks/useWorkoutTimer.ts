@@ -1,6 +1,7 @@
 // src/hooks/useWorkoutTimer.ts
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { dispatchPushNotification } from "@/utils/pushNotifications";
 import { toast } from "sonner";
 import { SESSION_STATUS, ACTIVE_SESSION_STATUSES, WORKOUT_EVENTS, dispatchWorkoutEvent } from "@/constants/workoutStatus";
 
@@ -786,7 +787,7 @@ export function useWorkoutTimer({
       }
 
       // Enviar notificação ao personal
-      await supabase.from("notificacoes").insert({
+      const { data: notificacaoTreino } = await supabase.from("notificacoes").insert({
         destinatario_id: personalId,
         tipo: "treino_concluido",
         titulo: "🎉 Treino Concluído",
@@ -800,7 +801,9 @@ export function useWorkoutTimer({
           duracao_pausas: pausasTotalSegundos,
         },
         lida: false,
-      });
+      }).select("id").single();
+
+      await dispatchPushNotification(notificacaoTreino?.id);
 
       // Mensagem customizada do personal (fallback profissional)
       const { data: personalCfg } = await supabase

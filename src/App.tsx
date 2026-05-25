@@ -19,6 +19,7 @@ import Biblioteca from "./pages/Biblioteca";
 import ResetPassword from "./pages/ResetPassword";
 import AlunosManager from "./pages/Alunos";
 import Chat from "./pages/Chat";
+import { PushNotificationsBootstrap } from "./components/PushNotificationsBootstrap";
 
 // Seções do painel admin (lazy)
 const DashboardOverview = lazy(() => import("./components/Admin/Sections/DashboardOverview"));
@@ -51,6 +52,7 @@ const App = () => (
         <Sonner />
         <InstallPWAPrompt />
         <BrowserRouter>
+          <PushNotificationsBootstrap />
           <ErrorBoundary>
             <Routes>
               <Route path="/auth" element={<Auth />} />

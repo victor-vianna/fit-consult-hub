@@ -4,13 +4,53 @@ import { useToast } from "@/hooks/use-toast";
 
 export const DEFAULT_CARDS_VISIVEIS = [
   "treinos",
-  "historico",
+  "chat",
   "avaliacao",
+  "historico",
   "materiais",
   "plano",
   "biblioteca",
-  "chat",
 ] as const;
+
+export const DEFAULT_ALUNO_DASHBOARD_COMPONENTES = [
+  "frequencia",
+  "mensagens",
+  "boas_vindas",
+  "cards",
+  "jornada",
+] as const;
+
+export const ALUNO_CARD_LABELS: Record<string, string> = {
+  treinos: "Treinos",
+  chat: "Chat",
+  avaliacao: "Avaliacao",
+  historico: "Historico",
+  materiais: "Materiais",
+  plano: "Meu Plano",
+  biblioteca: "Biblioteca",
+};
+
+export const ALUNO_DASHBOARD_COMPONENT_LABELS: Record<string, string> = {
+  frequencia: "Frequencia de treinos",
+  mensagens: "Preview de mensagens",
+  boas_vindas: "Boas-vindas",
+  cards: "Cards de acesso",
+  jornada: "Sua Jornada",
+};
+
+const normalizeStringArray = (
+  value: unknown,
+  fallback: readonly string[],
+  allowed: readonly string[]
+) => {
+  if (!Array.isArray(value)) return [...fallback];
+
+  const unique = value
+    .filter((item): item is string => typeof item === "string" && allowed.includes(item))
+    .filter((item, index, arr) => arr.indexOf(item) === index);
+
+  return unique.length ? unique : [...fallback];
+};
 
 export interface PersonalSettings {
   id: string;
@@ -24,7 +64,9 @@ export interface PersonalSettings {
   welcome_message: string | null;
   jornada_title: string | null;
   jornada_message: string | null;
+  chat_welcome_message: string | null;
   cards_visiveis: string[] | null;
+  aluno_dashboard_componentes: string[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -42,9 +84,16 @@ export function usePersonalSettings(personalId?: string) {
 
   const normalize = (raw: any): PersonalSettings => ({
     ...raw,
-    cards_visiveis: Array.isArray(raw?.cards_visiveis)
-      ? (raw.cards_visiveis as string[])
-      : [...DEFAULT_CARDS_VISIVEIS],
+    cards_visiveis: normalizeStringArray(
+      raw?.cards_visiveis,
+      DEFAULT_CARDS_VISIVEIS,
+      DEFAULT_CARDS_VISIVEIS
+    ),
+    aluno_dashboard_componentes: normalizeStringArray(
+      raw?.aluno_dashboard_componentes,
+      DEFAULT_ALUNO_DASHBOARD_COMPONENTES,
+      DEFAULT_ALUNO_DASHBOARD_COMPONENTES
+    ),
   });
 
   const fetchSettings = async () => {
@@ -89,6 +138,8 @@ export function usePersonalSettings(personalId?: string) {
           personal_id: personalId,
           display_name: profile?.nome || "Personal Trainer",
           theme_color: "#3b82f6",
+          cards_visiveis: [...DEFAULT_CARDS_VISIVEIS],
+          aluno_dashboard_componentes: [...DEFAULT_ALUNO_DASHBOARD_COMPONENTES],
         })
         .select()
         .single();

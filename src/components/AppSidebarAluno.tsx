@@ -1,16 +1,13 @@
 import {
-  Home,
-  BookOpen,
-  FileText,
-  ListChecks,
-  Dumbbell,
-  Library,
-  CreditCard,
-  Calendar,
-  MessageSquare,
   Activity,
+  Calendar,
+  CreditCard,
+  Dumbbell,
+  FileText,
+  Home,
+  Library,
+  MessageSquare,
 } from "lucide-react";
-import { Link } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -22,40 +19,49 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { usePersonalSettings } from "@/hooks/usePersonalSettings";
+import {
+  ALUNO_CARD_LABELS,
+  DEFAULT_CARDS_VISIVEIS,
+  usePersonalSettings,
+} from "@/hooks/usePersonalSettings";
 
-const items = [
-  { title: "Início", icon: Home, value: "inicio" },
-  { title: "Treinos", icon: Dumbbell, value: "treinos" },
-  { title: "Histórico", icon: Calendar, value: "historico" },
-  { title: "Avaliação", icon: Activity, value: "avaliacao" },
-  { title: "Materiais", icon: FileText, value: "materiais" },
-  { title: "Biblioteca", icon: Library, value: "biblioteca" },
-  { title: "Meu Plano", icon: CreditCard, value: "plano" },
-  { title: "Chat", icon: MessageSquare, value: "chat" },
-];
+const itemConfig: Record<string, { title: string; icon: any; value: string }> = {
+  treinos: { title: ALUNO_CARD_LABELS.treinos, icon: Dumbbell, value: "treinos" },
+  chat: { title: ALUNO_CARD_LABELS.chat, icon: MessageSquare, value: "chat" },
+  avaliacao: { title: ALUNO_CARD_LABELS.avaliacao, icon: Activity, value: "avaliacao" },
+  historico: { title: ALUNO_CARD_LABELS.historico, icon: Calendar, value: "historico" },
+  materiais: { title: ALUNO_CARD_LABELS.materiais, icon: FileText, value: "materiais" },
+  plano: { title: ALUNO_CARD_LABELS.plano, icon: CreditCard, value: "plano" },
+  biblioteca: { title: ALUNO_CARD_LABELS.biblioteca, icon: Library, value: "biblioteca" },
+};
 
 interface AppSidebarAlunoProps {
   activeSection: string;
   onSectionChange: (section: string) => void;
   personalId?: string;
+  cardsVisiveis?: string[];
 }
 
 export function AppSidebarAluno({
   activeSection,
   onSectionChange,
   personalId,
+  cardsVisiveis,
 }: AppSidebarAlunoProps) {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-
-  // Buscar configurações do personal
   const { settings: personalSettings } = usePersonalSettings(personalId);
+
+  const items = [
+    { title: "Inicio", icon: Home, value: "inicio" },
+    ...(cardsVisiveis?.length ? cardsVisiveis : [...DEFAULT_CARDS_VISIVEIS])
+      .map((id) => itemConfig[id])
+      .filter(Boolean),
+  ];
 
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
-        {/* Header com Logo e Nome do Personal */}
         {!collapsed && (
           <div
             className="p-4 border-b"
@@ -88,13 +94,12 @@ export function AppSidebarAluno({
                 >
                   {personalSettings?.display_name || "FitConsult"}
                 </h2>
-                <p className="text-xs text-muted-foreground">Área do Aluno</p>
+                <p className="text-xs text-muted-foreground">Area do Aluno</p>
               </div>
             </div>
           </div>
         )}
 
-        {/* Menu Principal */}
         <SidebarGroup>
           <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <SidebarGroupContent>

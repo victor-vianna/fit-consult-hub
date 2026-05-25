@@ -50,7 +50,11 @@ import ExercisesLibrary from "@/components/ExercisesLibrary";
 import { PlanilhaStatusCard } from "@/components/PlanilhaStatusCard";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { useChatNaoLidas, useUltimaMensagem } from "@/hooks/useChatMessages";
-import { DEFAULT_CARDS_VISIVEIS } from "@/hooks/usePersonalSettings";
+import {
+  ALUNO_CARD_LABELS,
+  DEFAULT_ALUNO_DASHBOARD_COMPONENTES,
+  DEFAULT_CARDS_VISIVEIS,
+} from "@/hooks/usePersonalSettings";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { MaterialFileExplorer } from "@/components/materials/MaterialFileExplorer";
@@ -162,26 +166,16 @@ export default function AreaAluno() {
     ? personalSettings.cards_visiveis
     : [...DEFAULT_CARDS_VISIVEIS]) as string[];
 
-  const ordenarCardsDashboard = (cards: string[]) => {
-    const ordenados = [...cards];
-    let historicoIndex = ordenados.indexOf("historico");
-    const chatIndex = ordenados.indexOf("chat");
+  const dashboardComponentes = (personalSettings?.aluno_dashboard_componentes?.length
+    ? personalSettings.aluno_dashboard_componentes
+    : [...DEFAULT_ALUNO_DASHBOARD_COMPONENTES]) as string[];
 
-    if (historicoIndex >= 0 && chatIndex >= 0 && historicoIndex < chatIndex) {
-      ordenados[historicoIndex] = "chat";
-      ordenados[chatIndex] = "historico";
+  useEffect(() => {
+    const secoesPermitidas = ["inicio", ...cardsVisiveis];
+    if (!secoesPermitidas.includes(activeSection)) {
+      setActiveSection("inicio");
     }
-
-    historicoIndex = ordenados.indexOf("historico");
-    const bibliotecaIndex = ordenados.indexOf("biblioteca");
-
-    if (historicoIndex >= 0 && bibliotecaIndex >= 0) {
-      ordenados[historicoIndex] = "biblioteca";
-      ordenados[bibliotecaIndex] = "historico";
-    }
-
-    return ordenados;
-  };
+  }, [activeSection, cardsVisiveis.join("|"), setActiveSection]);
 
   const { ultima: ultimaMsg } = useUltimaMensagem(
     profile?.personal_id || "",
@@ -227,83 +221,141 @@ export default function AreaAluno() {
   };
 
   const cardConfig: Record<string, { title: string; icon: any; section: string; badge?: number }> = {
-    treinos: { title: "Treinos", icon: Dumbbell, section: "treinos" },
-    historico: { title: "Histórico", icon: Calendar, section: "historico" },
-    avaliacao: { title: "Avaliação", icon: Activity, section: "avaliacao" },
-    materiais: { title: "Materiais", icon: FileText, section: "materiais" },
-    plano: { title: "Meu Plano", icon: CreditCard, section: "plano" },
-    biblioteca: { title: "Biblioteca", icon: Library, section: "biblioteca" },
-    chat: { title: "Chat", icon: MessageSquare, section: "chat", badge: chatNaoLidas },
+    treinos: { title: ALUNO_CARD_LABELS.treinos, icon: Dumbbell, section: "treinos" },
+    chat: { title: ALUNO_CARD_LABELS.chat, icon: MessageSquare, section: "chat", badge: chatNaoLidas },
+    avaliacao: { title: ALUNO_CARD_LABELS.avaliacao, icon: Activity, section: "avaliacao" },
+    historico: { title: ALUNO_CARD_LABELS.historico, icon: Calendar, section: "historico" },
+    materiais: { title: ALUNO_CARD_LABELS.materiais, icon: FileText, section: "materiais" },
+    plano: { title: ALUNO_CARD_LABELS.plano, icon: CreditCard, section: "plano" },
+    biblioteca: { title: ALUNO_CARD_LABELS.biblioteca, icon: Library, section: "biblioteca" },
+  };
+
+  const renderCardsGrid = () => (
+    <div className="grid grid-cols-2 gap-4 sm:gap-6 md:gap-4">
+      {cardsVisiveis.map((id) => {
+        const cfg = cardConfig[id];
+        if (!cfg) return null;
+        return (
+          <ActionCard
+            key={id}
+            title={cfg.title}
+            icon={cfg.icon}
+            onClick={() => setActiveSection(cfg.section)}
+            badge={cfg.badge && cfg.badge > 0 ? cfg.badge : undefined}
+          />
+        );
+      })}
+    </div>
+  );
+
+  const renderWelcomeCard = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle
+          className="text-2xl"
+          style={{
+            color: personalSettings?.theme_color || undefined,
+          }}
+        >
+          {personalSettings?.welcome_title
+            ? personalSettings.welcome_title.replace("{nome}", profile?.nome ?? "")
+            : `Bem-vindo(a), ${profile?.nome ?? ""}!`}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4 text-muted-foreground whitespace-pre-line">
+        {personalSettings?.welcome_message ? (
+          <p>{personalSettings.welcome_message}</p>
+        ) : (
+          <>
+            <p>Seja muito bem-vindo(a) à minha consultoria online!</p>
+            <p>
+              Fico muito feliz por ter você aqui, e quero te dizer que este
+              é um espaço exclusivo, criado para oferecer orientação de
+              qualidade, com um acompanhamento próximo e personalizado.
+            </p>
+            <p>
+              Aqui, tudo é feito por mim, com total dedicação para garantir
+              que você tenha o suporte necessário para alcançar os melhores
+              resultados!
+            </p>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  const renderJornadaCard = () => (
+    <Card
+      className="border-2"
+      style={{
+        borderColor: personalSettings?.theme_color
+          ? `${personalSettings.theme_color}50`
+          : undefined,
+        background: personalSettings?.theme_color
+          ? `linear-gradient(to bottom right, ${personalSettings.theme_color}05, ${personalSettings.theme_color}10)`
+          : undefined,
+      }}
+    >
+      <CardHeader>
+        <CardTitle
+          style={{
+            color: personalSettings?.theme_color || undefined,
+          }}
+        >
+          {personalSettings?.jornada_title || "Sua Jornada Começa Agora"}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="text-muted-foreground whitespace-pre-line">
+        {personalSettings?.jornada_message ? (
+          <p>{personalSettings.jornada_message}</p>
+        ) : (
+          <>
+            <p className="mb-4">
+              Agora que você já conhece o funcionamento da minha
+              consultoria, chegou o momento de dar o primeiro passo! Estou
+              aqui para te guiar nessa jornada, garantindo que você tenha o
+              suporte necessário para evoluir de forma consistente e
+              alcançar seus objetivos.
+            </p>
+            <p className="font-semibold">
+              Vamos juntos transformar sua rotina, superar desafios e
+              conquistar os seus melhores resultados. Estou pronto para te
+              acompanhar - vem comigo!
+            </p>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  const renderAlunoDashboardComponent = (id: string) => {
+    if (id === "frequencia" && profile?.personal_id) {
+      return (
+        <CalendarioSemanal
+          key={id}
+          profileId={user!.id}
+          personalId={profile.personal_id}
+          themeColor={personalSettings?.theme_color}
+          onVerHistoricoCompleto={() => setActiveSection("historico")}
+        />
+      );
+    }
+
+    if (id === "mensagens") {
+      const preview = renderChatPreview();
+      return preview ? <div key={id}>{preview}</div> : null;
+    }
+
+    if (id === "boas_vindas") return <div key={id}>{renderWelcomeCard()}</div>;
+    if (id === "cards") return <div key={id}>{renderCardsGrid()}</div>;
+    if (id === "jornada") return <div key={id}>{renderJornadaCard()}</div>;
+    return null;
   };
 
   const renderMobileHome = () => {
     return (
       <div className="space-y-4 container-mobile pb-24 animate-fade-in">
-        {profile?.personal_id && (
-          <CalendarioSemanal
-            profileId={user!.id}
-            personalId={profile.personal_id}
-            themeColor={personalSettings?.theme_color}
-            onVerHistoricoCompleto={() => setActiveSection("historico")}
-          />
-        )}
-
-        {/* Preview de mensagens */}
-        {renderChatPreview()}
-
-        <div className="grid grid-cols-2 gap-4 sm:gap-6 md:gap-4">
-          {ordenarCardsDashboard(cardsVisiveis).map((id) => {
-            const cfg = cardConfig[id];
-            if (!cfg) return null;
-            return (
-              <ActionCard
-                key={id}
-                title={cfg.title}
-                icon={cfg.icon}
-                onClick={() => setActiveSection(cfg.section)}
-                badge={cfg.badge && cfg.badge > 0 ? cfg.badge : undefined}
-              />
-            );
-          })}
-        </div>
-
-        <Card
-          className="border-2"
-          style={{
-            borderColor: personalSettings?.theme_color
-              ? `${personalSettings.theme_color}50`
-              : undefined,
-            background: personalSettings?.theme_color
-              ? `linear-gradient(to bottom right, ${personalSettings.theme_color}05, ${personalSettings.theme_color}10)`
-              : undefined,
-          }}
-        >
-          <CardHeader>
-            <CardTitle
-              className="text-lg"
-              style={{
-                color: personalSettings?.theme_color || undefined,
-              }}
-            >
-              {personalSettings?.jornada_title || "Sua Jornada Começa Agora"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground whitespace-pre-line">
-            {personalSettings?.jornada_message || (
-              <>
-                <p className="mb-3">
-                  Agora que você já conhece o funcionamento da minha consultoria,
-                  chegou o momento de dar o primeiro passo!
-                </p>
-                <p className="font-semibold">
-                  Vamos juntos transformar sua rotina, superar desafios e conquistar
-                  os seus melhores resultados. Estou pronto para te acompanhar – vem
-                  comigo! 💪
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        {dashboardComponentes.map(renderAlunoDashboardComponent)}
       </div>
     );
   };
@@ -353,6 +405,12 @@ export default function AreaAluno() {
 
     switch (activeSection) {
       case "inicio":
+        return (
+          <div className="space-y-6 animate-fade-in">
+            {dashboardComponentes.map(renderAlunoDashboardComponent)}
+          </div>
+        );
+
         return (
           <div className="space-y-6 animate-fade-in">
             {profile?.personal_id && (
@@ -707,6 +765,7 @@ export default function AreaAluno() {
             onSignOut={signOut}
             personalWhatsApp={personalProfile?.telefone}
             chatNaoLidas={chatNaoLidas}
+            cardsVisiveis={cardsVisiveis}
           />
 
           {selectedFile && (
@@ -732,6 +791,7 @@ export default function AreaAluno() {
             activeSection={activeSection}
             onSectionChange={setActiveSection}
             personalId={profile?.personal_id}
+            cardsVisiveis={cardsVisiveis}
           />
 
           <div className="flex-1 flex flex-col">

@@ -1533,6 +1533,7 @@ export type Database = {
       }
       personal_settings: {
         Row: {
+          aluno_dashboard_componentes: Json | null
           cards_visiveis: Json | null
           chat_welcome_message: string | null
           controle_acesso_por_pagamento: boolean
@@ -1551,6 +1552,7 @@ export type Database = {
           welcome_title: string | null
         }
         Insert: {
+          aluno_dashboard_componentes?: Json | null
           cards_visiveis?: Json | null
           chat_welcome_message?: string | null
           controle_acesso_por_pagamento?: boolean
@@ -1569,6 +1571,7 @@ export type Database = {
           welcome_title?: string | null
         }
         Update: {
+          aluno_dashboard_componentes?: Json | null
           cards_visiveis?: Json | null
           chat_welcome_message?: string | null
           controle_acesso_por_pagamento?: boolean

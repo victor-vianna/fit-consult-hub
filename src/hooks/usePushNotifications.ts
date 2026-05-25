@@ -25,6 +25,24 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray;
 }
 
+function uint8ArrayToUrlBase64(value: ArrayBuffer | null) {
+  if (!value) return "";
+  const bytes = new Uint8Array(value);
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return window
+    .btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+function normalizeVapidKey(value?: string | null) {
+  return (value || "").trim().replace(/=+$/, "");
+}
+
 function getPushSupportStatus(): PushStatus {
   if (typeof window === "undefined") return "unsupported";
   if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
@@ -93,6 +111,15 @@ export function usePushNotifications(userId?: string | null) {
 
       const registration = await navigator.serviceWorker.ready;
       let subscription = await registration.pushManager.getSubscription();
+      const expectedKey = normalizeVapidKey(VAPID_PUBLIC_KEY);
+      const currentKey = normalizeVapidKey(
+        subscription ? uint8ArrayToUrlBase64(subscription.options.applicationServerKey) : null
+      );
+
+      if (subscription && currentKey && currentKey !== expectedKey) {
+        await subscription.unsubscribe();
+        subscription = null;
+      }
 
       if (!subscription) {
         subscription = await registration.pushManager.subscribe({

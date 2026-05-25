@@ -131,7 +131,9 @@ Deno.serve(async (req) => {
     });
 
     let sent = 0;
+    let failed = 0;
     const revokedIds: string[] = [];
+    const failures: Array<{ id: string; statusCode: number | null; message: string }> = [];
 
     await Promise.all(
       subscriptions.map(async (subscription) => {
@@ -148,8 +150,14 @@ Deno.serve(async (req) => {
           );
           sent += 1;
         } catch (error) {
+          failed += 1;
           const statusCode = error?.statusCode || error?.status;
-          if (statusCode === 404 || statusCode === 410) {
+          failures.push({
+            id: subscription.id,
+            statusCode: statusCode ?? null,
+            message: error?.body || error?.message || "Falha ao enviar push",
+          });
+          if ([400, 401, 403, 404, 410].includes(statusCode)) {
             revokedIds.push(subscription.id);
           } else {
             console.error("Erro ao enviar push:", error);
@@ -165,7 +173,7 @@ Deno.serve(async (req) => {
         .in("id", revokedIds);
     }
 
-    return jsonResponse({ sent, revoked: revokedIds.length });
+    return jsonResponse({ sent, failed, revoked: revokedIds.length, failures: failures.slice(0, 5) });
   } catch (error) {
     console.error("send-push-notification error:", error);
     return jsonResponse({ error: error?.message || "Erro inesperado." }, 500);

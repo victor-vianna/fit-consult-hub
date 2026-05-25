@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { dispatchPushNotification } from "@/utils/pushNotifications";
+import { createNotificationId, dispatchPushNotification } from "@/utils/pushNotifications";
 
 export interface ChatMessage {
   id: string;
@@ -114,7 +114,9 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
           supabase.from("profiles").select("nome").eq("id", alunoId).single(),
         ]);
 
-        const { data: notificacao } = await supabase.from("notificacoes").insert({
+        const notificacaoId = createNotificationId();
+        const { error: notificationError } = await supabase.from("notificacoes").insert({
+          id: notificacaoId,
           destinatario_id: destinatarioId,
           tipo: "nova_mensagem",
           titulo: `Nova mensagem de ${remetenteProfile?.nome || "Usuário"}`,
@@ -125,9 +127,13 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
             profile_id: currentUserId,
             tipo_acao: "chat",
           },
-        }).select("id").single();
+        });
 
-        await dispatchPushNotification(notificacao?.id);
+        if (!notificationError) {
+          await dispatchPushNotification(notificacaoId);
+        } else {
+          console.error("Erro ao criar notificacao de chat:", notificationError);
+        }
       }
 
       setSending(false);

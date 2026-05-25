@@ -32,6 +32,7 @@ import { useAuth } from "@/hooks/useAuth";
 const menuItems = [
   { title: "Dashboard", icon: Home, path: "/" },
   { title: "Alunos", icon: UsersIcon, path: "/alunos" },
+  { title: "Chat", icon: MessageSquare, path: "/chat" },
   { title: "Biblioteca", icon: Library, path: "/biblioteca" },
   { title: "Financeiro", icon: Wallet, path: "/financeiro" },
 ];

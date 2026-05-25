@@ -18,6 +18,7 @@ import Financeiro from "./pages/Financeiro";
 import Biblioteca from "./pages/Biblioteca";
 import ResetPassword from "./pages/ResetPassword";
 import AlunosManager from "./pages/Alunos";
+import Chat from "./pages/Chat";
 
 // Seções do painel admin (lazy)
 const DashboardOverview = lazy(() => import("./components/Admin/Sections/DashboardOverview"));
@@ -118,6 +119,14 @@ const App = () => (
                 element={
                   <AuthGuard allowedRoles={["personal"]}>
                     <AlunosManager />
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/chat"
+                element={
+                  <AuthGuard allowedRoles={["personal"]}>
+                    <Chat />
                   </AuthGuard>
                 }
               />

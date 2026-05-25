@@ -4,6 +4,7 @@ import {
   Home,
   DollarSign,
   Library,
+  MessageSquare,
   UserIcon,
 } from "lucide-react";
 import { useHaptic } from "@/hooks/useHaptic";
@@ -37,6 +38,11 @@ export function BottomNavigationPersonal({
       icon: UserIcon,
       label: "Alunos",
       path: "/alunos",
+    },
+    {
+      icon: MessageSquare,
+      label: "Chat",
+      path: "/chat",
     },
     {
       icon: Library,

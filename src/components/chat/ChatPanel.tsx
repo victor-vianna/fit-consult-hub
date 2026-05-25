@@ -17,7 +17,7 @@ import {
   UserCircle,
   X,
 } from "lucide-react";
-import { format, formatDistanceToNow, isSameDay, isToday, isYesterday } from "date-fns";
+import { format, isSameDay, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,8 +53,16 @@ interface ChatPanelProps {
 
 type DeleteTarget = { id: string; isMine: boolean } | null;
 type ProfileSummary = { nome: string | null; telefone?: string | null };
+type ScrollSnapshot = {
+  top: number;
+  height: number;
+  atBottom: boolean;
+  savedAt: number;
+};
 
 const QUICK_EMOJIS = ["👍", "💪", "🔥", "👏", "✅"];
+
+const SCROLL_CACHE_PREFIX = "pf:chat-scroll";
 
 export function ChatPanel({
   personalId,
@@ -73,6 +81,10 @@ export function ChatPanel({
   const [profiles, setProfiles] = useState<Record<string, ProfileSummary>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const restoredScrollKeyRef = useRef<string | null>(null);
+  const lastMessageCountRef = useRef(0);
+  const nearBottomRef = useRef(true);
+  const saveScrollTimerRef = useRef<number | null>(null);
   const { toast } = useToast();
 
   const {
@@ -93,10 +105,65 @@ export function ChatPanel({
     profiles[otherUserId]?.nome || (currentUserId === personalId ? "Aluno" : "Personal");
   const initials = getInitials(otherName);
   const accent = themeColor || "hsl(var(--primary))";
+  const scrollCacheKey = useMemo(
+    () => `${SCROLL_CACHE_PREFIX}:${currentUserId}:${personalId}:${alunoId}`,
+    [currentUserId, personalId, alunoId]
+  );
+
+  const readScrollSnapshot = () => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem(scrollCacheKey);
+      return raw ? (JSON.parse(raw) as ScrollSnapshot) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const persistScrollSnapshot = (el: HTMLDivElement, atBottom: boolean) => {
+    if (typeof window === "undefined") return;
+    try {
+      const snapshot: ScrollSnapshot = {
+        top: el.scrollTop,
+        height: el.scrollHeight,
+        atBottom,
+        savedAt: Date.now(),
+      };
+      window.localStorage.setItem(scrollCacheKey, JSON.stringify(snapshot));
+    } catch {
+      // Cache best-effort.
+    }
+  };
+
+  const scheduleScrollSnapshot = (el: HTMLDivElement, atBottom: boolean) => {
+    if (typeof window === "undefined") return;
+    if (saveScrollTimerRef.current) {
+      window.clearTimeout(saveScrollTimerRef.current);
+    }
+    saveScrollTimerRef.current = window.setTimeout(() => {
+      persistScrollSnapshot(el, atBottom);
+      saveScrollTimerRef.current = null;
+    }, 120);
+  };
 
   useEffect(() => {
     marcarComoLidas();
   }, [marcarComoLidas]);
+
+  useEffect(() => {
+    restoredScrollKeyRef.current = null;
+    lastMessageCountRef.current = 0;
+    nearBottomRef.current = true;
+    setShowScrollButton(false);
+  }, [scrollCacheKey]);
+
+  useEffect(() => {
+    return () => {
+      if (saveScrollTimerRef.current && typeof window !== "undefined") {
+        window.clearTimeout(saveScrollTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const handler = () => {
@@ -126,10 +193,6 @@ export function ChatPanel({
     fetchProfiles();
   }, [personalId, alunoId, currentUserId]);
 
-  useEffect(() => {
-    scrollToBottom("auto");
-  }, [mensagens.length]);
-
   const findMsg = (id: string | null) => (id ? mensagens.find((m) => m.id === id) : undefined);
 
   const visibleMessages = useMemo(() => {
@@ -155,18 +218,61 @@ export function ChatPanel({
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({
-        top: scrollRef.current.scrollHeight,
+      const el = scrollRef.current;
+      if (!el) return;
+      nearBottomRef.current = true;
+      setShowScrollButton(false);
+      el.scrollTo({
+        top: el.scrollHeight,
         behavior,
       });
     });
   };
 
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || searchTerm.trim()) return;
+
+    requestAnimationFrame(() => {
+      const currentEl = scrollRef.current;
+      if (!currentEl) return;
+
+      const hasRestored = restoredScrollKeyRef.current === scrollCacheKey;
+      if (!hasRestored) {
+        const snapshot = readScrollSnapshot();
+        const maxTop = Math.max(0, currentEl.scrollHeight - currentEl.clientHeight);
+        const targetTop = snapshot
+          ? snapshot.atBottom
+            ? maxTop
+            : Math.min(snapshot.top, maxTop)
+          : maxTop;
+
+        currentEl.scrollTop = targetTop;
+        const distanceFromBottom =
+          currentEl.scrollHeight - currentEl.scrollTop - currentEl.clientHeight;
+        nearBottomRef.current = distanceFromBottom < 120;
+        setShowScrollButton(distanceFromBottom > 180);
+        restoredScrollKeyRef.current = scrollCacheKey;
+        lastMessageCountRef.current = mensagens.length;
+        return;
+      }
+
+      const hasNewMessage = mensagens.length > lastMessageCountRef.current;
+      lastMessageCountRef.current = mensagens.length;
+      if (hasNewMessage && nearBottomRef.current) {
+        scrollToBottom("smooth");
+      }
+    });
+  }, [mensagens.length, scrollCacheKey, searchTerm]);
+
   const handleScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const atBottom = distanceFromBottom < 120;
+    nearBottomRef.current = atBottom;
     setShowScrollButton(distanceFromBottom > 180);
+    scheduleScrollSnapshot(el, atBottom);
     if (distanceFromBottom < 80) marcarComoLidas();
   };
 

@@ -92,6 +92,19 @@ export default function Chat() {
     [],
     { storage: "local" }
   );
+  const selectedAlunoStorageKey = useMemo(
+    () => (user?.id ? `pf:chat-selected-aluno:${user.id}:v1` : null),
+    [user?.id]
+  );
+
+  const readStoredSelectedAlunoId = () => {
+    if (!selectedAlunoStorageKey || typeof window === "undefined") return null;
+    try {
+      return window.localStorage.getItem(selectedAlunoStorageKey);
+    } catch {
+      return null;
+    }
+  };
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -99,6 +112,15 @@ export default function Chat() {
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  useEffect(() => {
+    if (!selectedAlunoStorageKey || !selectedAlunoId || typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(selectedAlunoStorageKey, selectedAlunoId);
+    } catch {
+      // cache best-effort
+    }
+  }, [selectedAlunoStorageKey, selectedAlunoId]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -134,10 +156,22 @@ export default function Chat() {
         .order("nome"),
     ]);
 
+    const fetchedStudents = (studentData || []) as Student[];
+    const storedAlunoId = readStoredSelectedAlunoId();
+    const nextSelectedAlunoId =
+      (selectedAlunoId && fetchedStudents.some((student) => student.id === selectedAlunoId)
+        ? selectedAlunoId
+        : null) ||
+      (storedAlunoId && fetchedStudents.some((student) => student.id === storedAlunoId)
+        ? storedAlunoId
+        : null) ||
+      fetchedStudents[0]?.id ||
+      null;
+
     setProfile(profileData);
-    setStudents((studentData || []) as Student[]);
-    if (!selectedAlunoId && studentData?.[0]?.id) {
-      setSelectedAlunoId(studentData[0].id);
+    setStudents(fetchedStudents);
+    if (nextSelectedAlunoId && nextSelectedAlunoId !== selectedAlunoId) {
+      setSelectedAlunoId(nextSelectedAlunoId);
     }
     await fetchMessages();
   };

@@ -58,6 +58,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { MaterialFileExplorer } from "@/components/materials/MaterialFileExplorer";
+import { cn } from "@/lib/utils";
 
 interface Material {
   id: string;
@@ -712,13 +713,14 @@ export default function AreaAluno() {
 
       case "chat":
         return (
-          <div className="space-y-6 animate-fade-in">
+          <div className={isMobile ? "h-full min-h-0 animate-fade-in" : "space-y-6 animate-fade-in"}>
             {profile?.personal_id && user && (
               <ChatPanel
                 personalId={profile.personal_id}
                 alunoId={user.id}
                 currentUserId={user.id}
                 themeColor={personalSettings?.theme_color}
+                fullHeight={isMobile}
               />
             )}
           </div>
@@ -748,15 +750,27 @@ export default function AreaAluno() {
 
   // Layout Mobile
   if (isMobile) {
+    const isChatSection = activeSection === "chat";
     return (
       <AppLayout>
         <div className="min-h-screen flex flex-col w-full bg-background">
           <MobileHeader userName={profile?.nome} />
 
-          <main className="flex-1 overflow-auto mobile-content-spacing">
-            <div className="container max-w-2xl mx-auto py-4">
-              {renderContent()}
-            </div>
+          <main
+            className={cn(
+              "flex-1",
+              isChatSection
+                ? "overflow-hidden pb-[calc(4rem+env(safe-area-inset-bottom,0px))]"
+                : "overflow-auto mobile-content-spacing"
+            )}
+          >
+            {isChatSection ? (
+              <div className="h-full min-h-0">{renderContent()}</div>
+            ) : (
+              <div className="container max-w-2xl mx-auto py-4">
+                {renderContent()}
+              </div>
+            )}
           </main>
 
           <BottomNavigation

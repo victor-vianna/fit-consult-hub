@@ -48,6 +48,7 @@ interface ChatPanelProps {
   alunoId: string;
   currentUserId: string;
   themeColor?: string;
+  fullHeight?: boolean;
 }
 
 type DeleteTarget = { id: string; isMine: boolean } | null;
@@ -55,7 +56,13 @@ type ProfileSummary = { nome: string | null; telefone?: string | null };
 
 const QUICK_EMOJIS = ["👍", "💪", "🔥", "👏", "✅"];
 
-export function ChatPanel({ personalId, alunoId, currentUserId, themeColor }: ChatPanelProps) {
+export function ChatPanel({
+  personalId,
+  alunoId,
+  currentUserId,
+  themeColor,
+  fullHeight = false,
+}: ChatPanelProps) {
   const [texto, setTexto] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
@@ -220,7 +227,14 @@ export function ChatPanel({ personalId, alunoId, currentUserId, themeColor }: Ch
 
   if (loading) {
     return (
-      <div className="flex h-[580px] items-center justify-center rounded-lg border bg-background">
+      <div
+        className={cn(
+          "flex items-center justify-center bg-background",
+          fullHeight
+            ? "h-full min-h-0 rounded-none border-0"
+            : "h-[580px] rounded-lg border"
+        )}
+      >
         <div className="text-center">
           <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           <p className="mt-3 text-sm text-muted-foreground">Carregando conversa...</p>
@@ -230,7 +244,14 @@ export function ChatPanel({ personalId, alunoId, currentUserId, themeColor }: Ch
   }
 
   return (
-    <div className="flex h-[min(76vh,720px)] min-h-[540px] flex-col overflow-hidden rounded-lg border bg-background shadow-sm">
+    <div
+      className={cn(
+        "flex flex-col overflow-hidden bg-background",
+        fullHeight
+          ? "h-full min-h-0 rounded-none border-0 shadow-none"
+          : "h-[min(76vh,720px)] min-h-[540px] rounded-lg border shadow-sm"
+      )}
+    >
       <div className="border-b bg-card">
         <div className="flex items-center gap-3 px-3 py-3 sm:px-4">
           <div
@@ -447,7 +468,7 @@ export function ChatPanel({ personalId, alunoId, currentUserId, themeColor }: Ch
             {sending ? <Clock className="h-4 w-4" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
-        <p className="mt-2 text-[11px] text-muted-foreground">
+        <p className="mt-2 hidden text-[11px] text-muted-foreground sm:block">
           Enter envia. Shift + Enter quebra linha.
         </p>
       </div>

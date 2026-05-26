@@ -3,11 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { Pause, ShieldAlert, LogOut, MessageCircle, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AccessMotivo, MOTIVO_LABELS, deriveStatus } from "@/hooks/useStudentAccess";
 import { AlunoCheckoutPlanos } from "@/components/AlunoCheckoutPlanos";
+import { useAuth } from "@/hooks/useAuth";
 
 interface LastLog {
   motivo: string | null;
@@ -17,7 +17,7 @@ interface LastLog {
 }
 
 export default function AcessoSuspenso() {
-  const navigate = useNavigate();
+  const { signOut } = useAuth();
   const [personalPhone, setPersonalPhone] = useState<string | null>(null);
   const [personalName, setPersonalName] = useState<string>("seu personal trainer");
   const [personalId, setPersonalId] = useState<string | null>(null);
@@ -98,11 +98,6 @@ export default function AcessoSuspenso() {
     }
   }
 
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    navigate("/auth", { replace: true });
-  }
-
   // Caso seja bloqueio por pagamento, renderiza fluxo dedicado
   if (bloqueioPorPagamento) {
     return (
@@ -122,7 +117,7 @@ export default function AcessoSuspenso() {
                 ? "Para continuar usando a plataforma, ative ou renove sua assinatura."
                 : `Para acessar seus treinos, escolha um dos planos oferecidos por ${personalName}.`}
             </p>
-            <Button onClick={handleLogout} variant="ghost" className="gap-2">
+            <Button onClick={signOut} variant="ghost" className="gap-2">
               <LogOut size={16} /> Sair da conta
             </Button>
           </div>
@@ -189,7 +184,7 @@ export default function AcessoSuspenso() {
           </Button>
         )}
 
-        <Button onClick={handleLogout} variant="ghost" className="w-full flex items-center justify-center gap-2">
+        <Button onClick={signOut} variant="ghost" className="w-full flex items-center justify-center gap-2">
           <LogOut size={16} />
           Sair da conta
         </Button>

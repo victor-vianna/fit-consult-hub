@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 export type UserRole = "admin" | "personal" | "aluno";
@@ -15,13 +14,25 @@ export type Profile = {
   [key: string]: any;
 };
 
+const clearPersistedAuthSession = () => {
+  if (typeof window === "undefined") return;
+
+  const clearStorage = (storage: Storage) => {
+    Object.keys(storage)
+      .filter((key) => key.startsWith("sb-") && key.includes("auth-token"))
+      .forEach((key) => storage.removeItem(key));
+  };
+
+  clearStorage(window.localStorage);
+  clearStorage(window.sessionStorage);
+};
+
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
   const initializedRef = useRef(false);
 
   const initializeUserData = useCallback(async (userId: string) => {
@@ -157,8 +168,13 @@ export const useAuth = () => {
     console.log("🔵 Iniciando logout...");
 
     try {
-      // Call supabase signOut first - this properly clears the session
-      await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.warn("Logout global falhou, limpando sessao local:", error);
+        await supabase.auth.signOut({ scope: "local" });
+      }
+
+      clearPersistedAuthSession();
 
       initializedRef.current = false;
       setUser(null);
@@ -167,19 +183,19 @@ export const useAuth = () => {
       setProfile(null);
       setLoading(false);
 
-      navigate("/auth", { replace: true });
       toast.success("Logout realizado com sucesso!");
+      window.location.replace("/auth");
     } catch (error) {
       console.error("Erro no logout:", error);
-      // Even if signOut fails, clear local state
+      clearPersistedAuthSession();
       initializedRef.current = false;
       setUser(null);
       setSession(null);
       setRole(null);
       setProfile(null);
       setLoading(false);
-      navigate("/auth", { replace: true });
-      toast.error("Erro ao fazer logout");
+      toast.success("Logout realizado com sucesso!");
+      window.location.replace("/auth");
     }
   };
 

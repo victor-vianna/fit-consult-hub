@@ -6,7 +6,6 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import {
   Users,
   FileText,
@@ -41,11 +40,6 @@ export function MobileMenuDrawerPersonal({
 }: MobileMenuDrawerPersonalProps) {
   const navigate = useNavigate();
   const { light } = useHaptic();
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/auth");
-  };
 
   const handleMenuItemClick = (onClick: () => void) => {
     light();

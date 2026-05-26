@@ -1,13 +1,7 @@
 import {
   Home,
-  Users,
   Library,
-  LogOut,
   Wallet,
-  FileText,
-  Dumbbell,
-  Calendar,
-  CreditCard,
   MessageSquare,
   UsersIcon,
 } from "lucide-react";
@@ -21,11 +15,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -46,17 +37,6 @@ export function AppSidebarPersonal() {
 
   // Buscar configurações do personal
   const { settings: personalSettings } = usePersonalSettings(user?.id);
-
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      navigate("/auth");
-      toast.success("Logout realizado com sucesso!");
-    } catch (error) {
-      console.error("Erro ao fazer logout:", error);
-      toast.error("Erro ao fazer logout");
-    }
-  };
 
   return (
     <Sidebar collapsible="icon">

@@ -110,16 +110,6 @@ export function ChatPanel({
     [currentUserId, personalId, alunoId]
   );
 
-  const readScrollSnapshot = () => {
-    if (typeof window === "undefined") return null;
-    try {
-      const raw = window.localStorage.getItem(scrollCacheKey);
-      return raw ? (JSON.parse(raw) as ScrollSnapshot) : null;
-    } catch {
-      return null;
-    }
-  };
-
   const persistScrollSnapshot = (el: HTMLDivElement, atBottom: boolean) => {
     if (typeof window === "undefined") return;
     try {
@@ -239,21 +229,26 @@ export function ChatPanel({
 
       const hasRestored = restoredScrollKeyRef.current === scrollCacheKey;
       if (!hasRestored) {
-        const snapshot = readScrollSnapshot();
         const maxTop = Math.max(0, currentEl.scrollHeight - currentEl.clientHeight);
-        const targetTop = snapshot
-          ? snapshot.atBottom
-            ? maxTop
-            : Math.min(snapshot.top, maxTop)
-          : maxTop;
 
-        currentEl.scrollTop = targetTop;
+        currentEl.scrollTop = maxTop;
         const distanceFromBottom =
           currentEl.scrollHeight - currentEl.scrollTop - currentEl.clientHeight;
         nearBottomRef.current = distanceFromBottom < 120;
         setShowScrollButton(distanceFromBottom > 180);
         restoredScrollKeyRef.current = scrollCacheKey;
         lastMessageCountRef.current = mensagens.length;
+
+        window.setTimeout(() => {
+          const latestEl = scrollRef.current;
+          if (!latestEl) return;
+
+          latestEl.scrollTop = latestEl.scrollHeight;
+          nearBottomRef.current = true;
+          setShowScrollButton(false);
+          persistScrollSnapshot(latestEl, true);
+        }, 120);
+
         return;
       }
 

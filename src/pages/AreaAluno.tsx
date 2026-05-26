@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { getMaterialSignedUrl, openMaterialInNewTab } from "@/utils/materiais";
 import { Button } from "@/components/ui/button";
@@ -76,6 +76,10 @@ function getAlunoActiveSectionKey(userId: string) {
   return `pf:aluno-active-section:${userId}:v1`;
 }
 
+function getAlunoSectionScrollKey(userId: string, section: string) {
+  return `pf:aluno-section-scroll:${userId}:${section}:v1`;
+}
+
 function readAlunoActiveSection(userId: string): string | null {
   try {
     const raw = window.localStorage.getItem(getAlunoActiveSectionKey(userId));
@@ -97,6 +101,18 @@ function hasWorkoutInProgress() {
   }
 }
 
+function readAlunoSectionScroll(userId: string, section: string) {
+  try {
+    const raw = window.localStorage.getItem(getAlunoSectionScrollKey(userId, section));
+    if (!raw) return 0;
+
+    const parsed = JSON.parse(raw) as { top?: number };
+    return Number(parsed.top) || 0;
+  } catch {
+    return 0;
+  }
+}
+
 export default function AreaAluno() {
   const { user, signOut } = useAuth();
   const isMobile = useIsMobile();
@@ -106,6 +122,9 @@ export default function AreaAluno() {
   const [materiais, setMateriais] = useState<Material[]>([]);
   const [activeSection, setActiveSection] = useState<string>("inicio");
   const activeSectionHydratedUserRef = useRef<string | null>(null);
+  const activeSectionRef = useRef(activeSection);
+  const mainScrollRef = useRef<HTMLElement | null>(null);
+  const scrollSaveTimerRef = useRef<number | null>(null);
   const skipNextSectionPersistRef = useRef(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
@@ -127,18 +146,84 @@ export default function AreaAluno() {
   );
 
   useEffect(() => {
+    activeSectionRef.current = activeSection;
+  }, [activeSection]);
+
+  const getMainScrollTop = useCallback(() => {
+    const el = mainScrollRef.current;
+    if (el) return el.scrollTop;
+    return window.scrollY || document.documentElement.scrollTop || 0;
+  }, []);
+
+  const saveSectionScroll = useCallback(
+    (section = activeSectionRef.current) => {
+      if (!user?.id || !section || section === "chat") return;
+
+      try {
+        window.localStorage.setItem(
+          getAlunoSectionScrollKey(user.id, section),
+          JSON.stringify({
+            top: getMainScrollTop(),
+            savedAt: Date.now(),
+          })
+        );
+      } catch {
+        // Cache best-effort.
+      }
+    },
+    [getMainScrollTop, user?.id]
+  );
+
+  const restoreSectionScroll = useCallback(
+    (section = activeSectionRef.current) => {
+      if (!user?.id || !section || section === "chat") return;
+
+      const top = readAlunoSectionScroll(user.id, section);
+      const el = mainScrollRef.current;
+
+      requestAnimationFrame(() => {
+        if (el) {
+          el.scrollTo({ top, behavior: "auto" });
+        } else {
+          window.scrollTo({ top, behavior: "auto" });
+        }
+      });
+    },
+    [user?.id]
+  );
+
+  const handleSectionChange = useCallback(
+    (section: string) => {
+      if (section !== activeSectionRef.current) {
+        saveSectionScroll(activeSectionRef.current);
+      }
+
+      setActiveSection(section);
+    },
+    [saveSectionScroll]
+  );
+
+  const handleMainScroll = useCallback(() => {
+    if (!user?.id || activeSectionRef.current === "chat") return;
+
+    if (scrollSaveTimerRef.current) {
+      window.clearTimeout(scrollSaveTimerRef.current);
+    }
+
+    scrollSaveTimerRef.current = window.setTimeout(() => {
+      saveSectionScroll(activeSectionRef.current);
+      scrollSaveTimerRef.current = null;
+    }, 120);
+  }, [saveSectionScroll, user?.id]);
+
+  useEffect(() => {
     if (!user?.id || activeSectionHydratedUserRef.current === user.id) return;
 
     activeSectionHydratedUserRef.current = user.id;
     skipNextSectionPersistRef.current = true;
 
     const persistedSection = readAlunoActiveSection(user.id);
-    const nextSection =
-      persistedSection && persistedSection !== "inicio"
-        ? persistedSection
-        : hasWorkoutInProgress()
-          ? "treinos"
-          : persistedSection || "inicio";
+    const nextSection = persistedSection ?? (hasWorkoutInProgress() ? "treinos" : "inicio");
 
     setActiveSection(nextSection);
   }, [user?.id]);
@@ -160,6 +245,37 @@ export default function AreaAluno() {
       // localStorage indisponivel: segue com estado em memoria
     }
   }, [activeSection, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || activeSectionHydratedUserRef.current !== user.id || loading) return;
+
+    const timer = window.setTimeout(() => {
+      restoreSectionScroll(activeSection);
+    }, 120);
+
+    return () => window.clearTimeout(timer);
+  }, [activeSection, loading, restoreSectionScroll, user?.id]);
+
+  useEffect(() => {
+    const handlePageHide = () => saveSectionScroll(activeSectionRef.current);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        saveSectionScroll(activeSectionRef.current);
+      }
+    };
+
+    window.addEventListener("pagehide", handlePageHide);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+
+      if (scrollSaveTimerRef.current) {
+        window.clearTimeout(scrollSaveTimerRef.current);
+      }
+    };
+  }, [saveSectionScroll]);
 
   useEffect(() => {
     if (user) {
@@ -235,17 +351,17 @@ export default function AreaAluno() {
   useEffect(() => {
     const secoesPermitidas = ["inicio", ...cardsVisiveis];
     if (!secoesPermitidas.includes(activeSection)) {
-      setActiveSection("inicio");
+      handleSectionChange("inicio");
     }
-  }, [activeSection, cardsVisiveis.join("|"), setActiveSection]);
+  }, [activeSection, cardsVisiveis.join("|"), handleSectionChange]);
 
   useEffect(() => {
     const sectionFromUrl = searchParams.get("section");
     const secoesPermitidas = ["inicio", ...cardsVisiveis];
     if (sectionFromUrl && secoesPermitidas.includes(sectionFromUrl)) {
-      setActiveSection(sectionFromUrl);
+      handleSectionChange(sectionFromUrl);
     }
-  }, [cardsVisiveis.join("|"), searchParams, setActiveSection]);
+  }, [cardsVisiveis.join("|"), handleSectionChange, searchParams]);
 
   const { ultima: ultimaMsg } = useUltimaMensagem(
     profile?.personal_id || "",
@@ -258,7 +374,7 @@ export default function AreaAluno() {
     const naoLida = isFromPersonal && !ultimaMsg.lida;
     return (
       <button
-        onClick={() => setActiveSection("chat")}
+        onClick={() => handleSectionChange("chat")}
         className={`w-full text-left rounded-lg border p-3 flex items-start gap-3 transition-colors hover:bg-muted/50 ${
           naoLida ? "border-destructive/50 bg-destructive/5" : "bg-card"
         }`}
@@ -310,7 +426,7 @@ export default function AreaAluno() {
             key={id}
             title={cfg.title}
             icon={cfg.icon}
-            onClick={() => setActiveSection(cfg.section)}
+            onClick={() => handleSectionChange(cfg.section)}
             badge={cfg.badge && cfg.badge > 0 ? cfg.badge : undefined}
           />
         );
@@ -406,7 +522,7 @@ export default function AreaAluno() {
           profileId={user!.id}
           personalId={profile.personal_id}
           themeColor={personalSettings?.theme_color}
-          onVerHistoricoCompleto={() => setActiveSection("historico")}
+          onVerHistoricoCompleto={() => handleSectionChange("historico")}
         />
       );
     }
@@ -450,7 +566,7 @@ export default function AreaAluno() {
             </div>
             <Button 
               variant="outline"
-              onClick={() => setActiveSection("chat")}
+              onClick={() => handleSectionChange("chat")}
               className="mt-2"
             >
               <MessageSquare className="mr-2 h-4 w-4" />
@@ -488,7 +604,7 @@ export default function AreaAluno() {
                 profileId={user!.id}
                 personalId={profile.personal_id}
                 themeColor={personalSettings?.theme_color}
-                onVerHistoricoCompleto={() => setActiveSection("historico")}
+                onVerHistoricoCompleto={() => handleSectionChange("historico")}
               />
             )}
 
@@ -581,7 +697,7 @@ export default function AreaAluno() {
                 profileId={user!.id}
                 personalId={profile.personal_id}
                 readOnly={true}
-                onWorkoutFinished={() => setActiveSection("treinos")}
+                onWorkoutFinished={() => handleSectionChange("treinos")}
               />
             )}
           </div>
@@ -826,6 +942,8 @@ export default function AreaAluno() {
           <MobileHeader userName={profile?.nome} />
 
           <main
+            ref={mainScrollRef}
+            onScroll={handleMainScroll}
             className={cn(
               "flex-1",
               isChatSection
@@ -844,7 +962,7 @@ export default function AreaAluno() {
 
           <BottomNavigation
             activeSection={activeSection}
-            onSectionChange={setActiveSection}
+            onSectionChange={handleSectionChange}
             onSignOut={signOut}
             personalWhatsApp={personalProfile?.telefone}
             chatNaoLidas={chatNaoLidas}
@@ -872,7 +990,7 @@ export default function AreaAluno() {
         <div className="min-h-screen flex w-full">
           <AppSidebarAluno
             activeSection={activeSection}
-            onSectionChange={setActiveSection}
+            onSectionChange={handleSectionChange}
             personalId={profile?.personal_id}
             cardsVisiveis={cardsVisiveis}
           />
@@ -957,7 +1075,11 @@ export default function AreaAluno() {
               </div>
             </header>
 
-            <main className="flex-1 p-6 overflow-auto">
+            <main
+              ref={mainScrollRef}
+              onScroll={handleMainScroll}
+              className="flex-1 p-6 overflow-auto"
+            >
               <div className="container max-w-4xl mx-auto">
                 {renderContent()}
               </div>

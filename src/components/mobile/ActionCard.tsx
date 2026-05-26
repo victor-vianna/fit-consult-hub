@@ -21,9 +21,9 @@ export function ActionCard({ title, icon: Icon, onClick, iconColor = 'text-prima
           {badge > 9 ? "9+" : badge}
         </Badge>
       )}
-      <CardContent className="flex flex-col items-center justify-center p-6 gap-3">
-        <Icon className={`h-8 w-8 ${iconColor}`} />
-        <span className="text-sm font-medium text-center">{title}</span>
+      <CardContent className="flex flex-col items-center justify-center gap-2.5 p-5">
+        <Icon className={`h-7 w-7 ${iconColor}`} />
+        <span className="text-center text-[13px] font-medium leading-tight">{title}</span>
       </CardContent>
     </Card>
   );

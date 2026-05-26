@@ -25,7 +25,9 @@ export async function dispatchPushNotification(notificationId?: string | null) {
     return;
   }
 
-  if (data?.sent === 0) {
+  if ((data?.failed || 0) > 0 || data?.sent === 0) {
     console.warn("Push notification nao entregue:", data);
   }
+
+  return data;
 }

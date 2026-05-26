@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { MessageSquare, Send, Star } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { createNotificationId, dispatchPushNotification } from "@/utils/pushNotifications";
 
 interface TreinoFeedbackModalProps {
   open: boolean;
@@ -71,7 +72,9 @@ export function TreinoFeedbackModal({
         .eq("id", personalId)
         .single();
 
-      await supabase.from("notificacoes").insert({
+      const notificacaoId = createNotificationId();
+      const { error: notificacaoError } = await supabase.from("notificacoes").insert({
+        id: notificacaoId,
         destinatario_id: alunoId,
         tipo: "nova_mensagem",
         titulo: `${personalProfile?.nome || "Personal"} respondeu seu feedback`,
@@ -84,6 +87,9 @@ export function TreinoFeedbackModal({
           tipo_acao: "chat",
         },
       });
+      if (notificacaoError) throw notificacaoError;
+
+      await dispatchPushNotification(notificacaoId);
 
       toast({
         title: "Resposta enviada!",

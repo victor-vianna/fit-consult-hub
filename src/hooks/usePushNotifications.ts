@@ -53,7 +53,12 @@ function normalizeVapidKey(value?: string | null) {
 
 function getPushSupportStatus(): PushStatus {
   if (typeof window === "undefined") return "unsupported";
-  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+  if (
+    !("serviceWorker" in navigator) ||
+    !("PushManager" in window) ||
+    !("Notification" in window) ||
+    !("showNotification" in ServiceWorkerRegistration.prototype)
+  ) {
     return "unsupported";
   }
   if (!VAPID_PUBLIC_KEY) return "missing_key";
@@ -65,13 +70,27 @@ async function getServiceWorkerRegistration() {
     window.setTimeout(() => resolve(null), 4000);
   });
   const readyRegistration = await Promise.race([navigator.serviceWorker.ready, timeout]);
-  if (readyRegistration) return readyRegistration;
+  if (readyRegistration) {
+    readyRegistration.update().catch((error) => {
+      console.warn("Nao foi possivel atualizar o service worker:", error);
+    });
+    return readyRegistration;
+  }
 
   const existing = await navigator.serviceWorker.getRegistration();
-  if (existing) return existing;
+  if (existing) {
+    existing.update().catch((error) => {
+      console.warn("Nao foi possivel atualizar o service worker:", error);
+    });
+    return existing;
+  }
 
   try {
-    return await navigator.serviceWorker.register("/sw.js");
+    const registration = await navigator.serviceWorker.register("/sw.js");
+    registration.update().catch((error) => {
+      console.warn("Nao foi possivel atualizar o service worker:", error);
+    });
+    return registration;
   } catch (error) {
     throw new Error(
       `Service worker nao registrado. Recarregue o app apos publicar a nova versao. Detalhe: ${
@@ -156,7 +175,7 @@ export function usePushNotifications(userId?: string | null) {
           subscription ? uint8ArrayToUrlBase64(subscription.options.applicationServerKey) : null
         );
 
-        if (subscription && currentKey && currentKey !== expectedKey) {
+        if (subscription && currentKey !== expectedKey) {
           await subscription.unsubscribe();
           subscription = null;
         }

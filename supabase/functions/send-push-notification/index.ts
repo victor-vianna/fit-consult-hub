@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
     const allowed =
       (roleRow?.role === "aluno" && notification.tipo === "nova_mensagem") ||
       (roleRow?.role === "personal" &&
-        ["nova_mensagem", "mensagem", "treino_concluido"].includes(notification.tipo));
+        ["nova_mensagem", "mensagem", "treino_concluido", "feedback_treino"].includes(notification.tipo));
 
     if (!allowed) {
       return jsonResponse({ skipped: true, reason: "Tipo de push nao habilitado para este perfil." });

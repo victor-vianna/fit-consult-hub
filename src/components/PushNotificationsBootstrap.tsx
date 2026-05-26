@@ -12,9 +12,10 @@ export function PushNotificationsBootstrap() {
   const [installHintDismissed, setInstallHintDismissed] = useState(false);
   const [deniedHintDismissed, setDeniedHintDismissed] = useState(false);
   const canPrompt = !!user?.id && !!role && ["personal", "aluno"].includes(role);
-  const needsActivation =
-    supported && !missingVapidKey && ["default", "granted", "error"].includes(status);
-  const permissionDenied = supported && status === "denied" && !deniedHintDismissed;
+  const isIOS = useMemo(() => {
+    if (typeof navigator === "undefined") return false;
+    return /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  }, []);
   const isLikelyMobileBrowser = useMemo(() => {
     if (typeof navigator === "undefined") return false;
     return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -26,10 +27,16 @@ export function PushNotificationsBootstrap() {
       (navigator as any).standalone === true
     );
   }, []);
+  const needsActivation =
+    supported &&
+    !missingVapidKey &&
+    !(isIOS && !isStandalone) &&
+    ["default", "granted", "error"].includes(status);
+  const permissionDenied = supported && status === "denied" && !deniedHintDismissed;
   const showInstallHint =
     canPrompt &&
-    status === "unsupported" &&
-    isLikelyMobileBrowser &&
+    (status === "unsupported" || isIOS) &&
+    (isLikelyMobileBrowser || isIOS) &&
     !isStandalone &&
     !installHintDismissed;
 
@@ -110,7 +117,7 @@ export function PushNotificationsBootstrap() {
       id: `${toastId}-denied`,
       duration: Infinity,
       description:
-        "Abra as configuracoes do site/app no dispositivo, permita notificacoes para o FitConsult e recarregue a aplicacao.",
+        "Voce ja bloqueou este site/app no navegador. Clique no cadeado da barra de endereco, libere Notificacoes para o FitConsult e recarregue a pagina.",
       action: {
         label: "Entendi",
         onClick: () => {
@@ -123,11 +130,13 @@ export function PushNotificationsBootstrap() {
 
   useEffect(() => {
     if (!showInstallHint) return;
-    toast("Instale o app para receber notificacoes", {
+    toast(isIOS ? "Instale o app no iPhone" : "Instale o app para receber notificacoes", {
       id: `${toastId}-install`,
       duration: Infinity,
       description:
-        "No mobile, as notificacoes push podem exigir o app instalado na tela inicial. Abra pelo icone instalado e toque em ativar novamente.",
+        isIOS
+          ? "No iPhone, as notificacoes web so podem ser ativadas pelo app adicionado a Tela de Inicio. Abra pelo icone instalado e toque em ativar."
+          : "No mobile, as notificacoes push podem exigir o app instalado na tela inicial. Abra pelo icone instalado e toque em ativar novamente.",
       action: {
         label: "Entendi",
         onClick: () => {

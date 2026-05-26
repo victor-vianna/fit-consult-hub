@@ -21,6 +21,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { WorkoutCompletionData } from "@/hooks/useWorkoutTimer";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { createNotificationId, dispatchPushNotification } from "@/utils/pushNotifications";
 
 interface WorkoutCompletionScreenProps {
   data: WorkoutCompletionData;
@@ -57,7 +58,9 @@ export function WorkoutCompletionScreen({
           .eq("id", sessaoData.profile_id)
           .single();
 
-        await supabase.from("notificacoes").insert({
+        const notificacaoId = createNotificationId();
+        const { error: notificacaoError } = await supabase.from("notificacoes").insert({
+          id: notificacaoId,
           destinatario_id: sessaoData.personal_id,
           tipo: "feedback_treino",
           titulo: `📝 Feedback de ${alunoProfile?.nome || "aluno"}`,
@@ -72,6 +75,9 @@ export function WorkoutCompletionScreen({
           },
           lida: false,
         });
+        if (notificacaoError) throw notificacaoError;
+
+        await dispatchPushNotification(notificacaoId);
       }
       toast.success("Feedback enviado!");
     } catch (err) {

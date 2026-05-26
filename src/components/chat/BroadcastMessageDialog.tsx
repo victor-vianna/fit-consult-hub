@@ -10,6 +10,7 @@ import {
 import { Megaphone, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { createNotificationId, dispatchPushNotification } from "@/utils/pushNotifications";
 
 interface BroadcastMessageDialogProps {
   personalId: string;
@@ -63,20 +64,29 @@ export function BroadcastMessageDialog({ personalId, themeColor }: BroadcastMess
       if (msgError) throw msgError;
 
       // Create notifications for all students
-      const notificacoes = alunos.map((aluno: any) => ({
-        destinatario_id: aluno.id,
-        tipo: "nova_mensagem",
-        titulo: `Nova mensagem de ${personalProfile?.nome || "Personal"}`,
-        mensagem: texto.trim().substring(0, 100),
-        dados: {
-          aluno_id: aluno.id,
-          aluno_nome: aluno.nome || null,
-          profile_id: personalId,
-          tipo_acao: "chat",
-        },
-      }));
+      const notificationIds: string[] = [];
+      const notificacoes = alunos.map((aluno: any) => {
+        const id = createNotificationId();
+        notificationIds.push(id);
+        return {
+          id,
+          destinatario_id: aluno.id,
+          tipo: "nova_mensagem",
+          titulo: `Nova mensagem de ${personalProfile?.nome || "Personal"}`,
+          mensagem: texto.trim().substring(0, 100),
+          dados: {
+            aluno_id: aluno.id,
+            aluno_nome: aluno.nome || null,
+            profile_id: personalId,
+            tipo_acao: "chat",
+          },
+        };
+      });
 
-      await supabase.from("notificacoes").insert(notificacoes);
+      const { error: notificacoesError } = await supabase.from("notificacoes").insert(notificacoes);
+      if (notificacoesError) throw notificacoesError;
+
+      await Promise.all(notificationIds.map((id) => dispatchPushNotification(id)));
 
       toast({
         title: "Mensagem enviada!",

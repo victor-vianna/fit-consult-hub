@@ -17,6 +17,9 @@ self.addEventListener("push", (event) => {
     badge: payload.badge || "/icons/icon-192x192.png",
     tag: payload.tag || payload.notificationId || "fitconsult-notification",
     renotify: true,
+    silent: false,
+    timestamp: Date.now(),
+    vibrate: payload.vibrate || [160, 80, 160],
     data: {
       url: payload.url || "/",
       notificationId: payload.notificationId || null,

@@ -160,7 +160,7 @@ export function CompactExerciseCard({
                 className="flex items-center gap-1 text-left text-cyan-700 underline decoration-cyan-700/30 underline-offset-2 dark:text-cyan-300"
               >
                 <Clock className="h-3.5 w-3.5 shrink-0" />
-                <span>Intervalo: {exercicio.descanso}s</span>
+                <span>Tempo entre séries: {exercicio.descanso}s</span>
               </button>
             ) : null}
 

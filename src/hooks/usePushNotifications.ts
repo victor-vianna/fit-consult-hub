@@ -103,19 +103,12 @@ export function usePushNotifications(userId?: string | null) {
         throw new Error("Subscription push incompleta.");
       }
 
-      const { error } = await (supabase as any).from("push_subscriptions").upsert(
-        {
-          user_id: userId,
-          endpoint,
-          p256dh,
-          auth,
-          user_agent: navigator.userAgent,
-          revoked_at: null,
-          updated_at: new Date().toISOString(),
-          last_used_at: new Date().toISOString(),
-        },
-        { onConflict: "endpoint" }
-      );
+      const { error } = await (supabase as any).rpc("upsert_push_subscription", {
+        _endpoint: endpoint,
+        _p256dh: p256dh,
+        _auth: auth,
+        _user_agent: navigator.userAgent,
+      });
 
       if (error) {
         throw new Error(`Falha ao salvar o dispositivo no Supabase: ${error.message}`);

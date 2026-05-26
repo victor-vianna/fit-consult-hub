@@ -19,6 +19,14 @@ function asRecord(value: unknown) {
   return value && typeof value === "object" ? value as Record<string, any> : {};
 }
 
+function isMobileSubscription(userAgent?: string | null) {
+  if (!userAgent) return false;
+  return (
+    /Android|iPhone|iPad|iPod/i.test(userAgent) ||
+    (/Macintosh/i.test(userAgent) && /Mobile/i.test(userAgent))
+  );
+}
+
 function buildTargetUrl(tipo: string, dados: Record<string, any>, recipientRole?: string) {
   const alunoId = dados.aluno_id || dados.profile_id;
 
@@ -110,12 +118,24 @@ Deno.serve(async (req) => {
 
     const { data: subscriptions } = await supabaseAdmin
       .from("push_subscriptions")
-      .select("id, endpoint, p256dh, auth")
+      .select("id, endpoint, p256dh, auth, user_agent")
       .eq("user_id", notification.destinatario_id)
       .is("revoked_at", null);
 
     if (!subscriptions?.length) {
       return jsonResponse({ sent: 0, reason: "Nenhuma subscription ativa." });
+    }
+
+    const mobileSubscriptions = subscriptions.filter((subscription) =>
+      isMobileSubscription(subscription.user_agent)
+    );
+
+    if (!mobileSubscriptions.length) {
+      return jsonResponse({
+        sent: 0,
+        reason: "Nenhuma subscription mobile ativa.",
+        ignored_web: subscriptions.length,
+      });
     }
 
     webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
@@ -136,7 +156,7 @@ Deno.serve(async (req) => {
     const failures: Array<{ id: string; statusCode: number | null; message: string }> = [];
 
     await Promise.all(
-      subscriptions.map(async (subscription) => {
+      mobileSubscriptions.map(async (subscription) => {
         try {
           await webpush.sendNotification(
             {

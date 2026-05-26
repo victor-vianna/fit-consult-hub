@@ -20,6 +20,16 @@ type PushPhase =
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
 
+function isMobilePushDevice() {
+  if (typeof navigator === "undefined") return false;
+  const userAgent = navigator.userAgent || "";
+  const isIOS = /iPhone|iPad|iPod/i.test(userAgent);
+  const isIPadOSDesktopMode =
+    /Macintosh/i.test(userAgent) && "maxTouchPoints" in navigator && navigator.maxTouchPoints > 1;
+  const isAndroid = /Android/i.test(userAgent);
+  return isAndroid || isIOS || isIPadOSDesktopMode;
+}
+
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -53,6 +63,7 @@ function normalizeVapidKey(value?: string | null) {
 
 function getPushSupportStatus(): PushStatus {
   if (typeof window === "undefined") return "unsupported";
+  if (!isMobilePushDevice()) return "unsupported";
   if (
     !("serviceWorker" in navigator) ||
     !("PushManager" in window) ||

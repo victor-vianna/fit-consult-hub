@@ -47,6 +47,85 @@ const diasSemana = [
   { nome: "Domingo", abrev: "DOM" },
 ];
 
+const WORKOUT_RESUME_CACHE_VERSION = 1;
+
+interface WorkoutResumeSnapshot {
+  version: number;
+  profileId: string;
+  personalId: string;
+  treinoId: string;
+  dia: number;
+  itemId: string | null;
+  scrollY: number;
+  updatedAt: number;
+}
+
+interface WorkoutResumeItem {
+  id: string;
+  type: "exercise" | "block";
+  treinoId: string;
+  dia: number;
+  ordem: number;
+  concluido: boolean;
+}
+
+function getWorkoutResumeCacheKey(profileId: string, personalId: string) {
+  return `fitconsult:workout-resume:${profileId}:${personalId}:v${WORKOUT_RESUME_CACHE_VERSION}`;
+}
+
+function buildWorkoutResumeItems(
+  treino: TreinoDia,
+  treinoId: string,
+  grupos: GrupoExercicio[],
+  blocos: BlocoTreino[]
+): WorkoutResumeItem[] {
+  const items: WorkoutResumeItem[] = [];
+
+  treino.exercicios
+    .filter((ex) => !ex.grupo_id)
+    .forEach((ex, index) => {
+      items.push({
+        id: ex.id,
+        type: "exercise",
+        treinoId,
+        dia: treino.dia,
+        ordem: ex.ordem ?? index,
+        concluido: !!ex.concluido,
+      });
+    });
+
+  grupos.forEach((grupo, grupoIndex) => {
+    const grupoOrdem =
+      grupo.exercicios?.length > 0
+        ? Math.min(...grupo.exercicios.map((ex: any) => ex.ordem ?? grupoIndex))
+        : grupoIndex;
+
+    grupo.exercicios?.forEach((ex: any, index: number) => {
+      items.push({
+        id: ex.id,
+        type: "exercise",
+        treinoId,
+        dia: treino.dia,
+        ordem: grupoOrdem + ((ex.ordem_no_grupo ?? index + 1) / 100),
+        concluido: !!ex.concluido,
+      });
+    });
+  });
+
+  blocos.forEach((bloco, index) => {
+    items.push({
+      id: bloco.id,
+      type: "block",
+      treinoId,
+      dia: treino.dia,
+      ordem: bloco.ordem ?? index,
+      concluido: !!bloco.concluido,
+    });
+  });
+
+  return items.sort((a, b) => a.ordem - b.ordem);
+}
+
 export function WorkoutDayView({
   treinos,
   profileId,
@@ -219,6 +298,13 @@ export function WorkoutDayView({
     // 🔧 Salvar no localStorage imediatamente (PWA)
     salvarProgressoLocal(id, concluido);
 
+    const resumeTarget = getResumeItemAfterToggle(id, concluido);
+    if (resumeTarget) {
+      setDiaAtivo(String(resumeTarget.dia));
+      saveResumeTarget(resumeTarget.treinoId, resumeTarget.id, resumeTarget.dia);
+      scrollToResumeItem(resumeTarget.id);
+    }
+
     // Update otimista em treinos
     setLocalTreinos((prev) =>
       prev.map((t) => ({
@@ -264,6 +350,22 @@ export function WorkoutDayView({
   const handleToggleGrupo = async (grupoId: string, concluido: boolean) => {
     if (!onToggleGrupoConcluido) return;
 
+    const grupoAtual = Object.values(localGrupos)
+      .flat()
+      .find((grupo) => grupo.grupo_id === grupoId);
+    const exercicioReferencia = concluido
+      ? grupoAtual?.exercicios?.[grupoAtual.exercicios.length - 1]
+      : grupoAtual?.exercicios?.[0];
+    const resumeTarget = exercicioReferencia
+      ? getResumeItemAfterToggle(exercicioReferencia.id, concluido)
+      : null;
+
+    if (resumeTarget) {
+      setDiaAtivo(String(resumeTarget.dia));
+      saveResumeTarget(resumeTarget.treinoId, resumeTarget.id, resumeTarget.dia);
+      scrollToResumeItem(resumeTarget.id);
+    }
+
     // Update otimista
     setLocalGrupos((prev) => {
       const updated = { ...prev };
@@ -297,6 +399,13 @@ export function WorkoutDayView({
 
     // 🔧 Salvar no localStorage imediatamente (PWA)
     salvarBlocoProgressoLocal(blocoId, concluido);
+
+    const resumeTarget = getResumeItemAfterToggle(blocoId, concluido);
+    if (resumeTarget) {
+      setDiaAtivo(String(resumeTarget.dia));
+      saveResumeTarget(resumeTarget.treinoId, resumeTarget.id, resumeTarget.dia);
+      scrollToResumeItem(resumeTarget.id);
+    }
 
     // Update otimista
     setLocalBlocos((prev) => {
@@ -367,9 +476,13 @@ export function WorkoutDayView({
   }, [getTreinoId, limparProgressoLocal, localBlocos, localGrupos, localTreinos]);
 
   // Handler para iniciar treino - usa hook de persistência
-  const handleIniciarTreino = (dia: number, treinoId: string | null) => {
+  const handleIniciarTreino = (treinoId: string, dia: number) => {
     if (treinoId) {
       marcarTreinoIniciado(treinoId, dia);
+      const target = getFirstPendingItemForTreino(treinoId);
+      setDiaAtivo(String(dia));
+      saveResumeTarget(treinoId, target?.id ?? null, dia);
+      scrollToResumeItem(target?.id ?? null);
     }
   };
 
@@ -388,6 +501,300 @@ export function WorkoutDayView({
     String(primeiroDiaComConteudo),
     { storage: "local" }
   );
+
+  const [resumeItemId, setResumeItemId] = useState<string | null>(null);
+  const restoreKeyRef = useRef<string | null>(null);
+  const scrollFrameRef = useRef<number | null>(null);
+  const resumeCacheKey = getWorkoutResumeCacheKey(profileId, personalId);
+
+  const readWorkoutResume = useCallback((): WorkoutResumeSnapshot | null => {
+    try {
+      const raw = window.localStorage.getItem(resumeCacheKey);
+      if (!raw) return null;
+
+      const parsed = JSON.parse(raw) as WorkoutResumeSnapshot;
+      if (
+        parsed.version !== WORKOUT_RESUME_CACHE_VERSION ||
+        parsed.profileId !== profileId ||
+        parsed.personalId !== personalId
+      ) {
+        return null;
+      }
+
+      return parsed;
+    } catch {
+      return null;
+    }
+  }, [personalId, profileId, resumeCacheKey]);
+
+  const writeWorkoutResume = useCallback(
+    (snapshot: Omit<WorkoutResumeSnapshot, "version" | "profileId" | "personalId" | "updatedAt">) => {
+      try {
+        const next: WorkoutResumeSnapshot = {
+          ...snapshot,
+          version: WORKOUT_RESUME_CACHE_VERSION,
+          profileId,
+          personalId,
+          updatedAt: Date.now(),
+        };
+
+        window.localStorage.setItem(resumeCacheKey, JSON.stringify(next));
+      } catch (error) {
+        console.error("[WorkoutDayView] Erro ao salvar retomada do treino:", error);
+      }
+    },
+    [personalId, profileId, resumeCacheKey]
+  );
+
+  const getTreinoContext = useCallback(
+    (treinoId: string | null) => {
+      if (!treinoId) return null;
+
+      const treino = localTreinos.find((item) => getTreinoId(item) === treinoId);
+      if (!treino) return null;
+
+      return {
+        treino,
+        treinoId,
+        grupos: localGrupos[treinoId] ?? [],
+        blocos: localBlocos[treinoId] ?? [],
+      };
+    },
+    [getTreinoId, localBlocos, localGrupos, localTreinos]
+  );
+
+  const getResumeItemsForTreino = useCallback(
+    (treinoId: string | null) => {
+      const context = getTreinoContext(treinoId);
+      if (!context) return [];
+
+      return buildWorkoutResumeItems(
+        context.treino,
+        context.treinoId,
+        context.grupos,
+        context.blocos
+      );
+    },
+    [getTreinoContext]
+  );
+
+  const findResumeItemById = useCallback(
+    (itemId: string) => {
+      for (const treino of localTreinos) {
+        const treinoId = getTreinoId(treino);
+        if (!treinoId) continue;
+
+        const item = getResumeItemsForTreino(treinoId).find((current) => current.id === itemId);
+        if (item) return item;
+      }
+
+      return null;
+    },
+    [getResumeItemsForTreino, getTreinoId, localTreinos]
+  );
+
+  const getResumeItemAfterToggle = useCallback(
+    (itemId: string, concluido: boolean) => {
+      const current = findResumeItemById(itemId);
+      if (!current) return null;
+
+      if (!concluido) return current;
+
+      const items = getResumeItemsForTreino(current.treinoId);
+      const currentIndex = items.findIndex((item) => item.id === itemId);
+      const nextPending = items
+        .slice(Math.max(currentIndex + 1, 0))
+        .find((item) => !item.concluido && item.id !== itemId);
+
+      return nextPending ?? items.find((item) => !item.concluido && item.id !== itemId) ?? current;
+    },
+    [findResumeItemById, getResumeItemsForTreino]
+  );
+
+  const getFirstPendingItemForTreino = useCallback(
+    (treinoId: string | null, preferredItemId?: string | null) => {
+      const items = getResumeItemsForTreino(treinoId);
+      if (items.length === 0) return null;
+
+      if (preferredItemId) {
+        const preferred = items.find((item) => item.id === preferredItemId);
+        if (preferred && !preferred.concluido) return preferred;
+
+        const preferredIndex = items.findIndex((item) => item.id === preferredItemId);
+        if (preferredIndex >= 0) {
+          const nextPending = items.slice(preferredIndex + 1).find((item) => !item.concluido);
+          if (nextPending) return nextPending;
+        }
+      }
+
+      return items.find((item) => !item.concluido) ?? items[0];
+    },
+    [getResumeItemsForTreino]
+  );
+
+  const scrollToResumeItem = useCallback((itemId: string | null, behavior: ScrollBehavior = "smooth") => {
+    if (!itemId) return;
+
+    setResumeItemId(itemId);
+
+    window.setTimeout(() => {
+      const target = Array.from(
+        document.querySelectorAll<HTMLElement>("[data-workout-cache-item]")
+      ).find((element) => element.dataset.workoutCacheItem === itemId);
+
+      if (target) {
+        target.scrollIntoView({ behavior, block: "center", inline: "center" });
+      }
+    }, 120);
+  }, []);
+
+  const saveResumeTarget = useCallback(
+    (treinoId: string, itemId: string | null, dia?: number) => {
+      const context = getTreinoContext(treinoId);
+      const resolvedDia = dia ?? context?.treino.dia ?? Number(diaAtivo) ?? primeiroDiaComConteudo;
+
+      writeWorkoutResume({
+        treinoId,
+        dia: resolvedDia,
+        itemId,
+        scrollY: window.scrollY,
+      });
+
+      if (itemId) setResumeItemId(itemId);
+    },
+    [diaAtivo, getTreinoContext, primeiroDiaComConteudo, writeWorkoutResume]
+  );
+
+  const saveVisibleWorkoutPosition = useCallback(() => {
+    const activeTreinoIds = localTreinos
+      .map((treino) => getTreinoId(treino))
+      .filter((treinoId): treinoId is string => !!treinoId && isTreinoIniciado(treinoId));
+
+    if (activeTreinoIds.length === 0) return;
+
+    const visibleItems = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-workout-cache-item]")
+    )
+      .filter((element) => {
+        const treinoId = element.dataset.workoutTreinoId;
+        if (!treinoId || !activeTreinoIds.includes(treinoId)) return false;
+
+        const rect = element.getBoundingClientRect();
+        return rect.bottom > 72 && rect.top < window.innerHeight - 72;
+      })
+      .sort((a, b) => {
+        const targetTop = Math.min(220, window.innerHeight * 0.35);
+        return (
+          Math.abs(a.getBoundingClientRect().top - targetTop) -
+          Math.abs(b.getBoundingClientRect().top - targetTop)
+        );
+      });
+
+    const current = visibleItems[0];
+    if (!current) return;
+
+    const treinoId = current.dataset.workoutTreinoId;
+    const itemId = current.dataset.workoutCacheItem ?? null;
+    if (!treinoId) return;
+
+    const context = getTreinoContext(treinoId);
+    if (!context) return;
+
+    writeWorkoutResume({
+      treinoId,
+      dia: context.treino.dia,
+      itemId,
+      scrollY: window.scrollY,
+    });
+  }, [getTreinoContext, getTreinoId, isTreinoIniciado, localTreinos, writeWorkoutResume]);
+
+  useEffect(() => {
+    if (isLoadingSession) return;
+
+    const cached = readWorkoutResume();
+    const activeTreinoIds = localTreinos
+      .map((treino) => getTreinoId(treino))
+      .filter((treinoId): treinoId is string => !!treinoId && isTreinoIniciado(treinoId));
+
+    const cachedIsActive = cached?.treinoId && activeTreinoIds.includes(cached.treinoId);
+    const treinoIdToRestore = cachedIsActive ? cached.treinoId : activeTreinoIds[0];
+    if (!treinoIdToRestore) return;
+
+    const target = getFirstPendingItemForTreino(
+      treinoIdToRestore,
+      cachedIsActive ? cached?.itemId : null
+    );
+
+    const context = getTreinoContext(treinoIdToRestore);
+    if (!context || !target) return;
+
+    const restoreKey = `${treinoIdToRestore}:${target.id}:${target.concluido}`;
+    if (restoreKeyRef.current === restoreKey) return;
+    restoreKeyRef.current = restoreKey;
+
+    setDiaAtivo(String(context.treino.dia));
+    saveResumeTarget(treinoIdToRestore, target.id, context.treino.dia);
+    scrollToResumeItem(target.id, "auto");
+  }, [
+    getFirstPendingItemForTreino,
+    getTreinoContext,
+    getTreinoId,
+    isLoadingSession,
+    isTreinoIniciado,
+    localTreinos,
+    readWorkoutResume,
+    saveResumeTarget,
+    scrollToResumeItem,
+    setDiaAtivo,
+  ]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (scrollFrameRef.current != null) return;
+
+      scrollFrameRef.current = window.requestAnimationFrame(() => {
+        scrollFrameRef.current = null;
+        saveVisibleWorkoutPosition();
+      });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        saveVisibleWorkoutPosition();
+        return;
+      }
+
+      const cached = readWorkoutResume();
+      if (!cached || !isTreinoIniciado(cached.treinoId)) return;
+
+      setDiaAtivo(String(cached.dia));
+      scrollToResumeItem(cached.itemId, "auto");
+    };
+
+    const handlePageHide = () => saveVisibleWorkoutPosition();
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    document.addEventListener("scroll", handleScroll, true);
+    window.addEventListener("pagehide", handlePageHide);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      document.removeEventListener("scroll", handleScroll, true);
+      window.removeEventListener("pagehide", handlePageHide);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+
+      if (scrollFrameRef.current != null) {
+        window.cancelAnimationFrame(scrollFrameRef.current);
+      }
+    };
+  }, [
+    isTreinoIniciado,
+    readWorkoutResume,
+    saveVisibleWorkoutPosition,
+    scrollToResumeItem,
+    setDiaAtivo,
+  ]);
 
   return (
     <div className="space-y-3 sm:space-y-4 pb-20">
@@ -527,7 +934,7 @@ export function WorkoutDayView({
                     treinoTemConteudo={treinoTemConteudo}
                     profileId={profileId}
                     personalId={personalId}
-                    marcarTreinoIniciado={marcarTreinoIniciado}
+                    marcarTreinoIniciado={handleIniciarTreino}
                     marcarTreinoFinalizado={marcarTreinoFinalizado}
                     onTreinoConcluido={(finishedTreinoId) => {
                       resetLocalProgressForTreino(finishedTreinoId);
@@ -536,6 +943,7 @@ export function WorkoutDayView({
                     handleToggleExercicio={handleToggleExercicio}
                     handleToggleGrupo={handleToggleGrupo}
                     handleToggleBloco={handleToggleBloco}
+                    resumeItemId={resumeItemId}
                   />
                 );
               })}
@@ -571,6 +979,7 @@ function TreinoCard({
   handleToggleExercicio,
   handleToggleGrupo,
   handleToggleBloco,
+  resumeItemId,
 }: {
   treino: TreinoDia;
   treinoId: string | null;
@@ -594,6 +1003,7 @@ function TreinoCard({
   handleToggleExercicio: (id: string, concluido: boolean) => Promise<any>;
   handleToggleGrupo: (grupoId: string, concluido: boolean) => Promise<void>;
   handleToggleBloco: (blocoId: string, concluido: boolean) => Promise<void>;
+  resumeItemId?: string | null;
 }) {
   const finalizarRef = useRef<(() => void) | null>(null);
 
@@ -662,6 +1072,8 @@ function TreinoCard({
             isWorkoutActive={isWorkoutActive}
             onFinalizarTreino={() => finalizarRef.current?.()}
             profileId={profileId}
+            treinoId={treinoId}
+            resumeItemId={resumeItemId}
           />
         )}
       </CardContent>

@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  ArrowDown,
   CheckCircle2,
   Circle,
   Clock,
@@ -14,12 +13,12 @@ import { cn } from "@/lib/utils";
 import { CompactExerciseCard } from "./CompactExerciseCard";
 
 const TIPOS_AGRUPAMENTO = {
-  normal: { label: "Normal", icon: "" },
-  "bi-set": { label: "Bi-Set", icon: "" },
-  "tri-set": { label: "Tri-Set", icon: "" },
-  "drop-set": { label: "Drop-Set", icon: "" },
-  superset: { label: "Super-Set", icon: "" },
-  circuito: { label: "Circuito", icon: "" },
+  normal: { label: "Normal" },
+  "bi-set": { label: "Bi-Set" },
+  "tri-set": { label: "Tri-Set" },
+  "drop-set": { label: "Drop-Set" },
+  superset: { label: "Super-Set" },
+  circuito: { label: "Circuito" },
 } as const;
 
 interface CompactGroupCardProps {
@@ -37,6 +36,8 @@ interface CompactGroupCardProps {
   ) => Promise<void>;
   isWorkoutActive?: boolean;
   profileId?: string;
+  treinoId?: string | null;
+  resumeItemId?: string | null;
 }
 
 export function CompactGroupCard({
@@ -45,6 +46,8 @@ export function CompactGroupCard({
   onToggleGrupoConcluido,
   isWorkoutActive = false,
   profileId,
+  treinoId,
+  resumeItemId,
 }: CompactGroupCardProps) {
   const [localExercicios, setLocalExercicios] = useState(grupo.exercicios);
 
@@ -81,18 +84,18 @@ export function CompactGroupCard({
   return (
     <Card
       className={cn(
-        "overflow-hidden transition-colors",
-        todosConcluidos && "bg-green-50/50 dark:bg-green-950/10 border-green-200/50",
+        "overflow-hidden rounded-lg border bg-card shadow-sm transition-colors",
+        todosConcluidos && "border-green-500/30 bg-green-50/50 dark:bg-green-950/10",
         algumConcluido && !todosConcluidos && "border-yellow-500/50"
       )}
     >
       <CardContent className="p-0">
         <div
           className={cn(
-            "flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3",
+            "flex items-start gap-3 p-3 sm:p-4",
             todosConcluidos
-              ? "bg-green-50/30 dark:bg-green-950/10"
-              : "bg-blue-50/50 dark:bg-blue-950/20"
+              ? "bg-green-50/60 dark:bg-green-950/10"
+              : "bg-primary/5"
           )}
         >
           {isWorkoutActive && onToggleGrupoConcluido && (
@@ -102,7 +105,7 @@ export function CompactGroupCard({
                 event.stopPropagation();
                 handleToggleGrupo();
               }}
-              aria-label="Marcar grupo como concluido"
+              aria-label="Marcar grupo combinado como concluido"
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-transform active:scale-95"
             >
               {todosConcluidos ? (
@@ -115,79 +118,84 @@ export function CompactGroupCard({
 
           <div
             className={cn(
-              "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg sm:h-12 sm:w-12",
+              "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
               todosConcluidos
                 ? "bg-green-100 dark:bg-green-900/30"
-                : "bg-blue-100 dark:bg-blue-900/30"
+                : "bg-primary/10"
             )}
           >
             <LinkIcon
               className={cn(
-                "h-5 w-5 sm:h-6 sm:w-6",
-                todosConcluidos ? "text-green-600" : "text-blue-600"
+                "h-5 w-5",
+                todosConcluidos ? "text-green-600" : "text-primary"
               )}
             />
           </div>
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
+              <p className="text-sm font-semibold leading-tight text-foreground sm:text-base">
+                Exercicios combinados
+              </p>
               <Badge variant="secondary" className="text-xs font-semibold">
                 {tipoConfig.label}
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                {localExercicios.length} exercicios
               </Badge>
               {todosConcluidos ? (
                 <Badge className="bg-green-600 text-xs">Completo</Badge>
               ) : algumConcluido ? (
                 <Badge
                   variant="outline"
-                  className="text-xs text-yellow-700 border-yellow-500"
+                  className="border-yellow-500 text-xs text-yellow-700 dark:text-yellow-400"
                 >
                   {concluidosCount}/{localExercicios.length}
                 </Badge>
               ) : null}
             </div>
-            <p
-              className={cn(
-                "mt-1 break-words text-xs leading-snug text-muted-foreground sm:text-sm",
-                todosConcluidos && "line-through"
-              )}
-            >
-              {localExercicios.map((e) => e.nome).join(" -> ")}
+            <p className="mt-1 line-clamp-2 text-xs leading-snug text-muted-foreground sm:text-sm">
+              Alterne os movimentos e descanse ao final do combinado.
             </p>
           </div>
         </div>
 
-        <div className="space-y-2 border-t p-3">
+        <div className="border-t bg-muted/10 p-3 sm:p-4">
           {!todosConcluidos && (
-            <div className="mb-1 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 p-2">
-              <div className="mt-0.5 flex flex-col items-center gap-1">
-                <Repeat className="h-3.5 w-3.5 text-primary" />
-                <ArrowDown className="h-2.5 w-2.5 text-primary/60" />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Execute em sequencia, depois descanse{" "}
-                <strong>{grupo.descanso_entre_grupos || 60}s</strong>
+            <div className="mb-3 flex items-start gap-2 rounded-lg border border-primary/20 bg-background/70 p-2">
+              <Repeat className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+              <p className="text-xs leading-snug text-muted-foreground">
+                Execute os cards em sequencia. Depois descanse{" "}
+                <strong>{grupo.descanso_entre_grupos || 60}s</strong>.
               </p>
             </div>
           )}
 
-          {localExercicios.map((exercicio, idx) => (
-            <CompactExerciseCard
-              key={exercicio.id}
-              exercicio={exercicio}
-              index={idx}
-              onToggleConcluido={onToggleConcluido}
-              isWorkoutActive={isWorkoutActive}
-              profileId={profileId}
-            />
-          ))}
+          <div className="-mx-3 overflow-x-auto px-3 pb-2 sm:-mx-4 sm:px-4">
+            <div className="flex snap-x snap-mandatory gap-3">
+              {localExercicios.map((exercicio, idx) => (
+                <CompactExerciseCard
+                  key={exercicio.id}
+                  exercicio={exercicio}
+                  index={idx}
+                  variant="carousel"
+                  onToggleConcluido={onToggleConcluido}
+                  isWorkoutActive={isWorkoutActive}
+                  profileId={profileId}
+                  treinoId={treinoId}
+                  highlighted={resumeItemId === exercicio.id}
+                />
+              ))}
+            </div>
+          </div>
 
           {grupo.descanso_entre_grupos &&
             grupo.descanso_entre_grupos > 0 &&
             !todosConcluidos && (
-              <div className="flex items-center justify-center gap-2 rounded-lg border border-yellow-200 bg-yellow-50 p-2 dark:border-yellow-800 dark:bg-yellow-950/20">
+              <div className="mt-1 flex items-center justify-center gap-2 rounded-lg border border-yellow-200 bg-yellow-50 p-2 dark:border-yellow-800 dark:bg-yellow-950/20">
                 <Clock className="h-4 w-4 text-yellow-700 dark:text-yellow-400" />
                 <span className="text-xs font-medium text-yellow-700 dark:text-yellow-400">
-                  Descanse {grupo.descanso_entre_grupos}s apos este grupo
+                  Descanso do combinado: {grupo.descanso_entre_grupos}s
                 </span>
               </div>
             )}

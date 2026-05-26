@@ -41,6 +41,8 @@ interface WorkoutExerciseListProps {
   isWorkoutActive?: boolean;
   onFinalizarTreino?: () => void;
   profileId?: string;
+  treinoId?: string | null;
+  resumeItemId?: string | null;
 }
 
 function buildUnifiedList(
@@ -94,24 +96,32 @@ export function WorkoutExerciseList({
   isWorkoutActive,
   onFinalizarTreino,
   profileId,
+  treinoId,
+  resumeItemId,
 }: WorkoutExerciseListProps) {
   const allBlocos = [...blocosInicio, ...blocosMeio, ...blocosFim];
   const unifiedList = buildUnifiedList(exerciciosIsolados, grupos, allBlocos);
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
+      <div className="space-y-3">
         {unifiedList.map((item, idx) => {
           if (item.type === "block") {
             const bloco = item.data;
             return (
-              <WorkoutBlockCard
+              <div
                 key={bloco.id}
-                bloco={bloco}
-                index={idx}
-                readOnly={true}
-                onToggleConcluido={isWorkoutActive ? onToggleBloco : undefined}
-              />
+                data-workout-cache-item={bloco.id}
+                data-workout-treino-id={treinoId ?? undefined}
+                data-workout-cache-type="block"
+              >
+                <WorkoutBlockCard
+                  bloco={bloco}
+                  index={idx}
+                  readOnly={true}
+                  onToggleConcluido={isWorkoutActive ? onToggleBloco : undefined}
+                />
+              </div>
             );
           }
 
@@ -126,6 +136,8 @@ export function WorkoutExerciseList({
                 onToggleGrupoConcluido={isWorkoutActive ? onToggleGrupo : undefined}
                 isWorkoutActive={!!isWorkoutActive}
                 profileId={profileId}
+                treinoId={treinoId}
+                resumeItemId={resumeItemId}
               />
             );
           }
@@ -139,6 +151,8 @@ export function WorkoutExerciseList({
               onToggleConcluido={isWorkoutActive ? onToggleExercicio : undefined}
               isWorkoutActive={!!isWorkoutActive}
               profileId={profileId}
+              treinoId={treinoId}
+              highlighted={resumeItemId === exercicio.id}
             />
           );
         })}

@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { usePersistedState } from "@/hooks/usePersistedState";
 import { getMaterialSignedUrl, openMaterialInNewTab } from "@/utils/materiais";
 import { Button } from "@/components/ui/button";
 import {
@@ -71,6 +70,33 @@ interface Material {
   created_at: string;
 }
 
+const WORKOUT_STATE_KEY = "pwa_workout_state";
+
+function getAlunoActiveSectionKey(userId: string) {
+  return `pf:aluno-active-section:${userId}:v1`;
+}
+
+function readAlunoActiveSection(userId: string): string | null {
+  try {
+    const raw = window.localStorage.getItem(getAlunoActiveSectionKey(userId));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function hasWorkoutInProgress() {
+  try {
+    const raw = window.localStorage.getItem(WORKOUT_STATE_KEY);
+    if (!raw) return false;
+
+    const states = JSON.parse(raw) as Record<string, { iniciado?: boolean }>;
+    return Object.values(states).some((state) => state?.iniciado);
+  } catch {
+    return false;
+  }
+}
+
 export default function AreaAluno() {
   const { user, signOut } = useAuth();
   const isMobile = useIsMobile();
@@ -78,11 +104,9 @@ export default function AreaAluno() {
   const [profile, setProfile] = useState<any>(null);
   const [personalProfile, setPersonalProfile] = useState<any>(null);
   const [materiais, setMateriais] = useState<Material[]>([]);
-  const [activeSection, setActiveSection] = usePersistedState<string>(
-    `aluno-active-section:${user?.id || "anon"}`,
-    "inicio",
-    { storage: "local" }
-  );
+  const [activeSection, setActiveSection] = useState<string>("inicio");
+  const activeSectionHydratedUserRef = useRef<string | null>(null);
+  const skipNextSectionPersistRef = useRef(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -101,6 +125,41 @@ export default function AreaAluno() {
   const { settings: personalSettings } = usePersonalSettings(
     profile?.personal_id || undefined
   );
+
+  useEffect(() => {
+    if (!user?.id || activeSectionHydratedUserRef.current === user.id) return;
+
+    activeSectionHydratedUserRef.current = user.id;
+    skipNextSectionPersistRef.current = true;
+
+    const persistedSection = readAlunoActiveSection(user.id);
+    const nextSection =
+      persistedSection && persistedSection !== "inicio"
+        ? persistedSection
+        : hasWorkoutInProgress()
+          ? "treinos"
+          : persistedSection || "inicio";
+
+    setActiveSection(nextSection);
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || activeSectionHydratedUserRef.current !== user.id) return;
+
+    if (skipNextSectionPersistRef.current) {
+      skipNextSectionPersistRef.current = false;
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(
+        getAlunoActiveSectionKey(user.id),
+        JSON.stringify(activeSection)
+      );
+    } catch {
+      // localStorage indisponivel: segue com estado em memoria
+    }
+  }, [activeSection, user?.id]);
 
   useEffect(() => {
     if (user) {

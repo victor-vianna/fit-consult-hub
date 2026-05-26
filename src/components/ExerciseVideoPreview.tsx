@@ -108,7 +108,7 @@ export function ExerciseVideoPreview({
             src={getYoutubeEmbedUrl(youtubeId)}
             className="h-full w-full pointer-events-none"
             allow="autoplay; encrypted-media; picture-in-picture"
-            loading="lazy"
+            loading="eager"
           />
         ) : fallbackImage ? (
           <img

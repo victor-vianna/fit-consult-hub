@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 import { createNotificationId, dispatchPushNotification } from "@/utils/pushNotifications";
 
 export interface ChatMessage {
@@ -208,54 +209,72 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
     [currentUserId]
   );
 
-  const toggleMensagemFavorita = useCallback(
-    async (mensagemId: string) => {
+  const toggleMensagemFlag = useCallback(
+    async (
+      mensagemId: string,
+      field: "favorited_by" | "pinned_by",
+      labels: { add: string; remove: string; error: string }
+    ) => {
       const msg = mensagens.find((m) => m.id === mensagemId);
       if (!msg) return false;
 
-      const current = msg.favorited_by || [];
-      const next = current.includes(currentUserId)
+      const current = msg[field] || [];
+      const isMarked = current.includes(currentUserId);
+      const next = isMarked
         ? current.filter((id) => id !== currentUserId)
         : [...current, currentUserId];
 
+      setMensagens((prev) =>
+        prev.map((m) => (m.id === mensagemId ? { ...m, [field]: next } : m))
+      );
+
       const { error } = await supabase
         .from("mensagens_chat")
-        .update({ favorited_by: next })
+        .update({ [field]: next })
         .eq("id", mensagemId);
 
-      if (!error) {
+      if (error) {
+        console.error(`Erro ao atualizar ${field}:`, error);
         setMensagens((prev) =>
-          prev.map((m) => (m.id === mensagemId ? { ...m, favorited_by: next } : m))
+          prev.map((m) => (m.id === mensagemId ? { ...m, [field]: current } : m))
         );
+        toast({
+          title: labels.error,
+          description:
+            error.message.includes(field) || error.message.includes("schema cache")
+              ? "A migration do chat ainda nao foi aplicada no Supabase."
+              : error.message,
+          variant: "destructive",
+        });
+        return false;
       }
-      return !error;
+
+      toast({ title: isMarked ? labels.remove : labels.add });
+      return true;
     },
     [mensagens, currentUserId]
   );
 
+  const toggleMensagemFavorita = useCallback(
+    async (mensagemId: string) => {
+      return toggleMensagemFlag(mensagemId, "favorited_by", {
+        add: "Mensagem favoritada",
+        remove: "Mensagem removida dos favoritos",
+        error: "Nao foi possivel favoritar",
+      });
+    },
+    [toggleMensagemFlag]
+  );
+
   const toggleMensagemFixada = useCallback(
     async (mensagemId: string) => {
-      const msg = mensagens.find((m) => m.id === mensagemId);
-      if (!msg) return false;
-
-      const current = msg.pinned_by || [];
-      const next = current.includes(currentUserId)
-        ? current.filter((id) => id !== currentUserId)
-        : [...current, currentUserId];
-
-      const { error } = await supabase
-        .from("mensagens_chat")
-        .update({ pinned_by: next })
-        .eq("id", mensagemId);
-
-      if (!error) {
-        setMensagens((prev) =>
-          prev.map((m) => (m.id === mensagemId ? { ...m, pinned_by: next } : m))
-        );
-      }
-      return !error;
+      return toggleMensagemFlag(mensagemId, "pinned_by", {
+        add: "Mensagem fixada",
+        remove: "Mensagem desafixada",
+        error: "Nao foi possivel fixar",
+      });
     },
-    [mensagens, currentUserId]
+    [toggleMensagemFlag]
   );
 
   useEffect(() => {

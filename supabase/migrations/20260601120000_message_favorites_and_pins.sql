@@ -22,3 +22,5 @@ CREATE INDEX IF NOT EXISTS idx_mensagens_chat_favorited_by
 
 CREATE INDEX IF NOT EXISTS idx_mensagens_chat_pinned_by
   ON public.mensagens_chat USING gin (pinned_by);
+
+NOTIFY pgrst, 'reload schema';

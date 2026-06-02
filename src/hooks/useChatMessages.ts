@@ -15,6 +15,8 @@ export interface ChatMessage {
   edited_at: string | null;
   deleted_for_all: boolean;
   deleted_for: string[];
+  favorited_by: string[];
+  pinned_by: string[];
 }
 
 interface UseChatMessagesProps {
@@ -206,6 +208,56 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
     [currentUserId]
   );
 
+  const toggleMensagemFavorita = useCallback(
+    async (mensagemId: string) => {
+      const msg = mensagens.find((m) => m.id === mensagemId);
+      if (!msg) return false;
+
+      const current = msg.favorited_by || [];
+      const next = current.includes(currentUserId)
+        ? current.filter((id) => id !== currentUserId)
+        : [...current, currentUserId];
+
+      const { error } = await supabase
+        .from("mensagens_chat")
+        .update({ favorited_by: next })
+        .eq("id", mensagemId);
+
+      if (!error) {
+        setMensagens((prev) =>
+          prev.map((m) => (m.id === mensagemId ? { ...m, favorited_by: next } : m))
+        );
+      }
+      return !error;
+    },
+    [mensagens, currentUserId]
+  );
+
+  const toggleMensagemFixada = useCallback(
+    async (mensagemId: string) => {
+      const msg = mensagens.find((m) => m.id === mensagemId);
+      if (!msg) return false;
+
+      const current = msg.pinned_by || [];
+      const next = current.includes(currentUserId)
+        ? current.filter((id) => id !== currentUserId)
+        : [...current, currentUserId];
+
+      const { error } = await supabase
+        .from("mensagens_chat")
+        .update({ pinned_by: next })
+        .eq("id", mensagemId);
+
+      if (!error) {
+        setMensagens((prev) =>
+          prev.map((m) => (m.id === mensagemId ? { ...m, pinned_by: next } : m))
+        );
+      }
+      return !error;
+    },
+    [mensagens, currentUserId]
+  );
+
   useEffect(() => {
     fetchMensagens();
     fetchNaoLidas();
@@ -271,6 +323,8 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
     editarMensagem,
     excluirParaMim,
     excluirParaTodos,
+    toggleMensagemFavorita,
+    toggleMensagemFixada,
     fetchNaoLidas,
   };
 }

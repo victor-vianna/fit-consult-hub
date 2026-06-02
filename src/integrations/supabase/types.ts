@@ -1176,8 +1176,10 @@ export type Database = {
           deleted_for_all: boolean
           destinatario_id: string
           edited_at: string | null
+          favorited_by: string[]
           id: string
           lida: boolean | null
+          pinned_by: string[]
           remetente_id: string
           reply_to: string | null
           tipo: string
@@ -1190,8 +1192,10 @@ export type Database = {
           deleted_for_all?: boolean
           destinatario_id: string
           edited_at?: string | null
+          favorited_by?: string[]
           id?: string
           lida?: boolean | null
+          pinned_by?: string[]
           remetente_id: string
           reply_to?: string | null
           tipo?: string
@@ -1204,8 +1208,10 @@ export type Database = {
           deleted_for_all?: boolean
           destinatario_id?: string
           edited_at?: string | null
+          favorited_by?: string[]
           id?: string
           lida?: boolean | null
+          pinned_by?: string[]
           remetente_id?: string
           reply_to?: string | null
           tipo?: string

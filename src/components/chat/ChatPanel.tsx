@@ -9,10 +9,12 @@ import {
   MessageSquare,
   MoreVertical,
   Paperclip,
+  Pin,
   Reply,
   Search,
   Send,
   Smile,
+  Star,
   Trash2,
   UserCircle,
   X,
@@ -77,6 +79,7 @@ export function ChatPanel({
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [profiles, setProfiles] = useState<Record<string, ProfileSummary>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -97,6 +100,8 @@ export function ChatPanel({
     editarMensagem,
     excluirParaMim,
     excluirParaTodos,
+    toggleMensagemFavorita,
+    toggleMensagemFixada,
   } = useChatMessages({ personalId, alunoId, currentUserId });
 
   const otherUserId = currentUserId === personalId ? alunoId : personalId;
@@ -185,11 +190,25 @@ export function ChatPanel({
 
   const findMsg = (id: string | null) => (id ? mensagens.find((m) => m.id === id) : undefined);
 
+  const pinnedMessages = useMemo(
+    () =>
+      mensagens.filter(
+        (msg) =>
+          !msg.deleted_for_all &&
+          (msg.pinned_by || []).includes(currentUserId)
+      ),
+    [mensagens, currentUserId]
+  );
+
   const visibleMessages = useMemo(() => {
-    if (!searchTerm.trim()) return mensagens;
+    const baseMessages = favoriteOnly
+      ? mensagens.filter((msg) => (msg.favorited_by || []).includes(currentUserId))
+      : mensagens;
+
+    if (!searchTerm.trim()) return baseMessages;
     const term = searchTerm.trim().toLowerCase();
-    return mensagens.filter((msg) => msg.conteudo.toLowerCase().includes(term));
-  }, [mensagens, searchTerm]);
+    return baseMessages.filter((msg) => msg.conteudo.toLowerCase().includes(term));
+  }, [mensagens, searchTerm, favoriteOnly, currentUserId]);
 
   const groupedMessages = useMemo(() => {
     return visibleMessages.map((msg, index) => {
@@ -217,6 +236,15 @@ export function ChatPanel({
         behavior,
       });
     });
+  };
+
+  const scrollToMessage = (messageId: string) => {
+    setFavoriteOnly(false);
+    window.setTimeout(() => {
+      document
+        .getElementById(`chat-message-${messageId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 80);
   };
 
   useEffect(() => {
@@ -372,6 +400,16 @@ export function ChatPanel({
           </div>
           <Button
             type="button"
+            variant={favoriteOnly ? "secondary" : "ghost"}
+            size="icon"
+            className="h-9 w-9"
+            onClick={() => setFavoriteOnly((prev) => !prev)}
+            title={favoriteOnly ? "Mostrar todas as mensagens" : "Ver mensagens favoritas"}
+          >
+            <Star className={cn("h-4 w-4", favoriteOnly && "fill-current text-amber-500")} />
+          </Button>
+          <Button
+            type="button"
             variant={searchOpen ? "secondary" : "ghost"}
             size="icon"
             className="h-9 w-9"
@@ -407,6 +445,28 @@ export function ChatPanel({
             </div>
           </div>
         )}
+
+        {pinnedMessages.length > 0 && (
+          <div className="border-t px-3 py-2 sm:px-4">
+            <div className="flex items-center gap-2 overflow-x-auto">
+              <div className="flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground">
+                <Pin className="h-3.5 w-3.5 fill-current" />
+                Fixadas
+              </div>
+              {pinnedMessages.map((msg) => (
+                <button
+                  key={msg.id}
+                  type="button"
+                  onClick={() => scrollToMessage(msg.id)}
+                  className="max-w-[260px] shrink-0 truncate rounded-full border bg-background px-3 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  title={msg.conteudo}
+                >
+                  {msg.conteudo || "Mensagem fixada"}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="relative flex-1 overflow-hidden bg-muted/20">
@@ -419,7 +479,9 @@ export function ChatPanel({
             <EmptyChat otherName={otherName} />
           ) : visibleMessages.length === 0 ? (
             <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">
-              Nenhuma mensagem encontrada para "{searchTerm}".
+              {favoriteOnly && !searchTerm.trim()
+                ? "Nenhuma mensagem favorita nesta conversa."
+                : `Nenhuma mensagem encontrada para "${searchTerm}".`}
             </div>
           ) : (
             <div className="space-y-2">
@@ -430,7 +492,7 @@ export function ChatPanel({
                 const senderName = isMe ? currentName : otherName;
 
                 return (
-                  <div key={msg.id} className="space-y-2">
+                  <div key={msg.id} id={`chat-message-${msg.id}`} className="space-y-2 scroll-mt-24">
                     {showDate && <DateSeparator date={new Date(msg.created_at)} />}
                     <div className={cn("flex items-end gap-2", isMe ? "justify-end" : "justify-start")}>
                       {!isMe && (
@@ -454,7 +516,11 @@ export function ChatPanel({
                         onEdit={() => startEdit(msg)}
                         onCopy={() => copyMessage(msg)}
                         onMarkUnread={() => marcarComoNaoLida(msg.id)}
+                        onToggleFavorite={() => toggleMensagemFavorita(msg.id)}
+                        onTogglePin={() => toggleMensagemFixada(msg.id)}
                         onDelete={() => setDeleteTarget({ id: msg.id, isMine: isMe })}
+                        isFavorite={(msg.favorited_by || []).includes(currentUserId)}
+                        isPinned={(msg.pinned_by || []).includes(currentUserId)}
                       >
                         <MessageBubble
                           msg={msg}
@@ -464,6 +530,8 @@ export function ChatPanel({
                           currentUserId={currentUserId}
                           themeColor={themeColor}
                           searchTerm={searchTerm}
+                          isFavorite={(msg.favorited_by || []).includes(currentUserId)}
+                          isPinned={(msg.pinned_by || []).includes(currentUserId)}
                         />
                       </MessageActions>
                     </div>
@@ -636,7 +704,11 @@ function MessageActions({
   onEdit,
   onCopy,
   onMarkUnread,
+  onToggleFavorite,
+  onTogglePin,
   onDelete,
+  isFavorite,
+  isPinned,
 }: {
   children: React.ReactNode;
   isMe: boolean;
@@ -646,7 +718,11 @@ function MessageActions({
   onEdit: () => void;
   onCopy: () => void;
   onMarkUnread: () => void;
+  onToggleFavorite: () => void;
+  onTogglePin: () => void;
   onDelete: () => void;
+  isFavorite: boolean;
+  isPinned: boolean;
 }) {
   return (
     <div className={cn("group flex max-w-[86%] items-center gap-1", isMe && "flex-row-reverse")}>
@@ -669,6 +745,24 @@ function MessageActions({
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onCopy}>
                 <Copy className="mr-2 h-4 w-4" /> Copiar
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onToggleFavorite}>
+                <Star
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    isFavorite && "fill-current text-amber-500"
+                  )}
+                />
+                {isFavorite ? "Remover dos favoritos" : "Favoritar mensagem"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onTogglePin}>
+                <Pin
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    isPinned && "fill-current text-primary"
+                  )}
+                />
+                {isPinned ? "Desafixar mensagem" : "Fixar mensagem"}
               </DropdownMenuItem>
             </>
           )}
@@ -701,6 +795,8 @@ function MessageBubble({
   currentUserId,
   themeColor,
   searchTerm,
+  isFavorite,
+  isPinned,
 }: {
   msg: ChatMessage;
   replied?: ChatMessage;
@@ -709,6 +805,8 @@ function MessageBubble({
   currentUserId: string;
   themeColor?: string;
   searchTerm: string;
+  isFavorite: boolean;
+  isPinned: boolean;
 }) {
   const isDeleted = msg.deleted_for_all;
 
@@ -749,6 +847,12 @@ function MessageBubble({
       )}
 
       <div className={cn("mt-1 flex items-center gap-1", isMe ? "justify-end" : "justify-end")}>
+        {isPinned && !isDeleted && (
+          <Pin className={cn("h-3 w-3", isMe ? "fill-current text-white/75" : "fill-current text-muted-foreground")} />
+        )}
+        {isFavorite && !isDeleted && (
+          <Star className={cn("h-3 w-3 fill-current", isMe ? "text-yellow-100" : "text-amber-500")} />
+        )}
         <p className={cn("text-[10px]", isMe ? "text-white/75" : "text-muted-foreground")}>
           {format(new Date(msg.created_at), "HH:mm")}
         </p>

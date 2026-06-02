@@ -32,27 +32,58 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
   const [sending, setSending] = useState(false);
   const [naoLidas, setNaoLidas] = useState(0);
   const conversaKey = `${personalId}::${alunoId}`;
+  const isReady = Boolean(personalId && alunoId && currentUserId);
 
   const visibleMensagens = mensagens.filter(
     (m) => !(m.deleted_for || []).includes(currentUserId)
   );
 
+  const upsertMensagem = useCallback((msg: ChatMessage) => {
+    setMensagens((prev) => {
+      if (prev.some((m) => m.id === msg.id)) {
+        return prev.map((m) => (m.id === msg.id ? { ...m, ...msg } : m));
+      }
+
+      return [...prev, msg].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+    });
+  }, []);
+
   const fetchMensagens = useCallback(async () => {
+    if (!isReady) {
+      setMensagens([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     const { data, error } = await supabase
       .from("mensagens_chat")
       .select("*")
       .eq("conversa_key", conversaKey)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
       .limit(200);
 
     if (!error && data) {
-      setMensagens(data as ChatMessage[]);
+      setMensagens((data as ChatMessage[]).reverse());
+    } else if (error) {
+      console.error("Erro ao carregar mensagens:", error);
+      toast({
+        title: "Nao foi possivel carregar o chat",
+        description: error.message,
+        variant: "destructive",
+      });
     }
     setLoading(false);
-  }, [conversaKey]);
+  }, [conversaKey, isReady]);
 
   const fetchNaoLidas = useCallback(async () => {
+    if (!isReady) {
+      setNaoLidas(0);
+      return;
+    }
+
     const { count } = await supabase
       .from("mensagens_chat")
       .select("*", { count: "exact", head: true })
@@ -61,9 +92,11 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
       .eq("lida", false);
 
     setNaoLidas(count || 0);
-  }, [conversaKey, currentUserId]);
+  }, [conversaKey, currentUserId, isReady]);
 
   const marcarComoLidas = useCallback(async () => {
+    if (!isReady) return;
+
     await supabase
       .from("mensagens_chat")
       .update({ lida: true })
@@ -75,10 +108,12 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
     setMensagens((prev) =>
       prev.map((m) => (m.destinatario_id === currentUserId ? { ...m, lida: true } : m))
     );
-  }, [conversaKey, currentUserId]);
+  }, [conversaKey, currentUserId, isReady]);
 
   const marcarComoNaoLida = useCallback(
     async (mensagemId: string) => {
+      if (!isReady) return;
+
       const { error } = await supabase
         .from("mensagens_chat")
         .update({ lida: false })
@@ -92,26 +127,42 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
         setNaoLidas((prev) => prev + 1);
       }
     },
-    [currentUserId]
+    [currentUserId, isReady]
   );
 
   const enviarMensagem = useCallback(
     async (conteudo: string, replyToId: string | null = null) => {
-      if (!conteudo.trim()) return;
+      const conteudoFinal = conteudo.trim();
+      if (!conteudoFinal || sending) return false;
+      if (!isReady || ![personalId, alunoId].includes(currentUserId)) {
+        toast({
+          title: "Conversa indisponivel",
+          description: "Nao foi possivel identificar personal e aluno desta conversa.",
+          variant: "destructive",
+        });
+        return false;
+      }
       setSending(true);
 
-      const destinatarioId = currentUserId === personalId ? alunoId : personalId;
+      try {
+        const destinatarioId = currentUserId === personalId ? alunoId : personalId;
 
-      const { error } = await supabase.from("mensagens_chat").insert({
-        conversa_key: conversaKey,
-        remetente_id: currentUserId,
-        destinatario_id: destinatarioId,
-        conteudo: conteudo.trim(),
-        tipo: "texto",
-        reply_to: replyToId,
-      });
+        const { data: mensagemEnviada, error } = await supabase
+          .from("mensagens_chat")
+          .insert({
+            conversa_key: conversaKey,
+            remetente_id: currentUserId,
+            destinatario_id: destinatarioId,
+            conteudo: conteudoFinal,
+            tipo: "texto",
+            reply_to: replyToId,
+          })
+          .select("*")
+          .single();
 
-      if (!error) {
+        if (error) throw error;
+        if (mensagemEnviada) upsertMensagem(mensagemEnviada as ChatMessage);
+
         const [{ data: remetenteProfile }, { data: alunoProfile }] = await Promise.all([
           supabase.from("profiles").select("nome").eq("id", currentUserId).single(),
           supabase.from("profiles").select("nome").eq("id", alunoId).single(),
@@ -123,7 +174,7 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
           destinatario_id: destinatarioId,
           tipo: "nova_mensagem",
           titulo: `Nova mensagem de ${remetenteProfile?.nome || "Usuário"}`,
-          mensagem: conteudo.trim().substring(0, 100),
+          mensagem: conteudoFinal.substring(0, 100),
           dados: {
             aluno_id: alunoId,
             aluno_nome: alunoProfile?.nome || null,
@@ -133,15 +184,27 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
         });
 
         if (!notificationError) {
-          await dispatchPushNotification(notificacaoId);
+          await dispatchPushNotification(notificacaoId).catch((pushError) => {
+            console.error("Erro ao enviar push de chat:", pushError);
+          });
         } else {
           console.error("Erro ao criar notificacao de chat:", notificationError);
         }
-      }
 
-      setSending(false);
+        return true;
+      } catch (error: any) {
+        console.error("Erro ao enviar mensagem:", error);
+        toast({
+          title: "Nao foi possivel enviar a mensagem",
+          description: error?.message || "Tente novamente em alguns instantes.",
+          variant: "destructive",
+        });
+        return false;
+      } finally {
+        setSending(false);
+      }
     },
-    [conversaKey, currentUserId, personalId, alunoId]
+    [conversaKey, currentUserId, personalId, alunoId, sending, upsertMensagem, isReady]
   );
 
   // Editar mensagem (apenas remetente)
@@ -278,6 +341,13 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
   );
 
   useEffect(() => {
+    if (!isReady) {
+      setMensagens([]);
+      setNaoLidas(0);
+      setLoading(false);
+      return;
+    }
+
     fetchMensagens();
     fetchNaoLidas();
 
@@ -293,7 +363,7 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
         },
         (payload) => {
           const newMsg = payload.new as ChatMessage;
-          setMensagens((prev) => [...prev, newMsg]);
+          upsertMensagem(newMsg);
           if (newMsg.destinatario_id === currentUserId) {
             if (typeof document !== "undefined" && document.visibilityState === "visible") {
               supabase
@@ -329,7 +399,7 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversaKey, fetchMensagens, fetchNaoLidas, currentUserId]);
+  }, [conversaKey, fetchMensagens, fetchNaoLidas, currentUserId, upsertMensagem, isReady]);
 
   return {
     mensagens: visibleMensagens,

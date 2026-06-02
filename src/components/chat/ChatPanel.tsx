@@ -302,13 +302,16 @@ export function ChatPanel({
   const handleSend = async () => {
     if (!texto.trim() || sending) return;
     const conteudo = texto;
-    setTexto("");
 
     if (editingId) {
-      await editarMensagem(editingId, conteudo);
+      const ok = await editarMensagem(editingId, conteudo);
+      if (!ok) return;
+      setTexto("");
       setEditingId(null);
     } else {
-      await enviarMensagem(conteudo, replyTo?.id ?? null);
+      const ok = await enviarMensagem(conteudo, replyTo?.id ?? null);
+      if (!ok) return;
+      setTexto("");
       setReplyTo(null);
     }
 

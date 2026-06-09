@@ -16,6 +16,8 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Calendar,
   CheckCircle,
+  CreditCard,
+  KeyRound,
   Loader2,
   Mail,
   Phone,
@@ -47,6 +49,7 @@ interface Personal {
     receitaGerada: number;
     alunosAtivos: number;
   };
+  controleAlunosPorPagamento: boolean;
 }
 
 interface PlanoOption {
@@ -57,6 +60,7 @@ interface PlanoOption {
 }
 
 const ACTIVE_STATUSES = ["ativa", "ativo", "trial"];
+type StudentAccessMode = "pagamento" | "login";
 
 export default function PersonalsManager() {
   const { toast } = useToast();
@@ -108,6 +112,7 @@ export default function PersonalsManager() {
         { data: profilesData, error: profilesError },
         { data: assinaturasData, error: assinaturasError },
         { data: alunosData, error: alunosError },
+        { data: personalSettingsData, error: personalSettingsError },
       ] = await Promise.all([
         supabase.from("profiles").select("*").in("id", personalIds),
         supabase
@@ -118,11 +123,16 @@ export default function PersonalsManager() {
           .from("profiles")
           .select("personal_id, is_active")
           .in("personal_id", personalIds),
+        supabase
+          .from("personal_settings")
+          .select("personal_id, controle_acesso_por_pagamento")
+          .in("personal_id", personalIds),
       ]);
 
       if (profilesError) throw profilesError;
       if (assinaturasError) throw assinaturasError;
       if (alunosError) throw alunosError;
+      if (personalSettingsError) throw personalSettingsError;
 
       const personalsCompletos: Personal[] =
         profilesData?.map((profile) => {
@@ -131,6 +141,9 @@ export default function PersonalsManager() {
           );
           const alunosDoPersonal = alunosData?.filter(
             (a) => a.personal_id === profile.id
+          );
+          const settings = personalSettingsData?.find(
+            (item) => item.personal_id === profile.id
           );
 
           return {
@@ -156,6 +169,8 @@ export default function PersonalsManager() {
                 alunosDoPersonal?.filter((a) => a.is_active).length || 0,
               receitaGerada: 0,
             },
+            controleAlunosPorPagamento:
+              settings?.controle_acesso_por_pagamento ?? false,
           };
         }) || [];
 
@@ -207,6 +222,8 @@ export default function PersonalsManager() {
       (sum, p) => sum + p.estatisticas.totalAlunos,
       0
     ),
+    controlePorPagamento: personals.filter((p) => p.controleAlunosPorPagamento)
+      .length,
   };
 
   const formatCurrency = (value: number) =>
@@ -367,6 +384,58 @@ export default function PersonalsManager() {
     }
   };
 
+  const handleChangeStudentAccessMode = async (
+    personal: Personal,
+    mode: StudentAccessMode
+  ) => {
+    const controlePorPagamento = mode === "pagamento";
+
+    try {
+      setSavingPersonalId(personal.id);
+
+      const { error } = await supabase.from("personal_settings").upsert(
+        {
+          personal_id: personal.id,
+          controle_acesso_por_pagamento: controlePorPagamento,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "personal_id" }
+      );
+
+      if (error) throw error;
+
+      const { error: alunosError } = await supabase
+        .from("profiles")
+        .update({ controle_acesso_por_pagamento: null })
+        .eq("personal_id", personal.id);
+
+      if (alunosError) throw alunosError;
+
+      setPersonals((prev) =>
+        prev.map((item) =>
+          item.id === personal.id
+            ? { ...item, controleAlunosPorPagamento: controlePorPagamento }
+            : item
+        )
+      );
+
+      toast({
+        title: "Acesso dos alunos atualizado",
+        description: controlePorPagamento
+          ? `Todos os alunos de ${personal.nome} dependerao de pagamento ativo.`
+          : `Todos os alunos de ${personal.nome} acessarao com login e senha liberados pelo personal.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar acesso dos alunos",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSavingPersonalId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -380,7 +449,7 @@ export default function PersonalsManager() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="text-2xl font-bold">{stats.total}</div>
@@ -415,6 +484,14 @@ export default function PersonalsManager() {
               {stats.totalAlunos}
             </div>
             <p className="text-xs text-foreground">Total alunos</p>
+          </CardContent>
+        </Card>
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold text-primary">
+              {stats.controlePorPagamento}
+            </div>
+            <p className="text-xs text-primary">Acesso por pagamento</p>
           </CardContent>
         </Card>
       </div>
@@ -495,7 +572,7 @@ export default function PersonalsManager() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-3 bg-muted/50 rounded-md">
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 p-3 bg-muted/50 rounded-md">
                         <div>
                           <p className="text-xs text-muted-foreground mb-1">Plano</p>
                           <p className="font-semibold text-sm">
@@ -526,10 +603,62 @@ export default function PersonalsManager() {
                             {personal.estatisticas.alunosAtivos}
                           </p>
                         </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">
+                            Acesso alunos
+                          </p>
+                          <p className="font-semibold text-sm">
+                            {personal.controleAlunosPorPagamento
+                              ? "Por pagamento"
+                              : "Login e senha"}
+                          </p>
+                        </div>
                       </div>
                     </div>
 
                     <div className="w-full xl:w-80 space-y-3">
+                      <div className="rounded-md border p-3">
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-semibold">Acesso dos alunos</p>
+                            <p className="text-xs text-muted-foreground">
+                              Define como todos os alunos deste personal entram na plataforma.
+                            </p>
+                          </div>
+                          {personal.controleAlunosPorPagamento ? (
+                            <CreditCard className="h-4 w-4 text-primary" />
+                          ) : (
+                            <KeyRound className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </div>
+                        <Select
+                          value={
+                            personal.controleAlunosPorPagamento
+                              ? "pagamento"
+                              : "login"
+                          }
+                          onValueChange={(value) =>
+                            handleChangeStudentAccessMode(
+                              personal,
+                              value as StudentAccessMode
+                            )
+                          }
+                          disabled={saving}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Modo de acesso dos alunos" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pagamento">
+                              Controlar por pagamento dos planos
+                            </SelectItem>
+                            <SelectItem value="login">
+                              Liberar por login e senha do personal
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
                       <Select
                         value={personal.assinatura?.planoId || "sem-plano"}
                         onValueChange={(planoId) =>

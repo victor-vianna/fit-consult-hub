@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Send, MessageSquare, Quote } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { buildChatConversationKey } from "@/utils/chat";
 import { createNotificationId, dispatchPushNotification } from "@/utils/pushNotifications";
 
 interface FeedbackReplyProps {
@@ -68,7 +69,7 @@ export function FeedbackReply({ checkinId, alunoId, personalId, alunoNome, theme
     setSending(true);
 
     try {
-      const conversaKey = `${personalId}::${alunoId}`;
+      const conversaKey = buildChatConversationKey(personalId, alunoId);
       const semanaInfo =
         checkin?.numero_semana && checkin?.ano
           ? ` (Semana ${checkin.numero_semana}/${checkin.ano})`
@@ -88,13 +89,14 @@ export function FeedbackReply({ checkinId, alunoId, personalId, alunoNome, theme
       }
       conteudo += resposta.trim();
 
-      await supabase.from("mensagens_chat").insert({
+      const { error: mensagemError } = await supabase.from("mensagens_chat").insert({
         conversa_key: conversaKey,
         remetente_id: personalId,
         destinatario_id: alunoId,
         conteudo,
         tipo: "texto",
       });
+      if (mensagemError) throw mensagemError;
 
       // Notificação para o aluno
       const { data: personalProfile } = await supabase

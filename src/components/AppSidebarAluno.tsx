@@ -51,12 +51,14 @@ export function AppSidebarAluno({
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { settings: personalSettings } = usePersonalSettings(personalId);
+  const configuredItemIds = cardsVisiveis?.length ? cardsVisiveis : [...DEFAULT_CARDS_VISIVEIS];
+  const menuItemIds = configuredItemIds.includes("chat")
+    ? configuredItemIds
+    : ["chat", ...configuredItemIds];
 
   const items = [
     { title: "Inicio", icon: Home, value: "inicio" },
-    ...(cardsVisiveis?.length ? cardsVisiveis : [...DEFAULT_CARDS_VISIVEIS])
-      .map((id) => itemConfig[id])
-      .filter(Boolean),
+    ...menuItemIds.map((id) => itemConfig[id]).filter(Boolean),
   ];
 
   return (

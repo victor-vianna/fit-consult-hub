@@ -71,6 +71,11 @@ interface Material {
 }
 
 const WORKOUT_STATE_KEY = "pwa_workout_state";
+const ALWAYS_ALLOWED_ALUNO_SECTIONS = ["inicio", "treinos", "chat"] as const;
+
+function getAllowedAlunoSections(cardsVisiveis: string[]) {
+  return Array.from(new Set([...ALWAYS_ALLOWED_ALUNO_SECTIONS, ...cardsVisiveis]));
+}
 
 function getAlunoActiveSectionKey(userId: string) {
   return `pf:aluno-active-section:${userId}:v1`;
@@ -349,7 +354,7 @@ export default function AreaAluno() {
     : [...DEFAULT_ALUNO_DASHBOARD_COMPONENTES]) as string[];
 
   useEffect(() => {
-    const secoesPermitidas = ["inicio", ...cardsVisiveis];
+    const secoesPermitidas = getAllowedAlunoSections(cardsVisiveis);
     if (!secoesPermitidas.includes(activeSection)) {
       handleSectionChange("inicio");
     }
@@ -357,7 +362,7 @@ export default function AreaAluno() {
 
   useEffect(() => {
     const sectionFromUrl = searchParams.get("section");
-    const secoesPermitidas = ["inicio", ...cardsVisiveis];
+    const secoesPermitidas = getAllowedAlunoSections(cardsVisiveis);
     if (sectionFromUrl && secoesPermitidas.includes(sectionFromUrl)) {
       handleSectionChange(sectionFromUrl);
     }

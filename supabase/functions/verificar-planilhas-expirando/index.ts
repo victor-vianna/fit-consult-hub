@@ -59,8 +59,7 @@ serve(async (req: Request) => {
 
       // Helper to create a chat message from personal to student
       const criarMensagemChat = (conteudo: string) => {
-        const ids = [planilha.personal_id, planilha.profile_id].sort();
-        const conversaKey = `${ids[0]}_${ids[1]}`;
+        const conversaKey = `${planilha.personal_id}::${planilha.profile_id}`;
         mensagensParaCriar.push({
           remetente_id: planilha.personal_id,
           destinatario_id: planilha.profile_id,

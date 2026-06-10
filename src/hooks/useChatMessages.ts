@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { buildChatConversationKey } from "@/utils/chat";
 import { createNotificationId, dispatchPushNotification } from "@/utils/pushNotifications";
 
 export interface ChatMessage {
@@ -31,7 +32,7 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [naoLidas, setNaoLidas] = useState(0);
-  const conversaKey = `${personalId}::${alunoId}`;
+  const conversaKey = buildChatConversationKey(personalId, alunoId);
   const isReady = Boolean(personalId && alunoId && currentUserId);
 
   const visibleMensagens = mensagens.filter(
@@ -480,7 +481,7 @@ export interface UltimaMensagemPreview {
 export function useUltimaMensagem(personalId: string, alunoId: string) {
   const [ultima, setUltima] = useState<UltimaMensagemPreview | null>(null);
   const [loading, setLoading] = useState(true);
-  const conversaKey = personalId && alunoId ? `${personalId}::${alunoId}` : "";
+  const conversaKey = personalId && alunoId ? buildChatConversationKey(personalId, alunoId) : "";
 
   useEffect(() => {
     if (!conversaKey) {

@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { MessageSquare, Send, Star } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { buildChatConversationKey } from "@/utils/chat";
 import { createNotificationId, dispatchPushNotification } from "@/utils/pushNotifications";
 
 interface TreinoFeedbackModalProps {
@@ -44,7 +45,7 @@ export function TreinoFeedbackModal({
     if (!resposta.trim() || sending) return;
     setSending(true);
     try {
-      const conversaKey = `${personalId}::${alunoId}`;
+      const conversaKey = buildChatConversationKey(personalId, alunoId);
       const citacao = [
         rating ? `⭐ Avaliação: ${"⭐".repeat(rating)}` : null,
         comentario ? `💬 "${comentario}"` : null,
@@ -58,13 +59,14 @@ export function TreinoFeedbackModal({
         (citacao ? `${citacao}\n\n` : "\n") +
         resposta.trim();
 
-      await supabase.from("mensagens_chat").insert({
+      const { error: mensagemError } = await supabase.from("mensagens_chat").insert({
         conversa_key: conversaKey,
         remetente_id: personalId,
         destinatario_id: alunoId,
         conteudo,
         tipo: "texto",
       });
+      if (mensagemError) throw mensagemError;
 
       const { data: personalProfile } = await supabase
         .from("profiles")

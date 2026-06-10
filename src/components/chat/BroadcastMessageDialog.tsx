@@ -10,6 +10,7 @@ import {
 import { Megaphone, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { buildChatConversationKey } from "@/utils/chat";
 import { createNotificationId, dispatchPushNotification } from "@/utils/pushNotifications";
 
 interface BroadcastMessageDialogProps {
@@ -50,7 +51,7 @@ export function BroadcastMessageDialog({ personalId, themeColor }: BroadcastMess
 
       // Insert messages for all students
       const mensagens = alunos.map((aluno) => ({
-        conversa_key: `${personalId}::${aluno.id}`,
+        conversa_key: buildChatConversationKey(personalId, aluno.id),
         remetente_id: personalId,
         destinatario_id: aluno.id,
         conteudo: texto.trim(),

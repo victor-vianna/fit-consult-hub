@@ -27,6 +27,7 @@ import { TreinosHojeModal } from "./TreinosHojeModal";
 import { AlertasModal } from "./AlertasModal";
 import { FeedbackDetailModal } from "./FeedbackDetailModal";
 import { useChatNaoLidas } from "@/hooks/useChatMessages";
+import { getAlunoIdFromConversationKey } from "@/utils/chat";
 import {
   DashboardCustomizeDialog,
   DashboardCardConfig,
@@ -232,9 +233,7 @@ export function PersonalDashboardCards({
         .limit(1);
 
       if (data && data.length > 0) {
-        // conversa_key format: personalId::alunoId
-        const parts = data[0].conversa_key.split("::");
-        const alunoId = parts[1];
+        const alunoId = getAlunoIdFromConversationKey(data[0].conversa_key);
         if (alunoId) {
           navigate(`/aluno/${alunoId}?tab=chat`);
           return;

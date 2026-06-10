@@ -38,6 +38,11 @@ import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { usePersistedState } from "@/hooks/usePersistedState";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import {
+  CHAT_CONVERSATION_SEPARATOR,
+  buildChatConversationKey,
+  getAlunoIdFromConversationKey,
+} from "@/utils/chat";
 
 interface Student {
   id: string;
@@ -196,7 +201,7 @@ export default function Chat() {
     const { data } = await supabase
       .from("mensagens_chat")
       .select("id, conversa_key, remetente_id, destinatario_id, conteudo, lida, created_at, deleted_for_all")
-      .like("conversa_key", `${user.id}::%`)
+      .like("conversa_key", `${user.id}${CHAT_CONVERSATION_SEPARATOR}%`)
       .order("created_at", { ascending: false })
       .limit(500);
 
@@ -207,7 +212,7 @@ export default function Chat() {
     const byStudent = new Map<string, { lastMessage: MessagePreview | null; unread: number }>();
 
     for (const msg of messages) {
-      const alunoId = msg.conversa_key.split("::")[1];
+      const alunoId = getAlunoIdFromConversationKey(msg.conversa_key);
       if (!alunoId) continue;
       const current = byStudent.get(alunoId) || { lastMessage: null, unread: 0 };
       if (!current.lastMessage) current.lastMessage = msg;
@@ -249,7 +254,7 @@ export default function Chat() {
   const allConversations = useMemo<ConversationItem[]>(() => {
     const byStudent = new Map<string, { lastMessage: MessagePreview | null; unread: number }>();
     for (const msg of messages) {
-      const alunoId = msg.conversa_key.split("::")[1];
+      const alunoId = getAlunoIdFromConversationKey(msg.conversa_key);
       if (!alunoId) continue;
       const current = byStudent.get(alunoId) || { lastMessage: null, unread: 0 };
       if (!current.lastMessage) current.lastMessage = msg;
@@ -301,7 +306,7 @@ export default function Chat() {
 
     const latestIncoming = messages.find(
       (msg) =>
-        msg.conversa_key === `${user?.id}::${studentId}` &&
+        msg.conversa_key === buildChatConversationKey(user?.id || "", studentId) &&
         msg.destinatario_id === user?.id &&
         !msg.deleted_for_all
     );
@@ -326,13 +331,13 @@ export default function Chat() {
     await supabase
       .from("mensagens_chat")
       .update({ lida: true })
-      .eq("conversa_key", `${user.id}::${studentId}`)
+      .eq("conversa_key", buildChatConversationKey(user.id, studentId))
       .eq("destinatario_id", user.id)
       .eq("lida", false);
 
     setMessages((prev) =>
       prev.map((msg) =>
-        msg.conversa_key === `${user.id}::${studentId}` && msg.destinatario_id === user.id
+        msg.conversa_key === buildChatConversationKey(user.id, studentId) && msg.destinatario_id === user.id
           ? { ...msg, lida: true }
           : msg
       )

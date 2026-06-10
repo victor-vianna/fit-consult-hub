@@ -83,6 +83,7 @@ import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { ExportTreinoDialog } from "@/components/ExportTreinoDialog";
 import { usePersistedState } from "@/hooks/usePersistedState";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
+import { AnamneseWorkoutNotes } from "@/components/AnamneseWorkoutNotes";
 
 import {
   DndContext,
@@ -1158,6 +1159,15 @@ export function TreinosManager({
       </div>
 
       <Separator />
+
+      {isPersonal && (
+        <AnamneseWorkoutNotes
+          profileId={profileId}
+          personalId={personalId}
+          studentName={alunoProfile?.nome}
+          themeColor={personalSettings?.theme_color}
+        />
+      )}
 
       {/* 🆕 TABS: Treinos da Semana | Modelos */}
       <Tabs value={activeMainTab} onValueChange={setActiveMainTab} className="w-full">

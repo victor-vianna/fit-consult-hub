@@ -1,6 +1,6 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import Stripe from "npm:stripe@14";
+import Stripe from "npm:stripe@17";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
+      { global: { headers: { Authorization: authHeader } } },
     );
     const token = authHeader.replace("Bearer ", "");
     const { data: claims, error: cErr } = await supabase.auth.getClaims(token);
@@ -30,12 +30,12 @@ Deno.serve(async (req) => {
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
     const { data: sub } = await admin
       .from("subscriptions")
-      .select("id, stripe_subscription_id")
+      .select("id, stripe_subscription_id, stripe_account_id")
       .eq("student_id", userId)
       .eq("status_pagamento", "pago")
       .not("stripe_subscription_id", "is", null)
@@ -45,18 +45,26 @@ Deno.serve(async (req) => {
 
     if (!sub?.stripe_subscription_id) {
       return new Response(
-        JSON.stringify({ error: "Nenhuma assinatura ativa encontrada" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Nenhuma assinatura Stripe ativa encontrada" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
-      apiVersion: "2023-10-16",
+      apiVersion: "2024-12-18.acacia" as any,
     });
 
-    await stripe.subscriptions.update(sub.stripe_subscription_id, {
-      cancel_at_period_end: true,
-    });
+    if (sub.stripe_account_id) {
+      await stripe.subscriptions.update(
+        sub.stripe_subscription_id,
+        { cancel_at_period_end: true },
+        { stripeAccount: sub.stripe_account_id },
+      );
+    } else {
+      await stripe.subscriptions.update(sub.stripe_subscription_id, {
+        cancel_at_period_end: true,
+      });
+    }
 
     await admin
       .from("subscriptions")

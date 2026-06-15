@@ -1,6 +1,6 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import Stripe from "npm:stripe@14";
+import Stripe from "npm:stripe@17";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
+      { global: { headers: { Authorization: authHeader } } },
     );
     const token = authHeader.replace("Bearer ", "");
     const { data: claims, error: cErr } = await supabase.auth.getClaims(token);
@@ -31,13 +31,14 @@ Deno.serve(async (req) => {
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
     const { data: sub } = await admin
       .from("subscriptions")
-      .select("stripe_customer_id")
+      .select("stripe_customer_id, stripe_account_id")
       .eq("student_id", userId)
+      .eq("status_pagamento", "pago")
       .not("stripe_customer_id", "is", null)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -46,19 +47,22 @@ Deno.serve(async (req) => {
     if (!sub?.stripe_customer_id) {
       return new Response(
         JSON.stringify({ error: "Nenhum cliente Stripe vinculado" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
-      apiVersion: "2023-10-16",
+      apiVersion: "2024-12-18.acacia" as any,
     });
 
     const origin = req.headers.get("origin") ?? "";
-    const portal = await stripe.billingPortal.sessions.create({
+    const portalParams = {
       customer: sub.stripe_customer_id,
       return_url: `${origin}/aluno?tab=plano`,
-    });
+    };
+    const portal = sub.stripe_account_id
+      ? await stripe.billingPortal.sessions.create(portalParams, { stripeAccount: sub.stripe_account_id })
+      : await stripe.billingPortal.sessions.create(portalParams);
 
     return new Response(JSON.stringify({ url: portal.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

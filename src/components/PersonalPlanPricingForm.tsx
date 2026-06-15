@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePersonalPlanPrices, Plano } from "@/hooks/usePersonalPlanPrices";
 
 const PLANOS: { plano: Plano; label: string; descricao: string }[] = [
-  { plano: "mensal", label: "Mensal", descricao: "Cobrado a cada mês" },
+  { plano: "mensal", label: "Mensal", descricao: "Cobrado a cada mes" },
   { plano: "trimestral", label: "Trimestral", descricao: "Cobrado a cada 3 meses" },
   { plano: "semestral", label: "Semestral", descricao: "Cobrado a cada 6 meses" },
   { plano: "anual", label: "Anual", descricao: "Cobrado a cada 12 meses" },
@@ -67,11 +67,11 @@ export function PersonalPlanPricingForm() {
           <div>
             <CardTitle className="flex items-center gap-2">
               <CreditCard className="h-5 w-5" />
-              Preços dos Planos
+              Precos dos Planos
             </CardTitle>
             <CardDescription>
-              Defina os valores que seus alunos pagarão pela sua mentoria.
-              Os preços são sincronizados automaticamente com o Stripe.
+              Defina os valores que seus alunos pagarao pela sua mentoria.
+              Os precos sao sincronizados com a conta Stripe conectada.
             </CardDescription>
           </div>
         </div>
@@ -83,21 +83,23 @@ export function PersonalPlanPricingForm() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {PLANOS.map(({ plano, label, descricao }) => {
                 const existing = prices?.find((p) => p.plano === plano);
                 return (
-                  <div
-                    key={plano}
-                    className="border rounded-lg p-4 space-y-3 bg-card"
-                  >
+                  <div key={plano} className="space-y-3 rounded-lg border bg-card p-4">
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="flex items-center gap-2">
                           <h4 className="font-semibold">{label}</h4>
-                          {existing?.stripe_price_id && (
+                          {existing?.stripe_price_id && existing?.stripe_account_id && (
                             <Badge variant="secondary" className="text-xs">
                               Sincronizado
+                            </Badge>
+                          )}
+                          {existing?.stripe_price_id && !existing?.stripe_account_id && (
+                            <Badge variant="outline" className="text-xs">
+                              Legado
                             </Badge>
                           )}
                         </div>
@@ -137,14 +139,14 @@ export function PersonalPlanPricingForm() {
 
             <div className="flex justify-end pt-2">
               <Button onClick={handleSave} disabled={savePrices.isPending}>
-                {savePrices.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {savePrices.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Salvar e sincronizar
               </Button>
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Ao salvar, criamos os produtos e preços na sua conta Stripe.
-              Mudar um valor desativa o preço antigo e cria um novo (assinaturas existentes seguem com o valor original).
+              Ao salvar, criamos os produtos e precos na conta Stripe conectada.
+              Mudar um valor desativa o preco antigo e cria um novo (assinaturas existentes seguem com o valor original).
             </p>
           </>
         )}

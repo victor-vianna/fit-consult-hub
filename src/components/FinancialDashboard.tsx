@@ -16,6 +16,7 @@ import {
 import { useFinancialDashboard } from "@/hooks/useFinancialDashboard";
 import { useAuth } from "@/hooks/useAuth";
 import { PersonalPlanPricingForm } from "@/components/PersonalPlanPricingForm";
+import { StripeConnectOnboardingCard } from "@/components/StripeConnectOnboardingCard";
 import { AccessByPaymentToggle } from "@/components/AccessByPaymentToggle";
 import {
   LineChart,
@@ -89,6 +90,7 @@ export function FinancialDashboard() {
         </h1>
       </div>
 
+      <StripeConnectOnboardingCard personalId={userId} />
       <PersonalPlanPricingForm />
       <AccessByPaymentToggle />
 

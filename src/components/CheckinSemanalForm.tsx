@@ -10,6 +10,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, TrendingUp, AlertCircle, Calendar } from "lucide-react";
 import { format } from "date-fns";
+import {
+  CHECKIN_AVAILABLE_AFTER_DAYS,
+  getDaysSinceAnamnese,
+} from "@/utils/anamneseDate";
 
 interface Props {
   profileId: string;
@@ -112,10 +116,10 @@ export function CheckinSemanalForm({
     try {
       const { data: anamnese, error } = await supabase
         .from("anamnese_inicial")
-        .select("created_at")
+        .select("created_at, updated_at, preenchida_em")
         .eq("profile_id", profileId)
         .eq("personal_id", personalId)
-        .single();
+        .maybeSingle();
 
       if (error || !anamnese) {
         setPodeMostrarCheckin(false);
@@ -123,13 +127,12 @@ export function CheckinSemanalForm({
         return;
       }
 
-      const dataAnamnese = new Date(anamnese.created_at);
-      const hoje = new Date();
-      const diasDesdeAnamnese = Math.floor(
-        (hoje.getTime() - dataAnamnese.getTime()) / (1000 * 60 * 60 * 24)
-      );
+      const diasDesdeAnamnese = getDaysSinceAnamnese(anamnese);
 
-      setPodeMostrarCheckin(diasDesdeAnamnese >= 7);
+      setPodeMostrarCheckin(
+        diasDesdeAnamnese !== null &&
+          diasDesdeAnamnese >= CHECKIN_AVAILABLE_AFTER_DAYS
+      );
       setVerificandoPrimeiraVez(false);
     } catch (error) {
       console.error("Erro ao verificar primeira vez:", error);
@@ -193,7 +196,7 @@ export function CheckinSemanalForm({
           duvidas: data.duvidas || "",
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao verificar check-in:", error);
     }
   };
@@ -256,11 +259,11 @@ export function CheckinSemanalForm({
       }
 
       if (onComplete) onComplete();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao salvar check-in:", error);
       toast({
         title: "Erro ao salvar check-in",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive",
       });
     } finally {

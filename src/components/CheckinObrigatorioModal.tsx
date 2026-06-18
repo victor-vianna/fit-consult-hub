@@ -11,6 +11,7 @@ import { TrendingUp, AlertCircle, Lock, Calendar } from "lucide-react";
 import { CheckinSemanalForm } from "./CheckinSemanalForm";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { getAnamneseReferenceDate } from "@/utils/anamneseDate";
 
 interface Props {
   profileId: string;
@@ -95,17 +96,16 @@ export function CheckinObrigatorioModal({
     try {
       const { data, error } = await supabase
         .from("anamnese_inicial")
-        .select("created_at")
+        .select("created_at, updated_at, preenchida_em")
         .eq("profile_id", profileId)
         .eq("personal_id", personalId)
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== "PGRST116") throw error;
 
-      if (data) {
-        setFirstAccessDate(new Date(data.created_at));
+      const anamneseDate = getAnamneseReferenceDate(data);
+      if (anamneseDate) {
+        setFirstAccessDate(anamneseDate);
       }
     } catch (error) {
       console.error("Erro ao buscar data da anamnese:", error);

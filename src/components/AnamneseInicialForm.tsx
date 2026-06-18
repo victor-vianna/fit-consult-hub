@@ -7,8 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
 import { ClipboardList, CheckCircle2, AlertCircle } from "lucide-react";
+import { getAnamneseReferenceDateValue } from "@/utils/anamneseDate";
 
 interface Props {
   profileId: string;
@@ -58,6 +60,160 @@ interface AnamneseData {
   observacoes_extras?: string;
 }
 
+type ExistingAnamneseData = AnamneseData & {
+  id?: string;
+  profile_id?: string;
+  personal_id?: string;
+  preenchida_em?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  termoAceito?: boolean;
+};
+
+type CachedAnamneseDraft = {
+  cachedAt: string;
+  sourceUpdatedAt: string | null;
+  values: AnamneseFormValues;
+};
+
+type AnamneseValue = string | number | boolean | null | undefined;
+type AnamneseFormValues = Partial<AnamneseData> &
+  Record<string, AnamneseValue> & {
+    termoAceito?: boolean;
+  };
+type AnamneseInsert =
+  Database["public"]["Tables"]["anamnese_inicial"]["Insert"];
+type AnamneseUpdate =
+  Database["public"]["Tables"]["anamnese_inicial"]["Update"];
+
+const ANAMNESE_CACHE_PREFIX = "fit-consult-hub:anamnese-draft";
+
+const ANAMNESE_FORM_FIELDS = [
+  "data_nascimento",
+  "profissao",
+  "objetivos",
+  "rotina",
+  "experiencia_online",
+  "acompanhamento_nutricional",
+  "nutri_nome",
+  "refeicoes_dia",
+  "rotina_alimentar",
+  "consumo_agua",
+  "horas_sono",
+  "qualidade_sono",
+  "suplementos",
+  "cirurgias",
+  "dores_lesoes",
+  "fuma",
+  "bebe",
+  "restricao_medica",
+  "medicamentos",
+  "alergia",
+  "problema_coracao",
+  "diabetes",
+  "problema_respiratorio",
+  "pressao_arterial",
+  "peso_atual",
+  "altura",
+  "peso_desejado",
+  "crianca_obesa",
+  "exercicio_atual",
+  "frequencia_exercicio",
+  "compromisso_treinos",
+  "tempo_disponivel",
+  "local_treino",
+  "materiais_disponiveis",
+  "preferencia_exercicio",
+  "exercicios_gosta",
+  "exercicios_odeia",
+  "observacoes_extras",
+] as const;
+
+function getAnamneseCacheKey(profileId: string, personalId: string) {
+  return `${ANAMNESE_CACHE_PREFIX}:${profileId}:${personalId}`;
+}
+
+function pickAnamneseFormValues(
+  values: Partial<AnamneseFormValues> | null | undefined
+) {
+  const picked: AnamneseFormValues = {};
+  if (!values) return picked;
+
+  ANAMNESE_FORM_FIELDS.forEach((field) => {
+    if (Object.prototype.hasOwnProperty.call(values, field)) {
+      picked[field] = values[field];
+    }
+  });
+
+  return picked;
+}
+
+function getTimestamp(value?: string | null) {
+  if (!value) return 0;
+
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function readCachedAnamnese(cacheKey: string): CachedAnamneseDraft | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const cached = window.localStorage.getItem(cacheKey);
+    if (!cached) return null;
+
+    const parsed = JSON.parse(cached) as Partial<CachedAnamneseDraft>;
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      !parsed.values ||
+      typeof parsed.values !== "object"
+    ) {
+      return null;
+    }
+
+    return {
+      cachedAt: typeof parsed.cachedAt === "string" ? parsed.cachedAt : "",
+      sourceUpdatedAt:
+        typeof parsed.sourceUpdatedAt === "string"
+          ? parsed.sourceUpdatedAt
+          : null,
+      values: parsed.values,
+    };
+  } catch (error) {
+    console.warn("Nao foi possivel ler o cache da anamnese:", error);
+    return null;
+  }
+}
+
+function writeCachedAnamnese(
+  cacheKey: string,
+  values: Partial<AnamneseFormValues>,
+  sourceUpdatedAt: string | null
+) {
+  if (typeof window === "undefined") return;
+
+  const cachedValues = pickAnamneseFormValues(values);
+  if (Object.keys(cachedValues).length === 0) return;
+
+  try {
+    window.localStorage.setItem(
+      cacheKey,
+      JSON.stringify({
+        cachedAt: new Date().toISOString(),
+        sourceUpdatedAt,
+        values: cachedValues,
+      } satisfies CachedAnamneseDraft)
+    );
+  } catch (error) {
+    console.warn("Nao foi possivel salvar o cache da anamnese:", error);
+  }
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export function AnamneseInicialForm({
   profileId,
   personalId,
@@ -66,27 +222,32 @@ export function AnamneseInicialForm({
 }: Props) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [existingAnamnese, setExistingAnamnese] = useState<AnamneseData | null>(
-    null
-  );
+  const [existingAnamnese, setExistingAnamnese] =
+    useState<ExistingAnamneseData | null>(null);
+  const [cacheHydrated, setCacheHydrated] = useState(false);
   const [step, setStep] = useState(1);
   const totalSteps = 6;
 
   // form values controlados
-  const [formValues, setFormValues] = useState<Record<string, any>>({});
+  const [formValues, setFormValues] = useState<AnamneseFormValues>({});
 
   // --- Effects (fora de qualquer função) ---
   useEffect(() => {
-    // checar existencia na montagem / quando ids mudarem
+    setCacheHydrated(false);
+    setStep(1);
     checkExistingAnamnese();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, personalId]);
 
   useEffect(() => {
-    if (existingAnamnese) {
-      setFormValues({ ...existingAnamnese });
-    }
-  }, [existingAnamnese]);
+    if (!cacheHydrated || !profileId || !personalId) return;
+
+    writeCachedAnamnese(
+      getAnamneseCacheKey(profileId, personalId),
+      formValues,
+      getAnamneseReferenceDateValue(existingAnamnese)
+    );
+  }, [cacheHydrated, existingAnamnese, formValues, profileId, personalId]);
 
   // --- Helpers / handlers ---
   const nextStep = () => {
@@ -110,6 +271,9 @@ export function AnamneseInicialForm({
 
   async function checkExistingAnamnese() {
     if (!profileId || !personalId) return;
+
+    const cacheKey = getAnamneseCacheKey(profileId, personalId);
+
     try {
       const { data, error } = await supabase
         .from("anamnese_inicial")
@@ -118,26 +282,36 @@ export function AnamneseInicialForm({
         .eq("personal_id", personalId)
         .maybeSingle();
 
-      if (error) {
-        if (error?.code === "PGRST116") {
-          // nenhum registro exato: trate como "não existe"
-          setExistingAnamnese(null);
-        } else {
-          console.error(error);
-        }
-      } else {
-        setExistingAnamnese(data);
-      }
+      if (error) throw error;
 
-      if (data) {
-        setExistingAnamnese(data);
-      }
-    } catch (error: any) {
+      const existingData = (data ?? null) as ExistingAnamneseData | null;
+      const savedValues = pickAnamneseFormValues(existingData);
+      const sourceUpdatedAt = getAnamneseReferenceDateValue(existingData);
+      const cached = readCachedAnamnese(cacheKey);
+      const shouldUseCache =
+        !!cached &&
+        (!existingData ||
+          getTimestamp(cached.cachedAt) >= getTimestamp(sourceUpdatedAt));
+
+      setExistingAnamnese(existingData);
+      setFormValues({
+        ...(shouldUseCache ? { ...savedValues, ...cached.values } : savedValues),
+        termoAceito: false,
+      });
+    } catch (error: unknown) {
       console.error("Erro ao verificar anamnese:", error);
+      const cached = readCachedAnamnese(cacheKey);
+      if (cached) {
+        setFormValues({ ...cached.values, termoAceito: false });
+      }
+    } finally {
+      setCacheHydrated(true);
     }
   }
 
-  const handleChange = (e: any) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value, type } = e.target;
     setFormValues((prev) => ({
       ...prev,
@@ -157,10 +331,12 @@ export function AnamneseInicialForm({
     }));
   };
 
-  const normalizeForSave = (obj: Record<string, any>) => {
-    const normalized: Record<string, any> = {};
+  const normalizeForSave = (obj: Partial<AnamneseFormValues>) => {
+    const normalized: Record<string, string | number | boolean | null> = {};
     Object.entries(obj).forEach(([k, v]) => {
-      normalized[k] = v === "" ? null : v;
+      if (v !== undefined) {
+        normalized[k] = v === "" ? null : v;
+      }
     });
     return normalized;
   };
@@ -226,20 +402,24 @@ export function AnamneseInicialForm({
     setLoading(true);
 
     try {
-      const anamneseData: AnamneseData & {
-        profile_id: string;
-        personal_id: string;
-      } = {
-        ...(normalizeForSave(formValues) as AnamneseData),
+      const now = new Date().toISOString();
+      const formDataForSave = normalizeForSave(
+        pickAnamneseFormValues(formValues)
+      ) as Partial<AnamneseInsert>;
+      const anamneseData: AnamneseInsert = {
+        ...formDataForSave,
         objetivos: (formValues.objetivos ?? "") as string,
         profile_id: profileId,
         personal_id: personalId,
+        preenchida_em: now,
+        updated_at: now,
+        termoAceito: formValues.termoAceito === true,
       };
 
       if (existingAnamnese) {
         const { error } = await supabase
           .from("anamnese_inicial")
-          .update(anamneseData as any)
+          .update(anamneseData as AnamneseUpdate)
           .eq("profile_id", profileId)
           .eq("personal_id", personalId);
 
@@ -248,7 +428,7 @@ export function AnamneseInicialForm({
       } else {
         const { error } = await supabase
           .from("anamnese_inicial")
-          .insert(anamneseData as any);
+          .insert(anamneseData);
 
         if (error) throw error;
         toast({
@@ -257,12 +437,18 @@ export function AnamneseInicialForm({
         });
       }
 
+      writeCachedAnamnese(
+        getAnamneseCacheKey(profileId, personalId),
+        anamneseData,
+        now
+      );
+
       if (onComplete) onComplete();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao salvar anamnese:", error);
       toast({
         title: "Erro ao salvar anamnese",
-        description: error?.message || String(error),
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     } finally {

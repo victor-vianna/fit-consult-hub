@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { AnamneseInicialForm } from "./AnamneseInicialForm";
 import { TriagemSection } from "./avaliacao/TriagemSection";
+import { getAnamneseReferenceDate } from "@/utils/anamneseDate";
 
 interface Props {
   profileId: string;
@@ -68,9 +69,9 @@ interface AnamneseData {
   exercicios_gosta?: string;
   exercicios_odeia?: string;
   observacoes_extras?: string;
-  preenchida_em: string;
-  created_at: string;
-  updated_at: string;
+  preenchida_em?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 export function AnamneseVisualizacao({
@@ -100,11 +101,11 @@ export function AnamneseVisualizacao({
 
       if (error && error.code !== "PGRST116") throw error;
       setAnamnese(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao buscar anamnese:", error);
       toast({
         title: "Erro ao carregar anamnese",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive",
       });
     } finally {
@@ -220,6 +221,17 @@ export function AnamneseVisualizacao({
     );
   }
 
+  const preenchidaEm = getAnamneseReferenceDate(anamnese);
+  const updatedAt = anamnese.updated_at ? new Date(anamnese.updated_at) : null;
+  const createdAt = anamnese.created_at ? new Date(anamnese.created_at) : null;
+  const hasUpdateDate = !!(
+    updatedAt &&
+    createdAt &&
+    !Number.isNaN(updatedAt.getTime()) &&
+    !Number.isNaN(createdAt.getTime()) &&
+    updatedAt.getTime() !== createdAt.getTime()
+  );
+
   return (
     <div className="space-y-6">
       <Card className="border-2 shadow-lg">
@@ -249,21 +261,17 @@ export function AnamneseVisualizacao({
                     <Calendar className="h-4 w-4" />
                     <span>
                       Preenchida em:{" "}
-                      {format(
-                        new Date(anamnese.preenchida_em),
-                        "dd/MM/yyyy 'às' HH:mm"
-                      )}
+                      {preenchidaEm
+                        ? format(preenchidaEm, "dd/MM/yyyy 'às' HH:mm")
+                        : "Data nao registrada"}
                     </span>
                   </div>
-                  {anamnese.updated_at !== anamnese.created_at && (
+                  {hasUpdateDate && (
                     <div className="flex items-center gap-1">
                       <CheckCircle2 className="h-4 w-4" />
                       <span>
                         Atualizada:{" "}
-                        {format(
-                          new Date(anamnese.updated_at),
-                          "dd/MM/yyyy 'às' HH:mm"
-                        )}
+                        {format(updatedAt, "dd/MM/yyyy 'às' HH:mm")}
                       </span>
                     </div>
                   )}

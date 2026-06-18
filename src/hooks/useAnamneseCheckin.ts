@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  ANAMNESE_RENEWAL_DAYS,
+  CHECKIN_AVAILABLE_AFTER_DAYS,
+  getDaysSinceAnamnese,
+} from "@/utils/anamneseDate";
 
 function getWeekNumber(date: Date): number {
   const d = new Date(
@@ -60,7 +65,7 @@ export function useAnamneseCheckin(
       // Verificar anamnese
       const { data: anamnese, error: anamneseError } = await supabase
         .from("anamnese_inicial")
-        .select("id, created_at")
+        .select("id, created_at, updated_at, preenchida_em")
         .eq("profile_id", profileId)
         .eq("personal_id", personalId)
         .maybeSingle();
@@ -73,15 +78,11 @@ export function useAnamneseCheckin(
       const anamneseExists = !!anamnese;
 
       // Verificar se anamnese expirou (mais de 180 dias / 6 meses)
-      let anamneseExpirada = false;
-      if (anamneseExists && anamnese.created_at) {
-        const dataAnamnese = new Date(anamnese.created_at);
-        const hoje = new Date();
-        const diasDesdeAnamnese = Math.floor(
-          (hoje.getTime() - dataAnamnese.getTime()) / (1000 * 60 * 60 * 24)
-        );
-        anamneseExpirada = diasDesdeAnamnese >= 180;
-      }
+      const diasDesdeAnamnese = getDaysSinceAnamnese(anamnese);
+      const anamneseExpirada =
+        anamneseExists &&
+        diasDesdeAnamnese !== null &&
+        diasDesdeAnamnese >= ANAMNESE_RENEWAL_DAYS;
 
       setIsRenovacao(anamneseExpirada);
       setAnamnesePreenchida(anamneseExists && !anamneseExpirada);
@@ -97,12 +98,9 @@ export function useAnamneseCheckin(
       }
 
       // Verificar se já passou 7 dias desde a anamnese
-      const dataAnamnese = new Date(anamnese.created_at);
-      const hoje = new Date();
-      const diasDesdeAnamnese = Math.floor(
-        (hoje.getTime() - dataAnamnese.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      const primeiraSemana = diasDesdeAnamnese < 7;
+      const primeiraSemana =
+        diasDesdeAnamnese !== null &&
+        diasDesdeAnamnese < CHECKIN_AVAILABLE_AFTER_DAYS;
 
       // Verificar check-in semanal
       const ano = new Date().getFullYear();
@@ -162,9 +160,9 @@ export function useAnamneseCheckin(
 
       setMostrarModalAnamnese(false);
       setLoading(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Erro ao verificar status:", err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : String(err));
       setLoading(false);
       setPodeAcessarTreinos(true); // Em caso de erro, não bloqueia
       setMostrarModalAnamnese(false);

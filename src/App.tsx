@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthGuard } from "./components/AuthGuard";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { InstallPWAPrompt } from "./components/InstallPWAPrompt";
@@ -20,6 +20,8 @@ import ResetPassword from "./pages/ResetPassword";
 import AlunosManager from "./pages/Alunos";
 import Chat from "./pages/Chat";
 import { PushNotificationsBootstrap } from "./components/PushNotificationsBootstrap";
+import Landing from "./pages/Landing";
+import PublicPersonal from "./pages/PublicPersonal";
 
 // Seções do painel admin (lazy)
 const DashboardOverview = lazy(() => import("./components/Admin/Sections/DashboardOverview"));
@@ -55,6 +57,8 @@ const App = () => (
           <PushNotificationsBootstrap />
           <ErrorBoundary>
             <Routes>
+              <Route path="/" element={<Landing />} />
+              <Route path="/p/:slug" element={<PublicPersonal />} />
               <Route path="/auth" element={<Auth />} />
               <Route
                 path="/admin"
@@ -77,7 +81,7 @@ const App = () => (
                 <Route path="configuracoes" element={<ConfiguracoesSection />} />
               </Route>
               <Route
-                path="/"
+                path="/personal"
                 element={
                   <AuthGuard allowedRoles={["personal"]}>
                     <Personal />

@@ -1,7 +1,8 @@
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -9,12 +10,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Settings, Upload, X, FileImage } from "lucide-react";
+import { Copy, ExternalLink, Settings, Upload, X, FileImage } from "lucide-react";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "@/hooks/use-toast";
 import { AlunoDashboardCustomizeForm } from "@/components/AlunoDashboardCustomizeForm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
   personalId: string;
@@ -41,13 +43,58 @@ export function PersonalSettingsDialog({ personalId, iconOnly = false }: Props) 
   const [themeColor, setThemeColor] = useState(
     settings?.theme_color || "#3b82f6"
   );
+  const [publicSlug, setPublicSlug] = useState("");
+  const [publicEnabled, setPublicEnabled] = useState(false);
+  const publicUrl =
+    typeof window === "undefined" || !publicSlug
+      ? ""
+      : `${window.location.origin}/p/${publicSlug}`;
+
+  useEffect(() => {
+    if (open) fetchPublicProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, personalId]);
+
+  useEffect(() => {
+    if (!settings) return;
+    setDisplayName(settings.display_name || "");
+    setThemeColor(settings.theme_color || "#3b82f6");
+  }, [settings]);
+
+  async function fetchPublicProfile() {
+    const { data } = await supabase
+      .from("profiles")
+      .select("public_slug, public_profile_enabled")
+      .eq("id", personalId)
+      .maybeSingle();
+
+    setPublicSlug((data as any)?.public_slug ?? "");
+    setPublicEnabled(!!(data as any)?.public_profile_enabled);
+  }
 
   const handleSave = async () => {
     await updateSettings({
       display_name: displayName,
       theme_color: themeColor,
     });
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        public_slug: publicSlug,
+        public_profile_enabled: publicEnabled,
+      } as any)
+      .eq("id", personalId);
+    if (error) throw error;
     setOpen(false);
+  };
+
+  const handleCopyPublicUrl = async () => {
+    if (!publicUrl) return;
+    await navigator.clipboard.writeText(publicUrl);
+    toast({
+      title: "Link copiado",
+      description: "Envie este link para alunos interessados.",
+    });
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -288,6 +335,46 @@ export function PersonalSettingsDialog({ personalId, iconOnly = false }: Props) 
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder="Ex: João Personal"
                 />
+              </div>
+
+              <div className="space-y-3 rounded-lg border p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <Label className="text-base">Pagina publica de venda</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Link para alunos conhecerem seus planos e criarem conta ja vinculada a voce.
+                    </p>
+                  </div>
+                  <Switch checked={publicEnabled} onCheckedChange={setPublicEnabled} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="public_slug">Slug publico</Label>
+                  <Input
+                    id="public_slug"
+                    value={publicSlug}
+                    onChange={(e) => setPublicSlug(e.target.value)}
+                    placeholder="seu-nome"
+                  />
+                </div>
+
+                {publicUrl && (
+                  <div className="flex flex-col gap-2 rounded-md bg-muted p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="break-all text-sm text-muted-foreground">{publicUrl}</span>
+                    <div className="flex shrink-0 gap-2">
+                      <Button type="button" size="sm" variant="outline" onClick={handleCopyPublicUrl}>
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copiar
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" asChild>
+                        <a href={publicUrl} target="_blank" rel="noreferrer">
+                          <ExternalLink className="mr-2 h-4 w-4" />
+                          Abrir
+                        </a>
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Cor do Tema */}

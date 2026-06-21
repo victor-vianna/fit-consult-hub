@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,8 +12,15 @@ import { Dumbbell } from 'lucide-react';
 
 type UserRole = 'aluno' | 'personal';
 
+type PublicPersonalContext = {
+  id: string;
+  nome: string;
+  slug: string;
+};
+
 export default function Auth() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
@@ -21,8 +28,47 @@ export default function Auth() {
   const [tipoUsuario, setTipoUsuario] = useState<UserRole>('aluno');
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [publicPersonal, setPublicPersonal] = useState<PublicPersonalContext | null>(null);
+  const publicPersonalSlug = searchParams.get('personal');
+  const selectedPlan = searchParams.get('plan');
 
   useEffect(() => {
+    let mounted = true;
+
+    async function loadPublicPersonal() {
+      if (!publicPersonalSlug) {
+        setPublicPersonal(null);
+        return;
+      }
+
+      const { data, error } = await (supabase as any).rpc(
+        'get_public_personal_sales_page',
+        { _slug: publicPersonalSlug }
+      );
+
+      if (!mounted) return;
+      if (error || !data?.personal?.id) {
+        setPublicPersonal(null);
+        toast({
+          title: 'Link do personal invalido',
+          description: 'Confira o link enviado pelo seu personal.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setPublicPersonal(data.personal as PublicPersonalContext);
+    }
+
+    loadPublicPersonal();
+    return () => {
+      mounted = false;
+    };
+  }, [publicPersonalSlug, toast]);
+
+  useEffect(() => {
+    if (publicPersonalSlug && !publicPersonal) return;
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         const { data } = await supabase
@@ -36,12 +82,66 @@ export default function Auth() {
           setCurrentUserId(session.user.id);
           // Se não é admin nem personal, redireciona
           if (data.role === 'aluno') {
-            navigate('/aluno');
+            if (publicPersonal?.id) {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('personal_id')
+                .eq('id', session.user.id)
+                .maybeSingle();
+              const currentPersonalId = (profile as any)?.personal_id as string | null | undefined;
+
+              if (currentPersonalId && currentPersonalId !== publicPersonal.id) {
+                toast({
+                  title: 'Aluno ja vinculado',
+                  description: 'Esta conta ja esta vinculada a outro personal. Entre em contato para trocar o vinculo.',
+                  variant: 'destructive',
+                });
+                return;
+              }
+
+              if (!currentPersonalId) {
+                await supabase
+                  .from('profiles')
+                  .update({ personal_id: publicPersonal.id } as any)
+                  .eq('id', session.user.id);
+              }
+            }
+            navigate(selectedPlan ? `/aluno?tab=plano&plan=${selectedPlan}` : '/aluno?tab=plano');
           }
         }
       }
     });
-  }, []);
+  }, [navigate, publicPersonal, publicPersonalSlug, selectedPlan, toast]);
+
+  const linkStudentToPublicPersonal = async (userId: string) => {
+    if (!publicPersonal?.id) return true;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('personal_id')
+      .eq('id', userId)
+      .maybeSingle();
+
+    const currentPersonalId = (profile as any)?.personal_id as string | null | undefined;
+    if (currentPersonalId && currentPersonalId !== publicPersonal.id) {
+      toast({
+        title: 'Aluno ja vinculado',
+        description: 'Esta conta ja esta vinculada a outro personal. Entre em contato para trocar o vinculo.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    if (!currentPersonalId) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ personal_id: publicPersonal.id } as any)
+        .eq('id', userId);
+      if (error) throw error;
+    }
+
+    return true;
+  };
 
   const redirectBasedOnRole = async (userId: string) => {
     const { data } = await supabase
@@ -51,8 +151,11 @@ export default function Auth() {
       .single();
 
     if (data?.role === 'admin') navigate('/admin');
-    else if (data?.role === 'personal') navigate('/');
-    else if (data?.role === 'aluno') navigate('/aluno');
+    else if (data?.role === 'personal') navigate('/personal');
+    else if (data?.role === 'aluno') {
+      const linked = await linkStudentToPublicPersonal(userId);
+      if (linked) navigate(selectedPlan ? `/aluno?tab=plano&plan=${selectedPlan}` : '/aluno?tab=plano');
+    }
   };
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -144,14 +247,32 @@ export default function Auth() {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/`,
-            data: { nome },
+            emailRedirectTo: `${window.location.origin}/aluno?tab=plano`,
+            data: {
+              nome,
+              telefone,
+              personal_id: publicPersonal?.id ?? undefined,
+            },
           },
         });
         if (error) throw error;
         if (data.user) {
-          await supabase.from('profiles').update({ telefone }).eq('id', data.user.id);
-          toast({ title: 'Cadastro realizado!', description: 'Você já pode fazer login.' });
+          await supabase
+            .from('profiles')
+            .update({
+              telefone,
+              personal_id: publicPersonal?.id ?? null,
+            } as any)
+            .eq('id', data.user.id);
+          toast({
+            title: 'Cadastro realizado!',
+            description: publicPersonal
+              ? `Conta vinculada a ${publicPersonal.nome}. Escolha seu plano para liberar o acesso.`
+              : 'Voce ja pode fazer login.',
+          });
+          if (data.session) {
+            navigate(selectedPlan ? `/aluno?tab=plano&plan=${selectedPlan}` : '/aluno?tab=plano');
+          }
         }
       }
 
@@ -180,11 +301,13 @@ export default function Auth() {
           <CardDescription>
             {isLoggedInWithRole
               ? `Logado como ${currentUserRole} — Criar novo usuário`
-              : 'Sistema de Consultoria Fitness'}
+              : publicPersonal
+                ? `Cadastro vinculado a ${publicPersonal.nome}`
+                : 'Sistema de Consultoria Fitness'}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue={isLoggedInWithRole ? 'cadastro' : 'login'} className="w-full">
+          <Tabs defaultValue={isLoggedInWithRole || publicPersonal ? 'cadastro' : 'login'} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login" disabled={isLoggedInWithRole}>Login</TabsTrigger>
               <TabsTrigger value="cadastro">Cadastro</TabsTrigger>

@@ -83,7 +83,7 @@ export const AuthGuard = ({ children, allowedRoles }: AuthGuardProps) => {
 
   if (allowedRoles && !allowedRoles.includes(role)) {
     if (role === "admin") return <Navigate to="/admin" replace />;
-    if (role === "personal") return <Navigate to="/" replace />;
+    if (role === "personal") return <Navigate to="/personal" replace />;
     if (role === "aluno") return <Navigate to="/aluno" replace />;
   }
 

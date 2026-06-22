@@ -40,7 +40,7 @@ export function BottomNavigationPersonal({
   };
 
   const primaryItems = [
-    { icon: Home, label: "Inicio", path: "/" },
+    { icon: Home, label: "Inicio", path: "/personal" },
     { icon: UserIcon, label: "Alunos", path: "/alunos" },
     { icon: MessageSquare, label: "Chat", path: "/chat" },
   ];

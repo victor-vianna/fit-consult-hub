@@ -21,7 +21,7 @@ import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { useAuth } from "@/hooks/useAuth";
 
 const menuItems = [
-  { title: "Dashboard", icon: Home, path: "/" },
+  { title: "Dashboard", icon: Home, path: "/personal" },
   { title: "Alunos", icon: UsersIcon, path: "/alunos" },
   { title: "Chat", icon: MessageSquare, path: "/chat" },
   { title: "Biblioteca", icon: Library, path: "/biblioteca" },

@@ -51,7 +51,7 @@ export function MobileMenuDrawerPersonal({
       icon: Home,
       label: "Dashboard",
       onClick: () => {
-        navigate("/");
+        navigate("/personal");
         onOpenChange(false);
       },
     },

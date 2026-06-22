@@ -1,9 +1,14 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAuth, UserRole } from "@/hooks/useAuth";
 import { Dumbbell, LogIn, UserPlus } from "lucide-react";
 
 export default function Landing() {
+  const { user, role, loading } = useAuth();
+  const accountPath = !loading && user && role ? getRolePath(role) : "/auth";
+  const isAuthenticated = Boolean(!loading && user && role);
+
   return (
     <main className="min-h-screen bg-background">
       <section className="mx-auto flex min-h-screen w-full max-w-5xl flex-col justify-center px-6 py-10">
@@ -30,7 +35,9 @@ export default function Landing() {
                 </p>
               </div>
               <Button asChild className="mt-auto w-fit">
-                <Link to="/auth">Entrar na minha conta</Link>
+                <Link to={accountPath}>
+                  {isAuthenticated ? "Ir para minha area" : "Entrar na minha conta"}
+                </Link>
               </Button>
             </CardContent>
           </Card>
@@ -45,7 +52,9 @@ export default function Landing() {
                 </p>
               </div>
               <Button asChild variant="outline" className="mt-auto w-fit">
-                <Link to="/auth">Acessar painel</Link>
+                <Link to={accountPath}>
+                  {isAuthenticated ? "Ir para meu painel" : "Acessar painel"}
+                </Link>
               </Button>
             </CardContent>
           </Card>
@@ -53,4 +62,10 @@ export default function Landing() {
       </section>
     </main>
   );
+}
+
+function getRolePath(role: UserRole) {
+  if (role === "admin") return "/admin";
+  if (role === "personal") return "/personal";
+  return "/aluno";
 }

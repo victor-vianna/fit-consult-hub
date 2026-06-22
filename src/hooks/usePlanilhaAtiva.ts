@@ -16,6 +16,10 @@ interface Planilha {
   data_prevista_fim: string;
   status: "ativa" | "encerrada" | "renovada";
   observacoes: string | null;
+  ciclo_genero?: string | null;
+  ciclo_modalidade?: string | null;
+  ciclo_nivel?: string | null;
+  ciclo_numero?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -95,11 +99,17 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
     queryFn: async () => {
       if (!profileId) return [];
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("planilhas_treino")
         .select("*")
         .eq("profile_id", profileId)
         .order("created_at", { ascending: false });
+
+      if (personalId) {
+        query = query.eq("personal_id", personalId);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error("Erro ao buscar histórico:", error);
@@ -648,53 +658,19 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
     }) => {
       if (!planilha) throw new Error("Sem planilha ativa");
 
-      // ✅ Buscar a última semana com treinos REAIS (com exercícios/blocos)
-      const { data: treinosAntigos } = await supabase
-        .from("treinos_semanais")
-        .select("semana, id")
-        .eq("profile_id", planilha.profile_id)
-        .eq("personal_id", planilha.personal_id)
-        .order("semana", { ascending: false });
-
-      let semanaOrigemTreinos = getWeekStart(parseISO(planilha.data_inicio));
-      
-      if (treinosAntigos && treinosAntigos.length > 0) {
-        const semanasUnicas = [...new Set(treinosAntigos.map(t => t.semana))];
-        
-        for (const semana of semanasUnicas) {
-          const treinoIds = treinosAntigos.filter(t => t.semana === semana).map(t => t.id);
-          
-          const { count: countEx } = await supabase
-            .from("exercicios")
-            .select("id", { count: "exact", head: true })
-            .in("treino_semanal_id", treinoIds)
-            .is("deleted_at", null);
-
-          const { count: countBl } = await supabase
-            .from("blocos_treino")
-            .select("id", { count: "exact", head: true })
-            .in("treino_semanal_id", treinoIds)
-            .is("deleted_at", null);
-
-          if ((countEx && countEx > 0) || (countBl && countBl > 0)) {
-            semanaOrigemTreinos = semana;
-            break;
-          }
-        }
-      }
-
-      console.log("[usePlanilhaAtiva] Semana origem para renovação:", semanaOrigemTreinos);
-
       // Marcar planilha atual como renovada
-      await supabase
+      const { error: updateError } = await supabase
         .from("planilhas_treino")
         .update({ status: "renovada" })
         .eq("id", planilha.id);
 
+      if (updateError) throw updateError;
+
       const dataInicio = format(new Date(), "yyyy-MM-dd");
       const duracaoSemanas = dados.duracaoSemanas || planilha.duracao_semanas;
 
-      // Criar nova planilha
+      // Criar nova vigencia preservando o ciclo. Esta acao e apenas um marcador:
+      // nao copia, apaga nem reinicia treinos/exercicios do aluno.
       const { data, error } = await supabase
         .from("planilhas_treino")
         .insert({
@@ -703,37 +679,24 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
           nome: dados.nome || planilha.nome,
           duracao_semanas: duracaoSemanas,
           data_inicio: dataInicio,
-          observacoes: dados.observacoes,
+          observacoes: dados.observacoes ?? planilha.observacoes,
+          ciclo_genero: planilha.ciclo_genero || null,
+          ciclo_modalidade: planilha.ciclo_modalidade || null,
+          ciclo_nivel: planilha.ciclo_nivel || null,
+          ciclo_numero: planilha.ciclo_numero || null,
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      // ✅ Copiar treinos da última semana da planilha antiga para a nova semana atual
-      const semanaAtual = getWeekStart(new Date());
-      await copiarTreinosDeSemana(
-        planilha.profile_id,
-        planilha.personal_id,
-        semanaOrigemTreinos,
-        semanaAtual
-      );
-
-      // Replicar para as demais semanas da nova planilha
-      await replicarTreinosParaSemanasRestantes(
-        planilha.profile_id,
-        planilha.personal_id,
-        semanaAtual,
-        duracaoSemanas
-      );
-
       return data;
+
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["planilha-ativa"] });
       queryClient.invalidateQueries({ queryKey: ["planilhas-historico"] });
-      queryClient.invalidateQueries({ queryKey: ["treinos"] });
-      toast.success("Planilha renovada e treinos copiados com sucesso!");
+      toast.success("Renovacao registrada sem alterar os treinos.");
     },
     onError: (error) => {
       console.error("Erro ao renovar planilha:", error);

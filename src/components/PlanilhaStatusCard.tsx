@@ -12,6 +12,8 @@ import {
   CheckCircle2,
   RotateCcw,
   Copy,
+  History,
+  Layers,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -54,6 +56,7 @@ export function PlanilhaStatusCard({
 }: PlanilhaStatusCardProps) {
   const {
     planilha,
+    historico,
     loading,
     diasRestantes,
     diasTotais,
@@ -73,6 +76,7 @@ export function PlanilhaStatusCard({
 
   const [showNovaDialog, setShowNovaDialog] = useState(false);
   const [showRenovarDialog, setShowRenovarDialog] = useState(false);
+  const [showHistoricoDialog, setShowHistoricoDialog] = useState(false);
   const [formData, setFormData] = useState({
     nome: "",
     duracaoSemanas: "4",
@@ -153,6 +157,21 @@ export function PlanilhaStatusCard({
 
   const config = getStatusConfig();
   const StatusIcon = config.icon;
+  const cicloAtualLabel = getCicloLabel(planilha);
+  const cicloExpirado = status === "expirada";
+  const cicloCritico = status === "critica";
+  const precisaAcao = cicloExpirado || cicloCritico;
+
+  const openRenovacaoDialog = () => {
+    if (!planilha) return;
+
+    setFormData({
+      nome: planilha.nome,
+      duracaoSemanas: planilha.duracao_semanas.toString(),
+      observacoes: planilha.observacoes || "",
+    });
+    setShowRenovarDialog(true);
+  };
 
   if (loading) {
     return (
@@ -179,6 +198,7 @@ export function PlanilhaStatusCard({
     }
 
     return (
+      <>
       <Card className="border-dashed">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
@@ -186,10 +206,22 @@ export function PlanilhaStatusCard({
               <ClipboardList className="h-5 w-5" />
               <span className="text-sm">Sem planilha ativa</span>
             </div>
-            <Button size="sm" onClick={() => setShowNovaDialog(true)}>
-              <Plus className="h-4 w-4 mr-1" />
-              Nova Planilha
-            </Button>
+            <div className="flex gap-2">
+              {historico.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowHistoricoDialog(true)}
+                >
+                  <History className="h-4 w-4 mr-1" />
+                  Historico
+                </Button>
+              )}
+              <Button size="sm" onClick={() => setShowNovaDialog(true)}>
+                <Plus className="h-4 w-4 mr-1" />
+                Nova Planilha
+              </Button>
+            </div>
           </div>
         </CardContent>
 
@@ -201,7 +233,13 @@ export function PlanilhaStatusCard({
           onConfirm={handleCriar}
           isLoading={isCriando}
         />
+        <HistoricoCiclosDialog
+          open={showHistoricoDialog}
+          onOpenChange={setShowHistoricoDialog}
+          historico={historico}
+        />
       </Card>
+      </>
     );
   }
 
@@ -229,6 +267,144 @@ export function PlanilhaStatusCard({
     );
   }
 
+  if (variant === "personal") {
+    return (
+      <>
+        <div className="space-y-4">
+          {precisaAcao && (
+            <div className="flex flex-col gap-3 rounded-lg border border-red-400/70 bg-red-950/80 p-4 text-red-50 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-200" />
+                <div>
+                  <p className="font-semibold">
+                    {cicloExpirado
+                      ? "Ciclo expirado - renovacao pendente"
+                      : "Ciclo perto do fim - prepare a renovacao"}
+                  </p>
+                  <p className="text-sm font-medium text-red-100">
+                    Progresso {percentualConcluido}% concluido, {diasRestantes} dias restantes desde{" "}
+                    {format(parseISO(planilha.data_prevista_fim), "dd/MM/yyyy", { locale: ptBR })}
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                className="bg-red-100 text-red-950 hover:bg-white"
+                onClick={openRenovacaoDialog}
+              >
+                Renovar agora
+              </Button>
+            </div>
+          )}
+
+          <Card
+            className={cn(
+              "border bg-card",
+              precisaAcao ? "border-destructive/40" : config.borderColor
+            )}
+          >
+            <CardContent className="space-y-5 p-4">
+              <CicloTreinoFields
+                planilhaId={planilha.id}
+                personalId={personalId}
+                initialValues={{
+                  ciclo_genero: (planilha as any).ciclo_genero,
+                  ciclo_modalidade: (planilha as any).ciclo_modalidade,
+                  ciclo_nivel: (planilha as any).ciclo_nivel,
+                  ciclo_numero: (planilha as any).ciclo_numero,
+                }}
+              />
+
+              <CycleProgressPanel
+                planilha={planilha}
+                percentualConcluido={percentualConcluido}
+                diasRestantes={diasRestantes}
+                status={status}
+              />
+            </CardContent>
+          </Card>
+
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-foreground/75">
+              Acoes de rotina
+            </p>
+            <div className="grid gap-3 md:grid-cols-3">
+              <ActionCard
+                icon={RotateCcw}
+                title={isSincronizando ? "Sincronizando..." : "Sincronizar treinos"}
+                description="Replica semana atual"
+                onClick={() => sincronizarTreinos()}
+                disabled={isSincronizando}
+              />
+              <ActionCard
+                icon={Copy}
+                title={isImportandoUltimaSemana ? "Importando..." : "Importar ultima semana"}
+                description="Copia treino anterior"
+                onClick={() => importarTreinosUltimaSemana()}
+                disabled={isImportandoUltimaSemana}
+              />
+              <ActionCard
+                icon={History}
+                title="Historico de ciclos"
+                description="Vigencias aplicadas"
+                onClick={() => setShowHistoricoDialog(true)}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-red-300">
+              Acoes criticas
+            </p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <ActionCard
+                icon={RefreshCw}
+                title="Marcar renovacao"
+                description="Cria nova vigencia sem alterar treinos"
+                onClick={openRenovacaoDialog}
+                tone="danger"
+              />
+              <ActionCard
+                icon={X}
+                title={isEncerrando ? "Encerrando..." : "Encerrar ciclo"}
+                description="Finaliza a planilha ativa"
+                onClick={() => encerrarPlanilha()}
+                disabled={isEncerrando}
+                tone="danger"
+              />
+            </div>
+          </div>
+        </div>
+
+        <NovaPlanilhaDialog
+          open={showRenovarDialog}
+          onOpenChange={setShowRenovarDialog}
+          formData={formData}
+          setFormData={setFormData}
+          onConfirm={handleRenovar}
+          isLoading={isRenovando}
+          isRenovacao
+        />
+
+        <NovaPlanilhaDialog
+          open={showNovaDialog}
+          onOpenChange={setShowNovaDialog}
+          formData={formData}
+          setFormData={setFormData}
+          onConfirm={handleCriar}
+          isLoading={isCriando}
+        />
+
+        <HistoricoCiclosDialog
+          open={showHistoricoDialog}
+          onOpenChange={setShowHistoricoDialog}
+          historico={historico}
+          activeId={planilha.id}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <Card className={cn("border", config.borderColor)}>
@@ -236,7 +412,12 @@ export function PlanilhaStatusCard({
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2">
               <ClipboardList className={cn("h-5 w-5", config.color)} />
-              <CardTitle className="text-base">{planilha.nome}</CardTitle>
+              <div>
+                <CardTitle className="text-base">{planilha.nome}</CardTitle>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {cicloAtualLabel}
+                </p>
+              </div>
             </div>
             <Badge variant={config.badgeVariant}>
               <StatusIcon className="h-3 w-3 mr-1" />
@@ -267,7 +448,7 @@ export function PlanilhaStatusCard({
           </div>
 
           {/* Info */}
-          <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="grid gap-3 text-sm sm:grid-cols-3">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Clock className="h-4 w-4" />
               <span>{diasRestantes} dias restantes</span>
@@ -275,6 +456,10 @@ export function PlanilhaStatusCard({
             <div className="flex items-center gap-2 text-muted-foreground">
               <Calendar className="h-4 w-4" />
               <span>{planilha.duracao_semanas} semanas</span>
+            </div>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Layers className="h-4 w-4" />
+              <span className="truncate">{cicloAtualLabel}</span>
             </div>
           </div>
 
@@ -327,7 +512,20 @@ export function PlanilhaStatusCard({
                 Copia o treino completo da semana anterior para a semana atual
               </p>
 
-              <div className="flex gap-2 pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => setShowHistoricoDialog(true)}
+              >
+                <History className="h-4 w-4 mr-1" />
+                Historico de ciclos
+              </Button>
+              <p className="text-xs text-muted-foreground text-center">
+                Veja as vigencias e ciclos ja aplicados para este aluno
+              </p>
+
+              <div className="flex flex-col gap-2 pt-1 sm:flex-row">
                 <Button
                   variant="outline"
                   size="sm"
@@ -336,13 +534,13 @@ export function PlanilhaStatusCard({
                     setFormData({
                       nome: planilha.nome,
                       duracaoSemanas: planilha.duracao_semanas.toString(),
-                      observacoes: "",
+                      observacoes: planilha.observacoes || "",
                     });
                     setShowRenovarDialog(true);
                   }}
                 >
                   <RefreshCw className="h-4 w-4 mr-1" />
-                  Renovar
+                  Marcar renovacao
                 </Button>
                 <Button
                   variant="ghost"
@@ -354,6 +552,9 @@ export function PlanilhaStatusCard({
                   Encerrar
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground text-center">
+                Marcar renovacao registra uma nova vigencia mantendo o ciclo e sem alterar treinos.
+              </p>
             </div>
           )}
         </CardContent>
@@ -379,7 +580,218 @@ export function PlanilhaStatusCard({
         onConfirm={handleCriar}
         isLoading={isCriando}
       />
+
+      <HistoricoCiclosDialog
+        open={showHistoricoDialog}
+        onOpenChange={setShowHistoricoDialog}
+        historico={historico}
+        activeId={planilha.id}
+      />
     </>
+  );
+}
+
+function getCicloLabel(planilha?: any) {
+  if (!planilha) return "Ciclo nao definido";
+
+  const label = [
+    planilha.ciclo_genero,
+    planilha.ciclo_modalidade,
+    planilha.ciclo_nivel,
+    planilha.ciclo_numero ? `Ciclo ${planilha.ciclo_numero}` : "",
+  ]
+    .filter(Boolean)
+    .join(" > ");
+
+  return label || "Ciclo nao definido";
+}
+
+function formatPlanilhaDate(value?: string | null) {
+  if (!value) return "--";
+
+  try {
+    return format(parseISO(value), "dd/MM/yyyy", { locale: ptBR });
+  } catch {
+    return "--";
+  }
+}
+
+function getHistoricoStatusLabel(status?: string) {
+  if (status === "ativa") return "Ativa";
+  if (status === "renovada") return "Renovada";
+  if (status === "encerrada") return "Encerrada";
+  return "Sem status";
+}
+
+function getHistoricoStatusVariant(status?: string) {
+  if (status === "ativa") return "secondary" as const;
+  if (status === "encerrada") return "outline" as const;
+  return "default" as const;
+}
+
+function CycleProgressPanel({
+  planilha,
+  percentualConcluido,
+  diasRestantes,
+  status,
+}: {
+  planilha: any;
+  percentualConcluido: number;
+  diasRestantes: number;
+  status: string;
+}) {
+  const expirado = status === "expirada";
+  const critico = status === "critica";
+
+  return (
+    <div className="border-t pt-4">
+      <div className="mb-2 flex items-center justify-between gap-3 text-xs font-medium text-foreground/75">
+        <span>{formatPlanilhaDate(planilha.data_inicio)}</span>
+        <span>
+          {formatPlanilhaDate(planilha.data_prevista_fim)} - {planilha.duracao_semanas} semanas
+        </span>
+      </div>
+      <Progress
+        value={percentualConcluido}
+        className={cn(
+          "h-2",
+          expirado || critico
+            ? "bg-red-950/60 [&>div]:bg-red-300"
+            : "[&>div]:bg-primary"
+        )}
+      />
+      <div className="mt-2 flex items-center justify-between gap-3 text-xs">
+        <span className="text-foreground/75">
+          Progresso {percentualConcluido}%
+        </span>
+        <span
+          className={cn(
+            "font-semibold",
+            expirado || critico ? "text-red-300" : "text-foreground/75"
+          )}
+        >
+          {diasRestantes} dias restantes
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ActionCard({
+  icon: Icon,
+  title,
+  description,
+  onClick,
+  disabled,
+  tone = "default",
+}: {
+  icon: typeof RefreshCw;
+  title: string;
+  description: string;
+  onClick: () => void;
+  disabled?: boolean;
+  tone?: "default" | "danger";
+}) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        "h-auto min-h-24 justify-start rounded-lg border-muted-foreground/35 bg-card/80 p-4 text-left hover:border-muted-foreground/60 hover:bg-muted/50",
+        tone === "danger" &&
+          "border-red-400/75 bg-red-950/45 text-red-50 hover:border-red-300 hover:bg-red-900/60 hover:text-white"
+      )}
+    >
+      <div className="flex flex-col items-start gap-2">
+        <Icon className="h-5 w-5" />
+        <div>
+          <p className="font-semibold leading-tight">{title}</p>
+          <p
+            className={cn(
+              "mt-1 text-xs font-normal",
+              tone === "danger" ? "text-red-100/90" : "text-foreground/70"
+            )}
+          >
+            {description}
+          </p>
+        </div>
+      </div>
+    </Button>
+  );
+}
+
+function HistoricoCiclosDialog({
+  open,
+  onOpenChange,
+  historico,
+  activeId,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  historico: any[];
+  activeId?: string;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Historico de ciclos</DialogTitle>
+          <DialogDescription>
+            Consulte as vigencias de treino aplicadas e o ciclo registrado em cada uma.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+          {historico.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+              Nenhum ciclo registrado para este aluno.
+            </div>
+          ) : (
+            historico.map((item) => {
+              const isActive = item.id === activeId || item.status === "ativa";
+              return (
+                <div
+                  key={item.id}
+                  className={cn(
+                    "rounded-lg border p-4",
+                    isActive && "border-primary/40 bg-primary/5"
+                  )}
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Layers className="h-4 w-4 text-muted-foreground" />
+                        <p className="font-medium">{getCicloLabel(item)}</p>
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {item.nome || "Planilha de treino"}
+                      </p>
+                    </div>
+                    <Badge variant={getHistoricoStatusVariant(item.status)}>
+                      {getHistoricoStatusLabel(item.status)}
+                    </Badge>
+                  </div>
+
+                  <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+                    <span>Inicio: {formatPlanilhaDate(item.data_inicio)}</span>
+                    <span>Fim: {formatPlanilhaDate(item.data_prevista_fim)}</span>
+                    <span>{item.duracao_semanas || 0} semanas</span>
+                  </div>
+
+                  {item.observacoes && (
+                    <p className="mt-3 rounded-md bg-muted/50 p-2 text-xs text-muted-foreground">
+                      {item.observacoes}
+                    </p>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -410,11 +822,11 @@ function NovaPlanilhaDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {isRenovacao ? "Renovar Planilha" : "Nova Planilha"}
+            {isRenovacao ? "Marcar renovacao" : "Nova Planilha"}
           </DialogTitle>
           <DialogDescription>
             {isRenovacao
-              ? "Configure a nova fase de treino do aluno"
+              ? "Registre uma nova vigencia sem alterar treinos ou apagar o ciclo atual."
               : "Crie uma nova planilha de treino para o aluno"}
           </DialogDescription>
         </DialogHeader>
@@ -472,7 +884,7 @@ function NovaPlanilhaDialog({
             Cancelar
           </Button>
           <Button onClick={onConfirm} disabled={isLoading}>
-            {isLoading ? "Salvando..." : isRenovacao ? "Renovar" : "Criar"}
+            {isLoading ? "Salvando..." : isRenovacao ? "Marcar renovacao" : "Criar"}
           </Button>
         </DialogFooter>
       </DialogContent>

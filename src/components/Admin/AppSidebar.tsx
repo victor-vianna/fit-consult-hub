@@ -9,6 +9,7 @@ import {
   TrendingUp,
   UserCog,
   Bell,
+  Activity,
   Package,
   Dumbbell,
 } from "lucide-react";
@@ -44,11 +45,12 @@ const insightsItems = [
 ];
 
 const systemItems = [
+  { title: "Monitoramento", url: "/admin/monitoramento", icon: Activity },
   { title: "Configurações", url: "/admin/configuracoes", icon: Settings },
 ];
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const { pathname } = useLocation();
 
@@ -64,7 +66,13 @@ export function AppSidebar() {
           tooltip={item.title}
           className="min-h-[44px]"
         >
-          <NavLink to={item.url} end={item.end}>
+          <NavLink
+            to={item.url}
+            end={item.end}
+            onClick={() => {
+              if (isMobile) setOpenMobile(false);
+            }}
+          >
             <item.icon className="h-5 w-5 shrink-0" />
             <span>{item.title}</span>
           </NavLink>

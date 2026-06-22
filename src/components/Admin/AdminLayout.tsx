@@ -26,17 +26,22 @@ export default function AdminLayout() {
 
   if (isMobile) {
     return (
-      <div className="min-h-screen bg-background">
-        <AdminHeader showSidebarTrigger={false} />
-        <main className="flex-1 overflow-y-auto pb-24">
-          <div className="container-mobile py-4 max-w-7xl mx-auto">
-            <Suspense fallback={<SectionFallback />}>
-              <Outlet />
-            </Suspense>
-          </div>
-        </main>
+      <SidebarProvider>
+        <div className="min-h-screen flex w-full bg-background">
+          <AppSidebar />
+          <SidebarInset>
+            <AdminHeader />
+            <main className="flex-1 overflow-y-auto pb-24">
+              <div className="container-mobile py-4 max-w-7xl mx-auto">
+                <Suspense fallback={<SectionFallback />}>
+                  <Outlet />
+                </Suspense>
+              </div>
+            </main>
+          </SidebarInset>
+        </div>
         <AdminMobileBottomNavigation />
-      </div>
+      </SidebarProvider>
     );
   }
 

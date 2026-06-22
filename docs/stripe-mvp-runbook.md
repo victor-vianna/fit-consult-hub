@@ -163,10 +163,10 @@ Para manter simples:
 2. Use `/p/:slug` como origem principal de alunos.
 3. Mantenha webhooks idempotentes.
 4. Nao edite assinatura direto no banco, exceto ajustes administrativos controlados.
-5. Quando escalar, crie uma tela admin para ver:
+5. Use `/admin/monitoramento` para acompanhar:
    - status Connect de cada personal;
    - webhooks falhos;
-   - assinaturas vencidas;
+   - assinaturas vencidas ainda marcadas como pagas;
    - alunos sem `personal_id`;
    - planos sem `stripe_price_id`.
 

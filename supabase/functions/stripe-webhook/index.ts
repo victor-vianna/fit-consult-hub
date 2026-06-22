@@ -172,19 +172,41 @@ Deno.serve(async (req) => {
     stripe_account_id: eventAccountId ?? null,
     event_type: event.type,
     livemode: !!event.livemode,
+    processing_status: "processing",
+    processing_attempts: 1,
+    last_attempt_at: new Date().toISOString(),
   });
 
   if (insertedEvent.error) {
     if (insertedEvent.error.code === "23505") {
-      return new Response(JSON.stringify({ received: true, duplicate: true }), {
+      const { data: existing } = await admin
+        .from("stripe_webhook_events")
+        .select("processing_status, processing_attempts")
+        .eq("id", event.id)
+        .maybeSingle();
+
+      if (!existing || existing.processing_status === "processed") {
+        return new Response(JSON.stringify({ received: true, duplicate: true }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      await admin
+        .from("stripe_webhook_events")
+        .update({
+          processing_status: "processing",
+          error_message: null,
+          processing_attempts: Number(existing.processing_attempts ?? 1) + 1,
+          last_attempt_at: new Date().toISOString(),
+        })
+        .eq("id", event.id);
+    } else {
+      console.error("webhook idempotency insert error:", insertedEvent.error);
+      return new Response(JSON.stringify({ error: insertedEvent.error.message }), {
+        status: 500,
         headers: { "Content-Type": "application/json" },
       });
     }
-    console.error("webhook idempotency insert error:", insertedEvent.error);
-    return new Response(JSON.stringify({ error: insertedEvent.error.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
   }
 
   try {
@@ -318,11 +340,27 @@ Deno.serve(async (req) => {
       }
     }
 
+    await admin
+      .from("stripe_webhook_events")
+      .update({
+        processing_status: "processed",
+        error_message: null,
+        processed_at: new Date().toISOString(),
+      })
+      .eq("id", event.id);
+
     return new Response(JSON.stringify({ received: true }), {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err: any) {
-    await admin.from("stripe_webhook_events").delete().eq("id", event.id);
+    await admin
+      .from("stripe_webhook_events")
+      .update({
+        processing_status: "failed",
+        error_message: err.message ?? "Erro desconhecido",
+        last_error_at: new Date().toISOString(),
+      })
+      .eq("id", event.id);
     console.error("webhook handler error:", err);
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,

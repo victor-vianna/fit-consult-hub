@@ -17,6 +17,7 @@ const TITLES: Record<string, string> = {
   "/admin/analytics": "Analytics",
   "/admin/notificacoes": "Notificações",
   "/admin/configuracoes": "Configurações",
+  "/admin/monitoramento": "Monitoramento",
 };
 
 interface AdminHeaderProps {

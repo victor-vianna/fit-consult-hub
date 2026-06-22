@@ -191,9 +191,9 @@ export default function DashboardOverview() {
             </Link>
           </Button>
           <Button asChild variant="outline" className="h-auto py-3 flex-col gap-1.5 touch-target">
-            <Link to="/admin/analytics">
+            <Link to="/admin/monitoramento">
               <Activity className="h-5 w-5" />
-              <span className="text-xs">Analytics</span>
+              <span className="text-xs">Monitoramento</span>
             </Link>
           </Button>
         </CardContent>

@@ -121,7 +121,7 @@ export function AlunoCheckoutPlanos({ personalId }: Props) {
           ))}
         </div>
         <p className="text-xs text-muted-foreground mt-4 text-center">
-          Pagamento seguro via Stripe. Cobrança recorrente automática.
+          Pagamento seguro via Stripe. Renovação automática conforme o plano escolhido.
         </p>
       </CardContent>
     </Card>

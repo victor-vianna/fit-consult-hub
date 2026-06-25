@@ -31,7 +31,7 @@ import {
 const mainItems = [
   { title: "Dashboard", url: "/admin", icon: LayoutDashboard, end: true },
   { title: "Usuários", url: "/admin/usuarios", icon: Users },
-  { title: "Personals", url: "/admin/personals", icon: UserCog },
+  { title: "Personal Trainers", url: "/admin/personals", icon: UserCog },
   { title: "Assinaturas", url: "/admin/assinaturas", icon: CreditCard },
   { title: "Pagamentos", url: "/admin/pagamentos", icon: DollarSign },
   { title: "Planos", url: "/admin/planos", icon: Package },

@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
 
     if (adminCheckError || !isAdmin) {
       return new Response(
-        JSON.stringify({ error: "Apenas admins podem criar personals" }),
+        JSON.stringify({ error: "Apenas admins podem criar personal trainers" }),
         {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -49,7 +49,7 @@ USING (
   )
 );
 
-CREATE POLICY "Personals podem ver descansos dos seus alunos"
+CREATE POLICY "Personal trainers podem ver descansos dos seus alunos"
 ON public.treino_descansos
 FOR SELECT
 USING (

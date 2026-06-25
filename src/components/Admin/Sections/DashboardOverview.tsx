@@ -86,7 +86,7 @@ export default function DashboardOverview() {
           title="Usuários"
           value={metrics.totalUsuarios}
           icon={Users}
-          hint={`${metrics.totalPersonals} personals · ${metrics.totalAlunos} alunos`}
+          hint={`${metrics.totalPersonals} personal trainers · ${metrics.totalAlunos} alunos`}
         />
         <KpiCard
           title="MRR"
@@ -156,7 +156,7 @@ export default function DashboardOverview() {
                 </p>
               </div>
               <div>
-                <p className="text-muted-foreground">Novos personals (mês)</p>
+                <p className="text-muted-foreground">Novos personal trainers (mês)</p>
                 <p className="font-semibold text-base">
                   +{metrics.novosPersonalsMes}
                 </p>

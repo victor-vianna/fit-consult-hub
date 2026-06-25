@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
       console.error("❌ Usuário não tem permissão:", user.id);
       return new Response(
         JSON.stringify({
-          error: "Apenas personals ou admins podem criar alunos",
+          error: "Apenas personal trainers ou admins podem criar alunos",
         }),
         {
           status: 403,

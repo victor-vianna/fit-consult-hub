@@ -321,7 +321,7 @@ export default function MonitoramentoSection() {
             </div>
             <p className="mt-2 text-2xl font-bold">{connectWarnings}</p>
             <p className="text-xs text-muted-foreground">
-              de {data.summary.personals} personals
+              de {data.summary.personals} personal trainers
             </p>
           </CardContent>
         </Card>
@@ -371,7 +371,7 @@ export default function MonitoramentoSection() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <LinkIcon className="h-4 w-4" />
-            Status Connect dos personals
+            Status Connect dos personal trainers
           </CardTitle>
         </CardHeader>
         <CardContent>

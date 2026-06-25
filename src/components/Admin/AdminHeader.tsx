@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 const TITLES: Record<string, string> = {
   "/admin": "Visão Geral",
   "/admin/usuarios": "Usuários",
-  "/admin/personals": "Personals",
+  "/admin/personals": "Personal Trainers",
   "/admin/assinaturas": "Assinaturas",
   "/admin/pagamentos": "Pagamentos",
   "/admin/planos": "Planos",

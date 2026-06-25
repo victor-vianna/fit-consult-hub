@@ -405,7 +405,7 @@ export default function ExerciseModal({
                   Conteudo global
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  Disponibiliza este exercicio para todos os personals com plano compativel.
+                  Disponibiliza este exercicio para todos os personal trainers com plano compativel.
                 </span>
               </span>
             </label>

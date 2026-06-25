@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 const adminItems = [
   { title: "Inicio", url: "/admin", icon: LayoutDashboard, end: true },
-  { title: "Personals", url: "/admin/personals", icon: UserCog },
+  { title: "Personal Trainers", url: "/admin/personals", icon: UserCog },
   { title: "Pagamentos", url: "/admin/pagamentos", icon: DollarSign },
   { title: "Monitor", url: "/admin/monitoramento", icon: Activity },
 ];

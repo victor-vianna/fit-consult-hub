@@ -176,9 +176,9 @@ export default function PersonalsManager() {
 
       setPersonals(personalsCompletos);
     } catch (error: any) {
-      console.error("Erro ao carregar personals:", error);
+      console.error("Erro ao carregar personal trainers:", error);
       toast({
-        title: "Erro ao carregar personals",
+        title: "Erro ao carregar personal trainers",
         description: error.message,
         variant: "destructive",
       });
@@ -441,7 +441,7 @@ export default function PersonalsManager() {
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mx-auto mb-4" />
-          <p className="text-muted-foreground">Carregando personals...</p>
+          <p className="text-muted-foreground">Carregando personal trainers...</p>
         </div>
       </div>
     );
@@ -499,7 +499,7 @@ export default function PersonalsManager() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Personals Trainers</span>
+            <span>Personal Trainers</span>
             <Badge variant="outline">{stats.semAssinatura} sem assinatura</Badge>
           </CardTitle>
         </CardHeader>

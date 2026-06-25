@@ -20,7 +20,7 @@ export default function Landing() {
             FitConsult
           </h1>
           <p className="mt-4 max-w-xl text-lg text-muted-foreground">
-            Plataforma para personals venderem planos, acompanharem alunos e liberarem acesso automaticamente apos o pagamento.
+            Plataforma para personal trainers venderem planos, acompanharem alunos e liberarem acesso automaticamente apos o pagamento.
           </p>
         </div>
 

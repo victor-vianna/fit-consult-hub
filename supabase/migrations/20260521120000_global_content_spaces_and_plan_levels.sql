@@ -174,8 +174,8 @@ BEGIN
       TO authenticated
       USING (public.is_admin(auth.uid()));
 
-    DROP POLICY IF EXISTS "Personals veem exercicios globais" ON public.exercises_library;
-    CREATE POLICY "Personals veem exercicios globais"
+    DROP POLICY IF EXISTS "Personal trainers veem exercicios globais" ON public.exercises_library;
+    CREATE POLICY "Personal trainers veem exercicios globais"
       ON public.exercises_library
       FOR SELECT
       TO authenticated
@@ -217,8 +217,8 @@ BEGIN
       TO authenticated
       USING (public.is_admin(auth.uid()));
 
-    DROP POLICY IF EXISTS "Personals veem pastas globais de modelos" ON public.modelo_pastas;
-    CREATE POLICY "Personals veem pastas globais de modelos"
+    DROP POLICY IF EXISTS "Personal trainers veem pastas globais de modelos" ON public.modelo_pastas;
+    CREATE POLICY "Personal trainers veem pastas globais de modelos"
       ON public.modelo_pastas
       FOR SELECT
       TO authenticated
@@ -260,8 +260,8 @@ BEGIN
       TO authenticated
       USING (public.is_admin(auth.uid()));
 
-    DROP POLICY IF EXISTS "Personals veem modelos globais" ON public.treino_modelos;
-    CREATE POLICY "Personals veem modelos globais"
+    DROP POLICY IF EXISTS "Personal trainers veem modelos globais" ON public.treino_modelos;
+    CREATE POLICY "Personal trainers veem modelos globais"
       ON public.treino_modelos
       FOR SELECT
       TO authenticated
@@ -304,8 +304,8 @@ BEGIN
       USING (public.is_admin(auth.uid()))
       WITH CHECK (public.is_admin(auth.uid()));
 
-    DROP POLICY IF EXISTS "Personals veem exercicios de modelos globais" ON public.treino_modelo_exercicios;
-    CREATE POLICY "Personals veem exercicios de modelos globais"
+    DROP POLICY IF EXISTS "Personal trainers veem exercicios de modelos globais" ON public.treino_modelo_exercicios;
+    CREATE POLICY "Personal trainers veem exercicios de modelos globais"
       ON public.treino_modelo_exercicios
       FOR SELECT
       TO authenticated
@@ -326,8 +326,8 @@ BEGIN
       USING (public.is_admin(auth.uid()))
       WITH CHECK (public.is_admin(auth.uid()));
 
-    DROP POLICY IF EXISTS "Personals veem blocos de modelos globais" ON public.treino_modelo_blocos;
-    CREATE POLICY "Personals veem blocos de modelos globais"
+    DROP POLICY IF EXISTS "Personal trainers veem blocos de modelos globais" ON public.treino_modelo_blocos;
+    CREATE POLICY "Personal trainers veem blocos de modelos globais"
       ON public.treino_modelo_blocos
       FOR SELECT
       TO authenticated

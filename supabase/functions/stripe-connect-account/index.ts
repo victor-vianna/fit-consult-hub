@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
       .eq("role", "personal")
       .maybeSingle();
 
-    if (!role) return json({ error: "Apenas personals podem configurar recebimentos" }, 403);
+    if (!role) return json({ error: "Apenas personal trainers podem configurar recebimentos" }, 403);
 
     const { data: profile, error: profileErr } = await admin
       .from("profiles")

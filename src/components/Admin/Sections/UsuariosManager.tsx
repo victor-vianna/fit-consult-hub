@@ -195,7 +195,7 @@ export default function UsuariosManager() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card><CardContent className="pt-6"><div className="text-2xl font-bold">{usuarios.length}</div><p className="text-xs text-muted-foreground">Total de Usuários</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-info">{usuarios.filter((u) => u.roles.includes("personal")).length}</div><p className="text-xs text-muted-foreground">Personals</p></CardContent></Card>
+        <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-info">{usuarios.filter((u) => u.roles.includes("personal")).length}</div><p className="text-xs text-muted-foreground">Personal Trainers</p></CardContent></Card>
         <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-success">{usuarios.filter((u) => u.roles.includes("aluno")).length}</div><p className="text-xs text-muted-foreground">Alunos</p></CardContent></Card>
         <Card><CardContent className="pt-6"><div className="text-2xl font-bold text-foreground">{usuarios.filter((u) => u.roles.includes("admin")).length}</div><p className="text-xs text-muted-foreground">Administradores</p></CardContent></Card>
       </div>

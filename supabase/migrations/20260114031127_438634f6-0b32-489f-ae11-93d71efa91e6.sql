@@ -106,8 +106,8 @@ CREATE TABLE IF NOT EXISTS public.produtos_personal (
 -- RLS para produtos
 ALTER TABLE public.produtos_personal ENABLE ROW LEVEL SECURITY;
 
--- Personals podem ver e gerenciar seus produtos
-CREATE POLICY "Personals podem gerenciar seus produtos"
+-- Personal trainers podem ver e gerenciar seus produtos
+CREATE POLICY "Personal trainers podem gerenciar seus produtos"
 ON public.produtos_personal
 FOR ALL
 USING (personal_id = auth.uid());

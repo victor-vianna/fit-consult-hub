@@ -53,10 +53,10 @@ export function AdminAccessByPaymentToggle() {
       return;
     }
     toast({
-      title: value ? "Bloqueio de personals ativado" : "Bloqueio desativado",
+      title: value ? "Bloqueio de personal trainers ativado" : "Bloqueio desativado",
       description: value
-        ? "Personals sem assinatura ativa serão bloqueados."
-        : "Personals podem acessar mesmo sem assinatura.",
+        ? "Personal trainers sem assinatura ativa serão bloqueados."
+        : "Personal trainers podem acessar mesmo sem assinatura.",
     });
   };
 
@@ -65,10 +65,10 @@ export function AdminAccessByPaymentToggle() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ShieldCheck className="h-5 w-5" />
-          Controle de acesso dos personals
+          Controle de acesso dos personal trainers
         </CardTitle>
         <CardDescription>
-          Quando ativo, apenas personals com assinatura ativa em "assinaturas" conseguem entrar na plataforma.
+          Quando ativo, apenas personal trainers com assinatura ativa em "assinaturas" conseguem entrar na plataforma.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -76,7 +76,7 @@ export function AdminAccessByPaymentToggle() {
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         ) : (
           <div className="flex items-center justify-between gap-4 rounded-md border p-4">
-            <Label className="text-base">Bloquear personals sem assinatura ativa</Label>
+            <Label className="text-base">Bloquear personal trainers sem assinatura ativa</Label>
             <Switch checked={enabled} onCheckedChange={handleToggle} disabled={saving} />
           </div>
         )}

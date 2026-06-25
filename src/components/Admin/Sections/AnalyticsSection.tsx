@@ -193,7 +193,7 @@ export default function AnalyticsSection() {
 
       setSegmentacao([
         {
-          tipo: "Personals",
+          tipo: "Personal Trainers",
           quantidade: personals,
           percentual: (personals / totalUsuarios) * 100,
         },

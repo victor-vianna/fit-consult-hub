@@ -60,12 +60,12 @@ $$;
 DO $$
 BEGIN
   IF to_regclass('public.exercises_library') IS NOT NULL THEN
-    DROP POLICY IF EXISTS "Personals veem exercicios globais" ON public.exercises_library;
+    DROP POLICY IF EXISTS "Personal trainers veem exercicios globais" ON public.exercises_library;
     DROP POLICY IF EXISTS "Somente admin grava exercicios globais" ON public.exercises_library;
     DROP POLICY IF EXISTS "Somente admin atualiza exercicios globais" ON public.exercises_library;
     DROP POLICY IF EXISTS "Somente admin remove exercicios globais" ON public.exercises_library;
 
-    CREATE POLICY "Personals veem exercicios globais"
+    CREATE POLICY "Personal trainers veem exercicios globais"
       ON public.exercises_library
       FOR SELECT
       TO authenticated
@@ -95,12 +95,12 @@ BEGIN
   END IF;
 
   IF to_regclass('public.treino_modelos') IS NOT NULL THEN
-    DROP POLICY IF EXISTS "Personals veem modelos globais" ON public.treino_modelos;
+    DROP POLICY IF EXISTS "Personal trainers veem modelos globais" ON public.treino_modelos;
     DROP POLICY IF EXISTS "Somente admin grava modelos globais" ON public.treino_modelos;
     DROP POLICY IF EXISTS "Somente admin atualiza modelos globais" ON public.treino_modelos;
     DROP POLICY IF EXISTS "Somente admin remove modelos globais" ON public.treino_modelos;
 
-    CREATE POLICY "Personals veem modelos globais"
+    CREATE POLICY "Personal trainers veem modelos globais"
       ON public.treino_modelos
       FOR SELECT
       TO authenticated
@@ -130,8 +130,8 @@ BEGIN
   END IF;
 
   IF to_regclass('public.treino_modelo_exercicios') IS NOT NULL THEN
-    DROP POLICY IF EXISTS "Personals veem exercicios de modelos globais" ON public.treino_modelo_exercicios;
-    CREATE POLICY "Personals veem exercicios de modelos globais"
+    DROP POLICY IF EXISTS "Personal trainers veem exercicios de modelos globais" ON public.treino_modelo_exercicios;
+    CREATE POLICY "Personal trainers veem exercicios de modelos globais"
       ON public.treino_modelo_exercicios
       FOR SELECT
       TO authenticated
@@ -142,8 +142,8 @@ BEGIN
   END IF;
 
   IF to_regclass('public.treino_modelo_blocos') IS NOT NULL THEN
-    DROP POLICY IF EXISTS "Personals veem blocos de modelos globais" ON public.treino_modelo_blocos;
-    CREATE POLICY "Personals veem blocos de modelos globais"
+    DROP POLICY IF EXISTS "Personal trainers veem blocos de modelos globais" ON public.treino_modelo_blocos;
+    CREATE POLICY "Personal trainers veem blocos de modelos globais"
       ON public.treino_modelo_blocos
       FOR SELECT
       TO authenticated

@@ -369,7 +369,7 @@ export default function PlanosManager() {
             <div>
               <p className="text-sm font-medium">Recursos do plano</p>
               <p className="text-xs text-muted-foreground">
-                Estes flags liberam funcionalidades para personals neste plano.
+                Estes flags liberam funcionalidades para personal trainers neste plano.
               </p>
             </div>
 

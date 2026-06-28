@@ -1,6 +1,14 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -16,10 +24,13 @@ import {
   Utensils,
   Dumbbell,
   BarChart3,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { format } from "date-fns";
 import { FeedbackReply } from "@/components/chat/FeedbackReply";
 import { FeedbackEvolucaoChart } from "@/components/FeedbackEvolucaoChart";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Props {
   profileId: string;
@@ -60,6 +71,7 @@ export function CheckinsDashboard({
   studentName,
 }: Props) {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [checkins, setCheckins] = useState<CheckinData[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCheckin, setSelectedCheckin] = useState<CheckinData | null>(
@@ -85,7 +97,10 @@ export function CheckinsDashboard({
       setCheckins(data || []);
 
       if (data && data.length > 0) {
-        setSelectedCheckin(data[0]);
+        setSelectedCheckin((current) => {
+          if (!current) return data[0];
+          return data.find((item) => item.id === current.id) ?? data[0];
+        });
       }
     } catch (error: any) {
       console.error("Erro ao buscar check-ins:", error);
@@ -121,6 +136,26 @@ export function CheckinsDashboard({
 
     const diferenca = atual - anterior;
     return diferenca;
+  };
+
+  const selectedIndex = selectedCheckin
+    ? checkins.findIndex((checkin) => checkin.id === selectedCheckin.id)
+    : -1;
+
+  const getWeekLabel = (checkin: CheckinData) =>
+    `Semana ${checkin.numero_semana}/${checkin.ano}`;
+
+  const getWeekRange = (checkin: CheckinData) =>
+    `${format(new Date(checkin.data_inicio), "dd/MM")} - ${format(
+      new Date(checkin.data_fim),
+      "dd/MM"
+    )}`;
+
+  const goToRelativeWeek = (direction: -1 | 1) => {
+    if (selectedIndex < 0) return;
+    const nextIndex = selectedIndex + direction;
+    if (nextIndex < 0 || nextIndex >= checkins.length) return;
+    setSelectedCheckin(checkins[nextIndex]);
   };
 
   const InfoCard = ({
@@ -287,8 +322,73 @@ export function CheckinsDashboard({
         </CardHeader>
       </Card>
 
+      {isMobile && selectedCheckin && (
+        <Card className="border-2 shadow-sm sticky top-2 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <CardContent className="p-3 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Feedback selecionado
+                </p>
+                <p className="font-semibold truncate">
+                  {getWeekLabel(selectedCheckin)}
+                </p>
+              </div>
+              <Badge variant="outline" className="shrink-0">
+                {getWeekRange(selectedCheckin)}
+              </Badge>
+            </div>
+
+            <Select
+              value={selectedCheckin.id}
+              onValueChange={(value) => {
+                const next = checkins.find((checkin) => checkin.id === value);
+                if (next) setSelectedCheckin(next);
+              }}
+            >
+              <SelectTrigger className="h-11">
+                <SelectValue placeholder="Selecionar semana" />
+              </SelectTrigger>
+              <SelectContent>
+                {checkins.map((checkin, index) => (
+                  <SelectItem key={checkin.id} value={checkin.id}>
+                    {getWeekLabel(checkin)} - {getWeekRange(checkin)}
+                    {index === 0 ? " - Mais recente" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="justify-center"
+                onClick={() => goToRelativeWeek(1)}
+                disabled={selectedIndex < 0 || selectedIndex >= checkins.length - 1}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Anterior
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="justify-center"
+                onClick={() => goToRelativeWeek(-1)}
+                disabled={selectedIndex <= 0}
+              >
+                Proxima
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1 space-y-2">
+        <div className="hidden lg:block lg:col-span-1 space-y-2">
           <h3 className="font-semibold text-lg mb-3">
             📅 Histórico de Semanas
           </h3>

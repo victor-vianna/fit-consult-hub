@@ -16,6 +16,7 @@ import {
 import { format, subWeeks, subMonths, subYears } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { TrendingUp, BarChart3, Scale } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Props {
   profileId: string;
@@ -48,12 +49,15 @@ const FEEDBACK_METRICS: {
   { key: "nivel_dificuldade", label: "Dificuldade Treino", color: "#ec4899", unit: "/10" },
 ];
 
+const SCORE_METRICS = FEEDBACK_METRICS.filter((m) => m.key !== "peso_atual");
+
 export function FeedbackEvolucaoChart({
   profileId,
   personalId,
   themeColor,
   studentName,
 }: Props) {
+  const isMobile = useIsMobile();
   const [checkins, setCheckins] = useState<any[]>([]);
   const [selectedMetrics, setSelectedMetrics] = useState<FeedbackMetric[]>([
     "nota_empenho",
@@ -107,6 +111,25 @@ export function FeedbackEvolucaoChart({
     );
   };
 
+  const selectedHasWeight = selectedMetrics.includes("peso_atual");
+
+  const weightDomain = useMemo(() => {
+    const values = chartData
+      .map((item) => Number(item.peso_atual))
+      .filter((value) => Number.isFinite(value));
+
+    if (values.length === 0) return ["auto", "auto"] as const;
+
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const padding = Math.max(1, (max - min) * 0.25);
+
+    return [
+      Math.max(0, Number((min - padding).toFixed(1))),
+      Number((max + padding).toFixed(1)),
+    ] as const;
+  }, [chartData]);
+
   // Compute comparison between last 2 items of filtered data
   const comparison = useMemo(() => {
     if (chartData.length < 2) return null;
@@ -119,6 +142,60 @@ export function FeedbackEvolucaoChart({
       return { ...m, current: curr, previous: prevVal, diff };
     }).filter((m) => m.current != null);
   }, [chartData]);
+
+  const quickRead = useMemo(() => {
+    if (chartData.length < 2) return null;
+
+    const last = chartData[chartData.length - 1];
+    const prev = chartData[chartData.length - 2];
+
+    const scoreKeys = selectedMetrics.filter((key) => key !== "peso_atual");
+    const currentScores = scoreKeys
+      .map((key) => Number(last[key]))
+      .filter((value) => Number.isFinite(value));
+    const previousScores = scoreKeys
+      .map((key) => Number(prev[key]))
+      .filter((value) => Number.isFinite(value));
+
+    const currentAverage = currentScores.length
+      ? currentScores.reduce((sum, value) => sum + value, 0) / currentScores.length
+      : null;
+    const previousAverage = previousScores.length
+      ? previousScores.reduce((sum, value) => sum + value, 0) / previousScores.length
+      : null;
+
+    const weightNow = Number(last.peso_atual);
+    const weightPrev = Number(prev.peso_atual);
+    const weightDiff =
+      Number.isFinite(weightNow) && Number.isFinite(weightPrev)
+        ? weightNow - weightPrev
+        : null;
+
+    const dificuldadeDiff =
+      Number(last.nivel_dificuldade) - Number(prev.nivel_dificuldade);
+    const saudeDiff = Number(last.saude_geral) - Number(prev.saude_geral);
+    const sonoDiff = Number(last.nota_sono) - Number(prev.nota_sono);
+
+    const attention =
+      Number.isFinite(dificuldadeDiff) && dificuldadeDiff >= 2
+        ? "Dificuldade subiu forte"
+        : Number.isFinite(saudeDiff) && saudeDiff <= -2
+        ? "Saúde geral caiu"
+        : Number.isFinite(sonoDiff) && sonoDiff <= -2
+        ? "Sono caiu"
+        : "Sem alerta crítico";
+
+    return {
+      currentAverage,
+      averageDiff:
+        currentAverage != null && previousAverage != null
+          ? currentAverage - previousAverage
+          : null,
+      weightNow: Number.isFinite(weightNow) ? weightNow : null,
+      weightDiff,
+      attention,
+    };
+  }, [chartData, selectedMetrics]);
 
   if (loading) {
     return (
@@ -197,20 +274,133 @@ export function FeedbackEvolucaoChart({
         </CardHeader>
         <CardContent>
           {chartData.length >= 2 ? (
-            <div className="h-[350px]">
+            <>
+              {quickRead && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                  <div className="rounded-lg border bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground">Média das notas selecionadas</p>
+                    <p className="text-xl font-bold">
+                      {quickRead.currentAverage != null
+                        ? quickRead.currentAverage.toFixed(1)
+                        : "--"}
+                      <span className="text-xs font-normal text-muted-foreground">/10</span>
+                    </p>
+                    {quickRead.averageDiff != null && quickRead.averageDiff !== 0 && (
+                      <p
+                        className={`text-xs font-medium ${
+                          quickRead.averageDiff > 0 ? "text-green-600" : "text-red-600"
+                        }`}
+                      >
+                        {quickRead.averageDiff > 0 ? "+" : ""}
+                        {quickRead.averageDiff.toFixed(1)} vs. semana anterior
+                      </p>
+                    )}
+                  </div>
+                  <div className="rounded-lg border bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground">Peso informado</p>
+                    <p className="text-xl font-bold">
+                      {quickRead.weightNow != null ? quickRead.weightNow.toFixed(1) : "--"}
+                      <span className="text-xs font-normal text-muted-foreground">kg</span>
+                    </p>
+                    {quickRead.weightDiff != null && quickRead.weightDiff !== 0 && (
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {quickRead.weightDiff > 0 ? "+" : ""}
+                        {quickRead.weightDiff.toFixed(1)}kg vs. semana anterior
+                      </p>
+                    )}
+                  </div>
+                  <div className="rounded-lg border bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground">Leitura rápida</p>
+                    <p
+                      className={`text-sm font-semibold ${
+                        quickRead.attention === "Sem alerta crítico"
+                          ? "text-green-600"
+                          : "text-amber-600"
+                      }`}
+                    >
+                      {quickRead.attention}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Use o gráfico para entender a tendência.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className={isMobile ? "h-[300px]" : "h-[350px]"}>
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
+                <LineChart
+                  data={chartData}
+                  margin={
+                    isMobile
+                      ? { top: 8, right: selectedHasWeight ? 12 : 4, left: -20, bottom: 6 }
+                      : { top: 8, right: selectedHasWeight ? 28 : 8, left: 0, bottom: 6 }
+                  }
+                >
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="label" className="text-xs" />
-                  <YAxis className="text-xs" />
+                  <XAxis
+                    dataKey="label"
+                    className="text-xs"
+                    tick={{ fontSize: isMobile ? 10 : 12 }}
+                    tickMargin={8}
+                  />
+                  <YAxis
+                    yAxisId="score"
+                    className="text-xs"
+                    domain={[0, 10]}
+                    width={isMobile ? 28 : 36}
+                    tick={{ fontSize: isMobile ? 10 : 12 }}
+                    tickCount={6}
+                    label={
+                      isMobile
+                        ? undefined
+                        : {
+                            value: "Notas",
+                            angle: -90,
+                            position: "insideLeft",
+                            style: { textAnchor: "middle", fill: "hsl(var(--muted-foreground))" },
+                          }
+                    }
+                  />
+                  {selectedHasWeight && (
+                    <YAxis
+                      yAxisId="weight"
+                      orientation="right"
+                      className="text-xs"
+                      domain={weightDomain as any}
+                      width={isMobile ? 34 : 48}
+                      tick={{ fontSize: isMobile ? 10 : 12 }}
+                      label={
+                        isMobile
+                          ? undefined
+                          : {
+                              value: "Peso kg",
+                              angle: 90,
+                              position: "insideRight",
+                              style: {
+                                textAnchor: "middle",
+                                fill: "hsl(var(--muted-foreground))",
+                              },
+                            }
+                      }
+                    />
+                  )}
                   <Tooltip
                     contentStyle={{
                       borderRadius: "8px",
                       border: "1px solid hsl(var(--border))",
                       backgroundColor: "hsl(var(--card))",
                     }}
+                    formatter={(value: any, name: any) => {
+                      const metric = FEEDBACK_METRICS.find((m) =>
+                        String(name).startsWith(m.label)
+                      );
+                      const numeric = Number(value);
+                      const display = Number.isFinite(numeric) ? numeric.toFixed(1) : value;
+                      return [`${display}${metric?.unit ?? ""}`, metric?.label ?? name];
+                    }}
                   />
-                  <Legend />
+                  <Legend wrapperStyle={{ fontSize: isMobile ? 11 : 12 }} />
                   {selectedMetrics.map((key) => {
                     const m = FEEDBACK_METRICS.find((x) => x.key === key)!;
                     return (
@@ -218,17 +408,29 @@ export function FeedbackEvolucaoChart({
                         key={key}
                         type="monotone"
                         dataKey={key}
+                        yAxisId={key === "peso_atual" ? "weight" : "score"}
                         name={`${m.label} (${m.unit})`}
                         stroke={m.color}
-                        strokeWidth={2}
-                        dot={{ r: 4 }}
+                        strokeWidth={isMobile ? 2.5 : 2}
+                        dot={isMobile ? false : { r: 3 }}
+                        activeDot={{ r: isMobile ? 4 : 5 }}
                         connectNulls
                       />
                     );
                   })}
                 </LineChart>
               </ResponsiveContainer>
-            </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <span className="rounded-full border px-2 py-1">Notas: eixo esquerdo 0-10</span>
+                {selectedHasWeight && (
+                  <span className="rounded-full border px-2 py-1">
+                    Peso: eixo direito em kg
+                  </span>
+                )}
+              </div>
+            </>
           ) : (
             <div className="text-center py-8">
               <TrendingUp className="h-10 w-10 text-muted-foreground mx-auto mb-2" />

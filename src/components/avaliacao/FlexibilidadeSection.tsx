@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Edit } from "lucide-react";
-import { format } from "date-fns";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 interface Props {
   profileId: string;
@@ -80,7 +80,7 @@ export function FlexibilidadeSection({ profileId, personalId, themeColor }: Prop
               <Card key={av.id} className="border">
                 <CardContent className="p-4">
                   <div className="flex justify-between mb-2">
-                    <h4 className="font-semibold">{format(new Date(av.data_avaliacao), "dd/MM/yyyy")}</h4>
+                    <h4 className="font-semibold">{formatDisplayDate(av.data_avaliacao)}</h4>
                     <Button variant="ghost" size="sm" onClick={() => { setEditing(av); setOpenDialog(true); }}><Edit className="h-4 w-4" /></Button>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">

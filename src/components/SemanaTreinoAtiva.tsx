@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { CalendarDays, Check, X } from "lucide-react";
 import { format, addWeeks, startOfWeek } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -15,6 +14,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { formatDisplayDate, formatDisplayMonthDay } from "@/utils/dateFormat";
 
 interface SemanaTreinoAtivaProps {
   profileId: string;
@@ -70,7 +70,7 @@ export function SemanaTreinoAtiva({
     onSuccess: (semana) => {
       queryClient.invalidateQueries({ queryKey: ["semana-ativa", profileId, personalId] });
       queryClient.invalidateQueries({ queryKey: ["treinos", profileId, personalId] });
-      toast.success(`Semana de ${format(new Date(semana), "dd/MM/yyyy", { locale: ptBR })} ativada`);
+      toast.success(`Semana de ${formatDisplayDate(semana)} ativada`);
       setOpen(false);
     },
     onError: (error) => {
@@ -124,7 +124,7 @@ export function SemanaTreinoAtiva({
           <CalendarDays className="h-4 w-4" />
           {semanaAtivaStr && semanaAtivaStr !== semanaAtualStr ? (
             <span className="text-xs">
-              Semana: {format(new Date(semanaAtivaStr), "dd/MM")}
+              Semana: {formatDisplayMonthDay(semanaAtivaStr)}
             </span>
           ) : (
             <span className="text-xs">Semana Atual</span>
@@ -163,7 +163,7 @@ export function SemanaTreinoAtiva({
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">
-                          Semana de {format(semana, "dd/MM/yyyy", { locale: ptBR })}
+                          Semana de {formatDisplayDate(semana)}
                         </span>
                         {isAtual && (
                           <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
@@ -177,7 +177,7 @@ export function SemanaTreinoAtiva({
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {format(semana, "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                        {formatDisplayDate(semana)}
                       </p>
                     </div>
                     {isAtiva && (

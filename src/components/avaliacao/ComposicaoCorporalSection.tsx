@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Edit, Trash2, Weight, TrendingUp, TrendingDown } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 interface Props {
   profileId: string;
@@ -107,7 +107,7 @@ export function ComposicaoCorporalSection({ profileId, personalId, themeColor, o
                   <CardContent className="p-4">
                     <div className="flex justify-between items-start mb-3">
                       <div>
-                        <h4 className="font-semibold">{format(new Date(av.data_avaliacao), "dd/MM/yyyy", { locale: ptBR })}</h4>
+                        <h4 className="font-semibold">{formatDisplayDate(av.data_avaliacao)}</h4>
                         {av.objetivo && <Badge variant="secondary" className="text-xs mt-1">{av.objetivo}</Badge>}
                       </div>
                       <div className="flex gap-1">

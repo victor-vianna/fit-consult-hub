@@ -3,10 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, Dumbbell, ArrowUp, ArrowDown, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { useWeightHistoryBatch, type WeightRecord } from "@/hooks/useWeightHistory";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatDisplayMonthDay } from "@/utils/dateFormat";
 
 interface WeightProgressionPanelProps {
   profileId: string;
@@ -103,7 +102,7 @@ function ExerciseProgressRow({ nome, records }: { nome: string; records: WeightR
             Última: <span className="font-mono font-semibold text-foreground">{ultimo.peso_executado}kg</span>
           </span>
           <span className="text-xs text-muted-foreground">
-            em {format(new Date(ultimo.data), "dd/MM", { locale: ptBR })}
+            em {formatDisplayMonthDay(ultimo.data)}
           </span>
           {records.length > 1 && (
             <span className="text-[10px] text-muted-foreground">

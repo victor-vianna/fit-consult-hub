@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Edit, X } from "lucide-react";
 import { format } from "date-fns";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 interface Props {
   profileId: string;
@@ -105,7 +106,7 @@ export function PosturalSection({ profileId, personalId, themeColor }: Props) {
               <Card key={av.id} className="border">
                 <CardContent className="p-4">
                   <div className="flex justify-between mb-2">
-                    <h4 className="font-semibold">{format(new Date(av.data_avaliacao), "dd/MM/yyyy")}</h4>
+                    <h4 className="font-semibold">{formatDisplayDate(av.data_avaliacao)}</h4>
                     <Button variant="ghost" size="sm" onClick={() => openEdit(av)}><Edit className="h-4 w-4" /></Button>
                   </div>
                   {av.postural_desvios && Array.isArray(av.postural_desvios) && (

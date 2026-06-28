@@ -82,6 +82,7 @@ import { useChatMessages } from "@/hooks/useChatMessages";
 import { WeightProgressionPanel } from "@/components/WeightProgressionPanel";
 import { MaterialFileExplorer } from "@/components/materials/MaterialFileExplorer";
 import { MobileAccountMenu } from "@/components/mobile/MobileAccountMenu";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 interface Material {
   id: string;
@@ -976,10 +977,7 @@ export default function AlunoDetalhes() {
                                       </span>
                                       <span className="flex items-center gap-1">
                                         📅{" "}
-                                        {format(
-                                          new Date(material.created_at),
-                                          "dd/MM/yyyy"
-                                        )}
+                                        {formatDisplayDate(material.created_at)}
                                       </span>
                                       <span className="flex items-center gap-1">
                                         🕐{" "}

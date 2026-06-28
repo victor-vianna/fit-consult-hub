@@ -3,8 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Eye, Trash2, Edit, ArrowLeftRight } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 interface FotoEvolucao {
   id: string;
@@ -69,7 +68,7 @@ export function FotoTimeline({ fotos, onDelete, onEditDate, onView }: Props) {
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-sm font-medium text-center mb-2">{format(new Date(compareDates[0] + "T12:00:00"), "dd/MM/yyyy")}</p>
+            <p className="text-sm font-medium text-center mb-2">{formatDisplayDate(compareDates[0])}</p>
             <div className="grid gap-2">
               {left?.photos.map((f) => (
                 <div key={f.id} className="space-y-1">
@@ -80,7 +79,7 @@ export function FotoTimeline({ fotos, onDelete, onEditDate, onView }: Props) {
             </div>
           </div>
           <div>
-            <p className="text-sm font-medium text-center mb-2">{format(new Date(compareDates[1] + "T12:00:00"), "dd/MM/yyyy")}</p>
+            <p className="text-sm font-medium text-center mb-2">{formatDisplayDate(compareDates[1])}</p>
             <div className="grid gap-2">
               {right?.photos.map((f) => (
                 <div key={f.id} className="space-y-1">
@@ -112,7 +111,7 @@ export function FotoTimeline({ fotos, onDelete, onEditDate, onView }: Props) {
           <div className="absolute left-[-5px] top-0 w-2.5 h-2.5 rounded-full bg-primary" />
           <div className="flex items-center gap-2 mb-3">
             <h4 className="font-semibold text-sm">
-              {format(new Date(date + "T12:00:00"), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+              {formatDisplayDate(date)}
             </h4>
             <Badge variant="outline" className="text-xs">{photos.length} foto{photos.length !== 1 ? "s" : ""}</Badge>
             <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => handleCompare(date)}>

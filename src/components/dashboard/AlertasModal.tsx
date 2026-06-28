@@ -12,12 +12,12 @@ import {
   ChevronRight,
   X
 } from "lucide-react";
-import { format, parseISO } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { parseISO } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { formatDisplayDate, formatDisplayMonthDay } from "@/utils/dateFormat";
 
 interface AlunoInativo {
   id: string;
@@ -175,7 +175,7 @@ export function AlertasModal({
                           <p className="font-medium text-sm">{aluno.nome}</p>
                           <p className="text-xs text-muted-foreground">
                             {aluno.ultimo_treino
-                              ? `Último treino: ${format(parseISO(aluno.ultimo_treino), "dd/MM/yyyy", { locale: ptBR })}`
+                              ? `Último treino: ${formatDisplayDate(aluno.ultimo_treino)}`
                               : "Nunca treinou"}
                           </p>
                         </div>
@@ -226,7 +226,7 @@ export function AlertasModal({
                         <div>
                           <p className="font-medium text-sm">{planilha.aluno_nome}</p>
                           <p className="text-xs text-muted-foreground">
-                            {planilha.nome_planilha} • Expira em {format(parseISO(planilha.data_fim), "dd/MM", { locale: ptBR })}
+                            {planilha.nome_planilha} • Expira em {formatDisplayMonthDay(planilha.data_fim)}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -276,7 +276,7 @@ export function AlertasModal({
                         <div>
                           <p className="font-medium text-sm">{venc.aluno_nome}</p>
                           <p className="text-xs text-muted-foreground">
-                            {venc.plano} • Vence em {format(parseISO(venc.data_expiracao), "dd/MM", { locale: ptBR })}
+                            {venc.plano} • Vence em {formatDisplayMonthDay(venc.data_expiracao)}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -331,7 +331,7 @@ export function AlertasModal({
                             </p>
                           ) : (
                             <p className="text-xs text-muted-foreground">
-                              Feedback semanal • {format(parseISO(feedback.data), "dd/MM", { locale: ptBR })}
+                              Feedback semanal • {formatDisplayMonthDay(feedback.data)}
                             </p>
                           )}
                         </div>
@@ -368,3 +368,4 @@ export function AlertasModal({
     </Dialog>
   );
 }
+

@@ -19,8 +19,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { format, differenceInDays, parseISO, startOfDay } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { differenceInDays, parseISO, startOfDay } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { TreinosHojeModal } from "./TreinosHojeModal";
@@ -35,6 +34,7 @@ import {
 } from "./DashboardCustomizeDialog";
 import { PriorityStudentsSection } from "./PriorityStudentsSection";
 import { usePriorityStudents } from "@/hooks/usePriorityStudents";
+import { formatDisplayMonthDay } from "@/utils/dateFormat";
 
 interface PersonalDashboardCardsProps {
   personalId: string;
@@ -755,7 +755,7 @@ export function PersonalDashboardCards({
                     <div>
                       <p className="font-medium text-sm">{aluno.nome}</p>
                       <p className="text-xs text-muted-foreground">
-                        {aluno.ultimo_treino ? `Último treino: ${format(parseISO(aluno.ultimo_treino), "dd/MM", { locale: ptBR })}` : "Ainda não iniciou os treinos"}
+                        {aluno.ultimo_treino ? `Último treino: ${formatDisplayMonthDay(aluno.ultimo_treino)}` : "Ainda não iniciou os treinos"}
                       </p>
                     </div>
                     <Badge variant="outline" className="text-orange-600">
@@ -807,7 +807,7 @@ export function PersonalDashboardCards({
                       )}
                     </div>
                     <Badge variant="outline" className="text-purple-600 shrink-0">
-                      {format(parseISO(feedback.data), "dd/MM", { locale: ptBR })}
+                      {formatDisplayMonthDay(feedback.data)}
                     </Badge>
                   </div>
                 ))}
@@ -907,3 +907,4 @@ export function PersonalDashboardCards({
     </div>
   );
 }
+

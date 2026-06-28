@@ -20,6 +20,7 @@ import {
   Filter,
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 interface Pagamento {
   id: string;
@@ -450,10 +451,7 @@ export default function PagamentosManager() {
                             Vencimento
                           </p>
                           <p className="font-medium">
-                            {format(
-                              new Date(pagamento.data_vencimento),
-                              "dd/MM/yyyy"
-                            )}
+                            {formatDisplayDate(pagamento.data_vencimento)}
                           </p>
                         </div>
                         {pagamento.data_pagamento && (
@@ -462,10 +460,7 @@ export default function PagamentosManager() {
                               Data Pagamento
                             </p>
                             <p className="font-medium">
-                              {format(
-                                new Date(pagamento.data_pagamento),
-                                "dd/MM/yyyy"
-                              )}
+                              {formatDisplayDate(pagamento.data_pagamento)}
                             </p>
                           </div>
                         )}
@@ -509,3 +504,4 @@ export default function PagamentosManager() {
     </div>
   );
 }
+

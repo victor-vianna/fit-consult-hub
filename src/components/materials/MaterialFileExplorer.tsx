@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { format } from "date-fns";
 import {
   ArrowLeft,
   Calendar,
@@ -22,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { formatDisplayDate } from "@/utils/dateFormat";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -438,7 +438,7 @@ function MaterialFileCard({
             <span className="truncate">{material.arquivo_nome}</span>
             <span className="flex items-center gap-1">
               <Calendar className="h-3 w-3" />
-              {format(new Date(material.created_at), "dd/MM/yyyy")}
+              {formatDisplayDate(material.created_at)}
             </span>
           </div>
         </div>

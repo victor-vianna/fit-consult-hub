@@ -34,7 +34,6 @@ import {
 import { AvaliacaoAlunoSection } from "@/components/avaliacao/AvaliacaoAlunoSection";
 import { StudentSubscriptionView } from "@/components/StudentSubscriptionView";
 import { DocumentViewer } from "@/components/DocumentViewer";
-import { format } from "date-fns";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CalendarioSemanal } from "@/components/CalendarioSemanal";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
@@ -59,6 +58,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { MaterialFileExplorer } from "@/components/materials/MaterialFileExplorer";
 import { cn } from "@/lib/utils";
+import { formatDisplayDateTime } from "@/utils/dateFormat";
 
 interface Material {
   id: string;
@@ -790,10 +790,7 @@ export default function AreaAluno() {
                             </p>
                             <p className="text-xs text-muted-foreground">
                               Enviado em:{" "}
-                              {format(
-                                new Date(material.created_at),
-                                "dd/MM/yyyy HH:mm"
-                              )}
+                              {formatDisplayDateTime(material.created_at)}
                             </p>
                           </div>
                           <div className="flex gap-2">

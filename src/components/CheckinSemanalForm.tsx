@@ -14,6 +14,7 @@ import {
   CHECKIN_AVAILABLE_AFTER_DAYS,
   getDaysSinceAnamnese,
 } from "@/utils/anamneseDate";
+import { formatDisplayDateRange } from "@/utils/dateFormat";
 
 interface Props {
   profileId: string;
@@ -353,7 +354,7 @@ export function CheckinSemanalForm({
             <p className="text-sm text-muted-foreground mt-1">
               <Calendar className="h-3 w-3 inline mr-1" />
               Semana {semanaAtual} de {anoAtual} (
-              {format(inicioSemana, "dd/MM")} - {format(fimSemana, "dd/MM")})
+              {formatDisplayDateRange(inicioSemana, fimSemana)})
             </p>
           </div>
         </div>

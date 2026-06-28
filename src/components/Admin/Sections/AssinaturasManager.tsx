@@ -19,7 +19,7 @@ import {
   Download,
   RefreshCw,
 } from "lucide-react";
-import { format } from "date-fns";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 interface Assinatura {
   id: string;
@@ -375,10 +375,7 @@ export default function AssinaturasManager() {
                             Data Início
                           </p>
                           <p className="font-medium">
-                            {format(
-                              new Date(assinatura.data_inicio),
-                              "dd/MM/yyyy"
-                            )}
+                            {formatDisplayDate(assinatura.data_inicio)}
                           </p>
                         </div>
                         {assinatura.data_fim && (
@@ -387,10 +384,7 @@ export default function AssinaturasManager() {
                               Data Fim
                             </p>
                             <p className="font-medium">
-                              {format(
-                                new Date(assinatura.data_fim),
-                                "dd/MM/yyyy"
-                              )}
+                              {formatDisplayDate(assinatura.data_fim)}
                             </p>
                           </div>
                         )}
@@ -400,10 +394,7 @@ export default function AssinaturasManager() {
                               Fim do Trial
                             </p>
                             <p className="font-medium">
-                              {format(
-                                new Date(assinatura.trial_fim),
-                                "dd/MM/yyyy"
-                              )}
+                              {formatDisplayDate(assinatura.trial_fim)}
                             </p>
                           </div>
                         )}
@@ -450,3 +441,4 @@ export default function AssinaturasManager() {
     </div>
   );
 }
+

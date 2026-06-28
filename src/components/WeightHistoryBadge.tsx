@@ -2,8 +2,6 @@
 import { useState } from "react";
 import { TrendingUp, History, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import type { WeightRecord } from "@/hooks/useWeightHistory";
+import { formatDisplayDate, formatDisplayMonthDay } from "@/utils/dateFormat";
 
 interface WeightHistoryBadgeProps {
   ultimoPeso: string | null;
@@ -36,7 +35,7 @@ export function WeightHistoryBadge({
   if (loading || !ultimoPeso) return null;
 
   const dataFormatada = ultimaData
-    ? format(new Date(ultimaData), "dd/MM", { locale: ptBR })
+    ? formatDisplayMonthDay(ultimaData)
     : null;
 
   // Calcular tendência
@@ -140,7 +139,7 @@ export function WeightHistoryBadge({
                     )}
                   </div>
                   <span className="text-xs text-muted-foreground">
-                    {format(new Date(record.data), "dd/MM/yy", { locale: ptBR })}
+                    {formatDisplayDate(record.data, { shortYear: true })}
                   </span>
                 </div>
               );

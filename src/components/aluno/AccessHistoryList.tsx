@@ -1,5 +1,3 @@
-import { format, parseISO } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { ArrowRight, Clock } from "lucide-react";
 import {
   AccessLogWithAuthor,
@@ -7,6 +5,7 @@ import {
   MOTIVO_LABELS,
 } from "@/hooks/useStudentAccess";
 import { Badge } from "@/components/ui/badge";
+import { formatDisplayDateTime } from "@/utils/dateFormat";
 
 interface Props {
   logs: AccessLogWithAuthor[];
@@ -76,9 +75,7 @@ export function AccessHistoryList({ logs, limit }: Props) {
               )}
               <p className="mt-1 text-xs text-muted-foreground">
                 {log.author_name ? `Por ${log.author_name} · ` : ""}
-                {format(parseISO(log.created_at), "dd/MM/yyyy 'às' HH:mm", {
-                  locale: ptBR,
-                })}
+                {formatDisplayDateTime(log.created_at)}
               </p>
             </div>
           </li>
@@ -87,3 +84,4 @@ export function AccessHistoryList({ logs, limit }: Props) {
     </ul>
   );
 }
+

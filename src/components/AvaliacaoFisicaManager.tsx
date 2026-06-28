@@ -47,6 +47,7 @@ import {
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { extractFotoPath, getFotosSignedMap } from "@/utils/fotosEvolucao";
+import { formatDisplayDateTime } from "@/utils/dateFormat";
 
 interface AvaliacaoFisica {
   id: string;
@@ -1190,7 +1191,7 @@ export function AvaliacaoFisicaManager({
                         </p>
                       )}
                       <p className="text-xs text-muted-foreground mt-1">
-                        {format(new Date(foto.created_at), "dd/MM/yyyy HH:mm")}
+                        {formatDisplayDateTime(foto.created_at)}
                       </p>
                     </div>
                   </div>

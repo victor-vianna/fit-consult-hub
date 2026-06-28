@@ -12,9 +12,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Eye, X, Camera, Image as ImageIcon, Calendar, Edit } from "lucide-react";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { FotoTimeline } from "./FotoTimeline";
 import { getFotosSignedMap, getFotoSignedUrl } from "@/utils/fotosEvolucao";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 interface FotoEvolucao {
   id: string;
@@ -254,7 +254,7 @@ export function FotosSection({ profileId, personalId, themeColor, refreshKey, on
                 <div className="mt-2">
                   <Badge variant="secondary" className="text-xs">{TIPOS_FOTO[foto.tipo_foto] || foto.tipo_foto}</Badge>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {format(new Date(foto.data_foto || foto.created_at), "dd/MM/yyyy")}
+                    {formatDisplayDate(foto.data_foto || foto.created_at)}
                   </p>
                 </div>
               </div>

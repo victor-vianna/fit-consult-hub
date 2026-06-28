@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Edit, ShieldCheck, CheckCircle, XCircle } from "lucide-react";
 import { format } from "date-fns";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 interface Props {
   profileId: string;
@@ -112,7 +113,7 @@ export function TriagemSection({ profileId, personalId, themeColor }: Props) {
                   <CardContent className="p-4">
                     <div className="flex justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <h4 className="font-semibold">{format(new Date(av.data_avaliacao), "dd/MM/yyyy")}</h4>
+                        <h4 className="font-semibold">{formatDisplayDate(av.data_avaliacao)}</h4>
                         {av.triagem_liberacao_medica ? (
                           <Badge className="bg-green-100 text-green-800 border-green-200"><CheckCircle className="h-3 w-3 mr-1" /> Liberado</Badge>
                         ) : (

@@ -53,6 +53,7 @@ import { SortableBlockCard } from "@/components/SortableBlockCard";
 import { WorkoutTimer } from "./WorkoutTimer";
 import { WorkoutDayView } from "./WorkoutDayView";
 import ExercisePicker from "@/components/exercises/ExercisePicker";
+import { formatDisplayDate, formatDisplayMonthDay } from "@/utils/dateFormat";
 import { WorkoutBlockDialog } from "./WorkoutBlockDialog";
 import { WorkoutBlockCard } from "./WorkoutBlockCard";
 import type { Exercise } from "@/types/exercise";
@@ -1041,7 +1042,7 @@ export function TreinosManager({
   const formatarSemana = () => {
     const inicio = parseISO(semanaSelecionada);
     const fim = addDays(inicio, 6);
-    return `${format(inicio, "dd/MM", { locale: ptBR })} - ${format(fim, "dd/MM/yyyy", { locale: ptBR })}`;
+    return `${formatDisplayMonthDay(inicio)} - ${formatDisplayDate(fim)}`;
   };
 
   return (

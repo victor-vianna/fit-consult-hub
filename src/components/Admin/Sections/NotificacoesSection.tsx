@@ -19,7 +19,7 @@ import {
   Trash2,
   Eye,
 } from "lucide-react";
-import { format } from "date-fns";
+import { formatDisplayDateTime } from "@/utils/dateFormat";
 
 interface Notificacao {
   id: string;
@@ -369,10 +369,7 @@ export default function NotificacoesSection() {
                         <div className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           <span>
-                            {format(
-                              new Date(notificacao.created_at),
-                              "dd/MM/yyyy HH:mm"
-                            )}
+                            {formatDisplayDateTime(notificacao.created_at)}
                           </span>
                         </div>
                         {notificacao.destinatario && (
@@ -467,3 +464,4 @@ export default function NotificacoesSection() {
     </div>
   );
 }
+

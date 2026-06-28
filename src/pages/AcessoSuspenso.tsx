@@ -3,11 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { Pause, ShieldAlert, LogOut, MessageCircle, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { format, parseISO } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { AccessMotivo, MOTIVO_LABELS, deriveStatus } from "@/hooks/useStudentAccess";
 import { AlunoCheckoutPlanos } from "@/components/AlunoCheckoutPlanos";
 import { useAuth } from "@/hooks/useAuth";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 interface LastLog {
   motivo: string | null;
@@ -168,7 +167,7 @@ export default function AcessoSuspenso() {
           <p className="text-sm text-foreground whitespace-pre-wrap">{mensagemPersonalizada}</p>
           {lastLog?.created_at && (
             <p className="text-xs text-muted-foreground mt-2">
-              Desde {format(parseISO(lastLog.created_at), "dd/MM/yyyy", { locale: ptBR })}
+              Desde {formatDisplayDate(lastLog.created_at)}
             </p>
           )}
         </div>

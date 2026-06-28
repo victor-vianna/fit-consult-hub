@@ -27,7 +27,7 @@ import {
   UserCog,
   XCircle,
 } from "lucide-react";
-import { format } from "date-fns";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 interface Personal {
   id: string;
@@ -567,7 +567,7 @@ export default function PersonalsManager() {
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Calendar className="h-4 w-4" />
                           <span>
-                            Cadastro {format(new Date(personal.created_at), "dd/MM/yyyy")}
+                            Cadastro {formatDisplayDate(personal.created_at)}
                           </span>
                         </div>
                       </div>

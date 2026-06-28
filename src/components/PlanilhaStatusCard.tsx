@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { format, parseISO } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import {
   ClipboardList,
   Calendar,
@@ -40,6 +38,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { usePlanilhaAtiva } from "@/hooks/usePlanilhaAtiva";
 import { CicloTreinoFields } from "@/components/CicloTreinoFields";
 import { cn } from "@/lib/utils";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 interface PlanilhaStatusCardProps {
   profileId: string;
@@ -283,7 +282,7 @@ export function PlanilhaStatusCard({
                   </p>
                   <p className="text-sm font-medium text-red-100">
                     Progresso {percentualConcluido}% concluido, {diasRestantes} dias restantes desde{" "}
-                    {format(parseISO(planilha.data_prevista_fim), "dd/MM/yyyy", { locale: ptBR })}
+                    {formatDisplayDate(planilha.data_prevista_fim)}
                   </p>
                 </div>
               </div>
@@ -435,14 +434,10 @@ export function PlanilhaStatusCard({
             <Progress value={percentualConcluido} className="h-2" />
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>
-                {format(parseISO(planilha.data_inicio), "dd/MM/yyyy", {
-                  locale: ptBR,
-                })}
+                {formatDisplayDate(planilha.data_inicio)}
               </span>
               <span>
-                {format(parseISO(planilha.data_prevista_fim), "dd/MM/yyyy", {
-                  locale: ptBR,
-                })}
+                {formatDisplayDate(planilha.data_prevista_fim)}
               </span>
             </div>
           </div>
@@ -610,7 +605,7 @@ function formatPlanilhaDate(value?: string | null) {
   if (!value) return "--";
 
   try {
-    return format(parseISO(value), "dd/MM/yyyy", { locale: ptBR });
+    return formatDisplayDate(value);
   } catch {
     return "--";
   }

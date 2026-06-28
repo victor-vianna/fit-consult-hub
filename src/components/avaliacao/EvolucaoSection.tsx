@@ -3,8 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { format, subMonths, subYears, subWeeks } from "date-fns";
+import { subMonths, subYears, subWeeks } from "date-fns";
 import { TrendingUp } from "lucide-react";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 interface Props {
   profileId: string;
@@ -55,7 +56,7 @@ export function EvolucaoSection({ profileId, personalId, themeColor }: Props) {
       : avaliacoes;
 
     return filtered.map((a) => ({
-      data: format(new Date(a.data_avaliacao), "dd/MM/yy"),
+      data: formatDisplayDate(a.data_avaliacao, { shortYear: true }),
       ...METRICS.reduce((acc, m) => {
         acc[m.key] = a[m.key] ?? null;
         return acc;

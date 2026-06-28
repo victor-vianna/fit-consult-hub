@@ -20,10 +20,9 @@ import {
   TrendingUp,
   TrendingDown,
 } from "lucide-react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { FeedbackReply } from "@/components/chat/FeedbackReply";
+import { formatDisplayDateTime } from "@/utils/dateFormat";
 
 interface FeedbackDetailModalProps {
   open: boolean;
@@ -165,7 +164,7 @@ export function FeedbackDetailModal({
                 {checkin && (
                   <p className="text-sm font-normal text-muted-foreground mt-0.5">
                     Semana {checkin.numero_semana}/{checkin.ano} •{" "}
-                    {format(new Date(checkin.preenchido_em), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                    {formatDisplayDateTime(checkin.preenchido_em)}
                   </p>
                 )}
               </div>

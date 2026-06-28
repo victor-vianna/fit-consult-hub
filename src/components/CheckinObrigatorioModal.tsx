@@ -10,8 +10,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TrendingUp, AlertCircle, Lock, Calendar } from "lucide-react";
 import { CheckinSemanalForm } from "./CheckinSemanalForm";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
 import { getAnamneseReferenceDate } from "@/utils/anamneseDate";
+import { formatDisplayDateTime } from "@/utils/dateFormat";
 
 interface Props {
   profileId: string;
@@ -84,7 +84,7 @@ export function CheckinObrigatorioModal({
 
       if (data) {
         setLastCheckinDate(
-          format(new Date(data.preenchido_em), "dd/MM/yyyy 'às' HH:mm")
+          formatDisplayDateTime(data.preenchido_em)
         );
       }
     } catch (error) {
@@ -175,7 +175,7 @@ export function CheckinObrigatorioModal({
                 {firstAccessDate && (
                   <p className="text-xs text-yellow-700 mt-2 italic">
                     📅 Sua anamnese foi preenchida em:{" "}
-                    {format(firstAccessDate, "dd/MM/yyyy HH:mm")}
+                    {formatDisplayDateTime(firstAccessDate)}
                   </p>
                 )}
               </AlertDescription>
@@ -249,3 +249,4 @@ export function CheckinObrigatorioModal({
     </Dialog>
   );
 }
+

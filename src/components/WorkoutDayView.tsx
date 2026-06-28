@@ -18,6 +18,7 @@ import { ptBR } from "date-fns/locale";
 import { useWorkoutSession } from "@/hooks/useWorkoutSession";
 import { useExerciseProgress } from "@/hooks/useExerciseProgress";
 import { usePersistedState } from "@/hooks/usePersistedState";
+import { formatDisplayMonthDay } from "@/utils/dateFormat";
 
 interface WorkoutDayViewProps {
   treinos: TreinoDia[];
@@ -812,7 +813,7 @@ export function WorkoutDayView({
           <Badge variant="outline" className="gap-1 px-2 py-0.5 text-[10px]">
             <CalendarDays className="h-3 w-3" />
             <span>
-              {format(new Date(semanaAtiva.semana_inicio), "dd/MM", { locale: ptBR })}
+              {formatDisplayMonthDay(semanaAtiva.semana_inicio)}
             </span>
           </Badge>
         )}

@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Search, UserPlus, Mail, Calendar, Shield, Ban, CheckCircle, MoreVertical,
 } from "lucide-react";
-import { format } from "date-fns";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 interface Usuario {
   id: string;
@@ -296,7 +296,7 @@ export default function UsuariosManager() {
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
                       <Calendar className="h-3 w-3" />
-                      <span>Cadastrado em {format(new Date(usuario.created_at), "dd/MM/yyyy")}</span>
+                      <span>Cadastrado em {formatDisplayDate(usuario.created_at)}</span>
                     </div>
                     <div className="flex gap-2">
                       {usuario.roles.map((role) => (

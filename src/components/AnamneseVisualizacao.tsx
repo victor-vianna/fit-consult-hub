@@ -12,7 +12,6 @@ import {
   CheckCircle2,
   ShieldCheck,
 } from "lucide-react";
-import { format } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +22,7 @@ import {
 import { AnamneseInicialForm } from "./AnamneseInicialForm";
 import { TriagemSection } from "./avaliacao/TriagemSection";
 import { getAnamneseReferenceDate } from "@/utils/anamneseDate";
+import { formatDisplayDate, formatDisplayDateTime } from "@/utils/dateFormat";
 
 interface Props {
   profileId: string;
@@ -262,7 +262,7 @@ export function AnamneseVisualizacao({
                     <span>
                       Preenchida em:{" "}
                       {preenchidaEm
-                        ? format(preenchidaEm, "dd/MM/yyyy 'às' HH:mm")
+                        ? formatDisplayDateTime(preenchidaEm)
                         : "Data nao registrada"}
                     </span>
                   </div>
@@ -271,7 +271,7 @@ export function AnamneseVisualizacao({
                       <CheckCircle2 className="h-4 w-4" />
                       <span>
                         Atualizada:{" "}
-                        {format(updatedAt, "dd/MM/yyyy 'às' HH:mm")}
+                        {formatDisplayDateTime(updatedAt)}
                       </span>
                     </div>
                   )}
@@ -323,7 +323,7 @@ export function AnamneseVisualizacao({
         {anamnese.data_nascimento && (
           <InfoItem
             label="Data de Nascimento"
-            value={format(new Date(anamnese.data_nascimento), "dd/MM/yyyy")}
+            value={formatDisplayDate(anamnese.data_nascimento)}
             icon="📅"
           />
         )}
@@ -551,3 +551,4 @@ export function AnamneseVisualizacao({
     </div>
   );
 }
+

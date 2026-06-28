@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { createNotificationId, dispatchPushNotification } from "@/utils/pushNotifications";
 import { toast } from "sonner";
 import { SESSION_STATUS, ACTIVE_SESSION_STATUSES, WORKOUT_EVENTS, dispatchWorkoutEvent } from "@/constants/workoutStatus";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 // 🔧 Key única por treino para evitar conflitos
 const getStorageKey = (treinoId: string) => `workout_timer_${treinoId}`;
@@ -837,7 +838,7 @@ export function useWorkoutTimer({
         tempoFormatado: formatTime(tempoFinal),
         horaInicio: inicioTreino ? inicioTreino.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--',
         horaFim: fimDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-        data: fimDate.toLocaleDateString('pt-BR'),
+        data: formatDisplayDate(fimDate),
         tempoDescanso: tempoDescansoCalculado,
         tempoPausas: pausasTotalSegundos,
         totalDescansos: descansosFinais?.length || 0,

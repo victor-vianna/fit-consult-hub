@@ -17,11 +17,11 @@ import {
   Bell,
   CreditCard,
 } from "lucide-react";
-import { format } from "date-fns";
 import { useAdminDashboard } from "../hooks/useAdminDashboard";
 import { KpiCard } from "../KpiCard";
 import { ChurnChart } from "../Charts/ChurnChart";
 import { RevenueChart } from "../Charts/RevenueChart";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("pt-BR", {
@@ -239,7 +239,7 @@ export default function DashboardOverview() {
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground truncate">
-                        {a.plano} · {format(new Date(a.dataInicio), "dd/MM/yyyy")}
+                        {a.plano} · {formatDisplayDate(a.dataInicio)}
                       </p>
                     </div>
                     <div className="text-right shrink-0">

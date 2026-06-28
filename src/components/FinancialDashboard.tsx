@@ -30,9 +30,8 @@ import {
   Bar,
   Legend,
 } from "recharts";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { useMemo } from "react";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -288,7 +287,7 @@ export function FinancialDashboard() {
                         {formatCurrency(p.valorParcela)}
                       </td>
                       <td className="py-3 px-2 text-center text-muted-foreground">
-                        {format(new Date(p.dataPagamento), "dd/MM/yyyy", { locale: ptBR })}
+                        {formatDisplayDate(p.dataPagamento)}
                       </td>
                       <td className="py-3 px-2 text-center capitalize">{p.metodo}</td>
                       <td className="py-3 px-2 text-center">
@@ -338,7 +337,7 @@ export function FinancialDashboard() {
                     <p className="text-sm md:text-xs text-muted-foreground truncate">{student.email}</p>
                     <p className="text-sm md:text-xs text-muted-foreground">
                       Valor: {formatCurrency(student.valor)} • Vencimento:{" "}
-                      {format(new Date(student.data_expiracao), "dd/MM/yyyy", { locale: ptBR })}
+                      {formatDisplayDate(student.data_expiracao)}
                     </p>
                   </div>
                   <Button variant="outline" size="sm" className="h-10 md:h-9 w-full sm:w-auto">

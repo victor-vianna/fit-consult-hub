@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getWeekStart } from "@/utils/weekUtils";
 import { cn } from "@/lib/utils";
+import { formatDisplayDateRange } from "@/utils/dateFormat";
 
 interface TreinoSemanal {
   id: string;
@@ -133,8 +134,7 @@ export function CalendarioSemanal({
               Frequencia de treinos
             </CardTitle>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {format(semanaAtual, "dd/MM", { locale: ptBR })} -{" "}
-              {format(addDays(semanaAtual, 6), "dd/MM", { locale: ptBR })}
+              {formatDisplayDateRange(semanaAtual, addDays(semanaAtual, 6))}
             </p>
           </div>
 

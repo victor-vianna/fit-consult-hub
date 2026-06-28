@@ -28,8 +28,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useSubscriptions, Subscription } from "@/hooks/useSubscriptions";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import {
   CreditCard,
   Plus,
@@ -51,6 +49,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 interface SubscriptionManagerProps {
   studentId: string;
@@ -291,11 +290,7 @@ export function SubscriptionManager({
             <div className="flex justify-between">
               <span className="text-muted-foreground">Expira em:</span>
               <span className="font-semibold">
-                {format(
-                  new Date(activeSubscription.data_expiracao),
-                  "dd/MM/yyyy",
-                  { locale: ptBR }
-                )}
+                {formatDisplayDate(activeSubscription.data_expiracao)}
               </span>
             </div>
           </CardContent>
@@ -544,17 +539,13 @@ export function SubscriptionManager({
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Calendar className="h-3 w-3" />
                         Pago em:{" "}
-                        {format(new Date(sub.data_pagamento), "dd/MM/yyyy", {
-                          locale: ptBR,
-                        })}
+                        {formatDisplayDate(sub.data_pagamento)}
                       </div>
                     )}
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Calendar className="h-3 w-3" />
                       Expira em:{" "}
-                      {format(new Date(sub.data_expiracao), "dd/MM/yyyy", {
-                        locale: ptBR,
-                      })}
+                      {formatDisplayDate(sub.data_expiracao)}
                     </div>
                     {sub.observacoes && (
                       <p className="text-muted-foreground italic">
@@ -685,3 +676,4 @@ export function SubscriptionManager({
     </div>
   );
 }
+

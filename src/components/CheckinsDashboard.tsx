@@ -27,10 +27,13 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { format } from "date-fns";
 import { FeedbackReply } from "@/components/chat/FeedbackReply";
 import { FeedbackEvolucaoChart } from "@/components/FeedbackEvolucaoChart";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  formatDisplayDateRange,
+  formatDisplayDateTime,
+} from "@/utils/dateFormat";
 
 interface Props {
   profileId: string;
@@ -150,10 +153,7 @@ export function CheckinsDashboard({
     `Semana ${checkin.numero_semana}/${checkin.ano}`;
 
   const getWeekRange = (checkin: CheckinData) =>
-    `${format(new Date(checkin.data_inicio), "dd/MM")} - ${format(
-      new Date(checkin.data_fim),
-      "dd/MM"
-    )}`;
+    formatDisplayDateRange(checkin.data_inicio, checkin.data_fim);
 
   const goToRelativeWeek = (direction: -1 | 1) => {
     if (selectedIndex < 0) return;
@@ -313,10 +313,7 @@ export function CheckinsDashboard({
                     <Calendar className="h-4 w-4" />
                     <span>
                       Último:{" "}
-                      {format(
-                        new Date(checkins[0].preenchido_em),
-                        "dd/MM/yyyy 'às' HH:mm"
-                      )}
+                      {formatDisplayDateTime(checkins[0].preenchido_em)}
                     </span>
                   </div>
                 </div>
@@ -419,8 +416,7 @@ export function CheckinsDashboard({
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {format(new Date(checkin.data_inicio), "dd/MM")} -{" "}
-                    {format(new Date(checkin.data_fim), "dd/MM")}
+                    {getWeekRange(checkin)}
                   </p>
                   <div className="mt-2 flex gap-2">
                     <div
@@ -490,16 +486,12 @@ export function CheckinsDashboard({
                       {selectedCheckin.ano}
                     </span>
                     <Badge variant="outline">
-                      {format(new Date(selectedCheckin.data_inicio), "dd/MM")} -{" "}
-                      {format(new Date(selectedCheckin.data_fim), "dd/MM")}
+                      {getWeekRange(selectedCheckin)}
                     </Badge>
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
                     Preenchido em{" "}
-                    {format(
-                      new Date(selectedCheckin.preenchido_em),
-                      "dd/MM/yyyy 'às' HH:mm"
-                    )}
+                    {formatDisplayDateTime(selectedCheckin.preenchido_em)}
                   </p>
                 </CardHeader>
               </Card>
@@ -752,3 +744,4 @@ export function CheckinsDashboard({
     </div>
   );
 }
+

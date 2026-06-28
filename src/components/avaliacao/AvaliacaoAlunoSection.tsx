@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Weight, TrendingUp } from "lucide-react";
-import { format } from "date-fns";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 interface Props {
   profileId: string;
@@ -98,7 +98,7 @@ export function AvaliacaoAlunoSection({ profileId, personalId, themeColor }: Pro
                   <CardContent className="p-4">
                     <div className="flex justify-between items-start mb-2">
                       <h4 className="font-semibold text-sm">
-                        {format(new Date(reg.data_avaliacao), "dd/MM/yyyy")}
+                        {formatDisplayDate(reg.data_avaliacao)}
                       </h4>
                     </div>
                     <div className="flex flex-wrap gap-4 text-sm">

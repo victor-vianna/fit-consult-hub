@@ -383,10 +383,10 @@ export function AnamneseVisualizacao({
         anamnese.diabetes ||
         anamnese.problema_respiratorio ||
         anamnese.pressao_arterial !== "Normal") && (
-        <Card className="border-2 border-red-200 bg-red-50/50">
+        <Card className="border-2 border-red-500/40 bg-red-500/10 dark:border-red-400/35 dark:bg-red-950/35">
           <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2 text-red-900">
-              <AlertCircle className="h-5 w-5 text-red-600" />
+            <CardTitle className="text-lg flex items-center gap-2 text-red-800 dark:text-red-100">
+              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-300" />
               ⚠️ Histórico de Saúde - ATENÇÃO
             </CardTitle>
           </CardHeader>

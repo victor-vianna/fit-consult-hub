@@ -115,9 +115,13 @@ export function CheckinsDashboard({
   };
 
   const getNotaColor = (nota: number) => {
-    if (nota <= 4) return "text-red-600 bg-red-50";
-    if (nota <= 7) return "text-yellow-600 bg-yellow-50";
-    return "text-green-600 bg-green-50";
+    if (nota <= 4) {
+      return "border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-200 dark:bg-red-500/15";
+    }
+    if (nota <= 7) {
+      return "border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200 dark:bg-amber-500/15";
+    }
+    return "border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200 dark:bg-emerald-500/15";
   };
 
   const getNotaEmoji = (nota: number) => {
@@ -454,7 +458,7 @@ export function CheckinsDashboard({
                       {checkin.estado_emocional && (
                         <Badge
                           variant="secondary"
-                          className="text-xs bg-yellow-100 text-yellow-800"
+                          className="text-xs border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200"
                         >
                           🧠 Emocional
                         </Badge>
@@ -462,7 +466,7 @@ export function CheckinsDashboard({
                       {checkin.nivel_dificuldade >= 8 && (
                         <Badge
                           variant="secondary"
-                          className="text-xs bg-orange-100 text-orange-800"
+                          className="text-xs border border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-200"
                         >
                           😓 Difícil
                         </Badge>
@@ -577,30 +581,30 @@ export function CheckinsDashboard({
 
               {(selectedCheckin.dores_corpo ||
                 selectedCheckin.estado_emocional) && (
-                <Card className="border-2 border-red-200 bg-red-50/50">
+                <Card className="border-2 border-red-500/40 bg-red-500/10 dark:border-red-400/35 dark:bg-red-950/35">
                   <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2 text-red-900">
-                      <AlertTriangle className="h-5 w-5 text-red-600" />
+                    <CardTitle className="text-lg flex items-center gap-2 text-red-800 dark:text-red-100">
+                      <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-300" />
                       ⚠️ Alertas Importantes
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {selectedCheckin.dores_corpo && (
                       <div>
-                        <p className="text-sm font-semibold text-red-900 mb-1">
+                        <p className="text-sm font-semibold text-red-800 dark:text-red-100 mb-1">
                           ⚠️ Dores no Corpo:
                         </p>
-                        <p className="text-sm text-red-800">
+                        <p className="text-sm text-foreground">
                           {selectedCheckin.dores_corpo}
                         </p>
                       </div>
                     )}
                     {selectedCheckin.estado_emocional && (
                       <div>
-                        <p className="text-sm font-semibold text-red-900 mb-1">
+                        <p className="text-sm font-semibold text-red-800 dark:text-red-100 mb-1">
                           🧠 Estado Emocional:
                         </p>
-                        <p className="text-sm text-red-800">
+                        <p className="text-sm text-foreground">
                           {selectedCheckin.estado_emocional}
                         </p>
                       </div>
@@ -668,18 +672,18 @@ export function CheckinsDashboard({
                     <span
                       className={`text-2xl font-bold px-3 py-1 rounded-lg ${
                         selectedCheckin.nivel_dificuldade <= 3
-                          ? "text-green-600 bg-green-50"
+                          ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200"
                           : selectedCheckin.nivel_dificuldade <= 7
-                          ? "text-yellow-600 bg-yellow-50"
-                          : "text-red-600 bg-red-50"
+                          ? "border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200"
+                          : "border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-200"
                       }`}
                     >
                       {selectedCheckin.nivel_dificuldade}/10
                     </span>
                   </div>
                   {selectedCheckin.nivel_dificuldade >= 8 && (
-                    <div className="mt-2 p-2 bg-orange-50 border-l-4 border-orange-500 rounded">
-                      <p className="text-xs text-orange-900">
+                    <div className="mt-2 rounded border border-orange-500/30 bg-orange-500/10 p-3">
+                      <p className="text-xs text-orange-800 dark:text-orange-100">
                         ⚠️ <strong>Atenção:</strong> O aluno está achando o
                         treino muito difícil. Considere ajustar a intensidade.
                       </p>
@@ -720,11 +724,11 @@ export function CheckinsDashboard({
                       </div>
                     )}
                     {selectedCheckin.duvidas && (
-                      <div className="p-3 bg-blue-50 border-l-4 border-blue-500 rounded">
-                        <p className="text-sm font-semibold text-blue-900 mb-1">
+                      <div className="rounded border border-blue-500/30 bg-blue-500/10 p-3">
+                        <p className="text-sm font-semibold text-blue-800 dark:text-blue-100 mb-1">
                           ❓ Dúvidas do Aluno:
                         </p>
-                        <p className="text-sm text-blue-800">
+                        <p className="text-sm text-foreground">
                           {selectedCheckin.duvidas}
                         </p>
                       </div>

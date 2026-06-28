@@ -61,9 +61,13 @@ interface FullCheckin {
 }
 
 const getNotaColor = (nota: number) => {
-  if (nota <= 4) return "text-red-600 bg-red-50 dark:bg-red-950/30";
-  if (nota <= 7) return "text-yellow-600 bg-yellow-50 dark:bg-yellow-950/30";
-  return "text-green-600 bg-green-50 dark:bg-green-950/30";
+  if (nota <= 4) {
+    return "border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-200 dark:bg-red-500/15";
+  }
+  if (nota <= 7) {
+    return "border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200 dark:bg-amber-500/15";
+  }
+  return "border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200 dark:bg-emerald-500/15";
 };
 
 const getNotaEmoji = (nota: number) => {
@@ -241,21 +245,21 @@ export function FeedbackDetailModal({
 
                 {/* Alertas */}
                 {(checkin.dores_corpo || checkin.estado_emocional) && (
-                  <Card className="border-destructive/30 bg-destructive/5">
+                  <Card className="border-red-500/40 bg-red-500/10 dark:border-red-400/35 dark:bg-red-950/35">
                     <CardContent className="pt-4 space-y-2">
-                      <div className="flex items-center gap-2 text-destructive font-medium text-sm">
+                      <div className="flex items-center gap-2 text-red-800 dark:text-red-100 font-medium text-sm">
                         <AlertTriangle className="h-4 w-4" />
                         Alertas Importantes
                       </div>
                       {checkin.dores_corpo && (
                         <div>
-                          <p className="text-xs font-medium text-destructive">⚠️ Dores:</p>
+                          <p className="text-xs font-medium text-red-800 dark:text-red-100">⚠️ Dores:</p>
                           <p className="text-sm">{checkin.dores_corpo}</p>
                         </div>
                       )}
                       {checkin.estado_emocional && (
                         <div>
-                          <p className="text-xs font-medium text-destructive">🧠 Estado emocional:</p>
+                          <p className="text-xs font-medium text-red-800 dark:text-red-100">🧠 Estado emocional:</p>
                           <p className="text-sm">{checkin.estado_emocional}</p>
                         </div>
                       )}

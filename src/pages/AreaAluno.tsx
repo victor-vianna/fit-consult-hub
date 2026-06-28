@@ -131,6 +131,7 @@ export default function AreaAluno() {
   const mainScrollRef = useRef<HTMLElement | null>(null);
   const scrollSaveTimerRef = useRef<number | null>(null);
   const skipNextSectionPersistRef = useRef(false);
+  const welcomeMessageRequestRef = useRef<Set<string>>(new Set());
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -316,8 +317,17 @@ export default function AreaAluno() {
 
         setPersonalProfile(personalData);
 
-        // Dispara mensagem automática de boas-vindas no chat (apenas no 1º acesso)
-        supabase.rpc("enviar_mensagem_boas_vindas_chat" as any).then(() => {});
+        const welcomeMessageKey = `${profileData.personal_id}:${user.id}`;
+        if (!welcomeMessageRequestRef.current.has(welcomeMessageKey)) {
+          welcomeMessageRequestRef.current.add(welcomeMessageKey);
+
+          void supabase.rpc("enviar_mensagem_boas_vindas_chat" as any).then(({ error }) => {
+            if (error) {
+              console.error("Erro ao enviar mensagem automatica de boas-vindas:", error);
+              welcomeMessageRequestRef.current.delete(welcomeMessageKey);
+            }
+          });
+        }
       }
 
       const { data: materiaisData } = await supabase

@@ -620,20 +620,14 @@ export default function AlunoDetalhes() {
             onValueChange={setActiveTab}
             className="space-y-6"
           >
-            <div
-              className={`${isMobile ? "overflow-x-auto scrollbar-hide" : ""}`}
-            >
+            <div className="w-full overflow-x-auto scrollbar-hide pb-1">
               <TabsList
-                className={`${
-                  isMobile
-                    ? "inline-flex w-auto min-w-full gap-2"
-                    : "grid grid-cols-9 w-full"
-                } bg-muted/50 p-1 h-auto`}
+                className="inline-flex h-auto min-w-full w-max justify-start gap-1 bg-muted/50 p-1"
               >
                 <TabsTrigger
                   value="geral"
                   className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
-                    isMobile ? "flex-shrink-0 px-6 py-3" : "py-3"
+                    isMobile ? "flex-shrink-0 px-6 py-3" : "flex-shrink-0 px-3 py-3 text-xs lg:text-sm"
                   }`}
                 >
                   <User
@@ -644,7 +638,7 @@ export default function AlunoDetalhes() {
                 <TabsTrigger
                   value="treinos"
                   className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
-                    isMobile ? "flex-shrink-0 px-6 py-3" : "py-3"
+                    isMobile ? "flex-shrink-0 px-6 py-3" : "flex-shrink-0 px-3 py-3 text-xs lg:text-sm"
                   }`}
                 >
                   <Dumbbell
@@ -655,7 +649,7 @@ export default function AlunoDetalhes() {
                 <TabsTrigger
                   value="historico"
                   className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
-                    isMobile ? "flex-shrink-0 px-6 py-3" : "py-3"
+                    isMobile ? "flex-shrink-0 px-6 py-3" : "flex-shrink-0 px-3 py-3 text-xs lg:text-sm"
                   }`}
                 >
                   <Calendar
@@ -666,7 +660,7 @@ export default function AlunoDetalhes() {
                 <TabsTrigger
                   value="materiais"
                   className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
-                    isMobile ? "flex-shrink-0 px-6 py-3" : "py-3"
+                    isMobile ? "flex-shrink-0 px-6 py-3" : "flex-shrink-0 px-3 py-3 text-xs lg:text-sm"
                   }`}
                 >
                   <FileText
@@ -677,7 +671,7 @@ export default function AlunoDetalhes() {
                 <TabsTrigger
                   value="avaliacao"
                   className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
-                    isMobile ? "flex-shrink-0 px-6 py-3" : "py-3"
+                    isMobile ? "flex-shrink-0 px-6 py-3" : "flex-shrink-0 px-3 py-3 text-xs lg:text-sm"
                   }`}
                 >
                   <Activity
@@ -688,7 +682,7 @@ export default function AlunoDetalhes() {
                 <TabsTrigger
                   value="anamnese"
                   className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
-                    isMobile ? "flex-shrink-0 px-6 py-3" : "py-3"
+                    isMobile ? "flex-shrink-0 px-6 py-3" : "flex-shrink-0 px-3 py-3 text-xs lg:text-sm"
                   }`}
                 >
                   <ClipboardList
@@ -699,7 +693,7 @@ export default function AlunoDetalhes() {
                 <TabsTrigger
                   value="checkins"
                   className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
-                    isMobile ? "flex-shrink-0 px-6 py-3" : "py-3"
+                    isMobile ? "flex-shrink-0 px-6 py-3" : "flex-shrink-0 px-3 py-3 text-xs lg:text-sm"
                   }`}
                 >
                   <ClipboardCheck
@@ -710,7 +704,7 @@ export default function AlunoDetalhes() {
                 <TabsTrigger
                   value="chat"
                   className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
-                    isMobile ? "flex-shrink-0 px-6 py-3" : "py-3"
+                    isMobile ? "flex-shrink-0 px-6 py-3" : "flex-shrink-0 px-3 py-3 text-xs lg:text-sm"
                   } relative`}
                 >
                   <MessageSquare
@@ -726,7 +720,7 @@ export default function AlunoDetalhes() {
                 <TabsTrigger
                   value="financeiro"
                   className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
-                    isMobile ? "flex-shrink-0 px-6 py-3" : "py-3"
+                    isMobile ? "flex-shrink-0 px-6 py-3" : "flex-shrink-0 px-3 py-3 text-xs lg:text-sm"
                   }`}
                 >
                   <CreditCard

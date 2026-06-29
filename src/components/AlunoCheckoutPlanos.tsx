@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { CreditCard, Info, Loader2, Repeat, ShieldCheck, Sparkles } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +24,13 @@ const ECONOMIA: Record<string, string | null> = {
   trimestral: "3 meses",
   semestral: "6 meses",
   anual: "Melhor valor",
+};
+
+const RECORRENCIA: Record<string, string> = {
+  mensal: "Renova todo mes",
+  trimestral: "Renova a cada 3 meses",
+  semestral: "Renova a cada 6 meses",
+  anual: "Renova uma vez por ano",
 };
 
 export function AlunoCheckoutPlanos({ personalId }: Props) {
@@ -54,7 +62,7 @@ export function AlunoCheckoutPlanos({ personalId }: Props) {
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       const url = (data as any)?.url;
-      if (!url) throw new Error("URL de checkout não recebida");
+      if (!url) throw new Error("URL de checkout nao recebida");
       window.location.href = url;
     } catch (err: any) {
       console.error(err);
@@ -89,7 +97,21 @@ export function AlunoCheckoutPlanos({ personalId }: Props) {
           Escolha seu plano
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        <Alert className="border-primary/30 bg-primary/5">
+          <Info className="h-4 w-4" />
+          <AlertTitle>Antes de assinar</AlertTitle>
+          <AlertDescription className="space-y-2 text-sm">
+            <p>
+              Os planos abaixo funcionam como uma assinatura com renovacao automatica.
+              A cobranca se repete conforme o periodo escolhido ate que a assinatura seja cancelada.
+            </p>
+            <p>
+              Se voce cancelar, o acesso continua ate o fim do periodo ja pago e depois a renovacao e encerrada.
+            </p>
+          </AlertDescription>
+        </Alert>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {prices.map((p: any) => (
             <div
@@ -101,6 +123,10 @@ export function AlunoCheckoutPlanos({ personalId }: Props) {
                   <h4 className="font-semibold">{LABELS[p.plano] ?? p.plano}</h4>
                   <p className="text-2xl font-bold mt-1">
                     R$ {Number(p.valor).toFixed(2)}
+                  </p>
+                  <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Repeat className="h-3.5 w-3.5" />
+                    {RECORRENCIA[p.plano] ?? "Renovacao automatica"}
                   </p>
                 </div>
                 {ECONOMIA[p.plano] && (
@@ -115,14 +141,22 @@ export function AlunoCheckoutPlanos({ personalId }: Props) {
                 {loadingPlano === p.plano && (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 )}
-                Assinar
+                Assinar com renovacao automatica
               </Button>
             </div>
           ))}
         </div>
-        <p className="text-xs text-muted-foreground mt-4 text-center">
-          Pagamento seguro via Stripe. Renovação automática conforme o plano escolhido.
-        </p>
+
+        <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+          <div className="flex items-start gap-2 rounded-md border bg-muted/20 p-3">
+            <ShieldCheck className="mt-0.5 h-4 w-4 text-green-600" />
+            <span>Pagamento seguro via Stripe. Seus dados de cartao sao processados pela Stripe.</span>
+          </div>
+          <div className="flex items-start gap-2 rounded-md border bg-muted/20 p-3">
+            <CreditCard className="mt-0.5 h-4 w-4 text-primary" />
+            <span>Em caso de troca ou bloqueio de cartao, atualize o pagamento para manter o acesso ativo.</span>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

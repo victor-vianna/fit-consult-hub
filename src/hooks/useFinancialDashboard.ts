@@ -83,14 +83,10 @@ export function useFinancialDashboard(personalId: string) {
         .eq("personal_id", personalId);
       if (subsError) throw subsError;
 
-      const twentyFiveMonthsAgo = new Date();
-      twentyFiveMonthsAgo.setMonth(twentyFiveMonthsAgo.getMonth() - 25);
-
       const { data: payments, error: paymentsError } = await supabase
         .from("payment_history")
         .select("*")
-        .eq("personal_id", personalId)
-        .gte("data_pagamento", twentyFiveMonthsAgo.toISOString());
+        .eq("personal_id", personalId);
       if (paymentsError) throw paymentsError;
 
       const studentIds = subscriptions?.map((s) => s.student_id) || [];
@@ -213,8 +209,7 @@ export function useFinancialDashboard(personalId: string) {
 
       // Detalhes de pagamentos com info de parcelas
       const recentPayments = payments
-        ?.sort((a, b) => new Date(b.data_pagamento).getTime() - new Date(a.data_pagamento).getTime())
-        .slice(0, 50) || [];
+        ?.sort((a, b) => new Date(b.data_pagamento).getTime() - new Date(a.data_pagamento).getTime()) || [];
 
       const paymentDetailsMapped: PaymentDetail[] = recentPayments.map((p) => {
         const sub = subscriptions?.find((s) => s.id === p.subscription_id);

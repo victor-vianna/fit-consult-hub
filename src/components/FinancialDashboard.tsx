@@ -1,9 +1,17 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   TrendingUp,
-  TrendingDown,
   DollarSign,
   AlertTriangle,
   Users,
@@ -12,6 +20,8 @@ import {
   ArrowDownRight,
   BarChart3,
   Receipt,
+  Search,
+  FilterX,
 } from "lucide-react";
 import { useFinancialDashboard } from "@/hooks/useFinancialDashboard";
 import { useAuth } from "@/hooks/useAuth";
@@ -29,11 +39,37 @@ import {
   Bar,
   Legend,
 } from "recharts";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { formatDisplayDate } from "@/utils/dateFormat";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+
+const DEFAULT_PAYMENT_FILTERS = {
+  search: "",
+  status: "all",
+  plan: "all",
+  method: "all",
+  period: "all",
+  startDate: "",
+  endDate: "",
+  minValue: "",
+  maxValue: "",
+};
+
+const normalizeText = (value: unknown) =>
+  String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const getDateTime = (value: string, endOfDay = false) => {
+  if (!value) return null;
+  const date = new Date(endOfDay ? `${value}T23:59:59` : `${value}T00:00:00`);
+  const time = date.getTime();
+  return Number.isFinite(time) ? time : null;
+};
 
 function ComparisonBadge({ value, label }: { value: number; label: string }) {
   return (
@@ -57,9 +93,102 @@ function ComparisonBadge({ value, label }: { value: number; label: string }) {
 export function FinancialDashboard() {
   const { user } = useAuth();
   const userId = useMemo(() => user?.id || "", [user?.id]);
+  const [paymentFilters, setPaymentFilters] = useState(DEFAULT_PAYMENT_FILTERS);
 
   const { metrics, monthlyRevenue, inadimplentesList, paymentDetails, loading } =
     useFinancialDashboard(userId);
+
+  const planOptions = useMemo(
+    () =>
+      Array.from(new Set(paymentDetails.map((p) => p.plano).filter(Boolean))).sort((a, b) =>
+        a.localeCompare(b)
+      ),
+    [paymentDetails]
+  );
+
+  const methodOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(paymentDetails.map((p) => p.metodo).filter((method) => method && method !== "—"))
+      ).sort((a, b) => a.localeCompare(b)),
+    [paymentDetails]
+  );
+
+  const filteredPaymentDetails = useMemo(() => {
+    const now = new Date();
+    const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const last30Days = new Date(now);
+    last30Days.setDate(now.getDate() - 30);
+    const last90Days = new Date(now);
+    last90Days.setDate(now.getDate() - 90);
+
+    const customStart = getDateTime(paymentFilters.startDate);
+    const customEnd = getDateTime(paymentFilters.endDate, true);
+    const minValue = paymentFilters.minValue ? Number(paymentFilters.minValue) : null;
+    const maxValue = paymentFilters.maxValue ? Number(paymentFilters.maxValue) : null;
+    const search = normalizeText(paymentFilters.search);
+
+    return paymentDetails.filter((payment) => {
+      const paymentTime = new Date(payment.dataPagamento).getTime();
+      const searchableText = normalizeText(
+        [
+          payment.studentName,
+          payment.plano,
+          payment.metodo,
+          payment.status,
+          payment.parcelaAtual,
+          payment.valorTotal,
+          payment.valorParcela,
+        ].join(" ")
+      );
+
+      if (search && !searchableText.includes(search)) return false;
+      if (paymentFilters.status !== "all" && payment.status !== paymentFilters.status) return false;
+      if (paymentFilters.plan !== "all" && payment.plano !== paymentFilters.plan) return false;
+      if (paymentFilters.method !== "all" && payment.metodo !== paymentFilters.method) return false;
+      if (minValue !== null && Number.isFinite(minValue) && payment.valorParcela < minValue) return false;
+      if (maxValue !== null && Number.isFinite(maxValue) && payment.valorParcela > maxValue) return false;
+
+      if (paymentFilters.period === "current_month" && paymentTime < startOfCurrentMonth) return false;
+      if (paymentFilters.period === "last_30" && paymentTime < last30Days.getTime()) return false;
+      if (paymentFilters.period === "last_90" && paymentTime < last90Days.getTime()) return false;
+      if (paymentFilters.period === "custom") {
+        if (customStart !== null && paymentTime < customStart) return false;
+        if (customEnd !== null && paymentTime > customEnd) return false;
+      }
+
+      return true;
+    });
+  }, [paymentDetails, paymentFilters]);
+
+  const filteredReceivedTotal = useMemo(
+    () =>
+      filteredPaymentDetails
+        .filter((payment) => payment.status === "pago")
+        .reduce((sum, payment) => sum + payment.valorParcela, 0),
+    [filteredPaymentDetails]
+  );
+
+  const filteredPendingTotal = useMemo(
+    () =>
+      filteredPaymentDetails
+        .filter((payment) => payment.status !== "pago")
+        .reduce((sum, payment) => sum + payment.valorParcela, 0),
+    [filteredPaymentDetails]
+  );
+
+  const hasActivePaymentFilters = useMemo(
+    () => JSON.stringify(paymentFilters) !== JSON.stringify(DEFAULT_PAYMENT_FILTERS),
+    [paymentFilters]
+  );
+
+  const updatePaymentFilter = (key: keyof typeof DEFAULT_PAYMENT_FILTERS, value: string) => {
+    setPaymentFilters((current) => ({ ...current, [key]: value }));
+  };
+
+  const clearPaymentFilters = () => {
+    setPaymentFilters(DEFAULT_PAYMENT_FILTERS);
+  };
 
   if (!userId) {
     return (
@@ -247,63 +376,264 @@ export function FinancialDashboard() {
       {paymentDetails.length > 0 && (
         <Card>
           <CardHeader className="p-4 md:p-6">
-            <div className="flex items-center gap-2">
-              <Receipt className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg md:text-xl">Histórico de Pagamentos</CardTitle>
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Receipt className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-lg md:text-xl">Histórico de Pagamentos</CardTitle>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Detalhamento de parcelas e pagamentos recebidos
+                </p>
+              </div>
+              <Badge variant="outline" className="w-fit">
+                {filteredPaymentDetails.length} de {paymentDetails.length} registro(s)
+              </Badge>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Detalhamento de parcelas e pagamentos recebidos
-            </p>
           </CardHeader>
           <CardContent className="p-4 md:p-6 pt-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-muted-foreground">
-                    <th className="text-left py-3 px-2 font-medium">Aluno</th>
-                    <th className="text-left py-3 px-2 font-medium">Plano</th>
-                    <th className="text-right py-3 px-2 font-medium">Valor Total</th>
-                    <th className="text-center py-3 px-2 font-medium">Parcela</th>
-                    <th className="text-right py-3 px-2 font-medium">Valor Parcela</th>
-                    <th className="text-center py-3 px-2 font-medium">Data</th>
-                    <th className="text-center py-3 px-2 font-medium">Método</th>
-                    <th className="text-center py-3 px-2 font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paymentDetails.map((p) => (
-                    <tr key={p.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
-                      <td className="py-3 px-2 font-medium">{p.studentName}</td>
-                      <td className="py-3 px-2">{p.plano}</td>
-                      <td className="py-3 px-2 text-right">{formatCurrency(p.valorTotal)}</td>
-                      <td className="py-3 px-2 text-center">
-                        <Badge variant="outline" className="text-xs">
-                          {p.parcelaAtual}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-2 text-right font-medium">
-                        {formatCurrency(p.valorParcela)}
-                      </td>
-                      <td className="py-3 px-2 text-center text-muted-foreground">
-                        {formatDisplayDate(p.dataPagamento)}
-                      </td>
-                      <td className="py-3 px-2 text-center capitalize">{p.metodo}</td>
-                      <td className="py-3 px-2 text-center">
-                        <Badge
-                          variant={p.status === "pago" ? "default" : "secondary"}
-                          className={
-                            p.status === "pago"
-                              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                              : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                          }
-                        >
-                          {p.status === "pago" ? "Pago" : "Pendente"}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/20 p-4">
+                <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold">Filtros</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Busque por aluno, plano, método, status, período ou valor da parcela.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={clearPaymentFilters}
+                    disabled={!hasActivePaymentFilters}
+                  >
+                    <FilterX className="h-4 w-4" />
+                    Limpar filtros
+                  </Button>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+                  <div className="space-y-1.5 md:col-span-2">
+                    <Label htmlFor="payment-search">Buscar</Label>
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="payment-search"
+                        value={paymentFilters.search}
+                        onChange={(event) => updatePaymentFilter("search", event.target.value)}
+                        placeholder="Aluno, plano, método, parcela..."
+                        className="pl-9"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Status</Label>
+                    <Select
+                      value={paymentFilters.status}
+                      onValueChange={(value) => updatePaymentFilter("status", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="pago">Pago</SelectItem>
+                        <SelectItem value="pendente">Pendente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Plano</Label>
+                    <Select
+                      value={paymentFilters.plan}
+                      onValueChange={(value) => updatePaymentFilter("plan", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {planOptions.map((plan) => (
+                          <SelectItem key={plan} value={plan}>
+                            {plan}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Método</Label>
+                    <Select
+                      value={paymentFilters.method}
+                      onValueChange={(value) => updatePaymentFilter("method", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {methodOptions.map((method) => (
+                          <SelectItem key={method} value={method}>
+                            {method}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Período</Label>
+                    <Select
+                      value={paymentFilters.period}
+                      onValueChange={(value) => updatePaymentFilter("period", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="current_month">Mês atual</SelectItem>
+                        <SelectItem value="last_30">Últimos 30 dias</SelectItem>
+                        <SelectItem value="last_90">Últimos 90 dias</SelectItem>
+                        <SelectItem value="custom">Personalizado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {paymentFilters.period === "custom" && (
+                    <>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="payment-start-date">Data inicial</Label>
+                        <Input
+                          id="payment-start-date"
+                          type="date"
+                          value={paymentFilters.startDate}
+                          onChange={(event) => updatePaymentFilter("startDate", event.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="payment-end-date">Data final</Label>
+                        <Input
+                          id="payment-end-date"
+                          type="date"
+                          value={paymentFilters.endDate}
+                          onChange={(event) => updatePaymentFilter("endDate", event.target.value)}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="payment-min-value">Valor mín.</Label>
+                    <Input
+                      id="payment-min-value"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      inputMode="decimal"
+                      value={paymentFilters.minValue}
+                      onChange={(event) => updatePaymentFilter("minValue", event.target.value)}
+                      placeholder="R$ 0,00"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="payment-max-value">Valor máx.</Label>
+                    <Input
+                      id="payment-max-value"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      inputMode="decimal"
+                      value={paymentFilters.maxValue}
+                      onChange={(event) => updatePaymentFilter("maxValue", event.target.value)}
+                      placeholder="R$ 999,00"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-lg border bg-background p-3">
+                  <p className="text-xs text-muted-foreground">Registros encontrados</p>
+                  <p className="text-xl font-semibold">{filteredPaymentDetails.length}</p>
+                </div>
+                <div className="rounded-lg border bg-background p-3">
+                  <p className="text-xs text-muted-foreground">Recebido no filtro</p>
+                  <p className="text-xl font-semibold text-green-600 dark:text-green-400">
+                    {formatCurrency(filteredReceivedTotal)}
+                  </p>
+                </div>
+                <div className="rounded-lg border bg-background p-3">
+                  <p className="text-xs text-muted-foreground">Pendente no filtro</p>
+                  <p className="text-xl font-semibold text-yellow-600 dark:text-yellow-400">
+                    {formatCurrency(filteredPendingTotal)}
+                  </p>
+                </div>
+              </div>
+
+              {filteredPaymentDetails.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-8 text-center">
+                  <p className="font-medium">Nenhum pagamento encontrado</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Ajuste os filtros para ampliar a busca.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-muted-foreground">
+                        <th className="text-left py-3 px-2 font-medium">Aluno</th>
+                        <th className="text-left py-3 px-2 font-medium">Plano</th>
+                        <th className="text-right py-3 px-2 font-medium">Valor Total</th>
+                        <th className="text-center py-3 px-2 font-medium">Parcela</th>
+                        <th className="text-right py-3 px-2 font-medium">Valor Parcela</th>
+                        <th className="text-center py-3 px-2 font-medium">Data</th>
+                        <th className="text-center py-3 px-2 font-medium">Método</th>
+                        <th className="text-center py-3 px-2 font-medium">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredPaymentDetails.map((p) => (
+                        <tr key={p.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
+                          <td className="py-3 px-2 font-medium">{p.studentName}</td>
+                          <td className="py-3 px-2">{p.plano}</td>
+                          <td className="py-3 px-2 text-right">{formatCurrency(p.valorTotal)}</td>
+                          <td className="py-3 px-2 text-center">
+                            <Badge variant="outline" className="text-xs">
+                              {p.parcelaAtual}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-2 text-right font-medium">
+                            {formatCurrency(p.valorParcela)}
+                          </td>
+                          <td className="py-3 px-2 text-center text-muted-foreground">
+                            {formatDisplayDate(p.dataPagamento)}
+                          </td>
+                          <td className="py-3 px-2 text-center capitalize">{p.metodo}</td>
+                          <td className="py-3 px-2 text-center">
+                            <Badge
+                              variant={p.status === "pago" ? "default" : "secondary"}
+                              className={
+                                p.status === "pago"
+                                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                  : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                              }
+                            >
+                              {p.status === "pago" ? "Pago" : "Pendente"}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

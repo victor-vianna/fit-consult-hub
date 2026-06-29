@@ -130,7 +130,15 @@ export const useAuth = () => {
           (payload: any) => {
             if (payload.new?.allowed === false) {
               console.log("Aluno foi bloqueado pela fonte unica de acesso, redirecionando...");
-              window.location.href = "/acesso-suspenso";
+              if (window.location.pathname !== "/acesso-suspenso") {
+                window.location.href = "/acesso-suspenso";
+              }
+            } else if (
+              payload.new?.allowed === true &&
+              window.location.pathname === "/acesso-suspenso"
+            ) {
+              console.log("Aluno foi liberado pela fonte unica de acesso, redirecionando...");
+              window.location.replace("/aluno");
             }
           }
         )

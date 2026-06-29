@@ -5,21 +5,60 @@ import { Pause, ShieldAlert, LogOut, MessageCircle, CreditCard } from "lucide-re
 import { Button } from "@/components/ui/button";
 import { AlunoCheckoutPlanos } from "@/components/AlunoCheckoutPlanos";
 import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 import type { StudentAccessState } from "@/hooks/useStudentAccess";
 import { getAccessReasonLabel } from "@/hooks/useStudentAccess";
 import { formatDisplayDate } from "@/utils/dateFormat";
 
 export default function AcessoSuspenso() {
   const { signOut } = useAuth();
+  const navigate = useNavigate();
   const [personalPhone, setPersonalPhone] = useState<string | null>(null);
   const [personalName, setPersonalName] = useState<string>("seu personal trainer");
   const [personalId, setPersonalId] = useState<string | null>(null);
   const [state, setState] = useState<StudentAccessState | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [studentId, setStudentId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (role === "aluno" && state?.allowed === true) {
+      navigate("/aluno", { replace: true });
+    }
+  }, [navigate, role, state?.allowed]);
+
+  useEffect(() => {
+    if (!studentId || role !== "aluno") return;
+
+    const channel = supabase
+      .channel(`blocked-page-access-state:${studentId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "student_access_state",
+          filter: `student_id=eq.${studentId}`,
+        },
+        (payload: any) => {
+          const nextState = payload.new as StudentAccessState | undefined;
+          if (!nextState) return;
+
+          setState(nextState);
+          if (nextState.allowed === true) {
+            navigate("/aluno", { replace: true });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [navigate, role, studentId]);
 
   async function fetchData() {
     try {
@@ -27,6 +66,7 @@ export default function AcessoSuspenso() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
+      setStudentId(user.id);
 
       const { data: roleRow } = await supabase
         .from("user_roles")
@@ -47,7 +87,13 @@ export default function AcessoSuspenso() {
           { _student_id: user.id }
         );
         if (error) throw error;
-        setState(accessState as StudentAccessState);
+        const nextState = accessState as StudentAccessState;
+        setState(nextState);
+
+        if (nextState?.allowed === true) {
+          navigate("/aluno", { replace: true });
+          return;
+        }
       }
 
       if (profile?.personal_id) {
@@ -66,6 +112,14 @@ export default function AcessoSuspenso() {
     } catch (error) {
       console.error("Erro ao buscar contexto de acesso:", error);
     }
+  }
+
+  if (role === "aluno" && state?.allowed === true) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-6">
+        <p className="text-muted-foreground">Acesso liberado. Redirecionando...</p>
+      </div>
+    );
   }
 
   const isPaymentBlock =

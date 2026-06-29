@@ -76,6 +76,8 @@ export const AuthGuard = ({ children, allowedRoles }: AuthGuardProps) => {
           if (payload.new?.allowed === false) {
             setIsBlocked(true);
             navigate("/acesso-suspenso", { replace: true });
+          } else if (payload.new?.allowed === true) {
+            setIsBlocked(false);
           }
         }
       )

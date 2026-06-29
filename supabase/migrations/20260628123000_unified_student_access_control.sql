@@ -142,6 +142,7 @@ DECLARE
   v_source text := 'system';
   v_priority integer := 0;
   v_effective_event_id uuid := null;
+  v_active_subscription_id uuid := null;
   v_previous record;
   v_transition_event_id uuid := null;
 BEGIN
@@ -154,7 +155,7 @@ BEGIN
   FROM public.profiles p
   WHERE p.id = _student_id;
 
-  IF v_profile.id IS NULL THEN
+  IF NOT FOUND THEN
     RETURN NULL;
   END IF;
 
@@ -167,7 +168,7 @@ BEGIN
   ORDER BY e.created_at DESC, e.id DESC
   LIMIT 1;
 
-  IF v_manual.effect = 'block' THEN
+  IF FOUND AND v_manual.effect = 'block' THEN
     v_allowed := false;
     v_status := CASE WHEN v_manual.event_type = 'manual_pause' THEN 'pausado' ELSE 'suspenso' END;
     v_reason_code := v_manual.event_type;
@@ -199,7 +200,10 @@ BEGIN
     ORDER BY s.data_expiracao DESC
     LIMIT 1;
 
-    v_has_active_payment := v_subscription.id IS NOT NULL;
+    IF FOUND THEN
+      v_has_active_payment := true;
+      v_active_subscription_id := v_subscription.id;
+    END IF;
 
     IF v_payment_required AND NOT v_has_active_payment THEN
       v_allowed := false;
@@ -216,14 +220,14 @@ BEGIN
       ORDER BY s.data_expiracao DESC NULLS LAST, s.created_at DESC NULLS LAST
       LIMIT 1;
 
-      IF v_subscription.id IS NOT NULL
+      IF FOUND
         AND v_subscription.status_pagamento = 'pago'
         AND v_subscription.data_expiracao <= now()
       THEN
         v_status := 'pagamento_pendente';
         v_reason_code := 'payment_expired';
         v_reason := 'Bloqueado porque o ultimo pagamento venceu.';
-      ELSIF v_subscription.id IS NOT NULL
+      ELSIF FOUND
         AND v_subscription.status_pagamento IN ('pendente', 'atrasado')
       THEN
         v_reason_code := 'payment_pending';
@@ -299,7 +303,7 @@ BEGIN
     v_effective_event_id,
     v_payment_required,
     v_has_active_payment,
-    CASE WHEN v_has_active_payment THEN v_subscription.id ELSE NULL END,
+    v_active_subscription_id,
     now(),
     now()
   )
@@ -879,3 +883,5 @@ GRANT EXECUTE ON FUNCTION public.get_student_access_state(uuid) TO authenticated
 GRANT EXECUTE ON FUNCTION public.get_student_access_events(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.register_student_access_event(uuid, text, text, text, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.recalculate_student_access(uuid) TO authenticated;
+
+NOTIFY pgrst, 'reload schema';

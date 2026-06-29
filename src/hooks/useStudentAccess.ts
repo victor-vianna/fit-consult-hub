@@ -1,8 +1,13 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-export type AccessStatus = "ativo" | "pausado" | "suspenso";
+export type AccessStatus =
+  | "ativo"
+  | "pausado"
+  | "suspenso"
+  | "pagamento_pendente";
 
 export type AccessMotivo =
   | "ferias"
@@ -10,119 +15,213 @@ export type AccessMotivo =
   | "viagem"
   | "inadimplencia"
   | "violacao"
-  | "outro";
+  | "outro"
+  | "legacy_profile_inactive"
+  | "payment_required"
+  | "payment_expired"
+  | "payment_pending";
 
-export const MOTIVO_LABELS: Record<AccessMotivo, string> = {
-  ferias: "Férias",
-  lesao: "Lesão / Recuperação",
+export const MOTIVO_LABELS: Record<string, string> = {
+  ferias: "Ferias",
+  lesao: "Lesao / Recuperacao",
   viagem: "Viagem",
-  inadimplencia: "Inadimplência",
-  violacao: "Violação de regras",
+  inadimplencia: "Inadimplencia",
+  violacao: "Violacao de regras",
   outro: "Outro",
+  legacy_profile_inactive: "Suspensao existente",
+  payment_required: "Pagamento necessario",
+  payment_expired: "Pagamento vencido",
+  payment_pending: "Pagamento pendente",
+  manual_pause: "Pausa manual",
+  manual_suspend: "Suspensao manual",
+  manual_release: "Liberacao manual",
+  payment_rule_changed: "Regra de pagamento alterada",
 };
-
-// Motivos considerados de "pausa amigável" — os demais são "suspensão"
-const PAUSA_MOTIVOS: AccessMotivo[] = ["ferias", "lesao", "viagem"];
 
 export const MENSAGENS_PADRAO: Record<AccessMotivo, string> = {
   ferias:
-    "Seu acesso está pausado durante o período de férias. Aproveite e nos avise quando estiver pronto para retornar.",
+    "Seu acesso esta pausado durante o periodo de ferias. Aproveite e nos avise quando estiver pronto para retornar.",
   lesao:
-    "Seu acesso está pausado para sua recuperação. Cuide-se e nos avise quando estiver liberado para voltar a treinar.",
-  viagem:
-    "Seu acesso está pausado durante a sua viagem. Boa viagem!",
+    "Seu acesso esta pausado para sua recuperacao. Cuide-se e nos avise quando estiver liberado para voltar a treinar.",
+  viagem: "Seu acesso esta pausado durante a sua viagem. Boa viagem!",
   inadimplencia:
     "Seu acesso foi temporariamente suspenso. Entre em contato para regularizar e reativar.",
-  violacao:
-    "Seu acesso foi suspenso. Entre em contato para mais informações.",
+  violacao: "Seu acesso foi suspenso. Entre em contato para mais informacoes.",
   outro: "",
+  legacy_profile_inactive:
+    "Seu acesso esta temporariamente suspenso. Entre em contato com seu personal trainer.",
+  payment_required:
+    "Seu acesso depende de um pagamento ativo. Regularize seu plano para voltar a acessar.",
+  payment_expired:
+    "Seu ultimo pagamento venceu. Regularize seu plano para voltar a acessar.",
+  payment_pending:
+    "Existe um pagamento pendente ou atrasado. Regularize seu plano para voltar a acessar.",
 };
 
-export interface AccessLog {
-  id: string;
+export interface StudentAccessState {
   student_id: string;
-  changed_by: string;
-  from_active: boolean | null;
-  to_active: boolean | null;
-  motivo: string | null;
-  mensagem_aluno: string | null;
-  observacao_personal: string | null;
-  created_at: string;
+  personal_id: string | null;
+  allowed: boolean;
+  status: AccessStatus;
+  status_label: string;
+  reason_code: string | null;
+  reason: string | null;
+  message_aluno: string | null;
+  source: "manual" | "payment" | "settings" | "system" | string;
+  priority: number;
+  effective_event_id: string | null;
+  payment_required: boolean;
+  has_active_payment: boolean;
+  active_subscription_id: string | null;
+  calculated_at: string;
+  updated_at: string;
 }
 
-export interface AccessLogWithAuthor extends AccessLog {
-  author_name?: string | null;
+export interface AccessLogWithAuthor {
+  id: string;
+  student_id: string;
+  personal_id: string | null;
+  actor_id: string | null;
+  actor_name?: string | null;
+  source: string;
+  event_type: string;
+  effect: "allow" | "block" | "neutral";
+  priority: number;
+  reason_code: string | null;
+  message_aluno: string | null;
+  observation: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  from_active?: boolean | null;
+  to_active?: boolean | null;
+  motivo?: string | null;
+  mensagem_aluno?: string | null;
+  observacao_personal?: string | null;
 }
+
+export type AccessLog = AccessLogWithAuthor;
+
+const DEFAULT_STATE = (studentId: string): StudentAccessState => ({
+  student_id: studentId,
+  personal_id: null,
+  allowed: true,
+  status: "ativo",
+  status_label: "Ativo",
+  reason_code: "active",
+  reason: "Aluno liberado para acessar a plataforma.",
+  message_aluno: null,
+  source: "system",
+  priority: 0,
+  effective_event_id: null,
+  payment_required: false,
+  has_active_payment: false,
+  active_subscription_id: null,
+  calculated_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+});
 
 export function deriveStatus(
   isActive: boolean | undefined | null,
   lastLog: AccessLog | null
 ): AccessStatus {
-  if (isActive) return "ativo";
-  const motivo = (lastLog?.motivo ?? "") as AccessMotivo;
-  if (PAUSA_MOTIVOS.includes(motivo)) return "pausado";
-  return "suspenso";
+  if (lastLog?.event_type === "manual_pause") return "pausado";
+  if (lastLog?.effect === "block") return "suspenso";
+  return isActive === false ? "suspenso" : "ativo";
+}
+
+export function getAccessStatusLabel(status: AccessStatus) {
+  if (status === "pagamento_pendente") return "Pagamento pendente";
+  if (status === "pausado") return "Pausado";
+  if (status === "suspenso") return "Suspenso";
+  return "Ativo";
+}
+
+export function getAccessReasonLabel(reasonCode?: string | null) {
+  if (!reasonCode) return null;
+  return MOTIVO_LABELS[reasonCode] ?? reasonCode;
 }
 
 export function useStudentAccess(studentId: string | undefined) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const profileQuery = useQuery({
-    queryKey: ["student-access-profile", studentId],
+  useEffect(() => {
+    if (!studentId) return;
+
+    const refreshAccess = () => {
+      queryClient.invalidateQueries({ queryKey: ["student-access-state", studentId] });
+      queryClient.invalidateQueries({ queryKey: ["student-access-events", studentId] });
+      queryClient.invalidateQueries({ queryKey: ["platform-access", studentId] });
+    };
+
+    const stateChannel = supabase
+      .channel(`student-access-hook-state:${studentId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "student_access_state",
+          filter: `student_id=eq.${studentId}`,
+        },
+        refreshAccess
+      )
+      .subscribe();
+
+    const eventsChannel = supabase
+      .channel(`student-access-hook-events:${studentId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "student_access_events",
+          filter: `student_id=eq.${studentId}`,
+        },
+        refreshAccess
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(stateChannel);
+      supabase.removeChannel(eventsChannel);
+    };
+  }, [queryClient, studentId]);
+
+  const stateQuery = useQuery({
+    queryKey: ["student-access-state", studentId],
     queryFn: async () => {
       if (!studentId) return null;
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, nome, is_active")
-        .eq("id", studentId)
-        .maybeSingle();
+      const { data, error } = await (supabase as any).rpc("get_student_access_state", {
+        _student_id: studentId,
+      });
       if (error) throw error;
-      return data;
+      return (data ?? DEFAULT_STATE(studentId)) as StudentAccessState;
     },
     enabled: !!studentId,
-    staleTime: 30_000,
+    staleTime: 15_000,
   });
 
-  const logsQuery = useQuery({
-    queryKey: ["student-access-logs", studentId],
+  const eventsQuery = useQuery({
+    queryKey: ["student-access-events", studentId],
     queryFn: async () => {
       if (!studentId) return [] as AccessLogWithAuthor[];
-      const { data: logs, error } = await supabase
-        .from("student_access_logs")
-        .select("*")
-        .eq("student_id", studentId)
-        .order("created_at", { ascending: false })
-        .limit(50);
+      const { data, error } = await (supabase as any).rpc("get_student_access_events", {
+        _student_id: studentId,
+      });
       if (error) throw error;
 
-      const ids = Array.from(
-        new Set((logs ?? []).map((l) => l.changed_by).filter(Boolean))
-      );
-      let authors: Record<string, string> = {};
-      if (ids.length > 0) {
-        const { data: profs } = await supabase
-          .from("profiles")
-          .select("id, nome")
-          .in("id", ids as string[]);
-        authors = Object.fromEntries(
-          (profs ?? []).map((p) => [p.id, p.nome ?? ""])
-        );
-      }
-      return (logs ?? []).map((l) => ({
-        ...l,
-        author_name: authors[l.changed_by] ?? null,
-      })) as AccessLogWithAuthor[];
+      return ((data ?? []) as AccessLogWithAuthor[]).map((event) => ({
+        ...event,
+        to_active: event.effect === "allow",
+        motivo: event.reason_code,
+        mensagem_aluno: event.message_aluno,
+        observacao_personal: event.observation,
+      }));
     },
     enabled: !!studentId,
-    staleTime: 30_000,
+    staleTime: 15_000,
   });
-
-  const lastLog = logsQuery.data?.[0] ?? null;
-  const status: AccessStatus = deriveStatus(
-    profileQuery.data?.is_active,
-    lastLog
-  );
 
   const mutate = useMutation({
     mutationFn: async (params: {
@@ -131,48 +230,36 @@ export function useStudentAccess(studentId: string | undefined) {
       mensagemAluno?: string;
       observacao?: string;
     }) => {
-      if (!studentId) throw new Error("Aluno inválido");
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData.user?.id;
-      if (!userId) throw new Error("Não autenticado");
+      if (!studentId) throw new Error("Aluno invalido");
 
-      const fromActive = profileQuery.data?.is_active ?? true;
-      const toActive = params.acao === "reativar";
+      const eventType =
+        params.acao === "pausar"
+          ? "manual_pause"
+          : params.acao === "suspender"
+          ? "manual_suspend"
+          : "manual_release";
 
-      const { error: upErr } = await supabase
-        .from("profiles")
-        .update({
-          is_active: toActive,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", studentId);
-      if (upErr) throw upErr;
+      const { data, error } = await (supabase as any).rpc(
+        "register_student_access_event",
+        {
+          _student_id: studentId,
+          _event_type: eventType,
+          _reason_code: params.motivo ?? null,
+          _message_aluno: params.mensagemAluno ?? null,
+          _observation: params.observacao ?? null,
+        }
+      );
 
-      const { error: logErr } = await supabase
-        .from("student_access_logs")
-        .insert({
-          student_id: studentId,
-          changed_by: userId,
-          from_active: fromActive,
-          to_active: toActive,
-          motivo: params.motivo ?? null,
-          mensagem_aluno: params.mensagemAluno?.trim() || null,
-          observacao_personal: params.observacao?.trim() || null,
-        });
-      if (logErr) {
-        // Reverte o flag para manter consistência
-        await supabase
-          .from("profiles")
-          .update({ is_active: fromActive })
-          .eq("id", studentId);
-        throw logErr;
-      }
+      if (error) throw error;
+      return data as StudentAccessState;
     },
-    onSuccess: (_d, vars) => {
-      queryClient.invalidateQueries({ queryKey: ["student-access-profile", studentId] });
-      queryClient.invalidateQueries({ queryKey: ["student-access-logs", studentId] });
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["student-access-state", studentId] });
+      queryClient.invalidateQueries({ queryKey: ["student-access-events", studentId] });
+      queryClient.invalidateQueries({ queryKey: ["platform-access", studentId] });
       queryClient.invalidateQueries({ queryKey: ["alunos"] });
       queryClient.invalidateQueries({ queryKey: ["aluno", studentId] });
+
       const titles: Record<typeof vars.acao, string> = {
         pausar: "Acesso pausado",
         suspender: "Acesso suspenso",
@@ -189,16 +276,28 @@ export function useStudentAccess(studentId: string | undefined) {
     },
   });
 
+  const state = stateQuery.data ?? (studentId ? DEFAULT_STATE(studentId) : null);
+  const logs = eventsQuery.data ?? [];
+  const lastLog = logs[0] ?? null;
+
   return {
-    profile: profileQuery.data,
-    isActive: profileQuery.data?.is_active ?? true,
-    status,
+    state,
+    profile: state
+      ? {
+          id: state.student_id,
+          is_active: state.allowed,
+          personal_id: state.personal_id,
+        }
+      : null,
+    isActive: state?.allowed ?? true,
+    status: (state?.status ?? "ativo") as AccessStatus,
+    allowed: state?.allowed ?? true,
     lastLog,
-    logs: logsQuery.data ?? [],
-    loading: profileQuery.isLoading || logsQuery.isLoading,
+    logs,
+    loading: stateQuery.isLoading || eventsQuery.isLoading,
     refresh: () => {
-      profileQuery.refetch();
-      logsQuery.refetch();
+      stateQuery.refetch();
+      eventsQuery.refetch();
     },
     mutate: mutate.mutateAsync,
     isMutating: mutate.isPending,

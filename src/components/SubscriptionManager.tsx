@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -55,6 +55,10 @@ interface SubscriptionManagerProps {
   studentId: string;
   personalId: string;
   studentName: string;
+  embedded?: boolean;
+  createButtonLabel?: string;
+  openCreateSignal?: number;
+  onChanged?: () => void;
 }
 
 const PLANOS = [
@@ -68,6 +72,10 @@ export function SubscriptionManager({
   studentId,
   personalId,
   studentName,
+  embedded = false,
+  createButtonLabel = "Nova Assinatura",
+  openCreateSignal = 0,
+  onChanged,
 }: SubscriptionManagerProps) {
   const {
     subscriptions,
@@ -111,6 +119,12 @@ export function SubscriptionManager({
   const [metodoPagamento, setMetodoPagamento] = useState<string>("");
   const [observacoesPagamento, setObservacoesPagamento] = useState<string>("");
 
+  useEffect(() => {
+    if (openCreateSignal > 0) {
+      setDialogOpen(true);
+    }
+  }, [openCreateSignal]);
+
   const handleCreateSubscription = async () => {
     if (!valor || !plano) return;
 
@@ -133,6 +147,7 @@ export function SubscriptionManager({
     setValor("");
     setObservacoes("");
     setDialogOpen(false);
+    onChanged?.();
   };
 
   const handleRegisterPayment = async () => {
@@ -150,6 +165,7 @@ export function SubscriptionManager({
     setMetodoPagamento("");
     setObservacoesPagamento("");
     setPaymentDialogOpen(false);
+    onChanged?.();
   };
 
   const handleOpenEdit = (sub: Subscription) => {
@@ -209,6 +225,7 @@ export function SubscriptionManager({
 
     setEditDialogOpen(false);
     setSubscriptionToEdit(null);
+    onChanged?.();
   };
 
   const handleConfirmDelete = async () => {
@@ -216,6 +233,7 @@ export function SubscriptionManager({
     await deleteSubscription(subscriptionToDelete);
     setDeleteDialogOpen(false);
     setSubscriptionToDelete(null);
+    onChanged?.();
   };
 
   const getStatusBadge = (sub: Subscription) => {
@@ -266,7 +284,7 @@ export function SubscriptionManager({
   return (
     <div className="space-y-4">
       {/* Status Atual */}
-      {activeSubscription && (
+      {activeSubscription && !embedded && (
         <Card className="border-green-500/50 bg-green-500/5">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -302,7 +320,7 @@ export function SubscriptionManager({
         <DialogTrigger asChild>
           <Button className="w-full">
             <Plus className="h-4 w-4 mr-2" />
-            Nova Assinatura
+            {createButtonLabel}
           </Button>
         </DialogTrigger>
         <DialogContent>
@@ -375,7 +393,7 @@ export function SubscriptionManager({
       {/* Lista de Assinaturas */}
       <Card>
         <CardHeader>
-          <CardTitle>Histórico de Assinaturas</CardTitle>
+          <CardTitle>{embedded ? "Assinaturas e pagamentos" : "Histórico de Assinaturas"}</CardTitle>
           <CardDescription>
             Todas as assinaturas de {studentName}
           </CardDescription>

@@ -114,25 +114,24 @@ export const useAuth = () => {
     return () => subscription.unsubscribe();
   }, [initializeUserData]);
 
-  // Listener for student profile changes (blocked status)
+  // Listener for the unified student access state.
   useEffect(() => {
     if (user && role === "aluno") {
       const channel = supabase
-        .channel("profile-changes")
+        .channel(`student-access-state:${user.id}`)
         .on(
           "postgres_changes",
           {
-            event: "UPDATE",
+            event: "*",
             schema: "public",
-            table: "profiles",
-            filter: `id=eq.${user.id}`,
+            table: "student_access_state",
+            filter: `student_id=eq.${user.id}`,
           },
-          (payload) => {
-            if (payload.new.is_active === false) {
-              console.log("Aluno foi bloqueado, redirecionando...");
+          (payload: any) => {
+            if (payload.new?.allowed === false) {
+              console.log("Aluno foi bloqueado pela fonte unica de acesso, redirecionando...");
               window.location.href = "/acesso-suspenso";
             }
-            setProfile(payload.new as Profile);
           }
         )
         .subscribe();

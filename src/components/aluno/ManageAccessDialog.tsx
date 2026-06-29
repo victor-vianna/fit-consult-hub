@@ -63,7 +63,7 @@ export function ManageAccessDialog({
 
   useEffect(() => {
     if (open) {
-      setAcao(status === "ativo" ? null : "reativar");
+      setAcao(status === "ativo" || status === "pagamento_pendente" ? null : "reativar");
       setMotivo("");
       setMensagem("");
       setObservacao("");
@@ -101,7 +101,7 @@ export function ManageAccessDialog({
         <DialogHeader>
           <DialogTitle>Gerenciar acesso · {studentName}</DialogTitle>
           <DialogDescription>
-            {status === "ativo"
+            {status === "ativo" || status === "pagamento_pendente"
               ? "Escolha a ação. O aluno verá a mensagem que você escrever na tela de bloqueio."
               : "Reative o acesso do aluno à plataforma."}
           </DialogDescription>
@@ -109,7 +109,17 @@ export function ManageAccessDialog({
 
         <div className="space-y-4 py-2">
           {/* Seleção de ação (apenas se ativo) */}
-          {status === "ativo" && (
+          {status === "pagamento_pendente" && (
+            <div className="flex items-start gap-2 p-3 rounded-md bg-amber-500/10 border border-amber-500/30 text-sm">
+              <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-amber-600" />
+              <span>
+                Este aluno esta bloqueado por pagamento. Voce ainda pode aplicar uma suspensao
+                manual, que passa a ter prioridade sobre o status financeiro.
+              </span>
+            </div>
+          )}
+
+          {(status === "ativo" || status === "pagamento_pendente") && (
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"

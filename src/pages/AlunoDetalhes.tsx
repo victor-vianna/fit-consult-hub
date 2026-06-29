@@ -68,7 +68,6 @@ import {
   AccessControlPanel,
   AccessStatusBadge,
 } from "@/components/aluno/AccessControlPanel";
-import { SubscriptionManager } from "@/components/SubscriptionManager";
 import { CalendarioTreinosMensal } from "@/components/CalendarioTreinosMensal";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { AppLayout } from "@/components/AppLayout";
@@ -1142,10 +1141,6 @@ export default function AlunoDetalhes() {
             <TabsContent value="financeiro" className="space-y-4">
               <AccessControlPanel
                 studentId={aluno.id}
-                studentName={aluno.nome}
-              />
-              <SubscriptionManager
-                studentId={id!}
                 personalId={user!.id}
                 studentName={aluno.nome}
               />

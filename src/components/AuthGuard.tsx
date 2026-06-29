@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState, useRef } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth, UserRole } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,7 +13,6 @@ export const AuthGuard = ({ children, allowedRoles }: AuthGuardProps) => {
   const navigate = useNavigate();
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [isBlocked, setIsBlocked] = useState(false);
-  const checkedRef = useRef(false);
 
   useEffect(() => {
     if (!loading) {
@@ -34,12 +33,6 @@ export const AuthGuard = ({ children, allowedRoles }: AuthGuardProps) => {
       return;
     }
 
-    if (checkedRef.current) {
-      setCheckingAccess(false);
-      return;
-    }
-    checkedRef.current = true;
-
     try {
       const { data, error } = await supabase.rpc("pode_acessar_plataforma", {
         _user_id: user.id,
@@ -57,12 +50,41 @@ export const AuthGuard = ({ children, allowedRoles }: AuthGuardProps) => {
         navigate("/acesso-suspenso", { replace: true });
         return;
       }
+
+      setIsBlocked(false);
     } catch (e) {
       console.error("Erro ao verificar acesso:", e);
     }
 
     setCheckingAccess(false);
   };
+
+  useEffect(() => {
+    if (!user || role !== "aluno") return;
+
+    const channel = supabase
+      .channel(`student-access-state:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "student_access_state",
+          filter: `student_id=eq.${user.id}`,
+        },
+        (payload: any) => {
+          if (payload.new?.allowed === false) {
+            setIsBlocked(true);
+            navigate("/acesso-suspenso", { replace: true });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [navigate, role, user]);
 
   if (loading || checkingAccess) {
     return (

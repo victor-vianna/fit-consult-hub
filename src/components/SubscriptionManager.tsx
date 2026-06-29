@@ -236,11 +236,34 @@ export function SubscriptionManager({
     onChanged?.();
   };
 
+  const getSubscriptionReferenceTime = (sub: Subscription) => {
+    const value = sub.data_pagamento || sub.created_at || sub.data_expiracao;
+    const time = value ? new Date(value).getTime() : 0;
+    return Number.isFinite(time) ? time : 0;
+  };
+
+  const hasLaterPaidSubscription = (sub: Subscription) => {
+    const currentTime = getSubscriptionReferenceTime(sub);
+    return subscriptions.some((other) => {
+      if (other.id === sub.id || other.status_pagamento !== "pago") return false;
+      return getSubscriptionReferenceTime(other) > currentTime;
+    });
+  };
+
   const getStatusBadge = (sub: Subscription) => {
     const expirada = new Date(sub.data_expiracao) < new Date();
     // Se a assinatura está marcada como paga mas a data já passou,
     // exibe "Não renovado" em vez de "Pago".
     if (sub.status_pagamento === "pago" && expirada) {
+      if (hasLaterPaidSubscription(sub)) {
+        return (
+          <Badge className="bg-blue-500">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Renovado
+          </Badge>
+        );
+      }
+
       return (
         <Badge className="bg-orange-500">
           <AlertCircle className="h-3 w-3 mr-1" />

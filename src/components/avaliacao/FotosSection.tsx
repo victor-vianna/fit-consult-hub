@@ -10,7 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Eye, X, Camera, Image as ImageIcon, Calendar, Edit } from "lucide-react";
+import { Plus, Trash2, Eye, X, Camera, Image as ImageIcon, ArrowLeftRight, Edit } from "lucide-react";
 import { format } from "date-fns";
 import { FotoTimeline } from "./FotoTimeline";
 import { getFotosSignedMap, getFotoSignedUrl } from "@/utils/fotosEvolucao";
@@ -180,8 +180,8 @@ export function FotosSection({ profileId, personalId, themeColor, refreshKey, on
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setViewMode(viewMode === "galeria" ? "timeline" : "galeria")}>
-              {viewMode === "galeria" ? <Calendar className="h-4 w-4 mr-1" /> : <ImageIcon className="h-4 w-4 mr-1" />}
-              {viewMode === "galeria" ? "Timeline" : "Galeria"}
+              {viewMode === "galeria" ? <ArrowLeftRight className="h-4 w-4 mr-1" /> : <ImageIcon className="h-4 w-4 mr-1" />}
+              {viewMode === "galeria" ? "Comparar" : "Galeria"}
             </Button>
             <Button size="sm" style={{ backgroundColor: themeColor }} onClick={() => setOpenUpload(true)}>
               <Plus className="h-4 w-4 mr-1" /> Foto

@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Eye, X, Camera, Image as ImageIcon, ArrowLeftRight, Edit } from "lucide-react";
 import { format } from "date-fns";
-import { FotoTimeline } from "./FotoTimeline";
+import { FotoTimeline, type ReleasedPhotoComparison } from "./FotoTimeline";
 import { getFotosSignedMap, getFotoSignedUrl } from "@/utils/fotosEvolucao";
 import { formatDisplayDate } from "@/utils/dateFormat";
 
@@ -56,9 +56,11 @@ export function FotosSection({ profileId, personalId, themeColor, refreshKey, on
   const [editingFoto, setEditingFoto] = useState<FotoEvolucao | null>(null);
   const [editDate, setEditDate] = useState("");
   const [viewMode, setViewMode] = useState<"galeria" | "timeline">("galeria");
+  const [releasedComparisons, setReleasedComparisons] = useState<ReleasedPhotoComparison[]>([]);
 
   useEffect(() => {
     fetchFotos();
+    fetchReleasedComparisons();
   }, [profileId, refreshKey]);
 
   const fetchFotos = async () => {
@@ -84,6 +86,20 @@ export function FotosSection({ profileId, personalId, themeColor, refreshKey, on
       console.error("Erro ao buscar fotos:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchReleasedComparisons = async () => {
+    try {
+      const { data, error } = await (supabase.from("foto_comparativos_liberados") as any)
+        .select("id, data_antes, data_depois, titulo, observacoes, created_at")
+        .eq("profile_id", profileId)
+        .eq("personal_id", personalId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      setReleasedComparisons(data || []);
+    } catch (error: any) {
+      console.error("Erro ao buscar comparativos liberados:", error);
     }
   };
 
@@ -163,6 +179,44 @@ export function FotosSection({ profileId, personalId, themeColor, refreshKey, on
     }
   };
 
+  const handleReleaseComparison = async (dataAntes: string, dataDepois: string) => {
+    try {
+      const { error } = await (supabase.from("foto_comparativos_liberados") as any).insert({
+        profile_id: profileId,
+        personal_id: personalId,
+        data_antes: dataAntes,
+        data_depois: dataDepois,
+      });
+      if (error) throw error;
+      toast({ title: "Comparativo liberado para o aluno" });
+      fetchReleasedComparisons();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao liberar comparativo",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRevokeComparison = async (comparisonId: string) => {
+    try {
+      const { error } = await (supabase.from("foto_comparativos_liberados") as any)
+        .delete()
+        .eq("id", comparisonId)
+        .eq("personal_id", personalId);
+      if (error) throw error;
+      toast({ title: "Comparativo removido da area do aluno" });
+      fetchReleasedComparisons();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao revogar comparativo",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const fotosFiltradas = filtroTipo === "todos" ? fotos : fotos.filter((f) => f.tipo_foto === filtroTipo);
 
   const contagemPorTipo = Object.keys(TIPOS_FOTO).reduce((acc, tipo) => {
@@ -213,7 +267,15 @@ export function FotosSection({ profileId, personalId, themeColor, refreshKey, on
 
       <CardContent className="pt-4">
         {viewMode === "timeline" ? (
-          <FotoTimeline fotos={fotosFiltradas} onDelete={handleDeleteFoto} onEditDate={(f) => { setEditingFoto(f); setEditDate(f.data_foto || ""); }} onView={(url) => { setSelectedFoto(url); setViewerOpen(true); }} />
+          <FotoTimeline
+            fotos={fotosFiltradas}
+            onDelete={handleDeleteFoto}
+            onEditDate={(f) => { setEditingFoto(f); setEditDate(f.data_foto || ""); }}
+            onView={(url) => { setSelectedFoto(url); setViewerOpen(true); }}
+            releasedComparisons={releasedComparisons}
+            onReleaseComparison={handleReleaseComparison}
+            onRevokeComparison={handleRevokeComparison}
+          />
         ) : fotosFiltradas.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {fotosFiltradas.map((foto) => (

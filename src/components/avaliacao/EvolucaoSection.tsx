@@ -1,10 +1,12 @@
-import { useState, useEffect, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useMemo, useState } from "react";
+import { subMonths, subWeeks, subYears } from "date-fns";
+import { Line, LineChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Table2, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { subMonths, subYears, subWeeks } from "date-fns";
-import { TrendingUp } from "lucide-react";
+import { EVOLUTION_METRICS, flattenAssessmentMetric, formatMetricValue } from "@/utils/avaliacaoMetrics";
 import { formatDisplayDate } from "@/utils/dateFormat";
 
 interface Props {
@@ -13,26 +15,17 @@ interface Props {
   themeColor?: string;
 }
 
-type Metric = "peso" | "percentual_gordura" | "massa_magra" | "imc" | "cintura" | "quadril" | "braco_direito" | "coxa_direita";
+type Period = "4sem" | "3m" | "6m" | "1a" | "todos";
 
-const METRICS: { key: Metric; label: string; color: string; unit: string }[] = [
-  { key: "peso", label: "Peso", color: "#3b82f6", unit: "kg" },
-  { key: "percentual_gordura", label: "% Gordura", color: "#ef4444", unit: "%" },
-  { key: "massa_magra", label: "Massa Magra", color: "#22c55e", unit: "kg" },
-  { key: "imc", label: "IMC", color: "#f59e0b", unit: "" },
-  { key: "cintura", label: "Cintura", color: "#8b5cf6", unit: "cm" },
-  { key: "quadril", label: "Quadril", color: "#ec4899", unit: "cm" },
-  { key: "braco_direito", label: "Braço D", color: "#06b6d4", unit: "cm" },
-  { key: "coxa_direita", label: "Coxa D", color: "#14b8a6", unit: "cm" },
-];
+const DEFAULT_METRICS = ["peso", "percentual_gordura"];
 
-export function EvolucaoSection({ profileId, personalId, themeColor }: Props) {
+export function EvolucaoSection({ profileId }: Props) {
   const [avaliacoes, setAvaliacoes] = useState<any[]>([]);
-  const [selectedMetrics, setSelectedMetrics] = useState<Metric[]>(["peso", "percentual_gordura"]);
-  const [period, setPeriod] = useState<"4sem" | "3m" | "6m" | "1a" | "todos">("todos");
+  const [selectedMetrics, setSelectedMetrics] = useState<string[]>(DEFAULT_METRICS);
+  const [period, setPeriod] = useState<Period>("todos");
 
   useEffect(() => {
-    const fetch = async () => {
+    const fetchData = async () => {
       const { data } = await supabase
         .from("avaliacoes_fisicas")
         .select("*")
@@ -40,100 +33,168 @@ export function EvolucaoSection({ profileId, personalId, themeColor }: Props) {
         .order("data_avaliacao", { ascending: true });
       setAvaliacoes(data || []);
     };
-    fetch();
+    fetchData();
   }, [profileId]);
 
-  const chartData = useMemo(() => {
+  const filteredAvaliacoes = useMemo(() => {
     const now = new Date();
     let cutoff: Date | null = null;
     if (period === "4sem") cutoff = subWeeks(now, 4);
-    else if (period === "3m") cutoff = subMonths(now, 3);
-    else if (period === "6m") cutoff = subMonths(now, 6);
-    else if (period === "1a") cutoff = subYears(now, 1);
-
-    const filtered = cutoff
-      ? avaliacoes.filter((a) => new Date(a.data_avaliacao) >= cutoff!)
-      : avaliacoes;
-
-    return filtered.map((a) => ({
-      data: formatDisplayDate(a.data_avaliacao, { shortYear: true }),
-      ...METRICS.reduce((acc, m) => {
-        acc[m.key] = a[m.key] ?? null;
-        return acc;
-      }, {} as Record<string, any>),
-    }));
+    if (period === "3m") cutoff = subMonths(now, 3);
+    if (period === "6m") cutoff = subMonths(now, 6);
+    if (period === "1a") cutoff = subYears(now, 1);
+    return cutoff ? avaliacoes.filter((item) => new Date(item.data_avaliacao) >= cutoff) : avaliacoes;
   }, [avaliacoes, period]);
 
-  const toggleMetric = (m: Metric) => {
+  const availableMetrics = useMemo(() => {
+    return EVOLUTION_METRICS.filter((metric) =>
+      filteredAvaliacoes.some((avaliacao) => flattenAssessmentMetric(avaliacao, metric.key) !== null && flattenAssessmentMetric(avaliacao, metric.key) !== undefined)
+    );
+  }, [filteredAvaliacoes]);
+
+  const chartData = useMemo(() => {
+    return filteredAvaliacoes.map((avaliacao) => {
+      const row: Record<string, any> = {
+        data: formatDisplayDate(avaliacao.data_avaliacao, { shortYear: true }),
+      };
+      availableMetrics.forEach((metric) => {
+        row[metric.key] = flattenAssessmentMetric(avaliacao, metric.key);
+      });
+      return row;
+    });
+  }, [availableMetrics, filteredAvaliacoes]);
+
+  const selectedAvailable = selectedMetrics.filter((metric) => availableMetrics.some((item) => item.key === metric));
+
+  const toggleMetric = (metricKey: string) => {
     setSelectedMetrics((prev) =>
-      prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]
+      prev.includes(metricKey) ? prev.filter((item) => item !== metricKey) : [...prev, metricKey]
     );
   };
 
   return (
     <Card className="border-2 shadow-md">
       <CardHeader className="bg-gradient-to-r from-card to-muted/20">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <TrendingUp className="h-5 w-5" /> Evolução
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <TrendingUp className="h-5 w-5" /> Evolucao
         </CardTitle>
-        <div className="flex gap-1.5 flex-wrap mt-2">
-          {([
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {[
             { value: "4sem", label: "4 sem" },
             { value: "3m", label: "3 meses" },
             { value: "6m", label: "6 meses" },
             { value: "1a", label: "1 ano" },
             { value: "todos", label: "Todos" },
-          ] as const).map((p) => (
+          ].map((option) => (
             <Badge
-              key={p.value}
-              variant={period === p.value ? "default" : "outline"}
+              key={option.value}
+              variant={period === option.value ? "default" : "outline"}
               className="cursor-pointer text-xs"
-              onClick={() => setPeriod(p.value)}
+              onClick={() => setPeriod(option.value as Period)}
             >
-              {p.label}
+              {option.label}
             </Badge>
           ))}
         </div>
-        <div className="flex gap-2 flex-wrap mt-2">
-          {METRICS.map((m) => (
+        <div className="mt-2 flex max-h-28 flex-wrap gap-2 overflow-y-auto pr-1">
+          {availableMetrics.map((metric) => (
             <Badge
-              key={m.key}
-              variant={selectedMetrics.includes(m.key) ? "default" : "outline"}
+              key={metric.key}
+              variant={selectedMetrics.includes(metric.key) ? "default" : "outline"}
               className="cursor-pointer"
-              style={selectedMetrics.includes(m.key) ? { backgroundColor: m.color } : undefined}
-              onClick={() => toggleMetric(m.key)}
+              style={selectedMetrics.includes(metric.key) ? { backgroundColor: metric.color } : undefined}
+              onClick={() => toggleMetric(metric.key)}
             >
-              {m.label}
+              {metric.label}
             </Badge>
           ))}
         </div>
       </CardHeader>
       <CardContent className="pt-4">
-        {chartData.length >= 2 ? (
-          <div className="h-[350px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="data" className="text-xs" />
-                <YAxis className="text-xs" />
-                <Tooltip />
-                <Legend />
-                {selectedMetrics.map((key) => {
-                  const m = METRICS.find((x) => x.key === key)!;
-                  return (
-                    <Line key={key} type="monotone" dataKey={key} name={`${m.label} (${m.unit})`} stroke={m.color} strokeWidth={2} dot={{ r: 4 }} connectNulls />
-                  );
-                })}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <TrendingUp className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-            <p className="text-muted-foreground">Necessário ao menos 2 avaliações para gerar gráficos</p>
-          </div>
-        )}
+        <Tabs defaultValue="grafico">
+          <TabsList className="mb-4">
+            <TabsTrigger value="grafico">Grafico</TabsTrigger>
+            <TabsTrigger value="tabela" className="gap-1.5">
+              <Table2 className="h-4 w-4" /> Tabela
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="grafico">
+            {chartData.length >= 2 && selectedAvailable.length > 0 ? (
+              <div className="h-[350px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="data" className="text-xs" />
+                    <YAxis className="text-xs" />
+                    <Tooltip />
+                    <Legend />
+                    {selectedAvailable.map((key) => {
+                      const metric = availableMetrics.find((item) => item.key === key)!;
+                      return (
+                        <Line
+                          key={key}
+                          type="monotone"
+                          dataKey={key}
+                          name={`${metric.label}${metric.unit ? ` (${metric.unit})` : ""}`}
+                          stroke={metric.color}
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                          connectNulls
+                        />
+                      );
+                    })}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <EmptyEvolution />
+            )}
+          </TabsContent>
+
+          <TabsContent value="tabela">
+            {filteredAvaliacoes.length > 0 && availableMetrics.length > 0 ? (
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="w-full min-w-[720px] text-sm">
+                  <thead className="bg-muted/60">
+                    <tr>
+                      <th className="sticky left-0 z-10 bg-muted/60 px-3 py-2 text-left font-semibold">Metrica</th>
+                      {filteredAvaliacoes.map((avaliacao) => (
+                        <th key={avaliacao.id} className="px-3 py-2 text-left font-semibold">
+                          {formatDisplayDate(avaliacao.data_avaliacao, { shortYear: true })}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {availableMetrics.map((metric) => (
+                      <tr key={metric.key} className="border-t">
+                        <td className="sticky left-0 z-10 bg-card px-3 py-2 font-medium">{metric.label}</td>
+                        {filteredAvaliacoes.map((avaliacao) => (
+                          <td key={avaliacao.id} className="px-3 py-2">
+                            {formatMetricValue(flattenAssessmentMetric(avaliacao, metric.key), metric.unit)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyEvolution />
+            )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
+  );
+}
+
+function EmptyEvolution() {
+  return (
+    <div className="py-12 text-center">
+      <TrendingUp className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
+      <p className="text-muted-foreground">Necessario ao menos 2 avaliacoes com a mesma metrica para gerar graficos</p>
+    </div>
   );
 }

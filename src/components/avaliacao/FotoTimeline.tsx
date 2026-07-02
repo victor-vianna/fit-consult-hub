@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { ArrowLeftRight, ImageIcon, MoveHorizontal, RefreshCw } from "lucide-react";
+import { ArrowLeftRight, ImageIcon, MoveHorizontal, RefreshCw, Share2, Trash2 } from "lucide-react";
 import { formatDisplayDate } from "@/utils/dateFormat";
 
 interface FotoEvolucao {
@@ -29,6 +29,17 @@ interface Props {
   onDelete: (foto: FotoEvolucao) => void;
   onEditDate: (foto: FotoEvolucao) => void;
   onView: (url: string) => void;
+  releasedComparisons?: ReleasedPhotoComparison[];
+  onReleaseComparison?: (dataAntes: string, dataDepois: string) => void;
+  onRevokeComparison?: (comparisonId: string) => void;
+}
+
+export interface ReleasedPhotoComparison {
+  id: string;
+  data_antes: string;
+  data_depois: string;
+  titulo?: string | null;
+  observacoes?: string | null;
 }
 
 const TIPOS_FOTO: Record<string, string> = {
@@ -107,7 +118,13 @@ function ComparisonImage({
   );
 }
 
-export function FotoTimeline({ fotos, onView }: Props) {
+export function FotoTimeline({
+  fotos,
+  onView,
+  releasedComparisons = [],
+  onReleaseComparison,
+  onRevokeComparison,
+}: Props) {
   const [beforeDate, setBeforeDate] = useState("");
   const [afterDate, setAfterDate] = useState("");
   const [selectedAngle, setSelectedAngle] = useState("");
@@ -173,6 +190,11 @@ export function FotoTimeline({ fotos, onView }: Props) {
     normalizedBeforeDate && normalizedAfterDate
       ? getElapsedLabel(normalizedBeforeDate, normalizedAfterDate)
       : "";
+  const currentReleased = releasedComparisons.find(
+    (comparison) =>
+      comparison.data_antes === normalizedBeforeDate &&
+      comparison.data_depois === normalizedAfterDate
+  );
 
   if (groupedByDate.length === 0) {
     return (
@@ -218,6 +240,48 @@ export function FotoTimeline({ fotos, onView }: Props) {
           Trocar fotos
         </Button>
       </div>
+
+      {releasedComparisons.length > 0 && (
+        <Card className="border bg-muted/20">
+          <CardContent className="space-y-3 p-4">
+            <div>
+              <p className="font-semibold">Comparativos liberados para o aluno</p>
+              <p className="text-sm text-muted-foreground">
+                Esses pares aparecem na area do aluno ate voce revogar.
+              </p>
+            </div>
+            <div className="space-y-2">
+              {releasedComparisons.map((comparison) => (
+                <div
+                  key={comparison.id}
+                  className="flex flex-col gap-2 rounded-lg border bg-background/70 p-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <p className="text-sm font-medium">
+                      {formatDisplayDate(comparison.data_antes)} x {formatDisplayDate(comparison.data_depois)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {getElapsedLabel(comparison.data_antes, comparison.data_depois)}
+                    </p>
+                  </div>
+                  {onRevokeComparison && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 text-destructive hover:text-destructive"
+                      onClick={() => onRevokeComparison(comparison.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Revogar
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-3 md:grid-cols-2">
         <Card className="bg-muted/30">
@@ -283,6 +347,31 @@ export function FotoTimeline({ fotos, onView }: Props) {
 
       {beforeFoto && afterFoto && (
         <>
+          {onReleaseComparison && (
+            <div className="flex justify-end">
+              {currentReleased ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-2 text-destructive hover:text-destructive"
+                  onClick={() => onRevokeComparison?.(currentReleased.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Revogar comparativo do aluno
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  className="gap-2"
+                  onClick={() => onReleaseComparison(normalizedBeforeDate, normalizedAfterDate)}
+                >
+                  <Share2 className="h-4 w-4" />
+                  Liberar comparativo para o aluno
+                </Button>
+              )}
+            </div>
+          )}
+
           {mode === "side-by-side" ? (
             <div className="grid grid-cols-2 gap-2 sm:gap-4">
               <ComparisonImage

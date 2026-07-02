@@ -7,6 +7,7 @@ import { InlinePesoInput } from "@/components/InlinePesoInput";
 import { ExerciseVideoPreview } from "@/components/ExerciseVideoPreview";
 import { RestCountdownDialog } from "@/components/RestCountdownDialog";
 import { supabase } from "@/integrations/supabase/client";
+import { useWeightHistory } from "@/hooks/useWeightHistory";
 
 interface CompactExerciseCardProps {
   exercicio: {
@@ -39,6 +40,7 @@ export function CompactExerciseCard({
   className,
   treinoId,
   highlighted = false,
+  profileId,
 }: CompactExerciseCardProps) {
   const [localConcluido, setLocalConcluido] = useState(
     exercicio.concluido || false
@@ -48,6 +50,8 @@ export function CompactExerciseCard({
   );
   const [restDialogOpen, setRestDialogOpen] = useState(false);
   const isCarousel = variant === "carousel";
+  const weightHistory = useWeightHistory(exercicio.nome, profileId || null);
+  const suggestedWeight = getSuggestedWeight(weightHistory.ultimoPeso);
 
   const handleToggle = async () => {
     const novoValor = !localConcluido;
@@ -149,6 +153,9 @@ export function CompactExerciseCard({
                 pesoRecomendado={exercicio.carga || null}
                 pesoExecutado={localPesoExecutado}
                 onSave={handleSavePeso}
+                ultimoPesoHistorico={weightHistory.ultimoPeso}
+                ultimaDataHistorico={weightHistory.ultimaData}
+                sugestaoPeso={suggestedWeight}
                 compact
               />
             </div>
@@ -251,6 +258,24 @@ export function CompactExerciseCard({
       <CardContent className="p-0">{exerciseContent}</CardContent>
     </Card>
   );
+}
+
+function parseWeight(value: string | number | null | undefined) {
+  if (value === null || value === undefined) return NaN;
+  return Number(String(value).replace(",", ".").replace(/[^\d.-]/g, ""));
+}
+
+function formatWeight(value: number) {
+  if (!Number.isFinite(value)) return null;
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function getSuggestedWeight(lastWeight: string | null) {
+  const parsed = parseWeight(lastWeight);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+
+  const increment = parsed < 10 ? 1 : parsed < 40 ? 2 : 2.5;
+  return formatWeight(parsed + increment);
 }
 
 export default CompactExerciseCard;

@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Check, X, Edit2 } from "lucide-react";
+import { Check, X, Edit2, History, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { formatDisplayMonthDay } from "@/utils/dateFormat";
 
 interface InlinePesoInputProps {
   exercicioId: string;
@@ -12,6 +13,9 @@ interface InlinePesoInputProps {
   onSave: (exercicioId: string, peso: string) => Promise<void>;
   disabled?: boolean;
   compact?: boolean;
+  ultimoPesoHistorico?: string | null;
+  ultimaDataHistorico?: string | null;
+  sugestaoPeso?: string | null;
 }
 
 export function InlinePesoInput({
@@ -20,7 +24,10 @@ export function InlinePesoInput({
   pesoExecutado,
   onSave,
   disabled = false,
-  compact = false
+  compact = false,
+  ultimoPesoHistorico = null,
+  ultimaDataHistorico = null,
+  sugestaoPeso = null,
 }: InlinePesoInputProps) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(pesoExecutado || pesoRecomendado || "");
@@ -49,6 +56,22 @@ export function InlinePesoInput({
     }
   };
 
+  const handleQuickSave = async (peso: string) => {
+    if (!peso.trim()) return;
+    setValue(peso.trim());
+    setSaving(true);
+    try {
+      await onSave(exercicioId, peso.trim());
+      setEditing(false);
+      toast.success("Peso atualizado!");
+    } catch (error) {
+      console.error("Erro ao salvar peso:", error);
+      toast.error("Erro ao salvar peso");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleCancel = () => {
     setValue(pesoExecutado || pesoRecomendado || "");
     setEditing(false);
@@ -57,6 +80,69 @@ export function InlinePesoInput({
   if (!editing) {
     const displayValue = value || pesoRecomendado || "";
     
+    if (!pesoExecutado && ultimoPesoHistorico) {
+      return (
+        <div className="w-full min-w-[220px] space-y-2 rounded-lg border bg-muted/30 p-2">
+          <div className="flex items-start gap-2">
+            <History className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <div className="min-w-0 text-xs">
+              <p className="text-muted-foreground">Ultima carga usada</p>
+              <p className="font-mono font-semibold text-foreground">
+                {ultimoPesoHistorico}kg
+                {ultimaDataHistorico && (
+                  <span className="font-sans font-normal text-muted-foreground">
+                    {" "}em {formatDisplayMonthDay(ultimaDataHistorico)}
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-1.5">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-auto flex-col gap-0.5 px-1 py-2 text-xs"
+              disabled={disabled || saving}
+              onClick={() => handleQuickSave(ultimoPesoHistorico)}
+            >
+              <span className="font-mono font-bold">{ultimoPesoHistorico}kg</span>
+              <span className="text-[10px] text-muted-foreground">Manter</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-auto flex-col gap-0.5 border-green-500/60 px-1 py-2 text-xs text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950/30"
+              disabled={disabled || saving || !sugestaoPeso}
+              onClick={() => sugestaoPeso && handleQuickSave(sugestaoPeso)}
+            >
+              <span className="flex items-center gap-1 font-mono font-bold">
+                <TrendingUp className="h-3 w-3" />
+                {sugestaoPeso || ultimoPesoHistorico}kg
+              </span>
+              <span className="text-[10px] text-green-700/80 dark:text-green-400/80">Aumentar</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-auto flex-col gap-0.5 px-1 py-2 text-xs"
+              disabled={disabled || saving}
+              onClick={() => {
+                setValue(sugestaoPeso || ultimoPesoHistorico);
+                setEditing(true);
+              }}
+            >
+              <Edit2 className="h-3.5 w-3.5" />
+              <span className="text-[10px] text-muted-foreground">Outra</span>
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
     if (!displayValue) {
       // No weight set yet - show "Registrar" button
       return (

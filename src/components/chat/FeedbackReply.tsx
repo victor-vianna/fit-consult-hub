@@ -25,7 +25,6 @@ const CAMPOS_CITAVEIS: Array<{ key: string; label: string; tipo: "texto" | "nota
   { key: "dores_corpo", label: "⚠️ Dores no corpo", tipo: "texto" },
   { key: "estado_emocional", label: "🧠 Estado emocional", tipo: "texto" },
   { key: "mudanca_rotina", label: "🔄 Mudança na rotina", tipo: "texto" },
-  { key: "semana_planejamento", label: "📋 Planejamento da semana", tipo: "texto" },
   { key: "justificativa_empenho", label: "💪 Justificativa do empenho", tipo: "texto" },
   { key: "justificativa_alimentacao", label: "🥗 Justificativa da alimentação", tipo: "texto" },
   { key: "justificativa_sono", label: "😴 Justificativa do sono", tipo: "texto" },

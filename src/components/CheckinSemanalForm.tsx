@@ -99,7 +99,6 @@ export function CheckinSemanalForm({
     estado_emocional: "",
     comentario_saude: "",
     mudanca_rotina: "",
-    semana_planejamento: "",
     duvidas: "",
   });
 
@@ -193,7 +192,6 @@ export function CheckinSemanalForm({
           estado_emocional: data.estado_emocional || "",
           comentario_saude: data.comentario_saude || "",
           mudanca_rotina: data.mudanca_rotina || "",
-          semana_planejamento: data.semana_planejamento || "",
           duvidas: data.duvidas || "",
         });
       }
@@ -230,7 +228,6 @@ export function CheckinSemanalForm({
       qualidade_vida: qualidadeVida[0],
       nivel_dificuldade: nivelDificuldade[0],
       mudanca_rotina: formData.mudanca_rotina,
-      semana_planejamento: formData.semana_planejamento,
       duvidas: formData.duvidas,
     };
 
@@ -626,20 +623,6 @@ export function CheckinSemanalForm({
               value={formData.mudanca_rotina}
               onChange={(e) =>
                 handleInputChange("mudanca_rotina", e.target.value)
-              }
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="semana_planejamento">
-              📊 Qual semana do planejamento você está hoje?
-            </Label>
-            <Input
-              id="semana_planejamento"
-              placeholder="Ex: Semana 4 de 8"
-              value={formData.semana_planejamento}
-              onChange={(e) =>
-                handleInputChange("semana_planejamento", e.target.value)
               }
             />
           </div>

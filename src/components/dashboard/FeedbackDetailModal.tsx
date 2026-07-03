@@ -267,19 +267,13 @@ export function FeedbackDetailModal({
                 )}
 
                 {/* Comentários livres */}
-                {(checkin.mudanca_rotina || checkin.semana_planejamento || checkin.duvidas || checkin.comentario_saude) && (
+                {(checkin.mudanca_rotina || checkin.duvidas || checkin.comentario_saude) && (
                   <Card className="border-2">
                     <CardContent className="pt-4 space-y-3">
                       {checkin.mudanca_rotina && (
                         <div>
                           <p className="text-xs font-semibold text-muted-foreground mb-0.5">🔄 Mudança na rotina</p>
                           <p className="text-sm">{checkin.mudanca_rotina}</p>
-                        </div>
-                      )}
-                      {checkin.semana_planejamento && (
-                        <div>
-                          <p className="text-xs font-semibold text-muted-foreground mb-0.5">📋 Planejamento da semana</p>
-                          <p className="text-sm">{checkin.semana_planejamento}</p>
                         </div>
                       )}
                       {checkin.duvidas && (

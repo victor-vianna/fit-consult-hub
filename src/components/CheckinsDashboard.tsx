@@ -685,7 +685,6 @@ export function CheckinsDashboard({
               </Card>
 
               {(selectedCheckin.mudanca_rotina ||
-                selectedCheckin.semana_planejamento ||
                 selectedCheckin.duvidas) && (
                 <Card className="border-2">
                   <CardHeader>
@@ -702,16 +701,6 @@ export function CheckinsDashboard({
                         </p>
                         <p className="text-sm">
                           {selectedCheckin.mudanca_rotina}
-                        </p>
-                      </div>
-                    )}
-                    {selectedCheckin.semana_planejamento && (
-                      <div>
-                        <p className="text-sm font-semibold text-muted-foreground mb-1">
-                          📊 Semana do Planejamento:
-                        </p>
-                        <p className="text-sm">
-                          {selectedCheckin.semana_planejamento}
                         </p>
                       </div>
                     )}

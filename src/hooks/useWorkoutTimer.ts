@@ -903,7 +903,7 @@ export function useWorkoutTimer({
   const cancelar = async () => {
     if (!sessaoId) {
       toast.error("Nenhuma sessão ativa");
-      return;
+      return false;
     }
 
     try {
@@ -913,6 +913,25 @@ export function useWorkoutTimer({
         .eq("id", sessaoId);
 
       if (error) throw error;
+
+      const resetResults = await Promise.allSettled([
+        supabase
+          .from("exercicios")
+          .update({ concluido: false })
+          .eq("treino_semanal_id", treinoId),
+        supabase
+          .from("blocos_treino")
+          .update({ concluido: false, concluido_em: null })
+          .eq("treino_semanal_id", treinoId),
+      ]);
+      const resetErrors = resetResults.filter(
+        (result) =>
+          result.status === "rejected" ||
+          (result.status === "fulfilled" && result.value.error)
+      );
+      if (resetErrors.length > 0) {
+        console.error("[useWorkoutTimer] Erro ao resetar progresso no cancelamento:", resetErrors);
+      }
 
       localStorage.removeItem(getStorageKey(treinoId));
       setIsRunning(false);
@@ -930,10 +949,14 @@ export function useWorkoutTimer({
       totalPausedMsRef.current = 0;
       restStartTimestampRef.current = 0;
 
+      dispatchWorkoutEvent(WORKOUT_EVENTS.PROGRESS_CHANGED, { treinoId, profileId, personalId });
+
       toast.info("Treino cancelado");
+      return true;
     } catch (err) {
       console.error("Erro ao cancelar treino:", err);
       toast.error("Erro ao cancelar treino");
+      return false;
     }
   };
 

@@ -941,6 +941,9 @@ export function WorkoutDayView({
                       resetLocalProgressForTreino(finishedTreinoId);
                       onWorkoutFinished?.();
                     }}
+                    onTreinoCancelado={(canceledTreinoId) => {
+                      resetLocalProgressForTreino(canceledTreinoId);
+                    }}
                     handleToggleExercicio={handleToggleExercicio}
                     handleToggleGrupo={handleToggleGrupo}
                     handleToggleBloco={handleToggleBloco}
@@ -977,6 +980,7 @@ function TreinoCard({
   marcarTreinoIniciado,
   marcarTreinoFinalizado,
   onTreinoConcluido,
+  onTreinoCancelado,
   handleToggleExercicio,
   handleToggleGrupo,
   handleToggleBloco,
@@ -1001,6 +1005,7 @@ function TreinoCard({
   marcarTreinoIniciado: (treinoId: string, dia: number) => void;
   marcarTreinoFinalizado: (treinoId: string, dia: number) => void;
   onTreinoConcluido: (treinoId: string) => void;
+  onTreinoCancelado: (treinoId: string) => void;
   handleToggleExercicio: (id: string, concluido: boolean) => Promise<any>;
   handleToggleGrupo: (grupoId: string, concluido: boolean) => Promise<void>;
   handleToggleBloco: (blocoId: string, concluido: boolean) => Promise<void>;
@@ -1027,7 +1032,10 @@ function TreinoCard({
               marcarTreinoFinalizado(treinoId, treino.dia);
               onTreinoConcluido(treinoId);
             }}
-            onWorkoutCancel={() => marcarTreinoFinalizado(treinoId, treino.dia)}
+            onWorkoutCancel={() => {
+              marcarTreinoFinalizado(treinoId, treino.dia);
+              onTreinoCancelado(treinoId);
+            }}
           />
         )}
 

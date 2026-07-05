@@ -190,18 +190,30 @@ export function WorkoutBlockCard({
 
     return (
       <Card
+        role="button"
+        tabIndex={0}
+        onClick={() => setExpanded((value) => !value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setExpanded((value) => !value);
+          }
+        }}
         className={cn(
-          "overflow-hidden rounded-none border-x-0 border-t-0 shadow-none transition-colors",
+          "overflow-hidden rounded-lg border shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           corClass,
           bloco.concluido && "opacity-80"
         )}
       >
-        <CardContent className="p-3 sm:p-4">
-          <div className="flex items-center gap-3">
+        <CardContent className="p-3">
+          <div className="flex min-h-[76px] items-center gap-3">
             {onToggleConcluido ? (
               <button
                 type="button"
-                onClick={handleToggleBloco}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleToggleBloco();
+                }}
                 aria-label={
                   bloco.concluido
                     ? `Desmarcar ${bloco.nome}`
@@ -249,19 +261,26 @@ export function WorkoutBlockCard({
                 {duration ? (
                   <p className="flex items-center gap-1">
                     <Clock className="h-3.5 w-3.5 shrink-0" />
-                    <span>Duração: {formatarDuracao(duration)}</span>
+                    <span>{formatarDuracao(duration)}</span>
                   </p>
                 ) : null}
 
-                {mainDetails.length > 0 ? (
+                {expanded && mainDetails.length > 0 ? (
                   <p className="capitalize">{mainDetails.filter(Boolean).join(" • ")}</p>
                 ) : null}
 
-                {description ? (
+                {expanded && description ? (
                   <p className="line-clamp-2 italic">{description}</p>
                 ) : null}
               </div>
             </div>
+
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                expanded && "rotate-180"
+              )}
+            />
           </div>
         </CardContent>
       </Card>
@@ -270,8 +289,17 @@ export function WorkoutBlockCard({
 
   return (
     <Card
+      role="button"
+      tabIndex={0}
+      onClick={() => setExpanded((value) => !value)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          setExpanded((value) => !value);
+        }
+      }}
       className={cn(
-        "group hover:shadow-md transition-all duration-300",
+        "group cursor-pointer hover:shadow-md transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         corClass,
         bloco.concluido && "opacity-75"
       )}
@@ -362,7 +390,7 @@ export function WorkoutBlockCard({
               </div>
 
               {/* Descrição - fallback para observações das configs */}
-              {(bloco.descricao || 
+              {expanded && (bloco.descricao || 
                 bloco.config_alongamento?.observacoes || 
                 bloco.config_aquecimento?.observacoes) && (
                 <p className="text-base md:text-sm text-muted-foreground">
@@ -373,7 +401,7 @@ export function WorkoutBlockCard({
               )}
 
               {/* Detalhes por tipo */}
-              {(!readOnly || expanded) && (
+              {expanded && (
               <div className="space-y-2">
                 {/* CARDIO */}
                 {bloco.tipo === "cardio" && bloco.config_cardio && (
@@ -609,11 +637,14 @@ export function WorkoutBlockCard({
 
 
           {/* Botão expandir (aluno) */}
-          {readOnly && !bloco.concluido && (
+          {!bloco.concluido && (
             <Button
               size="icon"
               variant="ghost"
-              onClick={() => setExpanded((v) => !v)}
+              onClick={(event) => {
+                event.stopPropagation();
+                setExpanded((v) => !v);
+              }}
               aria-expanded={expanded}
               aria-label={expanded ? "Recolher" : "Expandir"}
               className="shrink-0 h-11 w-11 min-h-[44px] min-w-[44px]"
@@ -630,12 +661,16 @@ export function WorkoutBlockCard({
 
           {/* Ações (só para Personal) */}
           {!readOnly && (
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div
+              className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={(event) => event.stopPropagation()}
+            >
               {onSaveAsTemplate && (
                 <Button 
                   size="icon" 
                   variant="ghost" 
-                  onClick={() => {
+                  onClick={(event) => {
+                    event.stopPropagation();
                     setTemplateName(bloco.nome);
                     setSaveDialogOpen(true);
                   }}
@@ -649,7 +684,10 @@ export function WorkoutBlockCard({
                 <Button 
                   size="icon" 
                   variant="ghost" 
-                  onClick={onEdit}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onEdit();
+                  }}
                   className="h-10 w-10 md:h-9 md:w-9 touch-target"
                 >
                   <Edit className="h-5 w-5 md:h-4 md:w-4" />
@@ -660,7 +698,10 @@ export function WorkoutBlockCard({
                   size="icon"
                   variant="ghost"
                   className="h-10 w-10 md:h-9 md:w-9 text-destructive hover:text-destructive touch-target"
-                  onClick={onDelete}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onDelete();
+                  }}
                 >
                   <Trash2 className="h-5 w-5 md:h-4 md:w-4" />
                 </Button>

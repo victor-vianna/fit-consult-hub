@@ -95,7 +95,9 @@ export function WorkoutTimer({
   };
 
   const handleCancelar = async () => {
-    await cancelar();
+    const cancelado = await cancelar();
+    if (!cancelado) return;
+
     setShowCancelarDialog(false);
     onWorkoutCancel?.();
   };

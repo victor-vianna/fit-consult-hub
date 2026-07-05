@@ -85,6 +85,7 @@ import { ExportTreinoDialog } from "@/components/ExportTreinoDialog";
 import { usePersistedState } from "@/hooks/usePersistedState";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { AnamneseWorkoutNotes } from "@/components/AnamneseWorkoutNotes";
+import { StudentWorkoutPreview } from "@/components/StudentWorkoutPreview";
 
 import {
   DndContext,
@@ -119,6 +120,8 @@ interface TreinosManagerProps {
   readOnly?: boolean;
   onWorkoutFinished?: () => void;
 }
+
+type WorkoutViewMode = "editor" | "preview" | "split";
 
 type DialogExercicio = {
   id?: string;
@@ -294,6 +297,12 @@ export function TreinosManager({
     "treinos",
     { storage: "session" }
   );
+  const [workoutViewMode, setWorkoutViewMode] =
+    usePersistedState<WorkoutViewMode>(
+      `tm-workout-view-mode:${profileId}`,
+      "editor",
+      { storage: "session" }
+    );
   const [exercicioTemp, setExercicioTemp] =
     useState<Partial<DialogExercicio> | null>(null);
   const [loadingStates, setLoadingStates] = useState({
@@ -1285,6 +1294,11 @@ export function TreinosManager({
 
               // Build unified list for drag-and-drop
               const unifiedList = buildUnifiedList(exerciciosIsolados, grupos, blocos);
+              const canUsePreviewMode = isPersonal && !readOnly;
+              const showEditorPane =
+                !canUsePreviewMode || workoutViewMode !== "preview";
+              const showPreviewPane =
+                canUsePreviewMode && workoutViewMode !== "editor";
 
               return (
                 <Collapsible
@@ -1597,6 +1611,44 @@ export function TreinosManager({
 
                     <CollapsibleContent>
                       <CardContent className="pt-0">
+                        {canUsePreviewMode && (
+                          <div className="mb-4 flex flex-col gap-2 rounded-lg border bg-muted/20 p-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium">
+                                Modo de edição
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Edite o treino e valide a experiência do aluno.
+                              </p>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-1 rounded-md bg-background p-1">
+                              {(
+                                [
+                                  ["editor", "Editor"],
+                                  ["split", "Lado a lado"],
+                                  ["preview", "Prévia"],
+                                ] as const
+                              ).map(([mode, label]) => (
+                                <Button
+                                  key={mode}
+                                  type="button"
+                                  size="sm"
+                                  variant={
+                                    workoutViewMode === mode
+                                      ? "default"
+                                      : "ghost"
+                                  }
+                                  className="h-8 px-2 text-xs"
+                                  onClick={() => setWorkoutViewMode(mode)}
+                                >
+                                  {label}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                         {!temExercicios && !temBlocos && grupos.length === 0 ? (
                           <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
                             <div className="p-3 bg-muted rounded-full">
@@ -1613,18 +1665,28 @@ export function TreinosManager({
                             </div>
                           </div>
                         ) : (
-                          <DndContext
-                            sensors={sensors}
-                            collisionDetection={closestCenter}
-                            onDragEnd={(event) =>
-                              handleUnifiedDragEnd(event, treino.dia, unifiedList)
-                            }
+                          <div
+                            className={cn(
+                              "gap-4",
+                              showEditorPane && showPreviewPane
+                                ? "grid xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.9fr)]"
+                                : "space-y-4"
+                            )}
                           >
-                            <SortableContext
-                              items={unifiedList.map((item) => item.sortableId)}
-                              strategy={verticalListSortingStrategy}
-                            >
-                              <div className="space-y-3">
+                            {showEditorPane && (
+                              <div className="min-w-0 space-y-3">
+                                <DndContext
+                                  sensors={sensors}
+                                  collisionDetection={closestCenter}
+                                  onDragEnd={(event) =>
+                                    handleUnifiedDragEnd(event, treino.dia, unifiedList)
+                                  }
+                                >
+                                  <SortableContext
+                                    items={unifiedList.map((item) => item.sortableId)}
+                                    strategy={verticalListSortingStrategy}
+                                  >
+                                    <div className="space-y-3">
                                 {unifiedList.map((item, idx) => {
                                   if (item.type === "block") {
                                     const bloco = item.data;
@@ -1728,9 +1790,21 @@ export function TreinosManager({
                                     />
                                   );
                                 })}
+                                    </div>
+                                  </SortableContext>
+                                </DndContext>
                               </div>
-                            </SortableContext>
-                          </DndContext>
+                            )}
+
+                            {showPreviewPane && (
+                              <StudentWorkoutPreview
+                                items={unifiedList}
+                                diaNome={diaInfo.nome}
+                                treinoNome={treino.nome_treino}
+                                className="min-w-0"
+                              />
+                            )}
+                          </div>
                         )}
                       </CardContent>
                     </CollapsibleContent>

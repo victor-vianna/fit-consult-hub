@@ -1,21 +1,21 @@
 // components/GroupedExerciseCard.tsx
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   ArrowRight,
-  Play,
+  BookOpen,
+  CheckCircle2,
+  ChevronDown,
+  Circle,
   Clock,
   Dumbbell,
-  CheckCircle2,
-  Circle,
   Edit,
-  Trash2,
   GripVertical,
+  Play,
   Repeat,
-  ArrowDown,
-  BookOpen,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -23,19 +23,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { InlinePesoInput } from "@/components/InlinePesoInput";
 import { useExerciseLibrary } from "@/hooks/useExerciseLibrary";
 
-// ✅ Tipos de agrupamento suportados
 const TIPOS_AGRUPAMENTO = {
-  normal: { label: "Normal", icon: "🏋️" },
-  "bi-set": { label: "Bi-Set", icon: "🔄" },
-  "tri-set": { label: "Tri-Set", icon: "🔄🔄" },
-  "drop-set": { label: "Drop-Set", icon: "📉" },
-  superset: { label: "Super-Set", icon: "⚡" },
-  circuito: { label: "Circuito", icon: "🔁" },
+  normal: { label: "Normal" },
+  "bi-set": { label: "Bi-Set" },
+  "tri-set": { label: "Tri-Set" },
+  "drop-set": { label: "Drop-Set" },
+  superset: { label: "Super-Set" },
+  circuito: { label: "Circuito" },
 } as const;
 
 type TipoAgrupamento = keyof typeof TIPOS_AGRUPAMENTO;
 
-// ✅ Interface do exercício agrupado (baseada nos hooks)
 interface ExercicioAgrupado {
   id: string;
   nome: string;
@@ -50,7 +48,6 @@ interface ExercicioAgrupado {
   ordem_no_grupo?: number | null;
 }
 
-// ✅ Interface do grupo (baseada em useExerciseGroups)
 interface GrupoExercicio {
   grupo_id: string;
   tipo_agrupamento: TipoAgrupamento | string;
@@ -88,50 +85,43 @@ export function GroupedExerciseCard({
   dragListeners,
   dragAttributes,
 }: GroupedExerciseCardProps) {
-  // Estado local para updates otimistas
   const [localExercicios, setLocalExercicios] = useState<ExercicioAgrupado[]>(
     grupo.exercicios || []
   );
+  const [expanded, setExpanded] = useState(false);
+  const { abrirExercicioNaBiblioteca } = useExerciseLibrary();
 
-  // Sincronizar com props quando mudarem
   useEffect(() => {
     setLocalExercicios(grupo.exercicios || []);
   }, [grupo.exercicios]);
 
-  // ✅ Tipo do agrupamento
   const tipoAtual = (grupo.tipo_agrupamento || "bi-set") as TipoAgrupamento;
   const tipoConfig =
     TIPOS_AGRUPAMENTO[tipoAtual] || TIPOS_AGRUPAMENTO["bi-set"];
 
-  // Status do grupo
   const todosConcluidos =
     localExercicios.length > 0 && localExercicios.every((e) => e.concluido);
   const algumConcluido = localExercicios.some((e) => e.concluido);
-  const nenhumConcluido = !algumConcluido;
+  const totalExercicios = localExercicios.length;
 
-  const { abrirExercicioNaBiblioteca } = useExerciseLibrary();
-
-  // ✅ Handler para toggle de exercício individual
   const handleToggleExercicio = async (
     exercicioId: string,
     concluido: boolean
   ) => {
     if (!onToggleConcluido) return;
 
-    // Haptic feedback
     if ("vibrate" in navigator) {
       navigator.vibrate(10);
     }
 
-    // Update otimista
     setLocalExercicios((prev) =>
       prev.map((e) => (e.id === exercicioId ? { ...e, concluido } : e))
     );
 
     try {
       await onToggleConcluido(exercicioId, concluido);
-      
-      const exercicio = localExercicios.find(e => e.id === exercicioId);
+
+      const exercicio = localExercicios.find((e) => e.id === exercicioId);
       if (exercicio) {
         if (concluido) {
           toast.success(`✓ ${exercicio.nome} concluído!`, {
@@ -139,14 +129,13 @@ export function GroupedExerciseCard({
           });
         } else {
           toast.info(`↻ ${exercicio.nome} desmarcado`, {
-            duration: 1500
+            duration: 1500,
           });
         }
       }
     } catch (error) {
       console.error("[GroupedExerciseCard] Erro ao marcar exercício:", error);
       toast.error("Erro ao atualizar exercício");
-      // Reverter em caso de erro
       setLocalExercicios((prev) =>
         prev.map((e) =>
           e.id === exercicioId ? { ...e, concluido: !concluido } : e
@@ -155,44 +144,34 @@ export function GroupedExerciseCard({
     }
   };
 
-  // ✅ Handler para toggle de grupo completo
   const handleToggleGrupo = async () => {
-    if (!onToggleGrupoConcluido || !grupo.grupo_id) {
-      console.warn("[GroupedExerciseCard] Toggle de grupo não disponível:", {
-        hasHandler: !!onToggleGrupoConcluido,
-        grupoId: grupo.grupo_id,
-      });
-      return;
-    }
+    if (!onToggleGrupoConcluido || !grupo.grupo_id) return;
 
-    // Haptic feedback
     if ("vibrate" in navigator) {
       navigator.vibrate(10);
     }
 
     const novoStatus = !todosConcluidos;
 
-    // Update otimista
     setLocalExercicios((prev) =>
       prev.map((e) => ({ ...e, concluido: novoStatus }))
     );
 
     try {
       await onToggleGrupoConcluido(grupo.grupo_id, novoStatus);
-      
+
       if (novoStatus) {
-        toast.success(`✓ Grupo ${tipoConfig.label} concluído!`, {
+        toast.success(`✓ ${tipoConfig.label} concluído!`, {
           duration: 2000,
         });
       } else {
-        toast.info(`↻ Grupo ${tipoConfig.label} desmarcado`, {
-          duration: 1500
+        toast.info(`↻ ${tipoConfig.label} desmarcado`, {
+          duration: 1500,
         });
       }
     } catch (error) {
       console.error("[GroupedExerciseCard] Erro ao marcar grupo:", error);
       toast.error("Erro ao atualizar grupo");
-      // Reverter em caso de erro
       setLocalExercicios(grupo.exercicios || []);
     }
   };
@@ -203,7 +182,7 @@ export function GroupedExerciseCard({
         .from("exercicios")
         .update({ peso_executado: peso })
         .eq("id", exercicioId);
-      
+
       if (error) throw error;
     } catch (error) {
       console.error("Erro ao atualizar peso:", error);
@@ -211,7 +190,6 @@ export function GroupedExerciseCard({
     }
   };
 
-  // ✅ Formatar carga (pode ser string ou number)
   const formatarCarga = (
     carga: string | number | null | undefined
   ): string | null => {
@@ -222,8 +200,17 @@ export function GroupedExerciseCard({
 
   return (
     <Card
+      role="button"
+      tabIndex={0}
+      onClick={() => setExpanded((value) => !value)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          setExpanded((value) => !value);
+        }
+      }}
       className={cn(
-        "group hover:shadow-md transition-all",
+        "group overflow-hidden border transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         todosConcluidos &&
           "border-green-500/50 bg-green-50/30 dark:bg-green-950/20",
         algumConcluido &&
@@ -231,18 +218,17 @@ export function GroupedExerciseCard({
           "border-yellow-500/50 bg-yellow-50/20 dark:bg-yellow-950/10"
       )}
     >
-      <CardContent className="p-4 space-y-3">
-        {/* Header do Grupo */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3 flex-1">
-            {/* Grip + Número (apenas para Personal) */}
-            <div className="flex flex-col items-center gap-1 pt-1">
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex min-h-[56px] items-center justify-between gap-3 sm:min-h-[64px]">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="flex shrink-0 flex-col items-center gap-1">
               {!readOnly && (
                 <div
                   {...dragListeners}
                   {...dragAttributes}
-                  className="cursor-grab active:cursor-grabbing touch-none p-1 -m-1"
+                  className="-m-1 cursor-grab touch-none p-1 active:cursor-grabbing"
                   title="Arrastar para reordenar"
+                  onClick={(event) => event.stopPropagation()}
                 >
                   <GripVertical className="h-4 w-4 text-muted-foreground" />
                 </div>
@@ -252,188 +238,177 @@ export function GroupedExerciseCard({
               </Badge>
             </div>
 
-            {/* Informações do Grupo */}
-            <div className="flex-1 space-y-2">
-              {/* Tipo do Agrupamento + Status */}
-              <div className="flex items-center gap-2 flex-wrap">
+            {onToggleGrupoConcluido && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleToggleGrupo();
+                }}
+                className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center text-muted-foreground hover:text-primary"
+                aria-label={
+                  todosConcluidos
+                    ? `Desmarcar ${tipoConfig.label}`
+                    : `Marcar ${tipoConfig.label} como concluído`
+                }
+              >
+                {todosConcluidos ? (
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                ) : (
+                  <Circle className="h-5 w-5" />
+                )}
+              </button>
+            )}
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
                 <Badge
                   variant={todosConcluidos ? "default" : "secondary"}
-                  className="font-semibold text-sm"
+                  className="shrink-0 font-semibold"
                 >
-                  {tipoConfig.icon} {tipoConfig.label}
+                  {tipoConfig.label}
                 </Badge>
-
-                {grupo.descanso_entre_grupos != null &&
-                  grupo.descanso_entre_grupos > 0 && (
-                    <Badge variant="outline" className="text-xs">
-                      <Clock className="h-3 w-3 mr-1" />
-                      {grupo.descanso_entre_grupos}s após grupo
-                    </Badge>
-                  )}
-
                 {todosConcluidos && (
-                  <Badge variant="default" className="bg-green-600">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                  <Badge className="hidden shrink-0 bg-green-600 text-xs sm:inline-flex">
                     Completo
                   </Badge>
                 )}
-
                 {algumConcluido && !todosConcluidos && (
-                  <Badge
-                    variant="outline"
-                    className="bg-yellow-100 border-yellow-300"
-                  >
+                  <Badge variant="outline" className="hidden text-xs sm:inline-flex">
                     Em andamento
                   </Badge>
                 )}
               </div>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {totalExercicios} exercício{totalExercicios !== 1 ? "s" : ""} colapsado
+                {totalExercicios !== 1 ? "s" : ""}
+              </p>
+            </div>
+          </div>
 
-              {/* Instrução visual para o aluno (apenas no modo aluno) */}
-              {!readOnly && onToggleGrupoConcluido && (
-                <div className="flex items-start gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                  <div className="flex flex-col items-center gap-1 mt-1">
-                    <Repeat className="h-4 w-4 text-primary" />
-                    <ArrowDown className="h-3 w-3 text-primary/60" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-primary mb-1">
-                      Execute estes exercícios em sequência
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Faça todos os exercícios abaixo, um após o outro, antes de
-                      descansar e repetir o circuito
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={handleToggleGrupo}
-                    className="shrink-0 transition-transform hover:scale-110"
-                    title={
-                      todosConcluidos
-                        ? "Desmarcar grupo completo"
-                        : "Marcar grupo completo"
-                    }
-                    aria-label={
-                      todosConcluidos
-                        ? "Desmarcar grupo como não concluído"
-                        : "Marcar grupo como concluído"
-                    }
-                  >
-                    {todosConcluidos ? (
-                      <CheckCircle2 className="h-6 w-6 text-green-600" />
-                    ) : (
-                      <Circle className="h-6 w-6 text-primary hover:text-green-600 transition-colors" />
-                    )}
-                  </button>
-                </div>
+          {!readOnly && (onEdit || onDelete) && (
+            <div
+              className="flex shrink-0 gap-1"
+              onClick={(event) => event.stopPropagation()}
+            >
+              {onEdit && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-9 w-9 touch-target"
+                  onClick={onEdit}
+                  title="Editar grupo"
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
               )}
+              {onDelete && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-9 w-9 text-destructive hover:text-destructive touch-target"
+                  onClick={onDelete}
+                  title="Deletar grupo"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          )}
 
-              {/* Lista de Exercícios */}
-              <div className="space-y-0 relative">
-                {localExercicios.map((exercicio, exIndex) => {
-                  const cargaFormatada = formatarCarga(exercicio.carga);
-                  const isFirst = exIndex === 0;
-                  const isLast = exIndex === localExercicios.length - 1;
-                  const hasNext = !isLast;
+          <ChevronDown
+            className={cn(
+              "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+              expanded && "rotate-180"
+            )}
+          />
+        </div>
 
-                  return (
-                    <div key={exercicio.id} className="relative">
-                      <div
-                        className={cn(
-                          "flex items-start gap-3 p-3 border transition-all",
-                          isFirst && "rounded-t-lg",
-                          isLast && "rounded-b-lg",
-                          !isFirst && "border-t-0",
-                          exercicio.concluido
-                            ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
-                            : "bg-muted/30 border-border hover:bg-muted/50"
-                        )}
-                      >
-                        {/* Checkbox (apenas no modo aluno) */}
-                        {!readOnly && onToggleConcluido && (
-                          <button
-                            onClick={() =>
-                              handleToggleExercicio(
-                                exercicio.id,
-                                !exercicio.concluido
-                              )
-                            }
-                            className="mt-1 shrink-0 transition-transform hover:scale-110"
-                            aria-label={
-                              exercicio.concluido
-                                ? `Desmarcar ${exercicio.nome}`
-                                : `Marcar ${exercicio.nome} como concluído`
-                            }
-                          >
-                            {exercicio.concluido ? (
-                              <CheckCircle2 className="h-5 w-5 text-green-600" />
-                            ) : (
-                              <Circle className="h-5 w-5 text-muted-foreground hover:text-primary" />
-                            )}
-                          </button>
-                        )}
+        {expanded && (
+          <div className="mt-3 space-y-3 border-t pt-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {grupo.descanso_entre_grupos != null &&
+                grupo.descanso_entre_grupos > 0 && (
+                  <Badge variant="outline" className="text-xs">
+                    <Clock className="mr-1 h-3 w-3" />
+                    {grupo.descanso_entre_grupos}s após grupo
+                  </Badge>
+                )}
+              <Badge variant="outline" className="text-xs">
+                <Repeat className="mr-1 h-3 w-3" />
+                Execute em sequência
+              </Badge>
+            </div>
 
-                        {/* Número do exercício no grupo */}
-                        <div className="flex flex-col items-center mt-1">
-                          <div
-                            className={cn(
-                              "h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all",
-                              exercicio.concluido
-                                ? "bg-green-600 text-white border-green-700"
-                                : "bg-background text-primary border-primary/30"
-                            )}
-                          >
-                            {exIndex + 1}
-                          </div>
-                        </div>
+            <div className="space-y-0">
+              {localExercicios.map((exercicio, exIndex) => {
+                const cargaFormatada = formatarCarga(exercicio.carga);
+                const isFirst = exIndex === 0;
+                const isLast = exIndex === localExercicios.length - 1;
+                const hasNext = !isLast;
 
-                        {/* Detalhes do exercício */}
-                        <div className="flex-1 space-y-1.5">
-                          <p
-                            className={cn(
-                              "font-semibold text-base md:text-sm",
-                              exercicio.concluido &&
-                                "line-through text-muted-foreground"
-                            )}
-                          >
-                            {exercicio.nome}
-                          </p>
+                return (
+                  <div key={exercicio.id} className="relative">
+                    <div
+                      className={cn(
+                        "flex items-start gap-3 border p-3 transition-all",
+                        isFirst && "rounded-t-lg",
+                        isLast && "rounded-b-lg",
+                        !isFirst && "border-t-0",
+                        exercicio.concluido
+                          ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/20"
+                          : "border-border bg-muted/30 hover:bg-muted/50"
+                      )}
+                    >
+                      {onToggleConcluido && (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleToggleExercicio(
+                              exercicio.id,
+                              !exercicio.concluido
+                            );
+                          }}
+                          className="mt-1 shrink-0 transition-transform hover:scale-110"
+                          aria-label={
+                            exercicio.concluido
+                              ? `Desmarcar ${exercicio.nome}`
+                              : `Marcar ${exercicio.nome} como concluído`
+                          }
+                        >
+                          {exercicio.concluido ? (
+                            <CheckCircle2 className="h-5 w-5 text-green-600" />
+                          ) : (
+                            <Circle className="h-5 w-5 text-muted-foreground hover:text-primary" />
+                          )}
+                        </button>
+                      )}
 
-                          {/* Links de vídeo e biblioteca */}
-                          <div className="flex flex-wrap items-center gap-3">
-                            {exercicio.link_video && (
-                              <a
-                                href={exercicio.link_video}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm md:text-xs text-blue-600 hover:underline flex items-center gap-1 touch-target"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <Play className="h-4 w-4 md:h-3 md:w-3" />
-                                Ver demonstração
-                              </a>
-                            )}
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-primary/30 bg-background text-xs font-bold text-primary">
+                        {exIndex + 1}
+                      </div>
 
-                            {!readOnly && (
-                              <button
-                                onClick={() => abrirExercicioNaBiblioteca(exercicio.nome)}
-                                className="text-sm md:text-xs text-purple-600 hover:underline flex items-center gap-1 touch-target"
-                              >
-                                <BookOpen className="h-4 w-4 md:h-3 md:w-3" />
-                                Ver na biblioteca
-                              </button>
-                            )}
-                          </div>
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <p
+                          className={cn(
+                            "truncate text-sm font-semibold sm:text-base",
+                            exercicio.concluido &&
+                              "text-muted-foreground line-through"
+                          )}
+                        >
+                          {exercicio.nome}
+                        </p>
 
-                          {/* Informações de treino */}
-                          <div className="flex flex-wrap items-center gap-2 text-sm md:text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1 font-medium">
-                              <Dumbbell className="h-3 w-3" />
-                              {exercicio.series || 3}x
-                              {exercicio.repeticoes || "12"}
-                            </span>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <span className="inline-flex items-center gap-1 font-medium">
+                            <Dumbbell className="h-3.5 w-3.5" />
+                            {exercicio.series || 3}x
+                            {exercicio.repeticoes || "12"}
+                          </span>
 
-                            {cargaFormatada && !readOnly ? (
+                          {cargaFormatada && onToggleConcluido ? (
+                            <span onClick={(event) => event.stopPropagation()}>
                               <InlinePesoInput
                                 exercicioId={exercicio.id}
                                 pesoRecomendado={cargaFormatada}
@@ -441,71 +416,70 @@ export function GroupedExerciseCard({
                                 onSave={handleSavePeso}
                                 disabled={false}
                               />
-                            ) : cargaFormatada ? (
-                              <span className="font-mono font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">
-                                {cargaFormatada}kg
+                            </span>
+                          ) : cargaFormatada ? (
+                            <span className="rounded bg-primary/10 px-2 py-0.5 font-mono font-semibold text-primary">
+                              {cargaFormatada}kg
+                            </span>
+                          ) : null}
+
+                          {exercicio.descanso != null &&
+                            exercicio.descanso > 0 && (
+                              <span className="inline-flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {exercicio.descanso}s
                               </span>
-                            ) : null}
+                            )}
+                        </div>
 
-                            {exercicio.descanso != null &&
-                              exercicio.descanso > 0 && (
-                                <span className="flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
-                                  {exercicio.descanso}s
-                                </span>
-                              )}
-                          </div>
+                        <div className="flex flex-wrap items-center gap-3">
+                          {exercicio.link_video && (
+                            <a
+                              href={exercicio.link_video}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline touch-target"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              <Play className="h-3.5 w-3.5" />
+                              Ver demonstração
+                            </a>
+                          )}
 
-                          {/* Observações do exercício */}
-                          {exercicio.observacoes && (
-                            <p className="text-sm md:text-xs text-muted-foreground italic">
-                              💡 {exercicio.observacoes}
-                            </p>
+                          {!readOnly && (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                abrirExercicioNaBiblioteca(exercicio.nome);
+                              }}
+                              className="inline-flex items-center gap-1 text-xs text-purple-600 hover:underline touch-target"
+                            >
+                              <BookOpen className="h-3.5 w-3.5" />
+                              Ver na biblioteca
+                            </button>
                           )}
                         </div>
-                      </div>
 
-                      {/* Seta entre exercícios (apenas se não for o último) */}
-                      {hasNext && (
-                        <div className="flex justify-center my-1">
-                          <ArrowRight className="h-4 w-4 text-primary" />
-                        </div>
-                      )}
+                        {exercicio.observacoes && (
+                          <p className="text-xs text-muted-foreground italic">
+                            {exercicio.observacoes}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
+
+                    {hasNext && (
+                      <div className="flex justify-center py-1">
+                        <ArrowRight className="h-4 w-4 text-primary" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
-
-          {/* Botões de ação (apenas para Personal) */}
-          {!readOnly && (onEdit || onDelete) && (
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              {onEdit && (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-10 w-10 md:h-9 md:w-9 touch-target"
-                  onClick={onEdit}
-                  title="Editar grupo"
-                >
-                  <Edit className="h-5 w-5 md:h-4 md:w-4" />
-                </Button>
-              )}
-              {onDelete && (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-10 w-10 md:h-9 md:w-9 text-destructive hover:text-destructive touch-target"
-                  onClick={onDelete}
-                  title="Deletar grupo"
-                >
-                  <Trash2 className="h-5 w-5 md:h-4 md:w-4" />
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
+        )}
       </CardContent>
     </Card>
   );

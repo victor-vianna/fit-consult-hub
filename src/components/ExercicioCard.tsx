@@ -1,22 +1,18 @@
 // components/ExercicioCard.tsx
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import {
-  Edit,
-  Trash2,
-  ExternalLink,
-  GripVertical,
-  Clock,
-  Repeat,
-  Weight,
-  CheckCircle2,
-  Circle,
-  Play,
-  Dumbbell,
   BookOpen,
+  CheckCircle2,
+  ChevronDown,
+  Circle,
+  Clock,
+  Dumbbell,
+  Edit,
+  GripVertical,
+  Play,
+  Trash2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -46,17 +42,7 @@ interface ExercicioCardProps {
   readOnly?: boolean;
   onEdit?: (exercicio: Exercicio) => void;
   onDelete?: (id: string) => void;
-  /**
-   * Handler que faz a persistência (pode retornar Promise).
-   * Se o pai quiser fazer atualização otimista, também pode fazê-lo aqui,
-   * ou usar onOptimisticToggle abaixo para explicitar a intenção otimista.
-   */
   onToggleConcluido?: (id: string, concluido: boolean) => Promise<any> | void;
-  /**
-   * Callback opcional para notificar o pai imediatamente (otimisticamente)
-   * de que o exercício foi marcado/desmarcado, para que o pai atualize
-   * seu estado e a barra de progresso.
-   */
   onOptimisticToggle?: (id: string, concluido: boolean) => void;
   dragListeners?: any;
   dragAttributes?: any;
@@ -75,20 +61,20 @@ export function ExercicioCard({
 }: ExercicioCardProps) {
   const [localConcluido, setLocalConcluido] = useState(exercicio.concluido);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const { success, light } = useHaptic();
-
-  // marca que o usuário interagiu (p/ evitar sobrescrever durante a interação ativa)
-  const hasUserInteracted = useRef(false);
-
-  // ✅ Apenas sincronizar quando prop mudar externamente
-  useEffect(() => {
-    setLocalConcluido(exercicio.concluido);
-  }, [exercicio.id]); // Remove exercicio.concluido da dependência
-
   const { abrirExercicioNaBiblioteca } = useExerciseLibrary();
 
+  useEffect(() => {
+    setLocalConcluido(exercicio.concluido);
+  }, [exercicio.id, exercicio.concluido]);
+
+  const treinoResumo =
+    exercicio.series > 0
+      ? `${exercicio.series}x${exercicio.repeticoes || "-"}`
+      : exercicio.repeticoes || "Prescrição";
+
   const handleToggle = async (novoValor: boolean) => {
-    // Feedback háptico: sucesso ao completar, leve ao desmarcar
     if (novoValor) {
       success();
     } else {
@@ -97,6 +83,7 @@ export function ExercicioCard({
 
     setLocalConcluido(novoValor);
     onOptimisticToggle?.(exercicio.id, novoValor);
+    setIsUpdating(true);
 
     try {
       await onToggleConcluido?.(exercicio.id, novoValor);
@@ -114,6 +101,8 @@ export function ExercicioCard({
       console.error("Erro ao atualizar exercício:", error);
       setLocalConcluido(!novoValor);
       toast.error("Erro ao atualizar exercício");
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -133,24 +122,33 @@ export function ExercicioCard({
 
   return (
     <Card
+      role="button"
+      tabIndex={0}
+      onClick={() => setExpanded((value) => !value)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          setExpanded((value) => !value);
+        }
+      }}
       className={cn(
-        "overflow-hidden transition-all border",
+        "overflow-hidden border transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         localConcluido
-          ? "bg-green-50 dark:bg-green-950/20 border-green-300 dark:border-green-900"
-          : "hover:shadow-md border-border",
+          ? "border-green-300 bg-green-50 dark:border-green-900 dark:bg-green-950/20"
+          : "border-border bg-card hover:bg-muted/30",
         isUpdating && "opacity-60"
       )}
     >
-      <CardContent className="p-4">
-        <div className="flex items-start gap-3">
-          {/* Número do exercício */}
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex min-h-[56px] items-center gap-3 sm:min-h-[64px]">
           {!readOnly && (
-            <div className="flex flex-col items-center gap-1 pt-1">
+            <div className="flex shrink-0 flex-col items-center gap-1">
               <div
                 {...dragListeners}
                 {...dragAttributes}
-                className="cursor-grab active:cursor-grabbing touch-none p-1 -m-1"
+                className="-m-1 cursor-grab touch-none p-1 active:cursor-grabbing"
                 title="Arrastar para reordenar"
+                onClick={(event) => event.stopPropagation()}
               >
                 <GripVertical className="h-4 w-4 text-muted-foreground" />
               </div>
@@ -160,158 +158,174 @@ export function ExercicioCard({
             </div>
           )}
 
-          {readOnly && (
-            <Badge variant="outline" className="text-xs flex-shrink-0">
+          {onToggleConcluido ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                handleToggle(!localConcluido);
+              }}
+              className={cn(
+                "flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center transition-all duration-200",
+                localConcluido
+                  ? "text-green-500"
+                  : "text-muted-foreground hover:text-primary"
+              )}
+              disabled={isUpdating}
+              aria-label={
+                localConcluido
+                  ? `Desmarcar ${exercicio.nome}`
+                  : `Marcar ${exercicio.nome} como concluído`
+              }
+            >
+              {localConcluido ? (
+                <CheckCircle2 className="h-5 w-5" />
+              ) : (
+                <Circle className="h-5 w-5" />
+              )}
+            </button>
+          ) : readOnly ? (
+            <Badge variant="outline" className="shrink-0 text-xs">
               {index + 1}
             </Badge>
-          )}
+          ) : null}
 
-          {/* Conteúdo do exercício */}
-          <div className="flex-1">
-            <div
-              className={cn(
-                "flex items-start gap-3 p-3 rounded-lg border transition-all",
-                localConcluido
-                  ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
-                  : "bg-muted/30 border-border hover:bg-muted/50"
-              )}
-            >
-              {/* Checkbox (só para aluno/readOnly) */}
-              {onToggleConcluido && (
-                <button
-                  onClick={() => handleToggle(!localConcluido)}
-                  className={cn(
-                    "mt-1 shrink-0 z-10 transition-all duration-300 ease-in-out",
-                    "min-w-[44px] min-h-[44px] flex items-center justify-center",
-                    localConcluido
-                      ? "scale-110 text-green-500"
-                      : "hover:scale-110 text-muted-foreground hover:text-primary"
-                  )}
-                  disabled={isUpdating}
-                >
-                  {localConcluido ? (
-                    <CheckCircle2 className="h-5 w-5 transition-transform duration-300 ease-in-out" />
-                  ) : (
-                    <Circle className="h-5 w-5 transition-transform duration-300 ease-in-out" />
-                  )}
-                </button>
-              )}
-
-              {/* Número circular */}
-              <div className="flex flex-col items-center mt-1">
-                <div
-                  className={cn(
-                    "h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all",
-                    localConcluido
-                      ? "bg-green-600 text-white border-green-700"
-                      : "bg-background text-primary border-primary/30"
-                  )}
-                >
-                  1
-                </div>
-              </div>
-
-              {/* Informações do exercício */}
-              <div className="flex-1 space-y-1">
-                <p
-                  className={cn(
-                    "font-semibold text-base md:text-sm",
-                    localConcluido && "line-through text-muted-foreground"
-                  )}
-                >
-                  {exercicio.nome}
-                </p>
-
-                <div className="flex flex-wrap items-center gap-3">
-                  {exercicio.link_video && (
-                    <a
-                      href={exercicio.link_video}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm md:text-xs text-blue-600 hover:underline flex items-center gap-1 touch-target"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Play className="h-4 w-4 md:h-3 md:w-3" />
-                      Ver demonstração
-                    </a>
-                  )}
-
-                  {onToggleConcluido && (
-                    <button
-                      onClick={() => abrirExercicioNaBiblioteca(exercicio.nome)}
-                      className="text-sm md:text-xs text-purple-600 hover:underline flex items-center gap-1 touch-target"
-                    >
-                      <BookOpen className="h-4 w-4 md:h-3 md:w-3" />
-                      Ver na biblioteca
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 text-sm md:text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1 font-medium">
-                    <Dumbbell className="h-4 w-4 md:h-3 md:w-3" />
-                    {exercicio.series}x{exercicio.repeticoes}
-                  </span>
-
-                  {exercicio.carga && onToggleConcluido ? (
-                    <InlinePesoInput
-                      exercicioId={exercicio.id}
-                      pesoRecomendado={exercicio.carga}
-                      pesoExecutado={exercicio.peso_executado || null}
-                      onSave={handleSavePeso}
-                      disabled={isUpdating}
-                    />
-                  ) : exercicio.carga ? (
-                    <span className="font-mono font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">
-                      {exercicio.carga}kg
-                    </span>
-                  ) : null}
-
-                  {exercicio.descanso > 0 && (
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {exercicio.descanso}s
-                    </span>
-                  )}
-                </div>
-
-                {exercicio.observacoes && (
-                  <p className="text-sm md:text-xs text-muted-foreground italic">
-                    {exercicio.observacoes}
-                  </p>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <p
+                className={cn(
+                  "min-w-0 flex-1 truncate text-sm font-semibold leading-tight sm:text-base",
+                  localConcluido && "text-muted-foreground line-through"
                 )}
-              </div>
+              >
+                {exercicio.nome}
+              </p>
+              {localConcluido && (
+                <Badge className="hidden shrink-0 bg-green-600 text-xs sm:inline-flex">
+                  Concluído
+                </Badge>
+              )}
+            </div>
+            <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1 font-medium">
+                <Dumbbell className="h-3.5 w-3.5" />
+                {treinoResumo}
+              </span>
+              {exercicio.descanso > 0 && (
+                <span className="hidden items-center gap-1 sm:inline-flex">
+                  <Clock className="h-3.5 w-3.5" />
+                  {exercicio.descanso}s
+                </span>
+              )}
             </div>
           </div>
 
-          {/* Ações (só para personal) */}
           {!readOnly && (onEdit || onDelete) && (
-            <div className="flex flex-col gap-1 flex-shrink-0">
+            <div
+              className="flex shrink-0 gap-1"
+              onClick={(event) => event.stopPropagation()}
+            >
               {onEdit && (
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-10 w-10 md:h-8 md:w-8 touch-target"
+                  className="h-9 w-9 touch-target"
                   onClick={() => onEdit(exercicio)}
                   title="Editar exercício"
                 >
-                  <Edit className="h-5 w-5 md:h-4 md:w-4" />
+                  <Edit className="h-4 w-4" />
                 </Button>
               )}
               {onDelete && (
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-10 w-10 md:h-8 md:w-8 text-destructive hover:text-destructive touch-target"
+                  className="h-9 w-9 text-destructive hover:text-destructive touch-target"
                   onClick={() => onDelete(exercicio.id)}
                   title="Excluir exercício"
                 >
-                  <Trash2 className="h-5 w-5 md:h-4 md:w-4" />
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               )}
             </div>
           )}
+
+          <ChevronDown
+            className={cn(
+              "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+              expanded && "rotate-180"
+            )}
+          />
         </div>
+
+        {expanded && (
+          <div className="mt-3 space-y-3 border-t pt-3">
+            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+              {exercicio.link_video && (
+                <a
+                  href={exercicio.link_video}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-blue-600 hover:underline touch-target"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <Play className="h-4 w-4" />
+                  Ver demonstração
+                </a>
+              )}
+
+              {onToggleConcluido && (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    abrirExercicioNaBiblioteca(exercicio.nome);
+                  }}
+                  className="inline-flex items-center gap-1 text-purple-600 hover:underline touch-target"
+                >
+                  <BookOpen className="h-4 w-4" />
+                  Ver na biblioteca
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <span className="inline-flex items-center gap-1 font-medium">
+                <Dumbbell className="h-4 w-4" />
+                {treinoResumo}
+              </span>
+
+              {exercicio.carga && onToggleConcluido ? (
+                <span onClick={(event) => event.stopPropagation()}>
+                  <InlinePesoInput
+                    exercicioId={exercicio.id}
+                    pesoRecomendado={exercicio.carga}
+                    pesoExecutado={exercicio.peso_executado || null}
+                    onSave={handleSavePeso}
+                    disabled={isUpdating}
+                  />
+                </span>
+              ) : exercicio.carga ? (
+                <span className="rounded bg-primary/10 px-2 py-0.5 font-mono font-semibold text-primary">
+                  {exercicio.carga}kg
+                </span>
+              ) : null}
+
+              {exercicio.descanso > 0 && (
+                <span className="inline-flex items-center gap-1">
+                  <Clock className="h-3.5 w-3.5" />
+                  {exercicio.descanso}s de descanso
+                </span>
+              )}
+            </div>
+
+            {exercicio.observacoes && (
+              <p className="text-sm text-muted-foreground italic">
+                {exercicio.observacoes}
+              </p>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

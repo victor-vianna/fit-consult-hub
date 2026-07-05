@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type MouseEvent } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Check, X, Edit2, History, TrendingUp } from "lucide-react";
@@ -77,12 +77,19 @@ export function InlinePesoInput({
     setEditing(false);
   };
 
+  const stopCardToggle = (event: MouseEvent<HTMLElement>) => {
+    event.stopPropagation();
+  };
+
   if (!editing) {
     const displayValue = value || pesoRecomendado || "";
     
     if (!pesoExecutado && ultimoPesoHistorico) {
       return (
-        <div className="w-full min-w-[220px] space-y-2 rounded-lg border bg-muted/30 p-2">
+        <div
+          className="w-full min-w-[220px] space-y-2 rounded-lg border bg-muted/30 p-2"
+          onClick={stopCardToggle}
+        >
           <div className="flex items-start gap-2">
             <History className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             <div className="min-w-0 text-xs">
@@ -105,7 +112,10 @@ export function InlinePesoInput({
               size="sm"
               className="h-auto flex-col gap-0.5 px-1 py-2 text-xs"
               disabled={disabled || saving}
-              onClick={() => handleQuickSave(ultimoPesoHistorico)}
+              onClick={(event) => {
+                event.stopPropagation();
+                handleQuickSave(ultimoPesoHistorico);
+              }}
             >
               <span className="font-mono font-bold">{ultimoPesoHistorico}kg</span>
               <span className="text-[10px] text-muted-foreground">Manter</span>
@@ -116,7 +126,10 @@ export function InlinePesoInput({
               size="sm"
               className="h-auto flex-col gap-0.5 border-green-500/60 px-1 py-2 text-xs text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950/30"
               disabled={disabled || saving || !sugestaoPeso}
-              onClick={() => sugestaoPeso && handleQuickSave(sugestaoPeso)}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (sugestaoPeso) handleQuickSave(sugestaoPeso);
+              }}
             >
               <span className="flex items-center gap-1 font-mono font-bold">
                 <TrendingUp className="h-3 w-3" />
@@ -130,7 +143,8 @@ export function InlinePesoInput({
               size="sm"
               className="h-auto flex-col gap-0.5 px-1 py-2 text-xs"
               disabled={disabled || saving}
-              onClick={() => {
+              onClick={(event) => {
+                event.stopPropagation();
                 setValue(sugestaoPeso || ultimoPesoHistorico);
                 setEditing(true);
               }}
@@ -147,7 +161,11 @@ export function InlinePesoInput({
       // No weight set yet - show "Registrar" button
       return (
         <button
-          onClick={() => setEditing(true)}
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            setEditing(true);
+          }}
           disabled={disabled}
           className={cn(
             "flex items-center rounded transition-all",
@@ -164,7 +182,11 @@ export function InlinePesoInput({
     
     return (
       <button
-        onClick={() => setEditing(true)}
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          setEditing(true);
+        }}
         disabled={disabled}
         className={cn(
           "flex items-center rounded transition-all",
@@ -193,12 +215,13 @@ export function InlinePesoInput({
   }
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1" onClick={stopCardToggle}>
       <Input
         type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
+          e.stopPropagation();
           if (e.key === "Enter") handleSave();
           if (e.key === "Escape") handleCancel();
         }}
@@ -215,7 +238,10 @@ export function InlinePesoInput({
       <Button
         size="icon"
         variant="ghost"
-        onClick={handleSave}
+        onClick={(event) => {
+          event.stopPropagation();
+          handleSave();
+        }}
         disabled={saving}
         className={cn(
           "text-green-600 hover:bg-green-100 dark:hover:bg-green-950",
@@ -227,7 +253,10 @@ export function InlinePesoInput({
       <Button
         size="icon"
         variant="ghost"
-        onClick={handleCancel}
+        onClick={(event) => {
+          event.stopPropagation();
+          handleCancel();
+        }}
         disabled={saving}
         className={cn(
           "text-red-600 hover:bg-red-100 dark:hover:bg-red-950",

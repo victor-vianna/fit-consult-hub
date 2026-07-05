@@ -1,13 +1,21 @@
 // components/CompactExerciseCard.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle2, Circle, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  CheckCircle2,
+  ChevronDown,
+  Circle,
+  Clock,
+  Dumbbell,
+  Play,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { InlinePesoInput } from "@/components/InlinePesoInput";
-import { ExerciseVideoPreview } from "@/components/ExerciseVideoPreview";
 import { RestCountdownDialog } from "@/components/RestCountdownDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useWeightHistory } from "@/hooks/useWeightHistory";
+import { formatDisplayMonthDay } from "@/utils/dateFormat";
 
 interface CompactExerciseCardProps {
   exercicio: {
@@ -33,9 +41,81 @@ interface CompactExerciseCardProps {
   highlighted?: boolean;
 }
 
+function parseWeight(value: string | number | null | undefined) {
+  if (value === null || value === undefined) return NaN;
+  return Number(String(value).replace(",", ".").replace(/[^\d.-]/g, ""));
+}
+
+function formatWeight(value: number) {
+  if (!Number.isFinite(value)) return null;
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function getSuggestedWeight(lastWeight: string | null) {
+  const parsed = parseWeight(lastWeight);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+
+  const increment = parsed < 10 ? 1 : parsed < 40 ? 2 : 2.5;
+  return formatWeight(parsed + increment);
+}
+
+function getYoutubeId(value?: string | null) {
+  if (!value) return null;
+
+  try {
+    const url = new URL(value);
+    const host = url.hostname.replace(/^www\./, "");
+
+    if (host === "youtu.be") {
+      return url.pathname.split("/").filter(Boolean)[0] || null;
+    }
+
+    if (host.endsWith("youtube.com")) {
+      if (url.pathname === "/watch") return url.searchParams.get("v");
+
+      const [, type, id] = url.pathname.split("/");
+      if (["embed", "shorts"].includes(type) && id) return id;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function getVideoThumbnail(videoUrl?: string | null, fallback?: string | null) {
+  if (fallback) return fallback;
+
+  const youtubeId = getYoutubeId(videoUrl);
+  if (youtubeId) return `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
+
+  return "/exercise-thumbnail.svg";
+}
+
+function getExternalVideoUrl(videoUrl?: string | null) {
+  if (!videoUrl) return null;
+
+  const youtubeId = getYoutubeId(videoUrl);
+  if (youtubeId) return `https://www.youtube.com/watch?v=${youtubeId}`;
+
+  return videoUrl;
+}
+
+function formatPrescription(exercicio: CompactExerciseCardProps["exercicio"]) {
+  const series = exercicio.series || 3;
+  const reps = exercicio.repeticoes || "12";
+  return `${series}x${reps}`;
+}
+
+function formatCarga(carga?: string | null, ultimoPeso?: string | null) {
+  const value = carga || ultimoPeso;
+  return value ? `${value}kg` : "carga livre";
+}
+
 export function CompactExerciseCard({
   exercicio,
   onToggleConcluido,
+  isWorkoutActive = false,
   variant = "list",
   className,
   treinoId,
@@ -48,14 +128,44 @@ export function CompactExerciseCard({
   const [localPesoExecutado, setLocalPesoExecutado] = useState(
     exercicio.peso_executado || null
   );
+  const [expanded, setExpanded] = useState(highlighted);
   const [restDialogOpen, setRestDialogOpen] = useState(false);
+  const [completedSeries, setCompletedSeries] = useState(
+    exercicio.concluido ? exercicio.series || 3 : 0
+  );
+
   const isCarousel = variant === "carousel";
+  const totalSeries = Math.max(1, exercicio.series || 3);
+  const currentSeries = Math.min(completedSeries + 1, totalSeries);
   const weightHistory = useWeightHistory(exercicio.nome, profileId || null);
   const suggestedWeight = getSuggestedWeight(weightHistory.ultimoPeso);
+  const externalVideoUrl = getExternalVideoUrl(exercicio.link_video);
+  const thumbnail = externalVideoUrl
+    ? getVideoThumbnail(exercicio.link_video, exercicio.thumbnail)
+    : null;
 
-  const handleToggle = async () => {
-    const novoValor = !localConcluido;
+  useEffect(() => {
+    setLocalConcluido(exercicio.concluido || false);
+    setLocalPesoExecutado(exercicio.peso_executado || null);
+    setCompletedSeries(exercicio.concluido ? exercicio.series || 3 : 0);
+  }, [exercicio.id, exercicio.concluido, exercicio.peso_executado, exercicio.series]);
+
+  useEffect(() => {
+    if (highlighted) setExpanded(true);
+  }, [highlighted]);
+
+  useEffect(() => {
+    if (!isWorkoutActive) {
+      setLocalConcluido(false);
+      setCompletedSeries(0);
+      setRestDialogOpen(false);
+    }
+  }, [isWorkoutActive]);
+
+  const handleToggle = async (target?: boolean) => {
+    const novoValor = target ?? !localConcluido;
     setLocalConcluido(novoValor);
+    setCompletedSeries(novoValor ? totalSeries : 0);
 
     if ("vibrate" in navigator) {
       navigator.vibrate(10);
@@ -66,6 +176,7 @@ export function CompactExerciseCard({
     } catch (error) {
       console.error("Erro ao marcar exercicio:", error);
       setLocalConcluido(!novoValor);
+      setCompletedSeries(!novoValor ? totalSeries : 0);
     }
   };
 
@@ -84,169 +195,42 @@ export function CompactExerciseCard({
     }
   };
 
-  useEffect(() => {
-    setLocalConcluido(exercicio.concluido || false);
-    setLocalPesoExecutado(exercicio.peso_executado || null);
-  }, [exercicio.id, exercicio.concluido, exercicio.peso_executado]);
+  const handleRegisterSet = async () => {
+    const nextCount = Math.min(completedSeries + 1, totalSeries);
+    setCompletedSeries(nextCount);
 
-  const toggleButton = onToggleConcluido ? (
-    <button
-      type="button"
-      onClick={(event) => {
-        event.stopPropagation();
-        handleToggle();
-      }}
-      aria-label={
-        localConcluido
-          ? `Desmarcar ${exercicio.nome}`
-          : `Marcar ${exercicio.nome} como concluido`
-      }
-      className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-full transition-transform active:scale-95",
-        isCarousel ? "h-8 w-8" : "h-10 w-10"
-      )}
-    >
-      {localConcluido ? (
-        <CheckCircle2 className={cn("text-green-600", isCarousel ? "h-5 w-5" : "h-6 w-6")} />
-      ) : (
-        <Circle className={cn("text-muted-foreground", isCarousel ? "h-5 w-5" : "h-6 w-6")} />
-      )}
-    </button>
-  ) : null;
+    if (exercicio.descanso && exercicio.descanso > 0 && nextCount < totalSeries) {
+      setRestDialogOpen(true);
+    }
 
-  const exerciseContent = (
-    <>
-      <div
-        className={cn(
-          "flex min-w-0 items-start gap-3",
-          isCarousel ? "h-full p-3" : "p-3 sm:p-4"
-        )}
-      >
-        {toggleButton}
+    if (nextCount >= totalSeries && !localConcluido) {
+      await handleToggle(true);
+    }
+  };
 
-        <div className="min-w-0 flex-1 space-y-2">
-          <p
-            className={cn(
-              "break-words font-semibold leading-snug text-foreground",
-              isCarousel ? "text-sm" : "text-sm sm:text-base",
-              localConcluido && "line-through text-muted-foreground"
-            )}
-          >
-            {exercicio.nome}
-          </p>
-
-          <div
-            className={cn(
-              "space-y-1.5 leading-tight text-muted-foreground",
-              isCarousel ? "text-xs" : "text-xs sm:text-sm"
-            )}
-          >
-            <p>
-              <span className="font-medium text-foreground/80">Series:</span>{" "}
-              {exercicio.series || 3}/{exercicio.repeticoes || "12"}
-            </p>
-
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="font-medium text-foreground/80">Carga:</span>
-              <InlinePesoInput
-                exercicioId={exercicio.id}
-                pesoRecomendado={exercicio.carga || null}
-                pesoExecutado={localPesoExecutado}
-                onSave={handleSavePeso}
-                ultimoPesoHistorico={weightHistory.ultimoPeso}
-                ultimaDataHistorico={weightHistory.ultimaData}
-                sugestaoPeso={suggestedWeight}
-                compact
-              />
-            </div>
-
-            {exercicio.descanso && exercicio.descanso > 0 ? (
-              <button
-                type="button"
-                onClick={() => setRestDialogOpen(true)}
-                className="flex items-center gap-1 text-left text-cyan-700 underline decoration-cyan-700/30 underline-offset-2 dark:text-cyan-300"
-              >
-                <Clock className="h-3.5 w-3.5 shrink-0" />
-                <span>Tempo entre séries: {exercicio.descanso}s</span>
-              </button>
-            ) : null}
-
-            {exercicio.observacoes ? (
-              <p className={cn("italic", isCarousel ? "line-clamp-2" : "line-clamp-3")}>
-                {exercicio.observacoes}
-              </p>
-            ) : null}
-          </div>
-        </div>
-
-        <ExerciseVideoPreview
-          videoUrl={exercicio.link_video}
-          fallbackImage={exercicio.thumbnail}
-          title={exercicio.nome}
-          objectFit="contain"
-          className={cn(
-            "bg-muted",
-            isCarousel
-              ? "aspect-[9/12] w-[104px] min-w-[104px] max-w-[104px] sm:w-[116px] sm:min-w-[116px] sm:max-w-[116px]"
-              : "aspect-[9/12] w-[108px] min-w-[108px] max-w-[108px] sm:aspect-video sm:w-[176px] sm:min-w-[176px] sm:max-w-[196px]"
-          )}
-        />
-      </div>
-
-      <RestCountdownDialog
-        open={restDialogOpen}
-        seconds={exercicio.descanso || 0}
-        onOpenChange={setRestDialogOpen}
-      />
-    </>
+  const compactSummary = useMemo(
+    () =>
+      `${formatPrescription(exercicio)} · ${formatCarga(
+        exercicio.carga,
+        weightHistory.ultimoPeso
+      )}`,
+    [exercicio, weightHistory.ultimoPeso]
   );
-
-  if (isCarousel) {
-    return (
-      <article
-        className={cn(
-          "h-full min-h-[188px] w-[82vw] min-w-[264px] max-w-[324px] snap-start overflow-hidden rounded-lg border bg-card shadow-sm",
-          localConcluido && "border-green-500/30 bg-green-50/50 dark:bg-green-950/10",
-          highlighted && "ring-2 ring-primary/70 ring-offset-2 ring-offset-background",
-          className
-        )}
-        data-workout-cache-item={exercicio.id}
-        data-workout-treino-id={treinoId ?? undefined}
-        data-workout-cache-type="exercise"
-      >
-        {exerciseContent}
-      </article>
-    );
-  }
-
-  if (localConcluido && onToggleConcluido) {
-    return (
-      <Card
-        className={cn(
-          "overflow-hidden rounded-lg border-green-500/30 bg-green-50/50 shadow-sm transition-colors dark:bg-green-950/10",
-          highlighted && "ring-2 ring-primary/70 ring-offset-2 ring-offset-background"
-        )}
-        data-workout-cache-item={exercicio.id}
-        data-workout-treino-id={treinoId ?? undefined}
-        data-workout-cache-type="exercise"
-      >
-        <CardContent className="p-3 sm:p-4">
-          <div className="flex items-center gap-3">
-            {toggleButton}
-
-            <p className="min-w-0 flex-1 break-words text-sm font-semibold leading-snug text-muted-foreground line-through sm:text-base">
-              {exercicio.nome}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card
+      role="button"
+      tabIndex={0}
+      onClick={() => setExpanded((value) => !value)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          setExpanded((value) => !value);
+        }
+      }}
       className={cn(
-        "overflow-hidden rounded-lg border bg-card shadow-sm transition-colors hover:bg-muted/20",
+        "overflow-hidden rounded-lg border bg-card shadow-sm transition-colors hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        isCarousel ? "h-full min-h-[176px] min-w-[280px] snap-start sm:min-w-[300px]" : "",
         localConcluido && "border-green-500/30 bg-green-50/50 dark:bg-green-950/10",
         highlighted && "ring-2 ring-primary/70 ring-offset-2 ring-offset-background",
         className
@@ -255,27 +239,207 @@ export function CompactExerciseCard({
       data-workout-treino-id={treinoId ?? undefined}
       data-workout-cache-type="exercise"
     >
-      <CardContent className="p-0">{exerciseContent}</CardContent>
+      <CardContent className="p-0">
+        <div
+          className={cn(
+            "flex items-center gap-3 p-3",
+            isCarousel ? "min-h-[92px]" : "min-h-[82px] sm:min-h-[88px]"
+          )}
+        >
+          {onToggleConcluido && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                handleToggle();
+              }}
+              aria-label={
+                localConcluido
+                  ? `Desmarcar ${exercicio.nome}`
+                  : `Marcar ${exercicio.nome} como concluido`
+              }
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-transform active:scale-95"
+            >
+              {localConcluido ? (
+                <CheckCircle2 className="h-6 w-6 text-green-600" />
+              ) : (
+                <Circle className="h-6 w-6 text-primary" />
+              )}
+            </button>
+          )}
+
+          <div className="min-w-0 flex-1">
+            <p
+              className={cn(
+                "truncate text-sm font-semibold leading-tight text-foreground sm:text-base",
+                localConcluido && "text-muted-foreground line-through"
+              )}
+            >
+              {exercicio.nome}
+            </p>
+            <p className="mt-1 truncate text-xs text-muted-foreground sm:text-sm">
+              {compactSummary}
+            </p>
+          </div>
+
+          {expanded && externalVideoUrl && thumbnail && (
+            <a
+              href={externalVideoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(event) => event.stopPropagation()}
+              aria-label={`Abrir demonstracao de ${exercicio.nome} em nova aba`}
+              title="Abrir demonstracao"
+              className={cn(
+                "relative shrink-0 overflow-hidden rounded-lg border bg-muted shadow-sm transition-transform active:scale-[0.98]",
+                isCarousel ? "h-12 w-16" : "h-12 w-16 sm:h-14 sm:w-20"
+              )}
+            >
+              <img
+                src={thumbnail}
+                alt=""
+                loading="lazy"
+                className="h-full w-full object-cover"
+              />
+              <span className="absolute inset-0 flex items-center justify-center bg-black/30">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55">
+                  <Play className="ml-0.5 h-3.5 w-3.5 text-white" />
+                </span>
+              </span>
+            </a>
+          )}
+
+          <ChevronDown
+            className={cn(
+              "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+              expanded && "rotate-180"
+            )}
+          />
+        </div>
+
+        {expanded && (
+          <div className="space-y-3 border-t bg-muted/10 p-3">
+            <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <Dumbbell className="h-3.5 w-3.5" />
+                {formatPrescription(exercicio)}
+              </span>
+              {weightHistory.ultimoPeso && (
+                <span className="truncate text-right">
+                  Última: {weightHistory.ultimoPeso}kg
+                  {weightHistory.ultimaData
+                    ? ` em ${formatDisplayMonthDay(weightHistory.ultimaData)}`
+                    : ""}
+                </span>
+              )}
+            </div>
+
+            <div
+              className={cn(
+                "grid gap-3",
+                !isCarousel && "sm:grid-cols-[minmax(0,1fr)_minmax(220px,0.85fr)]"
+              )}
+            >
+              <div className="rounded-lg border bg-background/70 p-3">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-foreground">
+                    Séries
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    série {Math.min(completedSeries + 1, totalSeries)} de {totalSeries}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {Array.from({ length: totalSeries }).map((_, seriesIndex) => {
+                    const done = seriesIndex < completedSeries;
+                    const active = seriesIndex + 1 === currentSeries && !localConcluido;
+                    return (
+                      <span
+                        key={seriesIndex}
+                        className={cn(
+                          "flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold",
+                          done && "border-green-500 bg-green-600 text-white",
+                          active && "border-primary text-primary",
+                          !done && !active && "border-border text-muted-foreground"
+                        )}
+                      >
+                        {seriesIndex + 1}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-lg border bg-background/70 p-3">
+                <p className="mb-2 text-sm font-medium text-foreground">
+                  Carga desta série
+                </p>
+                <InlinePesoInput
+                  exercicioId={exercicio.id}
+                  pesoRecomendado={exercicio.carga || null}
+                  pesoExecutado={localPesoExecutado}
+                  onSave={handleSavePeso}
+                  ultimoPesoHistorico={weightHistory.ultimoPeso}
+                  ultimaDataHistorico={weightHistory.ultimaData}
+                  sugestaoPeso={suggestedWeight}
+                  compact
+                />
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              variant={localConcluido ? "outline" : "default"}
+              size="lg"
+              className="h-12 w-full gap-2 text-base font-semibold"
+              disabled={!onToggleConcluido}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (localConcluido) {
+                  handleToggle(false);
+                } else {
+                  handleRegisterSet();
+                }
+              }}
+            >
+              {localConcluido ? (
+                <>
+                  <CheckCircle2 className="h-5 w-5" />
+                  Exercício concluído
+                </>
+              ) : (
+                <>
+                  <Circle className="h-4 w-4" />
+                  Registrar série {currentSeries}
+                </>
+              )}
+            </Button>
+
+            {(exercicio.descanso ?? 0) > 0 && completedSeries > 0 && !localConcluido && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setRestDialogOpen(true);
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm font-medium text-primary"
+              >
+                <Clock className="h-4 w-4" />
+                Descanso ativo: {exercicio.descanso}s
+              </button>
+            )}
+          </div>
+        )}
+      </CardContent>
+
+      <RestCountdownDialog
+        open={restDialogOpen}
+        seconds={exercicio.descanso || 0}
+        onOpenChange={setRestDialogOpen}
+      />
     </Card>
   );
-}
-
-function parseWeight(value: string | number | null | undefined) {
-  if (value === null || value === undefined) return NaN;
-  return Number(String(value).replace(",", ".").replace(/[^\d.-]/g, ""));
-}
-
-function formatWeight(value: number) {
-  if (!Number.isFinite(value)) return null;
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
-}
-
-function getSuggestedWeight(lastWeight: string | null) {
-  const parsed = parseWeight(lastWeight);
-  if (!Number.isFinite(parsed) || parsed <= 0) return null;
-
-  const increment = parsed < 10 ? 1 : parsed < 40 ? 2 : 2.5;
-  return formatWeight(parsed + increment);
 }
 
 export default CompactExerciseCard;

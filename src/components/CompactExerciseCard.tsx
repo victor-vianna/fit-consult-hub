@@ -40,6 +40,7 @@ interface CompactExerciseCardProps {
   className?: string;
   treinoId?: string | null;
   highlighted?: boolean;
+  fitContainer?: boolean;
 }
 
 function parseWeight(value: string | number | null | undefined) {
@@ -122,6 +123,7 @@ export function CompactExerciseCard({
   treinoId,
   highlighted = false,
   profileId,
+  fitContainer = false,
 }: CompactExerciseCardProps) {
   const [localConcluido, setLocalConcluido] = useState(
     exercicio.concluido || false
@@ -232,7 +234,10 @@ export function CompactExerciseCard({
       }}
       className={cn(
         "overflow-hidden rounded-lg border bg-card shadow-sm transition-colors hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        isCarousel ? "h-full min-h-[176px] min-w-[280px] snap-start sm:min-w-[300px]" : "",
+        isCarousel && !fitContainer
+          ? "h-full min-h-[176px] min-w-[280px] snap-start sm:min-w-[300px]"
+          : "",
+        isCarousel && fitContainer ? "h-full min-h-[176px] min-w-0" : "",
         localConcluido && "border-green-500/30 bg-green-50/50 dark:bg-green-950/10",
         highlighted && "ring-2 ring-primary/70 ring-offset-2 ring-offset-background",
         className

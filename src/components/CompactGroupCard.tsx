@@ -75,6 +75,7 @@ export function CompactGroupCard({
     localExercicios.length > 0 && localExercicios.every((e) => e.concluido);
   const algumConcluido = localExercicios.some((e) => e.concluido);
   const concluidosCount = localExercicios.filter((e) => e.concluido).length;
+  const fitExercisesOnScreen = localExercicios.length <= 2;
 
   const handleToggleGrupo = async () => {
     if (!onToggleGrupoConcluido) return;
@@ -188,11 +189,20 @@ export function CompactGroupCard({
 
         {expanded && (
           <div className="border-t bg-muted/10 p-3 sm:p-4">
-            <div className="-mx-3 overflow-x-auto px-3 pb-2 sm:-mx-4 sm:px-4">
+            <div
+              className={cn(
+                "pb-2",
+                fitExercisesOnScreen
+                  ? "overflow-visible"
+                  : "-mx-3 overflow-x-auto px-3 sm:-mx-4 sm:px-4"
+              )}
+            >
               <div
                 className={cn(
-                  "grid min-w-max snap-x snap-mandatory gap-3",
-                  "grid-cols-[repeat(var(--cols),minmax(280px,1fr))] sm:grid-cols-[repeat(var(--cols),minmax(300px,1fr))]"
+                  "grid gap-3",
+                  fitExercisesOnScreen
+                    ? "w-full grid-cols-1 min-[720px]:grid-cols-2"
+                    : "min-w-max snap-x snap-mandatory grid-cols-[repeat(var(--cols),minmax(280px,1fr))] sm:grid-cols-[repeat(var(--cols),minmax(300px,1fr))]"
                 )}
                 style={{ ["--cols" as any]: localExercicios.length }}
               >
@@ -207,6 +217,7 @@ export function CompactGroupCard({
                     profileId={profileId}
                     treinoId={treinoId}
                     highlighted={resumeItemId === exercicio.id}
+                    fitContainer={fitExercisesOnScreen}
                   />
                 ))}
               </div>

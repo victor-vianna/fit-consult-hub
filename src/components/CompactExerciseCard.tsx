@@ -8,6 +8,7 @@ import {
   Circle,
   Clock,
   Dumbbell,
+  MessageSquareText,
   Play,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -143,6 +144,7 @@ export function CompactExerciseCard({
   const thumbnail = externalVideoUrl
     ? getVideoThumbnail(exercicio.link_video, exercicio.thumbnail)
     : null;
+  const personalNote = exercicio.observacoes?.trim();
 
   useEffect(() => {
     setLocalConcluido(exercicio.concluido || false);
@@ -387,6 +389,19 @@ export function CompactExerciseCard({
                 />
               </div>
             </div>
+
+            {personalNote && (
+              <div
+                className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs leading-relaxed text-muted-foreground"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="mb-1.5 flex items-center gap-1.5 font-medium text-foreground">
+                  <MessageSquareText className="h-3.5 w-3.5 text-primary" />
+                  Observação do personal
+                </div>
+                <p className="whitespace-pre-line">{personalNote}</p>
+              </div>
+            )}
 
             <Button
               type="button"

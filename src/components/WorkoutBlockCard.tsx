@@ -270,7 +270,7 @@ export function WorkoutBlockCard({
                 ) : null}
 
                 {expanded && description ? (
-                  <p className="line-clamp-2 italic">{description}</p>
+                  <p className="break-words italic">{description}</p>
                 ) : null}
               </div>
             </div>
@@ -315,7 +315,7 @@ export function WorkoutBlockCard({
               <CheckCircle2 className="h-5 w-5 text-green-600" />
             </button>
             <span className="text-lg mr-1">{tipoConfig.icon}</span>
-            <p className="flex-1 min-w-0 text-xs text-muted-foreground line-through truncate">
+            <p className="min-w-0 flex-1 break-words text-xs text-muted-foreground line-through">
               {bloco.nome}
             </p>
             <Badge variant="default" className="text-[10px] bg-green-600 shrink-0">

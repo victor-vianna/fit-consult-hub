@@ -116,6 +116,7 @@ function formatCarga(carga?: string | null, ultimoPeso?: string | null) {
 
 export function CompactExerciseCard({
   exercicio,
+  index,
   onToggleConcluido,
   isWorkoutActive = false,
   variant = "list",
@@ -238,8 +239,8 @@ export function CompactExerciseCard({
           ? "h-full min-h-[176px] min-w-[280px] snap-start sm:min-w-[300px]"
           : "",
         isCarousel && fitContainer ? "h-full min-h-[176px] min-w-0" : "",
-        localConcluido && "border-green-500/30 bg-green-50/50 dark:bg-green-950/10",
-        highlighted && "ring-2 ring-primary/70 ring-offset-2 ring-offset-background",
+        localConcluido && "border-green-500/30 bg-green-50/50 opacity-75 dark:bg-green-950/10",
+        highlighted && "border-blue-500/60 bg-blue-950/10 ring-1 ring-blue-500/40",
         className
       )}
       data-workout-cache-item={exercicio.id}
@@ -253,7 +254,7 @@ export function CompactExerciseCard({
             isCarousel ? "min-h-[92px]" : "min-h-[82px] sm:min-h-[88px]"
           )}
         >
-          {onToggleConcluido && (
+          {onToggleConcluido ? (
             <button
               type="button"
               onClick={(event) => {
@@ -270,26 +271,32 @@ export function CompactExerciseCard({
               {localConcluido ? (
                 <CheckCircle2 className="h-6 w-6 text-green-600" />
               ) : (
-                <Circle className="h-6 w-6 text-primary" />
+                <span className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/60 text-sm font-semibold text-primary">
+                  {index + 1}
+                </span>
               )}
             </button>
+          ) : (
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-sm font-semibold text-muted-foreground">
+              {index + 1}
+            </span>
           )}
 
           <div className="min-w-0 flex-1">
             <p
               className={cn(
-                "truncate text-sm font-semibold leading-tight text-foreground sm:text-base",
+                "break-words text-sm font-semibold leading-tight text-foreground sm:text-base",
                 localConcluido && "text-muted-foreground line-through"
               )}
             >
               {exercicio.nome}
             </p>
-            <p className="mt-1 truncate text-xs text-muted-foreground sm:text-sm">
+            <p className="mt-1 break-words text-xs text-muted-foreground sm:text-sm">
               {compactSummary}
             </p>
           </div>
 
-          {expanded && externalVideoUrl && thumbnail && (
+          {externalVideoUrl && thumbnail && (
             <a
               href={externalVideoUrl}
               target="_blank"
@@ -332,7 +339,7 @@ export function CompactExerciseCard({
                 {formatPrescription(exercicio)}
               </span>
               {weightHistory.ultimoPeso && (
-                <span className="truncate text-right">
+                  <span className="break-words text-right">
                   Última: {weightHistory.ultimoPeso}kg
                   {weightHistory.ultimaData
                     ? ` em ${formatDisplayMonthDay(weightHistory.ultimaData)}`

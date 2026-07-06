@@ -16,12 +16,16 @@ import {
   ChevronDown,
   CheckCircle2,
   Clock,
+  Dumbbell,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { WorkoutCompletionData } from "@/hooks/useWorkoutTimer";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { createNotificationId, dispatchPushNotification } from "@/utils/pushNotifications";
+import {
+  createNotificationId,
+  dispatchPushNotification,
+} from "@/utils/pushNotifications";
 
 interface WorkoutCompletionScreenProps {
   data: WorkoutCompletionData;
@@ -39,9 +43,18 @@ export function WorkoutCompletionScreen({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
 
+  const tempoExibido = (() => {
+    const parts = data.tempoFormatado.split(":");
+    if (parts.length === 3 && parts[0] === "00") {
+      return parts.slice(1).join(":");
+    }
+    return data.tempoFormatado;
+  })();
+
   const enviarFeedback = async () => {
     if (!rating && !feedback.trim()) return;
     setIsSubmitting(true);
+
     try {
       const { data: sessaoData } = await supabase
         .from("treino_sessoes")
@@ -59,26 +72,31 @@ export function WorkoutCompletionScreen({
           .single();
 
         const notificacaoId = createNotificationId();
-        const { error: notificacaoError } = await supabase.from("notificacoes").insert({
-          id: notificacaoId,
-          destinatario_id: sessaoData.personal_id,
-          tipo: "feedback_treino",
-          titulo: `📝 Feedback de ${alunoProfile?.nome || "aluno"}`,
-          mensagem: `Avaliação: ${rating ? "⭐".repeat(rating) : "Sem nota"} - ${feedback || "Sem comentário"}`,
-          dados: {
-            treino_id: treinoId,
-            rating,
-            comentario: feedback,
-            aluno_id: sessaoData.profile_id,
-            aluno_nome: alunoProfile?.nome || null,
-            tipo_acao: "feedback",
-          },
-          lida: false,
-        });
-        if (notificacaoError) throw notificacaoError;
+        const { error: notificacaoError } = await supabase
+          .from("notificacoes")
+          .insert({
+            id: notificacaoId,
+            destinatario_id: sessaoData.personal_id,
+            tipo: "feedback_treino",
+            titulo: `Feedback de ${alunoProfile?.nome || "aluno"}`,
+            mensagem: `Avaliacao: ${
+              rating ? "estrela ".repeat(rating).trim() : "Sem nota"
+            } - ${feedback || "Sem comentario"}`,
+            dados: {
+              treino_id: treinoId,
+              rating,
+              comentario: feedback,
+              aluno_id: sessaoData.profile_id,
+              aluno_nome: alunoProfile?.nome || null,
+              tipo_acao: "feedback",
+            },
+            lida: false,
+          });
 
+        if (notificacaoError) throw notificacaoError;
         await dispatchPushNotification(notificacaoId);
       }
+
       toast.success("Feedback enviado!");
     } catch (err) {
       console.error("Erro ao enviar feedback:", err);
@@ -88,6 +106,116 @@ export function WorkoutCompletionScreen({
     }
   };
 
+  const createStoryImage = async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1080;
+    canvas.height = 1920;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    const gradient = ctx.createLinearGradient(0, 0, 1080, 1920);
+    gradient.addColorStop(0, "#07111f");
+    gradient.addColorStop(0.55, "#0b1628");
+    gradient.addColorStop(1, "#05070d");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 1080, 1920);
+
+    ctx.fillStyle = "rgba(59, 130, 246, 0.22)";
+    ctx.beginPath();
+    ctx.arc(900, 220, 220, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(255,255,255,0.18)";
+    ctx.lineWidth = 2;
+    ctx.roundRect(92, 240, 896, 1180, 44);
+    ctx.stroke();
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "700 76px Arial, sans-serif";
+    ctx.fillText("Treino concluido", 140, 380);
+
+    ctx.fillStyle = "rgba(255,255,255,0.68)";
+    ctx.font = "400 34px Arial, sans-serif";
+    ctx.fillText(data.data, 140, 440);
+
+    ctx.fillStyle = "#60a5fa";
+    ctx.font = "800 118px Arial, sans-serif";
+    ctx.fillText(tempoExibido, 140, 650);
+
+    const metrics = [
+      ["Exercicios", `${data.exerciciosConcluidos}/${data.exerciciosTotal}`],
+      ["Cargas registradas", String(data.cargasRegistradas)],
+      ["Inicio / fim", `${data.horaInicio} - ${data.horaFim}`],
+    ];
+
+    metrics.forEach(([label, value], index) => {
+      const y = 820 + index * 170;
+      ctx.fillStyle = "rgba(255,255,255,0.12)";
+      ctx.roundRect(140, y, 800, 112, 24);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.62)";
+      ctx.font = "500 28px Arial, sans-serif";
+      ctx.fillText(label, 180, y + 42);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "700 42px Arial, sans-serif";
+      ctx.fillText(value, 180, y + 88);
+    });
+
+    ctx.fillStyle = "rgba(255,255,255,0.74)";
+    ctx.font = "400 32px Arial, sans-serif";
+    ctx.fillText(data.mensagemMotivacional.slice(0, 92), 140, 1320);
+
+    return new Promise<File | null>((resolve) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          resolve(null);
+          return;
+        }
+
+        resolve(
+          new File([blob], "resumo-treino-story.png", {
+            type: "image/png",
+          })
+        );
+      }, "image/png");
+    });
+  };
+
+  const handleShare = async () => {
+    const storyFile = await createStoryImage();
+
+    if (storyFile && navigator.share) {
+      const shareData: ShareData = {
+        title: "Treino concluido",
+        text: data.mensagemMotivacional,
+        files: [storyFile],
+      };
+
+      try {
+        if (!navigator.canShare || navigator.canShare(shareData)) {
+          await navigator.share(shareData);
+          return;
+        }
+      } catch {
+        return;
+      }
+    }
+
+    if (storyFile) {
+      const url = URL.createObjectURL(storyFile);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = storyFile.name;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success("Imagem do story gerada. Escolha a imagem no Instagram.");
+    }
+
+    window.setTimeout(() => {
+      window.location.href = "instagram://story-camera";
+    }, 350);
+  };
+
   const handleVoltar = async () => {
     if (rating || feedback.trim()) {
       await enviarFeedback();
@@ -95,45 +223,17 @@ export function WorkoutCompletionScreen({
     onClose();
   };
 
-  const handleShare = async () => {
-    const shareText = `🏋️ Treino concluído!\n\n⏱️ Tempo: ${data.tempoFormatado}\n💪 Exercícios: ${data.exerciciosConcluidos}/${data.exerciciosTotal}\n📅 ${data.data}\n\n${data.mensagemMotivacional}`;
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: "Treino Concluído!",
-          text: shareText,
-        });
-      } catch {
-        /* cancel */
-      }
-    } else {
-      await navigator.clipboard.writeText(shareText);
-      toast.success("Copiado para a área de transferência!");
-    }
-  };
-
-  // Tempo formatado: remove HH se for 00
-  const tempoExibido = (() => {
-    const parts = data.tempoFormatado.split(":");
-    if (parts.length === 3 && parts[0] === "00") {
-      return parts.slice(1).join(":");
-    }
-    return data.tempoFormatado;
-  })();
-
   return (
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-background flex items-center justify-center overflow-y-auto p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-background p-4"
       >
-        {/* Botão Compartilhar discreto no topo */}
         <button
           onClick={handleShare}
-          className="absolute top-4 right-4 p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          className="absolute right-4 top-4 rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           aria-label="Compartilhar"
         >
           <Share2 className="h-5 w-5" />
@@ -146,68 +246,81 @@ export function WorkoutCompletionScreen({
           className="w-full max-w-md"
         >
           <Card className="border-2 shadow-xl">
-            <CardContent className="p-8 space-y-6">
-              {/* Troféu */}
+            <CardContent className="space-y-6 p-8">
               <div className="flex justify-center">
                 <motion.div
                   initial={{ scale: 0, rotate: -30 }}
                   animate={{ scale: 1, rotate: 0 }}
                   transition={{ delay: 0.2, type: "spring", bounce: 0.6 }}
-                  className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center"
+                  className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10"
                 >
                   <Trophy className="h-10 w-10 text-primary" />
                 </motion.div>
               </div>
 
-              {/* Título */}
-              <div className="text-center space-y-1">
+              <div className="space-y-1 text-center">
                 <h1 className="text-2xl font-bold tracking-tight">
-                  Treino Concluído
+                  Treino concluido
                 </h1>
                 <p className="text-sm text-muted-foreground">{data.data}</p>
               </div>
 
-              {/* Tempo total destacado */}
-              <div className="text-center space-y-1.5 py-2">
-                <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+              <div className="space-y-1.5 py-2 text-center">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Tempo total
                 </p>
-                <p className="text-5xl font-bold font-mono tracking-tight text-foreground">
+                <p className="font-mono text-5xl font-bold tracking-tight text-foreground">
                   {tempoExibido}
                 </p>
               </div>
 
-              {/* Início → Fim e exercícios */}
-              <div className="grid grid-cols-2 gap-3 text-center">
-                <div className="rounded-lg border bg-muted/30 px-3 py-3">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1 flex items-center justify-center gap-1">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-lg border bg-muted/30 px-2 py-3">
+                  <p className="mb-1 flex items-center justify-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                     <Clock className="h-3 w-3" />
-                    Início → Fim
+                    Tempo
                   </p>
-                  <p className="text-sm font-semibold tabular-nums">
-                    {data.horaInicio} → {data.horaFim}
+                  <p className="text-xs font-semibold tabular-nums">
+                    {data.horaInicio} - {data.horaFim}
                   </p>
                 </div>
-                <div className="rounded-lg border bg-muted/30 px-3 py-3">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1 flex items-center justify-center gap-1">
+                <div className="rounded-lg border bg-muted/30 px-2 py-3">
+                  <p className="mb-1 flex items-center justify-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                     <CheckCircle2 className="h-3 w-3" />
-                    Exercícios
+                    Feitos
                   </p>
                   <p className="text-sm font-semibold tabular-nums">
-                    {data.exerciciosConcluidos} de {data.exerciciosTotal}
+                    {data.exerciciosConcluidos}/{data.exerciciosTotal}
+                  </p>
+                </div>
+                <div className="rounded-lg border bg-muted/30 px-2 py-3">
+                  <p className="mb-1 flex items-center justify-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                    <Dumbbell className="h-3 w-3" />
+                    Cargas
+                  </p>
+                  <p className="text-sm font-semibold tabular-nums">
+                    {data.cargasRegistradas}
                   </p>
                 </div>
               </div>
 
-              {/* Frase motivacional */}
-              <p className="text-center text-sm text-muted-foreground italic px-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleShare}
+                className="h-11 w-full gap-2"
+              >
+                <Share2 className="h-4 w-4" />
+                Compartilhar story
+              </Button>
+
+              <p className="px-2 text-center text-sm italic text-muted-foreground">
                 {data.mensagemMotivacional}
               </p>
 
-              {/* Feedback opcional em collapse */}
               <Collapsible open={feedbackOpen} onOpenChange={setFeedbackOpen}>
                 <CollapsibleTrigger asChild>
-                  <button className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-1">
+                  <button className="flex w-full items-center justify-center gap-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground">
                     Deixar feedback para o personal
                     <ChevronDown
                       className={`h-3 w-3 transition-transform ${
@@ -238,17 +351,16 @@ export function WorkoutCompletionScreen({
                   <Textarea
                     placeholder="Como foi o treino? (opcional)"
                     value={feedback}
-                    onChange={(e) => setFeedback(e.target.value)}
+                    onChange={(event) => setFeedback(event.target.value)}
                     className="resize-none text-sm"
                     rows={3}
                   />
                 </CollapsibleContent>
               </Collapsible>
 
-              {/* Ação primária */}
               <Button
                 onClick={handleVoltar}
-                className="w-full h-12 text-base gap-2"
+                className="h-12 w-full gap-2 text-base"
                 disabled={isSubmitting}
               >
                 <Home className="h-5 w-5" />

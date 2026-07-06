@@ -49,6 +49,7 @@ export interface WorkoutCompletionData {
   mensagemMotivacional: string;
   exerciciosConcluidos: number;
   exerciciosTotal: number;
+  cargasRegistradas: number;
 }
 
 const FRASE_FINAL_PADRAO = "Treino finalizado com excelência.";
@@ -825,13 +826,16 @@ export function useWorkoutTimer({
       // Contagem de exercícios (concluídos / total)
       const { data: exerciciosTreino } = await supabase
         .from("exercicios")
-        .select("id, concluido")
+        .select("id, concluido, peso_executado")
         .eq("treino_semanal_id", treinoId)
         .is("deleted_at", null);
 
       const exerciciosTotal = exerciciosTreino?.length || 0;
       const exerciciosConcluidos =
         exerciciosTreino?.filter((e) => e.concluido).length || 0;
+      const cargasRegistradas =
+        exerciciosTreino?.filter((e) => String(e.peso_executado || "").trim().length > 0)
+          .length || 0;
 
       const dadosConclusao: WorkoutCompletionData = {
         tempoTotal: tempoFinal,
@@ -845,6 +849,7 @@ export function useWorkoutTimer({
         mensagemMotivacional,
         exerciciosConcluidos,
         exerciciosTotal,
+        cargasRegistradas,
       };
 
       setCompletionData(dadosConclusao);

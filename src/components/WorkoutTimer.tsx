@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, Check, X, Timer, Loader2, ChevronUp } from "lucide-react";
+import { Play, Pause, Check, X, Timer, Loader2 } from "lucide-react";
 import { useWorkoutTimer } from "@/hooks/useWorkoutTimer";
 import { WorkoutCompletionScreen } from "./WorkoutCompletionScreen";
 import {
@@ -13,7 +13,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 interface WorkoutTimerProps {
@@ -26,6 +25,7 @@ interface WorkoutTimerProps {
   onWorkoutStart?: () => void;
   progresso?: number;
   finalizarRef?: React.MutableRefObject<(() => void) | null>;
+  iniciarRef?: React.MutableRefObject<(() => void) | null>;
 }
 
 export function WorkoutTimer({
@@ -38,6 +38,7 @@ export function WorkoutTimer({
   onWorkoutStart,
   progresso = 0,
   finalizarRef,
+  iniciarRef,
 }: WorkoutTimerProps) {
   const [showFinalizarDialog, setShowFinalizarDialog] = useState(false);
   const [showCancelarDialog, setShowCancelarDialog] = useState(false);
@@ -67,6 +68,23 @@ export function WorkoutTimer({
       }
     }
   }, [finalizarRef, isRunning, isPaused]);
+
+  useEffect(() => {
+    if (!iniciarRef) return;
+
+    if (!isRunning && !isPaused && !isLoading) {
+      iniciarRef.current = () => {
+        iniciar();
+        onWorkoutStart?.();
+      };
+    } else {
+      iniciarRef.current = null;
+    }
+
+    return () => {
+      iniciarRef.current = null;
+    };
+  }, [iniciarRef, iniciar, isLoading, isPaused, isRunning, onWorkoutStart]);
 
   if (readOnly) return null;
 
@@ -104,23 +122,8 @@ export function WorkoutTimer({
 
   const isActive = isRunning || isPaused;
 
-  // Start button — rendered inline in the workout card
   if (!isActive) {
-    return (
-      <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 sm:p-6">
-        <div className="text-center space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Você está no <span className="font-semibold">modo visualização</span>.
-            <br />
-            Aperte <span className="font-semibold">INICIAR</span> para começar o treino.
-          </p>
-          <Button onClick={() => { iniciar(); onWorkoutStart?.(); }} size="lg" className="w-full h-12 text-base font-semibold shadow-lg">
-            <Play className="h-5 w-5 mr-2" />
-            Iniciar Treino
-          </Button>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   // ─── Active Workout: MFIT-style inline card ───

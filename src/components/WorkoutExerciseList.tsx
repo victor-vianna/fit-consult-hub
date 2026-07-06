@@ -99,64 +99,87 @@ export function WorkoutExerciseList({
   treinoId,
   resumeItemId,
 }: WorkoutExerciseListProps) {
-  const allBlocos = [...blocosInicio, ...blocosMeio, ...blocosFim];
-  const unifiedList = buildUnifiedList(exerciciosIsolados, grupos, allBlocos);
+  const aquecimentoList = buildUnifiedList([], [], blocosInicio);
+  const mainList = buildUnifiedList(
+    exerciciosIsolados,
+    grupos,
+    [...blocosMeio, ...blocosFim]
+  );
+
+  const renderItem = (item: UnifiedItem, idx: number) => {
+    if (item.type === "block") {
+      const bloco = item.data;
+      return (
+        <div
+          key={bloco.id}
+          data-workout-cache-item={bloco.id}
+          data-workout-treino-id={treinoId ?? undefined}
+          data-workout-cache-type="block"
+        >
+          <WorkoutBlockCard
+            bloco={bloco}
+            index={idx}
+            readOnly={true}
+            onToggleConcluido={isWorkoutActive ? onToggleBloco : undefined}
+          />
+        </div>
+      );
+    }
+
+    if (item.type === "group") {
+      const grupo = item.data;
+      return (
+        <CompactGroupCard
+          key={grupo.grupo_id || `grupo-${idx}`}
+          grupo={grupo}
+          index={idx}
+          onToggleConcluido={isWorkoutActive ? onToggleExercicio : undefined}
+          onToggleGrupoConcluido={isWorkoutActive ? onToggleGrupo : undefined}
+          isWorkoutActive={!!isWorkoutActive}
+          profileId={profileId}
+          treinoId={treinoId}
+          resumeItemId={isWorkoutActive ? resumeItemId : null}
+        />
+      );
+    }
+
+    const exercicio = item.data;
+    return (
+      <CompactExerciseCard
+        key={exercicio.id}
+        exercicio={exercicio}
+        index={idx}
+        onToggleConcluido={isWorkoutActive ? onToggleExercicio : undefined}
+        isWorkoutActive={!!isWorkoutActive}
+        profileId={profileId}
+        treinoId={treinoId}
+        highlighted={!!isWorkoutActive && resumeItemId === exercicio.id}
+      />
+    );
+  };
+
+  const renderSection = (label: string, items: UnifiedItem[], offset = 0) => {
+    if (items.length === 0) return null;
+
+    return (
+      <section className="space-y-2">
+        <div className="flex items-center gap-3">
+          <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {label}
+          </span>
+          <span className="h-px flex-1 bg-border" />
+        </div>
+        <div className="space-y-2">
+          {items.map((item, idx) => renderItem(item, offset + idx))}
+        </div>
+      </section>
+    );
+  };
 
   return (
     <div className="space-y-4">
-      <div className="space-y-3">
-        {unifiedList.map((item, idx) => {
-          if (item.type === "block") {
-            const bloco = item.data;
-            return (
-              <div
-                key={bloco.id}
-                data-workout-cache-item={bloco.id}
-                data-workout-treino-id={treinoId ?? undefined}
-                data-workout-cache-type="block"
-              >
-                <WorkoutBlockCard
-                  bloco={bloco}
-                  index={idx}
-                  readOnly={true}
-                  onToggleConcluido={isWorkoutActive ? onToggleBloco : undefined}
-                />
-              </div>
-            );
-          }
-
-          if (item.type === "group") {
-            const grupo = item.data;
-            return (
-              <CompactGroupCard
-                key={grupo.grupo_id || `grupo-${idx}`}
-                grupo={grupo}
-                index={idx}
-                onToggleConcluido={isWorkoutActive ? onToggleExercicio : undefined}
-                onToggleGrupoConcluido={isWorkoutActive ? onToggleGrupo : undefined}
-                isWorkoutActive={!!isWorkoutActive}
-                profileId={profileId}
-                treinoId={treinoId}
-                resumeItemId={resumeItemId}
-              />
-            );
-          }
-
-          const exercicio = item.data;
-          return (
-            <CompactExerciseCard
-              key={exercicio.id}
-              exercicio={exercicio}
-              index={idx}
-              onToggleConcluido={isWorkoutActive ? onToggleExercicio : undefined}
-              isWorkoutActive={!!isWorkoutActive}
-              profileId={profileId}
-              treinoId={treinoId}
-              highlighted={resumeItemId === exercicio.id}
-            />
-          );
-        })}
-      </div>
+      {renderSection("Aquecimento", aquecimentoList)}
+      {renderSection("Treino principal", mainList, aquecimentoList.length)}
 
       {isWorkoutActive && onFinalizarTreino && (
         <div className="mt-6 border-t border-border/50 pt-4">

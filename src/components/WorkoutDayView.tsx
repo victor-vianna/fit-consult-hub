@@ -50,6 +50,75 @@ const diasSemana = [
 
 const WORKOUT_RESUME_CACHE_VERSION = 1;
 
+function getBlockDurationMinutes(bloco: BlocoTreino) {
+  return (
+    bloco.config_cardio?.duracao_minutos ??
+    bloco.config_alongamento?.duracao_minutos ??
+    bloco.config_aquecimento?.duracao_minutos ??
+    bloco.duracao_estimada_minutos ??
+    0
+  );
+}
+
+function estimateExerciseMinutes(exercicio: { series?: number | null; descanso?: number | null }) {
+  const series = Math.max(1, exercicio.series ?? 3);
+  const workSeconds = series * 45;
+  const restSeconds = Math.max(series - 1, 0) * (exercicio.descanso ?? 0);
+  return (workSeconds + restSeconds) / 60;
+}
+
+function estimateWorkoutMinutes(
+  exercicios: any[],
+  grupos: GrupoExercicio[],
+  blocos: BlocoTreino[]
+) {
+  const isolatedMinutes = exercicios.reduce(
+    (total, exercicio) => total + estimateExerciseMinutes(exercicio),
+    0
+  );
+  const groupMinutes = grupos.reduce(
+    (total, grupo) =>
+      total +
+      (grupo.exercicios ?? []).reduce(
+        (subtotal: number, exercicio: any) =>
+          subtotal + estimateExerciseMinutes(exercicio),
+        0
+      ),
+    0
+  );
+  const blockMinutes = blocos.reduce(
+    (total, bloco) => total + getBlockDurationMinutes(bloco),
+    0
+  );
+
+  return Math.max(1, Math.round(isolatedMinutes + groupMinutes + blockMinutes));
+}
+
+function countCompletedItems(
+  exercicios: any[],
+  grupos: GrupoExercicio[],
+  blocos: BlocoTreino[]
+) {
+  const isolatedDone = exercicios.filter((exercicio) => exercicio.concluido).length;
+  const groupDone = grupos.reduce(
+    (total, grupo) =>
+      total + (grupo.exercicios ?? []).filter((ex: any) => ex.concluido).length,
+    0
+  );
+  const blocksDone = blocos.filter((bloco) => bloco.concluido).length;
+
+  return isolatedDone + groupDone + blocksDone;
+}
+
+function buildWorkoutSubtitle(treino: TreinoDia, hasMultiple: boolean) {
+  const parts = [
+    treino.nome_treino || (hasMultiple ? "Treino principal" : null),
+    treino.descricao,
+  ].filter((value): value is string => Boolean(value?.trim()));
+
+  return parts.join(" · ");
+}
+
 interface WorkoutResumeSnapshot {
   version: number;
   profileId: string;
@@ -440,6 +509,12 @@ export function WorkoutDayView({
     const blocoIds = (localBlocos[treinoId] || []).map((bloco) => bloco.id);
 
     limparProgressoLocal(exercicioIds, blocoIds);
+    exercicioIds.forEach((exercicioId) => {
+      salvarProgressoLocal(exercicioId, false);
+    });
+    blocoIds.forEach((blocoId) => {
+      salvarBlocoProgressoLocal(blocoId, false);
+    });
 
     setLocalTreinos((prev) =>
       prev.map((treino) =>
@@ -474,7 +549,15 @@ export function WorkoutDayView({
         concluido_em: null,
       })),
     }));
-  }, [getTreinoId, limparProgressoLocal, localBlocos, localGrupos, localTreinos]);
+  }, [
+    getTreinoId,
+    limparProgressoLocal,
+    localBlocos,
+    localGrupos,
+    localTreinos,
+    salvarBlocoProgressoLocal,
+    salvarProgressoLocal,
+  ]);
 
   // Handler para iniciar treino - usa hook de persistência
   const handleIniciarTreino = (treinoId: string, dia: number) => {
@@ -905,6 +988,16 @@ export function WorkoutDayView({
                 const exerciciosIsolados = treino.exercicios.filter(
                   (ex) => !ex.grupo_id
                 );
+                const completedItems = countCompletedItems(
+                  exerciciosIsolados,
+                  grupos,
+                  blocos
+                );
+                const duracaoEstimadaMinutos = estimateWorkoutMinutes(
+                  exerciciosIsolados,
+                  grupos,
+                  blocos
+                );
 
                 const isDiaIniciado = isTreinoIniciado(treinoId);
                 const hasMultiple = treinosDoDia.filter(t => {
@@ -924,6 +1017,8 @@ export function WorkoutDayView({
                     diaInfo={diaInfo}
                     hasMultiple={hasMultiple}
                     totalItens={totalItens}
+                    completedItems={completedItems}
+                    duracaoEstimadaMinutos={duracaoEstimadaMinutos}
                     grupos={grupos}
                     blocos={blocos}
                     blocosInicio={blocosInicio}
@@ -966,6 +1061,8 @@ function TreinoCard({
   diaInfo,
   hasMultiple,
   totalItens,
+  completedItems,
+  duracaoEstimadaMinutos,
   grupos,
   blocos,
   blocosInicio,
@@ -991,6 +1088,8 @@ function TreinoCard({
   diaInfo: { nome: string; abrev: string };
   hasMultiple: boolean;
   totalItens: number;
+  completedItems: number;
+  duracaoEstimadaMinutos: number;
   grupos: GrupoExercicio[];
   blocos: BlocoTreino[];
   blocosInicio: BlocoTreino[];
@@ -1012,12 +1111,34 @@ function TreinoCard({
   resumeItemId?: string | null;
 }) {
   const finalizarRef = useRef<(() => void) | null>(null);
+  const iniciarRef = useRef<(() => void) | null>(null);
 
   const isWorkoutActive = isDiaIniciado && !!treinoId;
+  const totalExercicios =
+    exerciciosIsolados.length +
+    grupos.reduce(
+      (total, grupo) => total + (grupo.exercicios?.length || 0),
+      0
+    );
+  const subtitle = buildWorkoutSubtitle(treino, hasMultiple);
 
   return (
     <Card className="border-primary/30 shadow-xl bg-card/50 backdrop-blur-sm">
       <CardContent className="p-3 sm:p-5 space-y-4">
+        <WorkoutDayHeader
+          diaNome={diaInfo.nome}
+          descricao={subtitle}
+          totalItens={totalItens}
+          completedItems={completedItems}
+          totalExercicios={totalExercicios}
+          totalGrupos={grupos.length}
+          totalBlocos={blocos.length}
+          progresso={progresso}
+          treinoIniciado={isDiaIniciado}
+          duracaoEstimadaMinutos={duracaoEstimadaMinutos}
+          onStartWorkout={treinoId ? () => iniciarRef.current?.() : undefined}
+        />
+
         {/* Timer inline em destaque no topo */}
         {treinoId && (
           <WorkoutTimer
@@ -1027,6 +1148,7 @@ function TreinoCard({
             readOnly={false}
             progresso={progresso}
             finalizarRef={finalizarRef}
+            iniciarRef={iniciarRef}
             onWorkoutStart={() => marcarTreinoIniciado(treinoId, treino.dia)}
             onWorkoutComplete={() => {
               marcarTreinoFinalizado(treinoId, treino.dia);
@@ -1038,19 +1160,6 @@ function TreinoCard({
             }}
           />
         )}
-
-        <WorkoutDayHeader
-          diaNome={hasMultiple && treino.nome_treino 
-            ? `${diaInfo.nome} — ${treino.nome_treino}` 
-            : diaInfo.nome}
-          descricao={treino.descricao}
-          totalExercicios={totalItens}
-          totalGrupos={grupos.length}
-          totalBlocos={blocos.length}
-          progresso={progresso}
-          treinoIniciado={isDiaIniciado}
-        />
-
 
         {!treinoTemConteudo ? (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">

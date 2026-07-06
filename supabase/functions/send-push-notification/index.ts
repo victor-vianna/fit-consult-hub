@@ -43,6 +43,195 @@ function buildTargetUrl(tipo: string, dados: Record<string, any>, recipientRole?
   return recipientRole === "aluno" ? "/aluno" : "/";
 }
 
+const EMOJI_REGEX =
+  /[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{27BF}\u{FE0F}]/gu;
+
+function stripEmoji(value?: string | null) {
+  return String(value || "").replace(EMOJI_REGEX, "").replace(/\s+/g, " ").trim();
+}
+
+function limitText(value: string, maxLength: number) {
+  const clean = stripEmoji(value);
+  if (clean.length <= maxLength) return clean;
+
+  const sliced = clean.slice(0, maxLength).trimEnd();
+  const lastSpace = sliced.lastIndexOf(" ");
+  return (lastSpace > Math.floor(maxLength * 0.6)
+    ? sliced.slice(0, lastSpace)
+    : sliced
+  ).trim();
+}
+
+function firstName(name?: string | null) {
+  return stripEmoji(name).split(/\s+/).filter(Boolean)[0] || "Aluno";
+}
+
+function compactName(name?: string | null, maxLength = 30) {
+  const clean = stripEmoji(name);
+  if (!clean) return "Aluno";
+  if (clean.length <= maxLength) return clean;
+
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return limitText(clean, maxLength);
+
+  const firstAndLast = `${parts[0]} ${parts[parts.length - 1]}`;
+  if (firstAndLast.length <= maxLength) return firstAndLast;
+
+  return parts[0].length <= maxLength ? parts[0] : limitText(parts[0], maxLength);
+}
+
+function formatWorkoutDuration(totalSeconds?: number | null) {
+  const minutes = Math.max(0, Math.round(Number(totalSeconds || 0) / 60));
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (hours > 0) return `${hours}h${String(remainingMinutes).padStart(2, "0")}min`;
+  return `${remainingMinutes}min`;
+}
+
+function todayStartIso() {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  return date.toISOString();
+}
+
+function buildMessageTitle(name: string, count: number) {
+  if (count <= 1) return compactName(name, 30);
+
+  const suffix = ` · ${count} mensagens`;
+  return `${compactName(name, Math.max(8, 30 - suffix.length))}${suffix}`;
+}
+
+async function buildPushPayload(
+  supabaseAdmin: any,
+  notification: Record<string, any>,
+  recipientRole?: string
+) {
+  const dados = asRecord(notification.dados);
+  const tipo = notification.tipo;
+  const recipientId = notification.destinatario_id;
+  const url = buildTargetUrl(tipo, dados, recipientRole);
+
+  let title = limitText(notification.titulo || "Nova notificação", 30);
+  let body = limitText(notification.mensagem || "Você tem uma nova notificação.", 60);
+  let tag = `fitconsult-${tipo}-${recipientId}`;
+  let timestamp = Date.now();
+
+  if (tipo === "nova_mensagem" || tipo === "mensagem") {
+    const senderId = dados.remetente_id || dados.profile_id || dados.aluno_id;
+    const conversationKey = dados.conversa_key || `${dados.aluno_id || ""}:${senderId || ""}`;
+    const senderName =
+      dados.remetente_nome ||
+      dados.remetente_nome_curto ||
+      notification.titulo?.replace(/^Nova mensagem de\s+/i, "") ||
+      "Mensagem";
+
+    const { data: unreadMessages } = await supabaseAdmin
+      .from("notificacoes")
+      .select("id, mensagem, dados, created_at, lida")
+      .eq("destinatario_id", recipientId)
+      .eq("tipo", notification.tipo)
+      .eq("lida", false)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    const related = (unreadMessages || []).filter((item: Record<string, any>) => {
+      const itemDados = asRecord(item.dados);
+      const itemSenderId = itemDados.remetente_id || itemDados.profile_id || itemDados.aluno_id;
+      const itemConversationKey =
+        itemDados.conversa_key || `${itemDados.aluno_id || ""}:${itemSenderId || ""}`;
+
+      return conversationKey
+        ? itemConversationKey === conversationKey
+        : itemSenderId && itemSenderId === senderId;
+    });
+
+    const count = Math.max(related.length, 1);
+    const previews = (related.length > 0 ? related : [notification])
+      .slice(0, 3)
+      .reverse()
+      .map((item: Record<string, any>) => limitText(item.mensagem || "", 60))
+      .filter(Boolean);
+
+    title = buildMessageTitle(senderName, count);
+    body = previews.join("\n") || body;
+    tag = `fitconsult-chat-${recipientId}-${conversationKey || senderId || notification.id}`;
+    timestamp = new Date((related[0] || notification).created_at || Date.now()).getTime();
+  }
+
+  if (tipo === "treino_concluido") {
+    const { data: sameDay } = await supabaseAdmin
+      .from("notificacoes")
+      .select("id")
+      .eq("destinatario_id", recipientId)
+      .eq("tipo", tipo)
+      .gte("created_at", todayStartIso());
+    const count = Math.max(sameDay?.length || 0, 1);
+
+    title = count > 1 ? "Treinos concluídos" : "Treino concluído";
+    body =
+      count > 1
+        ? `${count} alunos finalizaram hoje`
+        : limitText(
+            `${compactName(dados.aluno_nome, 42)} · ${formatWorkoutDuration(dados.duracao_total)}`,
+            60
+          );
+    tag = `fitconsult-treino-concluido-${recipientId}-${todayStartIso().slice(0, 10)}`;
+  }
+
+  if (tipo === "feedback_treino") {
+    const { data: sameDay } = await supabaseAdmin
+      .from("notificacoes")
+      .select("id")
+      .eq("destinatario_id", recipientId)
+      .eq("tipo", tipo)
+      .gte("created_at", todayStartIso());
+    const count = Math.max(sameDay?.length || 0, 1);
+
+    title = count > 1 ? "Novos feedbacks" : "Novo feedback";
+    body =
+      count > 1
+        ? `${count} alunos avaliaram hoje`
+        : limitText(
+            `${firstName(dados.aluno_nome)} avaliou com ${dados.rating || 0} estrelas`,
+            60
+          );
+    tag = `fitconsult-feedback-${recipientId}-${todayStartIso().slice(0, 10)}`;
+  }
+
+  if (tipo === "treino_iniciado") {
+    const { data: sameDay } = await supabaseAdmin
+      .from("notificacoes")
+      .select("id")
+      .eq("destinatario_id", recipientId)
+      .eq("tipo", tipo)
+      .gte("created_at", todayStartIso());
+    const count = Math.max(sameDay?.length || 0, 1);
+
+    title = count > 1 ? "Treinos iniciados" : "Treino iniciado";
+    body =
+      count > 1
+        ? `${count} alunos começaram hoje`
+        : limitText(
+            `${firstName(dados.aluno_nome)} começou o treino de ${dados.dia_treino || "hoje"}`,
+            60
+          );
+    tag = `fitconsult-treino-iniciado-${recipientId}-${todayStartIso().slice(0, 10)}`;
+  }
+
+  return {
+    title: title || "Nova notificação",
+    body: body || "Você tem uma nova notificação.",
+    icon: "/icons/icon-192x192.png",
+    badge: "/icons/icon-192x192.png",
+    tag,
+    renotify: true,
+    timestamp,
+    notificationId: notification.id,
+    url,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { status: 200, headers: corsHeaders });
@@ -81,7 +270,7 @@ Deno.serve(async (req) => {
 
     const { data: notification, error: notificationError } = await supabaseAdmin
       .from("notificacoes")
-      .select("id, destinatario_id, tipo, titulo, mensagem, dados")
+      .select("id, destinatario_id, tipo, titulo, mensagem, dados, created_at")
       .eq("id", notificationId)
       .single();
 
@@ -110,7 +299,13 @@ Deno.serve(async (req) => {
     const allowed =
       (roleRow?.role === "aluno" && notification.tipo === "nova_mensagem") ||
       (roleRow?.role === "personal" &&
-        ["nova_mensagem", "mensagem", "treino_concluido", "feedback_treino"].includes(notification.tipo));
+        [
+          "nova_mensagem",
+          "mensagem",
+          "treino_concluido",
+          "treino_iniciado",
+          "feedback_treino",
+        ].includes(notification.tipo));
 
     if (!allowed) {
       return jsonResponse({ skipped: true, reason: "Tipo de push nao habilitado para este perfil." });
@@ -140,15 +335,9 @@ Deno.serve(async (req) => {
 
     webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
 
-    const payload = JSON.stringify({
-      title: notification.titulo || "FitConsult",
-      body: notification.mensagem || "Nova notificacao",
-      icon: "/icons/icon-192x192.png",
-      badge: "/icons/icon-192x192.png",
-      tag: `fitconsult-${notification.id}`,
-      notificationId: notification.id,
-      url: buildTargetUrl(notification.tipo, dados, roleRow?.role),
-    });
+    const payload = JSON.stringify(
+      await buildPushPayload(supabaseAdmin, notification, roleRow?.role)
+    );
 
     let sent = 0;
     let failed = 0;

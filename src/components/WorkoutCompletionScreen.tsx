@@ -26,6 +26,7 @@ import {
   createNotificationId,
   dispatchPushNotification,
 } from "@/utils/pushNotifications";
+import { firstName, previewNotificationMessage } from "@/utils/notificationText";
 
 interface WorkoutCompletionScreenProps {
   data: WorkoutCompletionData;
@@ -78,10 +79,10 @@ export function WorkoutCompletionScreen({
             id: notificacaoId,
             destinatario_id: sessaoData.personal_id,
             tipo: "feedback_treino",
-            titulo: `Feedback de ${alunoProfile?.nome || "aluno"}`,
-            mensagem: `Avaliacao: ${
-              rating ? "estrela ".repeat(rating).trim() : "Sem nota"
-            } - ${feedback || "Sem comentario"}`,
+            titulo: "Novo feedback",
+            mensagem: previewNotificationMessage(
+              `${firstName(alunoProfile?.nome)} avaliou com ${rating || 0} estrelas`
+            ),
             dados: {
               treino_id: treinoId,
               rating,

@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { buildChatConversationKey } from "@/utils/chat";
 import { createNotificationId, dispatchPushNotification } from "@/utils/pushNotifications";
+import { compactName, previewNotificationMessage } from "@/utils/notificationText";
 
 interface BroadcastMessageDialogProps {
   personalId: string;
@@ -73,12 +74,16 @@ export function BroadcastMessageDialog({ personalId, themeColor }: BroadcastMess
           id,
           destinatario_id: aluno.id,
           tipo: "nova_mensagem",
-          titulo: `Nova mensagem de ${personalProfile?.nome || "Personal"}`,
-          mensagem: texto.trim().substring(0, 100),
+          titulo: compactName(personalProfile?.nome || "Personal"),
+          mensagem: previewNotificationMessage(texto.trim()),
           dados: {
             aluno_id: aluno.id,
             aluno_nome: aluno.nome || null,
             profile_id: personalId,
+            remetente_id: personalId,
+            remetente_nome: personalProfile?.nome || null,
+            remetente_nome_curto: compactName(personalProfile?.nome || "Personal"),
+            conversa_key: buildChatConversationKey(personalId, aluno.id),
             tipo_acao: "chat",
           },
         };

@@ -5,10 +5,26 @@ import { createNotificationId, dispatchPushNotification } from "@/utils/pushNoti
 import { toast } from "sonner";
 import { SESSION_STATUS, ACTIVE_SESSION_STATUSES, WORKOUT_EVENTS, dispatchWorkoutEvent } from "@/constants/workoutStatus";
 import { formatDisplayDate } from "@/utils/dateFormat";
+import {
+  compactName,
+  firstName,
+  formatWorkoutDuration,
+  previewNotificationMessage,
+} from "@/utils/notificationText";
 
 // 🔧 Key única por treino para evitar conflitos
 const getStorageKey = (treinoId: string) => `workout_timer_${treinoId}`;
 const PERSIST_INTERVAL = 5000; // 5 segundos
+const DIAS_SEMANA = [
+  "",
+  "segunda-feira",
+  "terça-feira",
+  "quarta-feira",
+  "quinta-feira",
+  "sexta-feira",
+  "sábado",
+  "domingo",
+];
 
 // 🔧 Interface melhorada com timestamps absolutos
 interface StoredSession {
@@ -533,7 +549,50 @@ export function useWorkoutTimer({
       };
       localStorage.setItem(getStorageKey(treinoId), JSON.stringify(session));
 
-      toast.success("🚀 Treino iniciado! Vamos nessa!");
+      try {
+        const [{ data: alunoData }, { data: treinoData }] = await Promise.all([
+          supabase.from("profiles").select("nome").eq("id", profileId).maybeSingle(),
+          supabase
+            .from("treinos_semanais")
+            .select("dia_semana")
+            .eq("id", treinoId)
+            .maybeSingle(),
+        ]);
+        const alunoNome = alunoData?.nome || "Aluno";
+        const diaTreino = DIAS_SEMANA[treinoData?.dia_semana || 0] || "hoje";
+        const notificacaoInicioId = createNotificationId();
+
+        const { error: notificacaoInicioError } = await supabase
+          .from("notificacoes")
+          .insert({
+            id: notificacaoInicioId,
+            destinatario_id: personalId,
+            tipo: "treino_iniciado",
+            titulo: "Treino iniciado",
+            mensagem: previewNotificationMessage(
+              `${firstName(alunoNome)} começou o treino de ${diaTreino}`
+            ),
+            dados: {
+              sessao_id: data.id,
+              treino_id: treinoId,
+              aluno_nome: alunoNome,
+              aluno_id: profileId,
+              dia_treino: diaTreino,
+              tipo_acao: "treino",
+            },
+            lida: false,
+          });
+
+        if (!notificacaoInicioError) {
+          await dispatchPushNotification(notificacaoInicioId);
+        } else {
+          console.error("Erro ao criar notificacao de treino iniciado:", notificacaoInicioError);
+        }
+      } catch (notificationError) {
+        console.error("Erro ao enviar push de treino iniciado:", notificationError);
+      }
+
+      toast.success("Treino iniciado");
     } catch (err) {
       console.error("Erro ao iniciar treino:", err);
       toast.error("Erro ao iniciar treino. Verifique sua conexão.");
@@ -794,8 +853,10 @@ export function useWorkoutTimer({
         id: notificacaoTreinoId,
         destinatario_id: personalId,
         tipo: "treino_concluido",
-        titulo: "🎉 Treino Concluído",
-        mensagem: `${nomeAluno} finalizou o treino em ${formatTime(tempoFinal)}`,
+        titulo: "Treino concluído",
+        mensagem: previewNotificationMessage(
+          `${compactName(nomeAluno, 42)} \u00B7 ${formatWorkoutDuration(tempoFinal)}`
+        ),
         dados: {
           sessao_id: sessaoId,
           treino_id: treinoId,

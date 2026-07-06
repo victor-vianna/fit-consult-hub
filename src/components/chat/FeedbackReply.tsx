@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { buildChatConversationKey } from "@/utils/chat";
 import { createNotificationId, dispatchPushNotification } from "@/utils/pushNotifications";
+import { compactName, previewNotificationMessage } from "@/utils/notificationText";
 
 interface FeedbackReplyProps {
   checkinId: string;
@@ -109,12 +110,16 @@ export function FeedbackReply({ checkinId, alunoId, personalId, alunoNome, theme
         id: notificacaoId,
         destinatario_id: alunoId,
         tipo: "nova_mensagem",
-        titulo: `${personalProfile?.nome || "Personal"} respondeu seu feedback`,
-        mensagem: resposta.trim().substring(0, 100),
+        titulo: compactName(personalProfile?.nome || "Personal"),
+        mensagem: previewNotificationMessage(resposta.trim()),
         dados: {
           aluno_id: alunoId,
           aluno_nome: alunoNome,
           profile_id: personalId,
+          remetente_id: personalId,
+          remetente_nome: personalProfile?.nome || null,
+          remetente_nome_curto: compactName(personalProfile?.nome || "Personal"),
+          conversa_key: conversaKey,
           checkin_id: checkinId,
           tipo_acao: "chat",
         },

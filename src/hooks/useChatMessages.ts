@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { buildChatConversationKey } from "@/utils/chat";
 import { createNotificationId, dispatchPushNotification } from "@/utils/pushNotifications";
+import { compactName, previewNotificationMessage } from "@/utils/notificationText";
 
 export interface ChatMessage {
   id: string;
@@ -174,12 +175,16 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
           id: notificacaoId,
           destinatario_id: destinatarioId,
           tipo: "nova_mensagem",
-          titulo: `Nova mensagem de ${remetenteProfile?.nome || "Usuário"}`,
-          mensagem: conteudoFinal.substring(0, 100),
+          titulo: compactName(remetenteProfile?.nome || "Usuario"),
+          mensagem: previewNotificationMessage(conteudoFinal),
           dados: {
             aluno_id: alunoId,
             aluno_nome: alunoProfile?.nome || null,
             profile_id: currentUserId,
+            remetente_id: currentUserId,
+            remetente_nome: remetenteProfile?.nome || null,
+            remetente_nome_curto: compactName(remetenteProfile?.nome || "Usuario"),
+            conversa_key: conversaKey,
             tipo_acao: "chat",
           },
         });

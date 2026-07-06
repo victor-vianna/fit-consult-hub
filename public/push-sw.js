@@ -5,20 +5,20 @@ self.addEventListener("push", (event) => {
     payload = event.data ? event.data.json() : {};
   } catch {
     payload = {
-      title: "FitConsult",
-      body: event.data ? event.data.text() : "Nova notificacao",
+      title: "Nova notificação",
+      body: event.data ? event.data.text() : "Você tem uma nova notificação.",
     };
   }
 
-  const title = payload.title || "FitConsult";
+  const title = payload.title || "Nova notificação";
   const options = {
-    body: payload.body || payload.mensagem || "Voce tem uma nova notificacao.",
+    body: payload.body || payload.mensagem || "Você tem uma nova notificação.",
     icon: payload.icon || "/icons/icon-192x192.png",
     badge: payload.badge || "/icons/icon-192x192.png",
     tag: payload.tag || payload.notificationId || "fitconsult-notification",
     renotify: true,
     silent: false,
-    timestamp: Date.now(),
+    timestamp: payload.timestamp || Date.now(),
     vibrate: payload.vibrate || [160, 80, 160],
     data: {
       url: payload.url || "/",

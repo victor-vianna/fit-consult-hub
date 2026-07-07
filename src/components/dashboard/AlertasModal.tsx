@@ -123,7 +123,7 @@ export function AlertasModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-h-[92vh] max-w-lg overflow-hidden p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-orange-500" />
@@ -158,7 +158,7 @@ export function AlertasModal({
 
           {/* Alunos Inativos */}
           <TabsContent value="inativos">
-            <ScrollArea className="h-[300px]">
+            <ScrollArea className="h-[min(70vh,420px)]">
               {filteredInativos.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">
                   Todos os alunos estão treinando regularmente! 🎉
@@ -322,11 +322,11 @@ export function AlertasModal({
                       key={feedback.id}
                       className="p-3 rounded-lg bg-purple-500/10"
                     >
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm">{feedback.aluno_nome}</p>
+                          <p className="break-words text-sm font-medium">{feedback.aluno_nome}</p>
                           {feedback.comentario ? (
-                            <p className="text-xs text-muted-foreground truncate">
+                            <p className="mt-1 whitespace-pre-wrap break-words text-xs leading-relaxed text-muted-foreground">
                               "{feedback.comentario}"
                             </p>
                           ) : (
@@ -335,7 +335,7 @@ export function AlertasModal({
                             </p>
                           )}
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex shrink-0 items-center gap-2">
                           <Badge variant="outline" className="text-purple-600 border-purple-600">
                             Novo
                           </Badge>
@@ -349,11 +349,11 @@ export function AlertasModal({
                           </Button>
                         </div>
                       </div>
-                      <div className="flex gap-2 mt-2">
-                        <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => handleAlunoClick(feedback.aluno_id, "checkins")}>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => handleAlunoClick(feedback.aluno_id, "checkins")}>
                           Ver feedback
                         </Button>
-                        <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => handleAlunoClick(feedback.aluno_id, "chat")}>
+                        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => handleAlunoClick(feedback.aluno_id, "chat")}>
                           <MessageSquare className="h-3 w-3 mr-1" /> Responder
                         </Button>
                       </div>

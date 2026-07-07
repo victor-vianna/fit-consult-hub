@@ -50,6 +50,23 @@ interface WorkoutBlockCardProps {
   dragAttributes?: any;
 }
 
+function DetailLine({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string | number | null;
+}) {
+  if (value === null || value === undefined || value === "") return null;
+
+  return (
+    <p className="break-words">
+      <span className="font-medium text-foreground">{label}: </span>
+      <span className="capitalize">{value}</span>
+    </p>
+  );
+}
+
 export function WorkoutBlockCard({
   bloco,
   index,
@@ -125,29 +142,6 @@ export function WorkoutBlockCard({
   const corClass = corClasses[cor] || corClasses.gray;
 
   if (readOnly) {
-    if (bloco.concluido && onToggleConcluido) {
-      return (
-        <Card className="overflow-hidden rounded-none border-x-0 border-t-0 bg-green-50/50 shadow-none transition-colors dark:bg-green-950/10">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleToggleBloco}
-                aria-label={`Desmarcar ${bloco.nome}`}
-                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-transform active:scale-95"
-              >
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
-              </button>
-
-              <p className="min-w-0 flex-1 break-words text-sm font-semibold leading-snug text-muted-foreground line-through sm:text-base">
-                {bloco.nome}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      );
-    }
-
     const duration =
       bloco.config_cardio?.duracao_minutos ??
       bloco.config_alongamento?.duracao_minutos ??
@@ -271,6 +265,73 @@ export function WorkoutBlockCard({
 
                 {expanded && description ? (
                   <p className="break-words italic">{description}</p>
+                ) : null}
+
+                {expanded &&
+                (bloco.config_cardio ||
+                  bloco.config_alongamento ||
+                  bloco.config_aquecimento ||
+                  (!mainDetails.length && !description)) ? (
+                  <div
+                    className="mt-3 space-y-3 rounded-lg border bg-background/60 p-3 text-xs leading-relaxed text-muted-foreground sm:text-sm"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {bloco.tipo === "cardio" && bloco.config_cardio ? (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <DetailLine label="Modalidade" value={bloco.config_cardio.modalidade} />
+                        <DetailLine label="Equipamento" value={bloco.config_cardio.tipo.replace("-", " ")} />
+                        <DetailLine label="Trabalho" value={bloco.config_cardio.trabalho_segundos ? `${bloco.config_cardio.trabalho_segundos}s` : null} />
+                        <DetailLine label="Pausa" value={bloco.config_cardio.descanso_segundos ? `${bloco.config_cardio.descanso_segundos}s` : null} />
+                        <DetailLine label="Rounds" value={bloco.config_cardio.rounds ? `${bloco.config_cardio.rounds}x` : null} />
+                        <DetailLine label="Velocidade" value={bloco.config_cardio.velocidade_kmh ? `${bloco.config_cardio.velocidade_kmh} km/h` : null} />
+                        <DetailLine label="Inclinacao" value={bloco.config_cardio.inclinacao_percentual ? `${bloco.config_cardio.inclinacao_percentual}%` : null} />
+                        <DetailLine label="Intensidade" value={bloco.config_cardio.intensidade ? formatarIntensidadeCardio(bloco.config_cardio) : null} />
+                        <DetailLine
+                          label="BPM alvo"
+                          value={
+                            bloco.config_cardio.batimentos_alvo
+                              ? `${bloco.config_cardio.batimentos_alvo.minimo}-${bloco.config_cardio.batimentos_alvo.maximo}`
+                              : null
+                          }
+                        />
+                      </div>
+                    ) : null}
+
+                    {(bloco.tipo === "alongamento" || bloco.tipo === "mobilidade") &&
+                    bloco.config_alongamento ? (
+                      <div className="space-y-2">
+                        <DetailLine label="Tipo" value={bloco.config_alongamento.tipo} />
+                        {bloco.config_alongamento.grupos_musculares?.length ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {bloco.config_alongamento.grupos_musculares.map((grupo, idx) => (
+                              <Badge key={`${grupo}-${idx}`} variant="secondary" className="text-[11px]">
+                                {grupo}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    {bloco.tipo === "aquecimento" && bloco.config_aquecimento ? (
+                      <div className="space-y-2">
+                        <DetailLine label="Tipo" value={bloco.config_aquecimento.tipo} />
+                        {bloco.config_aquecimento.atividades?.length ? (
+                          <ul className="space-y-1">
+                            {bloco.config_aquecimento.atividades.map((atividade, idx) => (
+                              <li key={`${atividade}-${idx}`} className="break-words">
+                                {atividade}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    {!mainDetails.length && !description ? (
+                      <p className="break-words">Nenhum detalhe adicional informado.</p>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             </div>

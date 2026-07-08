@@ -95,7 +95,6 @@ export function ComposicaoCorporalSection({ profileId, personalId, themeColor, o
     });
 
     const pending = calculateAssessmentPending(payload);
-    payload.avaliacao_incompleta = pending.length > 0;
     payload.campos_pendentes = pending;
 
     try {
@@ -182,6 +181,7 @@ export function ComposicaoCorporalSection({ profileId, personalId, themeColor, o
 function CompositionCard({ avaliacao, previous, onEdit, onDelete }: { avaliacao: any; previous?: any; onEdit: () => void; onDelete: () => void }) {
   const pending = Array.isArray(avaliacao.campos_pendentes) ? avaliacao.campos_pendentes : [];
   const distribution = avaliacao.distribuicao_gordura || {};
+  const isIncomplete = pending.length > 0;
 
   return (
     <Card className="border bg-card/80">
@@ -190,7 +190,7 @@ function CompositionCard({ avaliacao, previous, onEdit, onDelete }: { avaliacao:
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h4 className="font-semibold">{formatDisplayDate(avaliacao.data_avaliacao)}</h4>
-              {avaliacao.avaliacao_incompleta ? (
+              {isIncomplete ? (
                 <Badge variant="outline" className="border-amber-400 text-amber-500">
                   <AlertTriangle className="mr-1 h-3 w-3" /> Incompleta
                 </Badge>

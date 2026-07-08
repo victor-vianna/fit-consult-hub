@@ -107,7 +107,7 @@ interface Aluno {
 export default function AlunoDetalhes() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, profile } = useAuth();
   const { toast } = useToast();
   const [aluno, setAluno] = useState<Aluno | null>(null);
@@ -138,6 +138,18 @@ export default function AlunoDetalhes() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  const handleActiveTabChange = (tab: string) => {
+    setActiveTab(tab);
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      params.set("tab", tab);
+      if (tab !== "avaliacao") {
+        params.delete("avaliacaoTab");
+      }
+      return params;
+    }, { replace: true });
+  };
 
   // Chat não lidas badge
   const chatHook = useChatMessages({
@@ -617,7 +629,7 @@ export default function AlunoDetalhes() {
           {/* Tabs Premium */}
           <Tabs
             value={activeTab}
-            onValueChange={setActiveTab}
+            onValueChange={handleActiveTabChange}
             className="space-y-6"
           >
             <div className="w-full overflow-x-auto scrollbar-hide pb-1">
@@ -747,7 +759,7 @@ export default function AlunoDetalhes() {
                   profileId={id!}
                   personalId={user.id}
                   themeColor={personalSettings?.theme_color}
-                  onVerHistoricoCompleto={() => setActiveTab("historico")}
+                  onVerHistoricoCompleto={() => handleActiveTabChange("historico")}
                   onTreinoAtualizado={handleTreinoAtualizado}
                 />
               )}
@@ -1082,6 +1094,7 @@ export default function AlunoDetalhes() {
             <TabsContent value="avaliacao" className="space-y-6">
               {user && (
                 <AvaliacaoHub
+                  key={id}
                   profileId={id!}
                   personalId={user.id}
                   themeColor={personalSettings?.theme_color}

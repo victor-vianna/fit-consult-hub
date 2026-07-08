@@ -265,12 +265,14 @@ function ReadOnlyList({
 }
 
 function CompositionReadOnly({ item }: { item: any }) {
+  const pending = Array.isArray(item.campos_pendentes) ? item.campos_pendentes : [];
+
   return (
     <Card className="border bg-card/80">
       <CardContent className="space-y-3 p-4">
         <div className="flex flex-wrap items-center gap-2">
           <h4 className="font-semibold">{formatDisplayDate(item.data_avaliacao)}</h4>
-          {item.avaliacao_incompleta && <Badge variant="outline">Incompleta</Badge>}
+          {pending.length > 0 && <Badge variant="outline">Incompleta</Badge>}
         </div>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
           {GENERAL_FIELDS.filter(({ key }) => key !== "altura").map(({ key, label, unit }) => (

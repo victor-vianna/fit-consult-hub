@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accessibility, Camera, Eye, HeartPulse, TrendingUp, Weight } from "lucide-react";
+import { usePersistedState } from "@/hooks/usePersistedState";
 import { FotosSection } from "./FotosSection";
 import { EvolucaoSection } from "./EvolucaoSection";
 import { ComposicaoCorporalSection } from "./ComposicaoCorporalSection";
@@ -14,15 +16,45 @@ interface Props {
   themeColor?: string;
 }
 
+const ASSESSMENT_TABS = ["fotos", "evolucao", "composicao", "flexibilidade", "cardio", "postural"] as const;
+type AssessmentTab = (typeof ASSESSMENT_TABS)[number];
+
+function isAssessmentTab(value: string | null): value is AssessmentTab {
+  return Boolean(value && ASSESSMENT_TABS.includes(value as AssessmentTab));
+}
+
 export function AvaliacaoHub({ profileId, personalId, themeColor }: Props) {
-  const [activeSubTab, setActiveSubTab] = useState("fotos");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlSubTab = searchParams.get("avaliacaoTab");
+  const initialSubTab: AssessmentTab = isAssessmentTab(urlSubTab) ? urlSubTab : "fotos";
+  const [activeSubTab, setActiveSubTab] = usePersistedState<AssessmentTab>(
+    `avaliacao-subtab:${profileId}`,
+    initialSubTab,
+    { storage: "session", version: 1 }
+  );
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleRefresh = () => setRefreshKey((key) => key + 1);
+  const handleSubTabChange = (value: string) => {
+    if (!isAssessmentTab(value)) return;
+    setActiveSubTab(value);
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      params.set("tab", "avaliacao");
+      params.set("avaliacaoTab", value);
+      return params;
+    }, { replace: true });
+  };
+
+  useEffect(() => {
+    if (isAssessmentTab(urlSubTab) && urlSubTab !== activeSubTab) {
+      setActiveSubTab(urlSubTab);
+    }
+  }, [activeSubTab, setActiveSubTab, urlSubTab]);
 
   return (
     <div className="space-y-4">
-      <Tabs value={activeSubTab} onValueChange={setActiveSubTab}>
+      <Tabs value={activeSubTab} onValueChange={handleSubTabChange}>
         <div className="overflow-x-auto scrollbar-hide">
           <TabsList className="inline-flex h-auto w-auto min-w-full gap-1 bg-muted/50 p-1">
             <TabsTrigger value="fotos" className="flex-shrink-0 gap-1.5 px-3 py-2 text-xs sm:text-sm">

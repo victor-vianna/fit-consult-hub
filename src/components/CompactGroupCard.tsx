@@ -5,12 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import {
   CheckCircle2,
   ChevronDown,
-  Clock,
   Link as LinkIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CompactExerciseCard } from "./CompactExerciseCard";
-import { RestCountdownDialog } from "./RestCountdownDialog";
 
 const TIPOS_AGRUPAMENTO = {
   normal: { label: "Normal" },
@@ -52,7 +50,6 @@ export function CompactGroupCard({
 }: CompactGroupCardProps) {
   const [localExercicios, setLocalExercicios] = useState(grupo.exercicios);
   const [expanded, setExpanded] = useState(false);
-  const [restDialogOpen, setRestDialogOpen] = useState(false);
 
   useEffect(() => {
     setLocalExercicios(grupo.exercicios);
@@ -91,10 +88,6 @@ export function CompactGroupCard({
     setLocalExercicios((prev) =>
       prev.map((e) => ({ ...e, concluido: novoStatus }))
     );
-
-    if (novoStatus && (grupo.descanso_entre_grupos ?? 0) > 0) {
-      setRestDialogOpen(true);
-    }
 
     try {
       await onToggleGrupoConcluido(grupo.grupo_id, novoStatus);
@@ -247,26 +240,9 @@ export function CompactGroupCard({
               </div>
             </div>
 
-            {(grupo.descanso_entre_grupos ?? 0) > 0 &&
-              todosConcluidos && (
-                <button
-                  type="button"
-                  onClick={() => setRestDialogOpen(true)}
-                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 p-2 text-xs font-medium text-primary"
-                >
-                  <Clock className="h-4 w-4" />
-                  Descanso combinado: {grupo.descanso_entre_grupos}s
-                </button>
-              )}
           </div>
         )}
       </CardContent>
-
-      <RestCountdownDialog
-        open={restDialogOpen}
-        seconds={grupo.descanso_entre_grupos || 0}
-        onOpenChange={setRestDialogOpen}
-      />
     </Card>
   );
 }

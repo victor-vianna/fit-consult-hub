@@ -6,14 +6,12 @@ import {
   CheckCircle2,
   ChevronDown,
   Circle,
-  Clock,
   Dumbbell,
   MessageSquareText,
   Play,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { InlinePesoInput } from "@/components/InlinePesoInput";
-import { RestCountdownDialog } from "@/components/RestCountdownDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useWeightHistory } from "@/hooks/useWeightHistory";
 import { formatDisplayMonthDay } from "@/utils/dateFormat";
@@ -133,7 +131,6 @@ export function CompactExerciseCard({
     exercicio.peso_executado || null
   );
   const [expanded, setExpanded] = useState(highlighted);
-  const [restDialogOpen, setRestDialogOpen] = useState(false);
   const [completedSeries, setCompletedSeries] = useState(
     exercicio.concluido ? exercicio.series || 3 : 0
   );
@@ -163,7 +160,6 @@ export function CompactExerciseCard({
     if (!isWorkoutActive) {
       setLocalConcluido(false);
       setCompletedSeries(0);
-      setRestDialogOpen(false);
     }
   }, [isWorkoutActive]);
 
@@ -203,10 +199,6 @@ export function CompactExerciseCard({
   const handleRegisterSet = async () => {
     const nextCount = Math.min(completedSeries + 1, totalSeries);
     setCompletedSeries(nextCount);
-
-    if (exercicio.descanso && exercicio.descanso > 0 && nextCount < totalSeries) {
-      setRestDialogOpen(true);
-    }
 
     if (nextCount >= totalSeries && !localConcluido) {
       await handleToggle(true);
@@ -443,28 +435,9 @@ export function CompactExerciseCard({
               )}
             </Button>
 
-            {(exercicio.descanso ?? 0) > 0 && completedSeries > 0 && !localConcluido && (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setRestDialogOpen(true);
-                }}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm font-medium text-primary"
-              >
-                <Clock className="h-4 w-4" />
-                Descanso ativo: {exercicio.descanso}s
-              </button>
-            )}
           </div>
         )}
       </CardContent>
-
-      <RestCountdownDialog
-        open={restDialogOpen}
-        seconds={exercicio.descanso || 0}
-        onOpenChange={setRestDialogOpen}
-      />
     </Card>
   );
 }

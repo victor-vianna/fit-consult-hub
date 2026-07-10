@@ -151,12 +151,6 @@ function PreviewExerciseCard({
                   {carga}kg
                 </span>
               )}
-              {exercicio?.descanso > 0 && (
-                <span className="inline-flex items-center gap-1">
-                  <Clock className="h-3.5 w-3.5" />
-                  {exercicio.descanso}s de descanso
-                </span>
-              )}
               {exercicio?.link_video && (
                 <a
                   href={exercicio.link_video}
@@ -257,13 +251,6 @@ function PreviewGroupCard({
 
         {expanded && (
           <div className="mt-3 space-y-2 border-t pt-3">
-            {grupo?.descanso_entre_grupos > 0 && (
-              <Badge variant="outline" className="text-xs">
-                <Clock className="mr-1 h-3 w-3" />
-                {grupo.descanso_entre_grupos}s após grupo
-              </Badge>
-            )}
-
             <div className="space-y-2">
               {exercicios.map((exercicio: any, exIndex: number) => (
                 <PreviewExerciseCard

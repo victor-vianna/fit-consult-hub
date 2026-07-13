@@ -72,6 +72,8 @@ import { usePriorityStudents } from "@/hooks/usePriorityStudents";
 import { useAlunosQuickStatus } from "@/hooks/useAlunosQuickStatus";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileAccountMenu } from "@/components/mobile/MobileAccountMenu";
+import { QuickStudentAccessActions } from "@/components/aluno/QuickStudentAccessActions";
+import type { StudentAccessState } from "@/hooks/useStudentAccess";
 
 interface Aluno {
   id: string;
@@ -202,7 +204,27 @@ export default function AlunosManager() {
 
   const fetchAlunos = () => {
     queryClient.invalidateQueries({ queryKey: ["alunos", user?.id] });
+    queryClient.invalidateQueries({ queryKey: ["students-access-states", user?.id] });
   };
+
+  const { data: accessStates = [] } = useQuery<StudentAccessState[]>({
+    queryKey: ["students-access-states", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await (supabase as any).rpc(
+        "get_students_access_states",
+        { _personal_id: user.id }
+      );
+      if (error) throw error;
+      return (data || []) as StudentAccessState[];
+    },
+    enabled: !!user && alunos.length > 0,
+    staleTime: 15_000,
+  });
+
+  const accessByStudent = useMemo(() => {
+    return Object.fromEntries(accessStates.map((state) => [state.student_id, state]));
+  }, [accessStates]);
 
   const alunosFiltrados = useMemo(() => {
     let resultado = [...alunos];
@@ -216,9 +238,9 @@ export default function AlunosManager() {
     }
 
     if (filtroStatus === "ativos") {
-      resultado = resultado.filter((aluno) => aluno.is_active);
+      resultado = resultado.filter((aluno) => accessByStudent[aluno.id]?.allowed ?? aluno.is_active);
     } else if (filtroStatus === "inativos") {
-      resultado = resultado.filter((aluno) => !aluno.is_active);
+      resultado = resultado.filter((aluno) => !(accessByStudent[aluno.id]?.allowed ?? aluno.is_active));
     }
 
     resultado.sort((a, b) => {
@@ -236,7 +258,7 @@ export default function AlunosManager() {
     });
 
     return resultado;
-  }, [alunos, searchTerm, filtroStatus, ordenacao]);
+  }, [accessByStudent, alunos, searchTerm, filtroStatus, ordenacao]);
 
   const handleCreateAluno = async () => {
     if (!novoAluno.nome || !novoAluno.email || !novoAluno.password) {
@@ -359,8 +381,12 @@ export default function AlunosManager() {
     }
   };
 
-  const alunosAtivos = alunos.filter((a) => a.is_active).length;
-  const alunosInativos = alunos.filter((a) => !a.is_active).length;
+  const alunosAtivos = alunos.filter(
+    (a) => accessByStudent[a.id]?.allowed ?? a.is_active
+  ).length;
+  const alunosInativos = alunos.filter(
+    (a) => !(accessByStudent[a.id]?.allowed ?? a.is_active)
+  ).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
@@ -607,9 +633,11 @@ export default function AlunosManager() {
               );
               const hasPriority = flags.length > 0;
               const status = statusByAluno[aluno.id];
+              const accessState = accessByStudent[aluno.id];
+              const isAccessAllowed = accessState?.allowed ?? aluno.is_active;
               const corCustom = coresCustom[aluno.id];
 
-              const prioridade: "bloqueado" | "urgente" | "atencao" | "importante" | "ativo" = !aluno.is_active
+              const prioridade: "bloqueado" | "urgente" | "atencao" | "importante" | "ativo" = !isAccessAllowed
                 ? "bloqueado"
                 : hasHighPriority
                 ? "urgente"
@@ -690,6 +718,15 @@ export default function AlunosManager() {
                           <span className="truncate">{aluno.email}</span>
                         </div>
                       </div>
+
+                      {user?.id && (
+                        <QuickStudentAccessActions
+                          student={aluno}
+                          personalId={user.id}
+                          accessState={accessState}
+                          onChanged={fetchAlunos}
+                        />
+                      )}
 
                       {(() => {
                         // Montar lista de notificações ativas conforme preferências

@@ -27,6 +27,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Calendar as DateCalendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useSubscriptions, Subscription } from "@/hooks/useSubscriptions";
 import {
   CreditCard,
@@ -34,8 +36,7 @@ import {
   CheckCircle,
   AlertCircle,
   XCircle,
-  Calendar,
-  DollarSign,
+  Calendar as CalendarIcon,
   Edit,
   Trash2,
 } from "lucide-react";
@@ -49,7 +50,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { formatDisplayDate } from "@/utils/dateFormat";
+import { cn } from "@/lib/utils";
+import {
+  dateInputToIsoString,
+  formatDateForInput,
+  formatDisplayDateOnly,
+  parseDateInputValue,
+} from "@/utils/dateFormat";
 
 interface SubscriptionManagerProps {
   studentId: string;
@@ -98,9 +105,7 @@ export function SubscriptionManager({
   // Form states
   const [plano, setPlano] = useState<string>("mensal");
   const [valor, setValor] = useState<string>("");
-  const [dataInicio, setDataInicio] = useState<string>(
-    new Date().toISOString().split("T")[0]
-  );
+  const [dataInicio, setDataInicio] = useState<string>(formatDateForInput(new Date()));
   const [observacoes, setObservacoes] = useState<string>("");
 
   // Edit form states
@@ -113,9 +118,7 @@ export function SubscriptionManager({
 
   // Payment form states
   const [valorPagamento, setValorPagamento] = useState<string>("");
-  const [dataPagamento, setDataPagamento] = useState<string>(
-    new Date().toISOString().split("T")[0]
-  );
+  const [dataPagamento, setDataPagamento] = useState<string>(formatDateForInput(new Date()));
   const [metodoPagamento, setMetodoPagamento] = useState<string>("");
   const [observacoesPagamento, setObservacoesPagamento] = useState<string>("");
 
@@ -128,7 +131,9 @@ export function SubscriptionManager({
   const handleCreateSubscription = async () => {
     if (!valor || !plano) return;
 
-    const dataExpiracao = new Date(dataInicio);
+    const dataExpiracao = parseDateInputValue(dataInicio);
+    if (!dataExpiracao) return;
+
     const meses = PLANOS.find((p) => p.value === plano)?.meses || 1;
     dataExpiracao.setMonth(dataExpiracao.getMonth() + meses);
 
@@ -145,6 +150,7 @@ export function SubscriptionManager({
     // Reset form
     setPlano("mensal");
     setValor("");
+    setDataInicio(formatDateForInput(new Date()));
     setObservacoes("");
     setDialogOpen(false);
     onChanged?.();
@@ -162,6 +168,7 @@ export function SubscriptionManager({
 
     // Reset form
     setValorPagamento("");
+    setDataPagamento(formatDateForInput(new Date()));
     setMetodoPagamento("");
     setObservacoesPagamento("");
     setPaymentDialogOpen(false);
@@ -172,8 +179,8 @@ export function SubscriptionManager({
     setSubscriptionToEdit(sub);
     setEditPlano(sub.plano);
     setEditValor(sub.valor.toString());
-    setEditDataExpiracao(new Date(sub.data_expiracao).toISOString().split("T")[0]);
-    setEditDataPagamento(sub.data_pagamento ? new Date(sub.data_pagamento).toISOString().split("T")[0] : "");
+    setEditDataExpiracao(formatDateForInput(sub.data_expiracao));
+    setEditDataPagamento(formatDateForInput(sub.data_pagamento));
     setEditStatus(sub.status_pagamento);
     setEditObservacoes(sub.observacoes || "");
     setEditDialogOpen(true);
@@ -182,14 +189,14 @@ export function SubscriptionManager({
   const handleUpdateSubscription = async () => {
     if (!subscriptionToEdit || !editValor) return;
 
-    const novaDataPagamento = editDataPagamento
-      ? new Date(editDataPagamento).toISOString()
-      : null;
+    const novaDataPagamento = dateInputToIsoString(editDataPagamento);
+    const novaDataExpiracao = dateInputToIsoString(editDataExpiracao);
+    if (!novaDataExpiracao) return;
 
     await updateSubscription(subscriptionToEdit.id, {
       plano: editPlano as any,
       valor: parseFloat(editValor),
-      data_expiracao: new Date(editDataExpiracao).toISOString(),
+      data_expiracao: novaDataExpiracao,
       data_pagamento: novaDataPagamento,
       status_pagamento: editStatus as any,
       observacoes: editObservacoes || null,
@@ -331,7 +338,7 @@ export function SubscriptionManager({
             <div className="flex justify-between">
               <span className="text-muted-foreground">Expira em:</span>
               <span className="font-semibold">
-                {formatDisplayDate(activeSubscription.data_expiracao)}
+                {formatDisplayDateOnly(activeSubscription.data_expiracao)}
               </span>
             </div>
           </CardContent>
@@ -385,11 +392,11 @@ export function SubscriptionManager({
 
             <div>
               <Label htmlFor="dataInicio">Data de Início</Label>
-              <Input
+              <LocalizedDateInput
                 id="dataInicio"
-                type="date"
                 value={dataInicio}
-                onChange={(e) => setDataInicio(e.target.value)}
+                onChange={setDataInicio}
+                placeholder="Selecione a data de inicio"
               />
             </div>
 
@@ -484,13 +491,11 @@ export function SubscriptionManager({
                                 <Label htmlFor="dataPagamento">
                                   Data do Pagamento
                                 </Label>
-                                <Input
+                                <LocalizedDateInput
                                   id="dataPagamento"
-                                  type="date"
                                   value={dataPagamento}
-                                  onChange={(e) =>
-                                    setDataPagamento(e.target.value)
-                                  }
+                                  onChange={setDataPagamento}
+                                  placeholder="Selecione a data do pagamento"
                                 />
                               </div>
 
@@ -578,15 +583,15 @@ export function SubscriptionManager({
                   <div className="space-y-1 text-sm">
                     {sub.data_pagamento && (
                       <div className="flex items-center gap-2 text-muted-foreground">
-                        <Calendar className="h-3 w-3" />
+                        <CalendarIcon className="h-3 w-3" />
                         Pago em:{" "}
-                        {formatDisplayDate(sub.data_pagamento)}
+                        {formatDisplayDateOnly(sub.data_pagamento)}
                       </div>
                     )}
                     <div className="flex items-center gap-2 text-muted-foreground">
-                      <Calendar className="h-3 w-3" />
+                      <CalendarIcon className="h-3 w-3" />
                       Expira em:{" "}
-                      {formatDisplayDate(sub.data_expiracao)}
+                      {formatDisplayDateOnly(sub.data_expiracao)}
                     </div>
                     {sub.observacoes && (
                       <p className="text-muted-foreground italic">
@@ -660,19 +665,20 @@ export function SubscriptionManager({
 
             <div>
               <Label>Data de Pagamento</Label>
-              <Input
-                type="date"
+              <LocalizedDateInput
                 value={editDataPagamento}
-                onChange={(e) => setEditDataPagamento(e.target.value)}
+                onChange={setEditDataPagamento}
+                placeholder="Selecione a data do pagamento"
+                allowClear
               />
             </div>
 
             <div>
               <Label>Data de Expiração</Label>
-              <Input
-                type="date"
+              <LocalizedDateInput
                 value={editDataExpiracao}
-                onChange={(e) => setEditDataExpiracao(e.target.value)}
+                onChange={setEditDataExpiracao}
+                placeholder="Selecione a data de expiracao"
               />
             </div>
 
@@ -715,6 +721,69 @@ export function SubscriptionManager({
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+interface LocalizedDateInputProps {
+  id?: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  allowClear?: boolean;
+}
+
+function LocalizedDateInput({
+  id,
+  value,
+  onChange,
+  placeholder,
+  allowClear = false,
+}: LocalizedDateInputProps) {
+  const [open, setOpen] = useState(false);
+  const selectedDate = parseDateInputValue(value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          id={id}
+          type="button"
+          variant="outline"
+          className={cn("w-full justify-between font-normal", !value && "text-muted-foreground")}
+        >
+          <span>{value ? formatDisplayDateOnly(value) : placeholder}</span>
+          <CalendarIcon className="h-4 w-4 opacity-60" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <DateCalendar
+          mode="single"
+          selected={selectedDate ?? undefined}
+          onSelect={(date) => {
+            if (!date) return;
+            onChange(formatDateForInput(date));
+            setOpen(false);
+          }}
+          initialFocus
+        />
+        {allowClear && value && (
+          <div className="border-t p-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-full"
+              onClick={() => {
+                onChange("");
+                setOpen(false);
+              }}
+            >
+              Limpar data
+            </Button>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
 

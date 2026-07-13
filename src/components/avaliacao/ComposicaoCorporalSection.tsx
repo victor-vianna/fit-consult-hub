@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { format } from "date-fns";
 import { AlertTriangle, Edit, Plus, Ruler, Trash2, Weight } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +22,7 @@ import {
   formatMetricValue,
   toNumber,
 } from "@/utils/avaliacaoMetrics";
-import { formatDisplayDate } from "@/utils/dateFormat";
+import { formatDateTimeForInput, formatDisplayDate } from "@/utils/dateFormat";
 
 interface Props {
   profileId: string;
@@ -259,7 +258,7 @@ function CompositionForm({ editing, loading, themeColor, onSubmit }: { editing: 
       <section className="space-y-3 rounded-lg border bg-muted/20 p-3">
         <h3 className="text-sm font-semibold">Dados gerais</h3>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="Data *"><Input name="data_avaliacao" type="datetime-local" defaultValue={editing?.data_avaliacao ? format(new Date(editing.data_avaliacao), "yyyy-MM-dd'T'HH:mm") : format(new Date(), "yyyy-MM-dd'T'HH:mm")} required /></Field>
+          <Field label="Data *"><Input name="data_avaliacao" type="datetime-local" defaultValue={formatDateTimeForInput(editing?.data_avaliacao || new Date())} required /></Field>
           <Field label="Objetivo"><Input name="objetivo" defaultValue={editing?.objetivo || ""} /></Field>
           <Field label="Peso (kg)"><Input name="peso" type="number" step="0.1" defaultValue={editing?.peso ?? ""} /></Field>
           <Field label="Altura (m)"><Input name="altura" type="number" step="0.01" defaultValue={editing?.altura ?? ""} /></Field>

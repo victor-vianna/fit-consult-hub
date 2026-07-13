@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { format } from "date-fns";
 import { Edit, Eye, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { formatDisplayDate } from "@/utils/dateFormat";
+import { formatDateTimeForInput, formatDisplayDate } from "@/utils/dateFormat";
 
 interface Props {
   profileId: string;
@@ -162,7 +161,7 @@ function PosturalForm({ editing, loading, themeColor, onSubmit }: { editing: any
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <Field label="Data *">
-        <Input name="data_avaliacao" type="datetime-local" defaultValue={editing?.data_avaliacao ? format(new Date(editing.data_avaliacao), "yyyy-MM-dd'T'HH:mm") : format(new Date(), "yyyy-MM-dd'T'HH:mm")} required />
+        <Input name="data_avaliacao" type="datetime-local" defaultValue={formatDateTimeForInput(editing?.data_avaliacao || new Date())} required />
       </Field>
 
       {POSTURAL_GROUPS.map((group) => (

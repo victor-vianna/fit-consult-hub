@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { format } from "date-fns";
 import { Activity, Edit, HeartPulse, Plus, Trash2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { calculateCardio, formatMetricValue, toNumber } from "@/utils/avaliacaoMetrics";
-import { formatDisplayDate } from "@/utils/dateFormat";
+import { formatDateTimeForInput, formatDisplayDate } from "@/utils/dateFormat";
 
 interface Props {
   profileId: string;
@@ -195,7 +194,7 @@ function CardioForm({ editing, loading, themeColor, onSubmit }: { editing: any |
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Data *">
-          <Input name="data_avaliacao" type="datetime-local" defaultValue={editing?.data_avaliacao ? format(new Date(editing.data_avaliacao), "yyyy-MM-dd'T'HH:mm") : format(new Date(), "yyyy-MM-dd'T'HH:mm")} required />
+          <Input name="data_avaliacao" type="datetime-local" defaultValue={formatDateTimeForInput(editing?.data_avaliacao || new Date())} required />
         </Field>
         <Field label="Tipo">
           <Select name="cardio_tipo" defaultValue={editing?.cardio_tipo || "teste_1600m"}>

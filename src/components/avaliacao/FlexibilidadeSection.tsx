@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { format } from "date-fns";
 import { Edit, Plus, StretchHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMetricValue, toNumber } from "@/utils/avaliacaoMetrics";
-import { formatDisplayDate } from "@/utils/dateFormat";
+import { formatDateTimeForInput, formatDisplayDate } from "@/utils/dateFormat";
 
 interface Props {
   profileId: string;
@@ -137,7 +136,7 @@ export function FlexibilidadeSection({ profileId, personalId, themeColor, onRefr
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <Field label="Data *">
-              <Input name="data_avaliacao" type="datetime-local" defaultValue={editing?.data_avaliacao ? format(new Date(editing.data_avaliacao), "yyyy-MM-dd'T'HH:mm") : format(new Date(), "yyyy-MM-dd'T'HH:mm")} required />
+              <Input name="data_avaliacao" type="datetime-local" defaultValue={formatDateTimeForInput(editing?.data_avaliacao || new Date())} required />
             </Field>
             <Field label="Sentar e alcancar (cm)">
               <Input name="sentar_alcancar" type="number" step="0.1" defaultValue={editing?.flexibilidade_sentar_alcancar ?? ""} />

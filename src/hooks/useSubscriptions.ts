@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { dateInputToIsoString, parseDateInputValue } from "@/utils/dateFormat";
 
 export interface Subscription {
   id: string;
@@ -149,7 +150,11 @@ export function useSubscriptions(studentId?: string, personalId?: string) {
       const parcelas = paymentData.parcelas || 1;
 
       // Calcular nova data de expiração
-      const dataExpiracao = new Date(paymentData.data_pagamento);
+      const dataPagamentoBase = parseDateInputValue(paymentData.data_pagamento);
+      if (!dataPagamentoBase) throw new Error("Data de pagamento invalida");
+
+      const dataPagamentoIso = dateInputToIsoString(paymentData.data_pagamento) ?? paymentData.data_pagamento;
+      const dataExpiracao = new Date(dataPagamentoBase);
       switch (subscription.plano) {
         case "mensal":
           dataExpiracao.setMonth(dataExpiracao.getMonth() + 1);
@@ -168,7 +173,7 @@ export function useSubscriptions(studentId?: string, personalId?: string) {
       // Atualizar assinatura (incluindo parcelas)
       await updateSubscription(subscriptionId, {
         status_pagamento: "pago",
-        data_pagamento: paymentData.data_pagamento,
+        data_pagamento: dataPagamentoIso,
         data_expiracao: dataExpiracao.toISOString(),
       });
 
@@ -177,7 +182,7 @@ export function useSubscriptions(studentId?: string, personalId?: string) {
       const paymentRecords = [];
 
       for (let i = 0; i < parcelas; i++) {
-        const dataParcela = new Date(paymentData.data_pagamento);
+        const dataParcela = new Date(dataPagamentoBase);
         dataParcela.setMonth(dataParcela.getMonth() + i);
 
         paymentRecords.push({

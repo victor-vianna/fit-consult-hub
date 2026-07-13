@@ -28,7 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { formatDisplayDate } from "@/utils/dateFormat";
+import { formatDateForInput, formatDisplayDateOnly, parseDateInputValue } from "@/utils/dateFormat";
 
 interface StudentSubscriptionViewProps {
   studentId: string;
@@ -89,7 +89,7 @@ export function StudentSubscriptionView({
   };
 
   const getStatusInfo = (sub: { status_pagamento: string; data_expiracao: string }) => {
-    const expired = new Date(sub.data_expiracao) < new Date();
+    const expired = getCalendarDate(sub.data_expiracao) < startOfDay(new Date());
     if (sub.status_pagamento === "pago" && expired) {
       return {
         icon: XCircle,
@@ -113,9 +113,13 @@ export function StudentSubscriptionView({
 
   const getDaysUntilExpiration = (expirationDate: string) => {
     return differenceInCalendarDays(
-      startOfDay(new Date(expirationDate)),
+      getCalendarDate(expirationDate),
       startOfDay(new Date())
     );
+  };
+
+  const getCalendarDate = (value: string) => {
+    return parseDateInputValue(formatDateForInput(value)) ?? startOfDay(new Date(value));
   };
 
   const diasParaExpirar = activeSubscription
@@ -203,7 +207,7 @@ export function StudentSubscriptionView({
                 </span>
                 <span className="text-sm font-medium">
                   {activeSubscription.data_pagamento
-                    ? formatDisplayDate(activeSubscription.data_pagamento)
+                    ? formatDisplayDateOnly(activeSubscription.data_pagamento)
                     : "Não registrado"}
                 </span>
               </div>
@@ -213,7 +217,7 @@ export function StudentSubscriptionView({
                   Data de Expiração
                 </span>
                 <span className="text-sm font-medium">
-                  {formatDisplayDate(activeSubscription.data_expiracao)}
+                  {formatDisplayDateOnly(activeSubscription.data_expiracao)}
                 </span>
               </div>
 
@@ -247,7 +251,7 @@ export function StudentSubscriptionView({
             {(activeSubscription as any).cancela_no_fim_do_ciclo && (
               <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
                 Sua assinatura será encerrada em{" "}
-                {formatDisplayDate(activeSubscription.data_expiracao)}.
+                {formatDisplayDateOnly(activeSubscription.data_expiracao)}.
               </div>
             )}
 
@@ -345,7 +349,7 @@ export function StudentSubscriptionView({
                             <CreditCard className="h-3 w-3" />
                             <span>
                               Pago em:{" "}
-                              {formatDisplayDate(sub.data_pagamento)}
+                              {formatDisplayDateOnly(sub.data_pagamento)}
                             </span>
                           </div>
                         )}
@@ -357,7 +361,7 @@ export function StudentSubscriptionView({
                               ? "Válido até"
                               : "Vence em"}
                             :{" "}
-                            {formatDisplayDate(sub.data_expiracao)}
+                            {formatDisplayDateOnly(sub.data_expiracao)}
                           </span>
                         </div>
 

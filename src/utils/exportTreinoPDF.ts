@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { TreinoDia } from "@/types/treino";
 import type { PersonalSettings } from "@/hooks/usePersonalSettings";
+import { formatDisplayDate } from "@/utils/dateFormat";
 import { organizeForExport } from "./exportOrganizer";
 
 const diasSemana = [
@@ -271,7 +272,7 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
 
   // Footer (skip when letterhead is used to avoid overlapping)
   if (!letterheadDataUrl) {
-    const footerText = `Gerado por ${personalName} - ${new Date().toLocaleDateString("pt-BR")}`;
+    const footerText = `Gerado por ${personalName} - ${formatDisplayDate(new Date())}`;
     doc.setFontSize(8);
     doc.setTextColor(150, 150, 150);
     doc.setFont("helvetica", "normal");

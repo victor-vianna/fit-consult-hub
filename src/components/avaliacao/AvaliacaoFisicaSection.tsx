@@ -9,8 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Edit, Trash2, Ruler } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { format } from "date-fns";
-import { formatDisplayDate } from "@/utils/dateFormat";
+import { formatDateTimeForInput, formatDisplayDate } from "@/utils/dateFormat";
 
 interface Props {
   profileId: string;
@@ -144,7 +143,7 @@ export function AvaliacaoFisicaSection({ profileId, personalId, themeColor, onRe
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editing ? "Editar" : "Nova"} Avaliação - Circunferências</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div><Label>Data *</Label><Input name="data_avaliacao" type="datetime-local" defaultValue={editing?.data_avaliacao ? format(new Date(editing.data_avaliacao), "yyyy-MM-dd'T'HH:mm") : format(new Date(), "yyyy-MM-dd'T'HH:mm")} required /></div>
+            <div><Label>Data *</Label><Input name="data_avaliacao" type="datetime-local" defaultValue={formatDateTimeForInput(editing?.data_avaliacao || new Date())} required /></div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {MEDIDAS.map(({ key, label }) => (
                 <div key={key}><Label>{label} (cm)</Label><Input name={key} type="number" step="0.1" defaultValue={editing?.[key]} /></div>

@@ -11,10 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Eye, X, Camera, Image as ImageIcon, ArrowLeftRight, Edit } from "lucide-react";
-import { format } from "date-fns";
 import { FotoTimeline, type ReleasedPhotoComparison } from "./FotoTimeline";
 import { getFotosSignedMap, getFotoSignedUrl } from "@/utils/fotosEvolucao";
-import { formatDisplayDate } from "@/utils/dateFormat";
+import { formatDateForInput, formatDisplayDate } from "@/utils/dateFormat";
 
 interface FotoEvolucao {
   id: string;
@@ -270,7 +269,7 @@ export function FotosSection({ profileId, personalId, themeColor, refreshKey, on
           <FotoTimeline
             fotos={fotosFiltradas}
             onDelete={handleDeleteFoto}
-            onEditDate={(f) => { setEditingFoto(f); setEditDate(f.data_foto || ""); }}
+            onEditDate={(f) => { setEditingFoto(f); setEditDate(formatDateForInput(f.data_foto || f.created_at)); }}
             onView={(url) => { setSelectedFoto(url); setViewerOpen(true); }}
             releasedComparisons={releasedComparisons}
             onReleaseComparison={handleReleaseComparison}
@@ -292,7 +291,7 @@ export function FotosSection({ profileId, personalId, themeColor, refreshKey, on
                   <Button size="sm" variant="secondary" className="h-7 w-7 p-0 bg-background/90" onClick={() => { setSelectedFoto(foto.foto_url); setViewerOpen(true); }}>
                     <Eye className="h-3 w-3" />
                   </Button>
-                  <Button size="sm" variant="secondary" className="h-7 w-7 p-0 bg-background/90" onClick={() => { setEditingFoto(foto); setEditDate(foto.data_foto || ""); }}>
+                  <Button size="sm" variant="secondary" className="h-7 w-7 p-0 bg-background/90" onClick={() => { setEditingFoto(foto); setEditDate(formatDateForInput(foto.data_foto || foto.created_at)); }}>
                     <Edit className="h-3 w-3" />
                   </Button>
                   <AlertDialog>

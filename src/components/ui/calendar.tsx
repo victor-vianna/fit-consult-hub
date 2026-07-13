@@ -1,13 +1,17 @@
 import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DayPicker } from "react-day-picker";
+import { ptBR } from "date-fns/locale";
 
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
+import { getDisplayDateLocale } from "@/utils/dateFormat";
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
 
 function Calendar({ className, classNames, showOutsideDays = true, ...props }: CalendarProps) {
+  const locale = props.locale ?? (getDisplayDateLocale().toLowerCase().startsWith("pt") ? ptBR : undefined);
+
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
@@ -46,6 +50,7 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         IconRight: ({ ..._props }) => <ChevronRight className="h-4 w-4" />,
       }}
       {...props}
+      locale={locale}
     />
   );
 }

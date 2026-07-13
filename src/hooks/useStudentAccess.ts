@@ -35,6 +35,7 @@ export const MOTIVO_LABELS: Record<string, string> = {
   manual_pause: "Pausa manual",
   manual_suspend: "Suspensao manual",
   manual_release: "Liberacao manual",
+  manual_temporary_release: "Liberacao temporaria",
   payment_rule_changed: "Regra de pagamento alterada",
 };
 
@@ -73,6 +74,7 @@ export interface StudentAccessState {
   payment_required: boolean;
   has_active_payment: boolean;
   active_subscription_id: string | null;
+  manual_release_until: string | null;
   calculated_at: string;
   updated_at: string;
 }
@@ -92,6 +94,7 @@ export interface AccessLogWithAuthor {
   observation: string | null;
   metadata: Record<string, unknown> | null;
   created_at: string;
+  manual_release_until?: string | null;
   from_active?: boolean | null;
   to_active?: boolean | null;
   motivo?: string | null;
@@ -116,6 +119,7 @@ const DEFAULT_STATE = (studentId: string): StudentAccessState => ({
   payment_required: false,
   has_active_payment: false,
   active_subscription_id: null,
+  manual_release_until: null,
   calculated_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 });
@@ -229,6 +233,7 @@ export function useStudentAccess(studentId: string | undefined) {
       motivo?: AccessMotivo;
       mensagemAluno?: string;
       observacao?: string;
+      manualReleaseUntil?: string | null;
     }) => {
       if (!studentId) throw new Error("Aluno invalido");
 
@@ -247,6 +252,7 @@ export function useStudentAccess(studentId: string | undefined) {
           _reason_code: params.motivo ?? null,
           _message_aluno: params.mensagemAluno ?? null,
           _observation: params.observacao ?? null,
+          _manual_release_until: params.manualReleaseUntil ?? null,
         }
       );
 

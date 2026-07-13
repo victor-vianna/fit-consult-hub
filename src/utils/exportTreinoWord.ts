@@ -19,6 +19,7 @@ import {
 import { saveAs } from "file-saver";
 import type { TreinoDia } from "@/types/treino";
 import type { PersonalSettings } from "@/hooks/usePersonalSettings";
+import { formatDisplayDate } from "@/utils/dateFormat";
 import { organizeForExport } from "./exportOrganizer";
 
 async function fetchImageBytes(url: string): Promise<{ bytes: Uint8Array; type: "png" | "jpg" }> {
@@ -396,7 +397,7 @@ export async function exportTreinoWord(params: ExportTreinoParams) {
                   new TextRun({
                     text: letterheadImage
                       ? ""
-                      : `Gerado por ${personalName} — ${new Date().toLocaleDateString("pt-BR")}`,
+                      : `Gerado por ${personalName} — ${formatDisplayDate(new Date())}`,
                     size: 16,
                     color: "888888",
                     font: "Calibri",

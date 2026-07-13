@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { ModeloTreino } from "./useModelosTreino";
+import { formatDisplayMonthDay } from "@/utils/dateFormat";
 
 interface AplicarModeloInput {
   modeloId: string;
@@ -333,8 +334,8 @@ export function useAplicarModelo() {
         .join(", ");
 
       // Formatar a semana para exibição
-      const semanaFormatada = variables.semana 
-        ? new Date(variables.semana + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+      const semanaFormatada = variables.semana
+        ? formatDisplayMonthDay(variables.semana)
         : "atual";
 
       toast.success(

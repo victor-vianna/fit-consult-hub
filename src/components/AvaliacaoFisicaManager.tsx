@@ -44,10 +44,13 @@ import {
   X,
   Eye,
 } from "lucide-react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { extractFotoPath, getFotosSignedMap } from "@/utils/fotosEvolucao";
-import { formatDisplayDateTime } from "@/utils/dateFormat";
+import {
+  formatDateTimeForInput,
+  formatDisplayDateLong,
+  formatDisplayDateTime,
+  formatDisplayTime,
+} from "@/utils/dateFormat";
 
 interface AvaliacaoFisica {
   id: string;
@@ -482,14 +485,7 @@ export function AvaliacaoFisicaManager({
                         id="data_avaliacao"
                         name="data_avaliacao"
                         type="datetime-local"
-                        defaultValue={
-                          editingAvaliacao?.data_avaliacao
-                            ? format(
-                                new Date(editingAvaliacao.data_avaliacao),
-                                "yyyy-MM-dd'T'HH:mm"
-                              )
-                            : format(new Date(), "yyyy-MM-dd'T'HH:mm")
-                        }
+                        defaultValue={formatDateTimeForInput(editingAvaliacao?.data_avaliacao || new Date())}
                         required
                       />
                     </div>
@@ -726,11 +722,7 @@ export function AvaliacaoFisicaManager({
                       <div>
                         <div className="flex items-center gap-3 mb-2">
                           <h3 className="font-bold text-lg">
-                            {format(
-                              new Date(avaliacao.data_avaliacao),
-                              "dd 'de' MMMM 'de' yyyy",
-                              { locale: ptBR }
-                            )}
+                            {formatDisplayDateLong(avaliacao.data_avaliacao)}
                           </h3>
                           {avaliacao.objetivo && (
                             <Badge variant="secondary">
@@ -740,7 +732,7 @@ export function AvaliacaoFisicaManager({
                         </div>
                         <p className="text-sm text-muted-foreground flex items-center gap-2">
                           <Calendar className="h-4 w-4" />
-                          {format(new Date(avaliacao.data_avaliacao), "HH:mm")}
+                          {formatDisplayTime(avaliacao.data_avaliacao)}
                         </p>
                       </div>
                       <div className="flex gap-2">

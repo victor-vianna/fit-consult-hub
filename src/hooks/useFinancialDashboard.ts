@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { formatDisplayMonthYear } from "@/utils/dateFormat";
 
 export interface FinancialMetrics {
   receitaMesAtual: number;
@@ -150,7 +151,7 @@ export function useFinancialDashboard(personalId: string) {
         receitaUltimos12MesesAnoAnterior += receitaAnoAnterior;
 
         monthlyRevenueData.push({
-          mes: targetDate.toLocaleDateString("pt-BR", { month: "short", year: "numeric" }),
+          mes: formatDisplayMonthYear(targetDate),
           receita,
           receitaAnoAnterior,
           pagamentos: monthPayments.length,

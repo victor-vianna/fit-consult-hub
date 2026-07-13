@@ -226,9 +226,12 @@ export function WorkoutDayView({
   const {
     salvarProgressoLocal,
     marcarSincronizado,
+    persistirExercicioAgora,
+    persistirSeriesAgora,
     mesclarProgressoExercicios,
     salvarBlocoProgressoLocal,
     marcarBlocoSincronizado,
+    persistirBlocoAgora,
     mesclarProgressoBlocos,
     limparProgressoLocal,
   } = useExerciseProgress(profileId);
@@ -399,6 +402,9 @@ export function WorkoutDayView({
       return updated;
     });
 
+    const sincronizado = await persistirExercicioAgora(id, concluido);
+    if (!sincronizado) return;
+
     try {
       await onToggleConcluido(id, concluido);
       // 🔧 Marcar como sincronizado após sucesso
@@ -414,6 +420,45 @@ export function WorkoutDayView({
         // Progresso local permanece e será sincronizado depois
       }
     }
+  };
+
+  // ✅ Handler para registro de séries
+  const handleRegisterSerie = async (
+    id: string,
+    seriesConcluidas: number,
+    totalSeries: number
+  ) => {
+    const safeTotal = Math.max(1, totalSeries);
+    const safeSeries = Math.min(Math.max(0, Math.floor(seriesConcluidas)), safeTotal);
+    const concluido = safeSeries >= safeTotal;
+
+    setLocalTreinos((prev) =>
+      prev.map((treino) => ({
+        ...treino,
+        exercicios: treino.exercicios.map((ex) =>
+          ex.id === id
+            ? { ...ex, series_concluidas: safeSeries, concluido }
+            : ex
+        ),
+      }))
+    );
+
+    setLocalGrupos((prev) => {
+      const updated = { ...prev };
+      Object.keys(updated).forEach((treinoId) => {
+        updated[treinoId] = updated[treinoId].map((grupo) => ({
+          ...grupo,
+          exercicios: grupo.exercicios.map((ex: any) =>
+            ex.id === id
+              ? { ...ex, series_concluidas: safeSeries, concluido }
+              : ex
+          ),
+        }));
+      });
+      return updated;
+    });
+
+    return persistirSeriesAgora(id, safeSeries, safeTotal);
   };
 
   // ✅ Handler para toggle de grupo
@@ -447,6 +492,7 @@ export function WorkoutDayView({
                 exercicios: grupo.exercicios.map((ex: any) => ({
                   ...ex,
                   concluido,
+                  series_concluidas: concluido ? ex.series || 1 : 0,
                 })),
               }
             : grupo
@@ -455,11 +501,21 @@ export function WorkoutDayView({
       return updated;
     });
 
+    const resultadosSync = await Promise.all(
+      (grupoAtual?.exercicios ?? []).map((exercicio: any) =>
+        persistirSeriesAgora(
+          exercicio.id,
+          concluido ? exercicio.series || 1 : 0,
+          exercicio.series || 1
+        )
+      )
+    );
+    if (resultadosSync.some((sincronizado) => !sincronizado)) return;
+
     try {
       await onToggleGrupoConcluido(grupoId, concluido);
     } catch (error) {
       console.error("[WorkoutDayView] Erro ao marcar grupo:", error);
-      setLocalGrupos(gruposPorTreino);
     }
   };
 
@@ -487,6 +543,9 @@ export function WorkoutDayView({
       });
       return updated;
     });
+
+    const blocoSincronizado = await persistirBlocoAgora(blocoId, concluido);
+    if (!blocoSincronizado) return;
 
     try {
       await onToggleBlocoConcluido(blocoId, concluido);
@@ -524,6 +583,7 @@ export function WorkoutDayView({
               exercicios: treino.exercicios.map((ex) => ({
                 ...ex,
                 concluido: false,
+                series_concluidas: 0,
               })),
             }
           : treino
@@ -537,6 +597,7 @@ export function WorkoutDayView({
         exercicios: grupo.exercicios.map((ex: any) => ({
           ...ex,
           concluido: false,
+          series_concluidas: 0,
         })),
       })),
     }));
@@ -1040,6 +1101,7 @@ export function WorkoutDayView({
                       resetLocalProgressForTreino(canceledTreinoId);
                     }}
                     handleToggleExercicio={handleToggleExercicio}
+                    handleRegisterSerie={handleRegisterSerie}
                     handleToggleGrupo={handleToggleGrupo}
                     handleToggleBloco={handleToggleBloco}
                     resumeItemId={resumeItemId}
@@ -1079,6 +1141,7 @@ function TreinoCard({
   onTreinoConcluido,
   onTreinoCancelado,
   handleToggleExercicio,
+  handleRegisterSerie,
   handleToggleGrupo,
   handleToggleBloco,
   resumeItemId,
@@ -1106,6 +1169,7 @@ function TreinoCard({
   onTreinoConcluido: (treinoId: string) => void;
   onTreinoCancelado: (treinoId: string) => void;
   handleToggleExercicio: (id: string, concluido: boolean) => Promise<any>;
+  handleRegisterSerie: (id: string, seriesConcluidas: number, totalSeries: number) => Promise<any>;
   handleToggleGrupo: (grupoId: string, concluido: boolean) => Promise<void>;
   handleToggleBloco: (blocoId: string, concluido: boolean) => Promise<void>;
   resumeItemId?: string | null;
@@ -1185,6 +1249,7 @@ function TreinoCard({
             blocosMeio={blocosMeio}
             blocosFim={blocosFim}
             onToggleExercicio={handleToggleExercicio}
+            onRegisterSerie={handleRegisterSerie}
             onToggleGrupo={handleToggleGrupo}
             onToggleBloco={handleToggleBloco}
             isWorkoutActive={isWorkoutActive}

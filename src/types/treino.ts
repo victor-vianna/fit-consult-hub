@@ -8,6 +8,7 @@ export interface Exercicio {
   ordem: number;
   ordem_no_grupo: number | null;
   series: number | null;
+  series_concluidas?: number | null;
   repeticoes: string | null;
   descanso: number | null;
   descanso_entre_grupos: number | null;

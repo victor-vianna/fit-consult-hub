@@ -22,6 +22,7 @@ interface CompactExerciseCardProps {
     nome: string;
     link_video?: string | null;
     series?: number;
+    series_concluidas?: number | null;
     repeticoes?: string;
     descanso?: number;
     carga?: string | null;
@@ -32,6 +33,7 @@ interface CompactExerciseCardProps {
   };
   index: number;
   onToggleConcluido?: (id: string, concluido: boolean) => Promise<any>;
+  onRegisterSerie?: (id: string, seriesConcluidas: number, totalSeries: number) => Promise<any>;
   isWorkoutActive?: boolean;
   profileId?: string;
   variant?: "list" | "carousel";
@@ -112,10 +114,17 @@ function formatCarga(carga?: string | null, ultimoPeso?: string | null) {
   return value ? `${value}kg` : "carga livre";
 }
 
+function getCompletedSeries(exercicio: CompactExerciseCardProps["exercicio"]) {
+  const total = Math.max(1, exercicio.series || 3);
+  if (exercicio.concluido) return total;
+  return Math.min(Math.max(0, exercicio.series_concluidas ?? 0), total);
+}
+
 export function CompactExerciseCard({
   exercicio,
   index,
   onToggleConcluido,
+  onRegisterSerie,
   isWorkoutActive = false,
   variant = "list",
   className,
@@ -132,7 +141,7 @@ export function CompactExerciseCard({
   );
   const [expanded, setExpanded] = useState(highlighted);
   const [completedSeries, setCompletedSeries] = useState(
-    exercicio.concluido ? exercicio.series || 3 : 0
+    getCompletedSeries(exercicio)
   );
 
   const isCarousel = variant === "carousel";
@@ -149,8 +158,8 @@ export function CompactExerciseCard({
   useEffect(() => {
     setLocalConcluido(exercicio.concluido || false);
     setLocalPesoExecutado(exercicio.peso_executado || null);
-    setCompletedSeries(exercicio.concluido ? exercicio.series || 3 : 0);
-  }, [exercicio.id, exercicio.concluido, exercicio.peso_executado, exercicio.series]);
+    setCompletedSeries(getCompletedSeries(exercicio));
+  }, [exercicio.id, exercicio.concluido, exercicio.peso_executado, exercicio.series, exercicio.series_concluidas]);
 
   useEffect(() => {
     if (highlighted) setExpanded(true);
@@ -160,19 +169,25 @@ export function CompactExerciseCard({
     if (!isWorkoutActive) {
       setLocalConcluido(false);
       setCompletedSeries(0);
+      return;
     }
-  }, [isWorkoutActive]);
+
+    setLocalConcluido(exercicio.concluido || false);
+    setCompletedSeries(getCompletedSeries(exercicio));
+  }, [isWorkoutActive, exercicio]);
 
   const handleToggle = async (target?: boolean) => {
     const novoValor = target ?? !localConcluido;
+    const nextSeries = novoValor ? totalSeries : 0;
     setLocalConcluido(novoValor);
-    setCompletedSeries(novoValor ? totalSeries : 0);
+    setCompletedSeries(nextSeries);
 
     if ("vibrate" in navigator) {
       navigator.vibrate(10);
     }
 
     try {
+      await onRegisterSerie?.(exercicio.id, nextSeries, totalSeries);
       await onToggleConcluido?.(exercicio.id, novoValor);
     } catch (error) {
       console.error("Erro ao marcar exercicio:", error);
@@ -199,6 +214,7 @@ export function CompactExerciseCard({
   const handleRegisterSet = async () => {
     const nextCount = Math.min(completedSeries + 1, totalSeries);
     setCompletedSeries(nextCount);
+    await onRegisterSerie?.(exercicio.id, nextCount, totalSeries);
 
     if (nextCount >= totalSeries && !localConcluido) {
       await handleToggle(true);

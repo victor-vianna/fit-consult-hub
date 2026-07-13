@@ -902,6 +902,7 @@ export type Database = {
           peso_executado: string | null
           repeticoes: string | null
           series: number | null
+          series_concluidas: number
           tipo_agrupamento: string | null
           treino_semanal_id: string
           updated_at: string
@@ -924,6 +925,7 @@ export type Database = {
           peso_executado?: string | null
           repeticoes?: string | null
           series?: number | null
+          series_concluidas?: number
           tipo_agrupamento?: string | null
           treino_semanal_id: string
           updated_at?: string
@@ -946,6 +948,7 @@ export type Database = {
           peso_executado?: string | null
           repeticoes?: string | null
           series?: number | null
+          series_concluidas?: number
           tipo_agrupamento?: string | null
           treino_semanal_id?: string
           updated_at?: string

@@ -72,7 +72,11 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
   });
   
   // 🔧 Hook para persistência de progresso PWA
-  const { salvarProgressoLocal, marcarSincronizado } = useExerciseProgress(profileId);
+  const {
+    salvarProgressoLocal,
+    marcarSincronizado,
+    mesclarProgressoExercicios,
+  } = useExerciseProgress(profileId);
   
   // Estado para semana selecionada (navegável)
   const [semanaSelecionada, setSemanaSelecionada] = useState<string>(
@@ -169,7 +173,7 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
             }
 
             // Mapear cada registro do banco para o tipo Exercicio com conversões corretas
-            const exerciciosTipados: Exercicio[] = (exercicios || []).map(
+            const exerciciosTipados: Exercicio[] = mesclarProgressoExercicios((exercicios || []).map(
               (ex: any) => {
                 const mapped: Exercicio = {
                   id: String(ex.id),
@@ -186,6 +190,10 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
                   ordem_no_grupo:
                     ex.ordem_no_grupo != null ? Number(ex.ordem_no_grupo) : null,
                   series: ex.series != null ? Number(ex.series) : 3,
+                  series_concluidas:
+                    ex.series_concluidas != null
+                      ? Number(ex.series_concluidas)
+                      : 0,
                   repeticoes: ex.repeticoes ?? "12",
                   descanso: ex.descanso != null ? Number(ex.descanso) : 60,
                   descanso_entre_grupos:
@@ -204,7 +212,7 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
                 };
                 return mapped;
               }
-            );
+            ));
 
             // Buscar grupos associados ao treino
             const grupos = await obterGruposDoTreino(treino.id);

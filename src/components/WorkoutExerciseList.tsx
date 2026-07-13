@@ -12,6 +12,7 @@ interface Exercicio {
   nome: string;
   link_video?: string | null;
   series?: number;
+  series_concluidas?: number | null;
   repeticoes?: string;
   descanso?: number;
   carga?: string | null;
@@ -36,6 +37,7 @@ interface WorkoutExerciseListProps {
   blocosMeio: BlocoTreino[];
   blocosFim: BlocoTreino[];
   onToggleExercicio: (id: string, concluido: boolean) => Promise<any>;
+  onRegisterSerie?: (id: string, seriesConcluidas: number, totalSeries: number) => Promise<any>;
   onToggleGrupo?: (grupoId: string, concluido: boolean) => Promise<void>;
   onToggleBloco?: (blocoId: string, concluido: boolean) => Promise<void>;
   isWorkoutActive?: boolean;
@@ -91,6 +93,7 @@ export function WorkoutExerciseList({
   blocosMeio,
   blocosFim,
   onToggleExercicio,
+  onRegisterSerie,
   onToggleGrupo,
   onToggleBloco,
   isWorkoutActive,
@@ -134,6 +137,7 @@ export function WorkoutExerciseList({
           grupo={grupo}
           index={idx}
           onToggleConcluido={isWorkoutActive ? onToggleExercicio : undefined}
+          onRegisterSerie={isWorkoutActive ? onRegisterSerie : undefined}
           onToggleGrupoConcluido={isWorkoutActive ? onToggleGrupo : undefined}
           isWorkoutActive={!!isWorkoutActive}
           profileId={profileId}
@@ -150,6 +154,7 @@ export function WorkoutExerciseList({
         exercicio={exercicio}
         index={idx}
         onToggleConcluido={isWorkoutActive ? onToggleExercicio : undefined}
+        onRegisterSerie={isWorkoutActive ? onRegisterSerie : undefined}
         isWorkoutActive={!!isWorkoutActive}
         profileId={profileId}
         treinoId={treinoId}

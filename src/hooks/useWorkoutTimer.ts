@@ -920,7 +920,7 @@ export function useWorkoutTimer({
       await Promise.all([
         supabase
           .from("exercicios")
-          .update({ concluido: false })
+          .update({ concluido: false, series_concluidas: 0 } as any)
           .eq("treino_semanal_id", treinoId),
         supabase
           .from("blocos_treino")
@@ -983,7 +983,7 @@ export function useWorkoutTimer({
       const resetResults = await Promise.allSettled([
         supabase
           .from("exercicios")
-          .update({ concluido: false })
+          .update({ concluido: false, series_concluidas: 0 } as any)
           .eq("treino_semanal_id", treinoId),
         supabase
           .from("blocos_treino")

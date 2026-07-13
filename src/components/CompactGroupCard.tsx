@@ -28,6 +28,7 @@ interface CompactGroupCardProps {
   };
   index: number;
   onToggleConcluido?: (id: string, concluido: boolean) => Promise<any>;
+  onRegisterSerie?: (id: string, seriesConcluidas: number, totalSeries: number) => Promise<any>;
   onToggleGrupoConcluido?: (
     grupoId: string,
     concluido: boolean
@@ -42,6 +43,7 @@ export function CompactGroupCard({
   grupo,
   index,
   onToggleConcluido,
+  onRegisterSerie,
   onToggleGrupoConcluido,
   isWorkoutActive = false,
   profileId,
@@ -58,9 +60,16 @@ export function CompactGroupCard({
   useEffect(() => {
     if (!isWorkoutActive) {
       setLocalExercicios((prev) =>
-        prev.map((exercicio) => ({ ...exercicio, concluido: false }))
+        prev.map((exercicio) => ({
+          ...exercicio,
+          concluido: false,
+          series_concluidas: 0,
+        }))
       );
+      return;
     }
+
+    setLocalExercicios(grupo.exercicios);
   }, [isWorkoutActive]);
 
   const tipoConfig =
@@ -86,7 +95,11 @@ export function CompactGroupCard({
     const novoStatus = !todosConcluidos;
 
     setLocalExercicios((prev) =>
-      prev.map((e) => ({ ...e, concluido: novoStatus }))
+      prev.map((e) => ({
+        ...e,
+        concluido: novoStatus,
+        series_concluidas: novoStatus ? e.series || 1 : 0,
+      }))
     );
 
     try {
@@ -100,11 +113,37 @@ export function CompactGroupCard({
   const handleToggleExercicio = async (id: string, concluido: boolean) => {
     setLocalExercicios((prev) =>
       prev.map((exercicio) =>
-        exercicio.id === id ? { ...exercicio, concluido } : exercicio
+        exercicio.id === id
+          ? {
+              ...exercicio,
+              concluido,
+              series_concluidas: concluido ? exercicio.series || 1 : 0,
+            }
+          : exercicio
       )
     );
 
     await onToggleConcluido?.(id, concluido);
+  };
+
+  const handleRegisterSerie = async (
+    id: string,
+    seriesConcluidas: number,
+    totalSeries: number
+  ) => {
+    const safeTotal = Math.max(1, totalSeries);
+    const safeSeries = Math.min(Math.max(0, Math.floor(seriesConcluidas)), safeTotal);
+    const concluido = safeSeries >= safeTotal;
+
+    setLocalExercicios((prev) =>
+      prev.map((exercicio) =>
+        exercicio.id === id
+          ? { ...exercicio, series_concluidas: safeSeries, concluido }
+          : exercicio
+      )
+    );
+
+    return onRegisterSerie?.(id, safeSeries, safeTotal);
   };
 
   return (
@@ -230,6 +269,7 @@ export function CompactGroupCard({
                     index={idx}
                     variant="carousel"
                     onToggleConcluido={handleToggleExercicio}
+                    onRegisterSerie={handleRegisterSerie}
                     isWorkoutActive={isWorkoutActive}
                     profileId={profileId}
                     treinoId={treinoId}

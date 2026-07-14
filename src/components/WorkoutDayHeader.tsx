@@ -14,17 +14,11 @@ interface WorkoutDayHeaderProps {
   totalBlocos: number;
   progresso: number;
   treinoIniciado: boolean;
-  duracaoEstimadaMinutos?: number | null;
   onStartWorkout?: () => void;
 }
 
 function pluralize(value: number, singular: string, plural: string) {
   return `${value} ${value === 1 ? singular : plural}`;
-}
-
-function formatDuration(minutes?: number | null) {
-  if (!minutes || minutes <= 0) return null;
-  return `~${Math.round(minutes)} min`;
 }
 
 export function WorkoutDayHeader({
@@ -37,10 +31,8 @@ export function WorkoutDayHeader({
   totalBlocos,
   progresso,
   treinoIniciado,
-  duracaoEstimadaMinutos,
   onStartWorkout,
 }: WorkoutDayHeaderProps) {
-  const durationLabel = formatDuration(duracaoEstimadaMinutos);
   const progressValue =
     totalItens > 0
       ? Math.round((Math.min(completedItems, totalItens) / totalItens) * 100)
@@ -52,7 +44,6 @@ export function WorkoutDayHeader({
       : null,
     totalGrupos > 0 ? pluralize(totalGrupos, "grupo", "grupos") : null,
     totalBlocos > 0 ? pluralize(totalBlocos, "bloco", "blocos") : null,
-    durationLabel,
   ].filter(Boolean);
 
   return (

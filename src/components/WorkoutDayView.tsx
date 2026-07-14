@@ -50,50 +50,6 @@ const diasSemana = [
 
 const WORKOUT_RESUME_CACHE_VERSION = 1;
 
-function getBlockDurationMinutes(bloco: BlocoTreino) {
-  return (
-    bloco.config_cardio?.duracao_minutos ??
-    bloco.config_alongamento?.duracao_minutos ??
-    bloco.config_aquecimento?.duracao_minutos ??
-    bloco.duracao_estimada_minutos ??
-    0
-  );
-}
-
-function estimateExerciseMinutes(exercicio: { series?: number | null; descanso?: number | null }) {
-  const series = Math.max(1, exercicio.series ?? 3);
-  const workSeconds = series * 45;
-  const restSeconds = Math.max(series - 1, 0) * (exercicio.descanso ?? 0);
-  return (workSeconds + restSeconds) / 60;
-}
-
-function estimateWorkoutMinutes(
-  exercicios: any[],
-  grupos: GrupoExercicio[],
-  blocos: BlocoTreino[]
-) {
-  const isolatedMinutes = exercicios.reduce(
-    (total, exercicio) => total + estimateExerciseMinutes(exercicio),
-    0
-  );
-  const groupMinutes = grupos.reduce(
-    (total, grupo) =>
-      total +
-      (grupo.exercicios ?? []).reduce(
-        (subtotal: number, exercicio: any) =>
-          subtotal + estimateExerciseMinutes(exercicio),
-        0
-      ),
-    0
-  );
-  const blockMinutes = blocos.reduce(
-    (total, bloco) => total + getBlockDurationMinutes(bloco),
-    0
-  );
-
-  return Math.max(1, Math.round(isolatedMinutes + groupMinutes + blockMinutes));
-}
-
 function countCompletedItems(
   exercicios: any[],
   grupos: GrupoExercicio[],
@@ -1054,12 +1010,6 @@ export function WorkoutDayView({
                   grupos,
                   blocos
                 );
-                const duracaoEstimadaMinutos = estimateWorkoutMinutes(
-                  exerciciosIsolados,
-                  grupos,
-                  blocos
-                );
-
                 const isDiaIniciado = isTreinoIniciado(treinoId);
                 const hasMultiple = treinosDoDia.filter(t => {
                   const tid = getTreinoId(t);
@@ -1079,7 +1029,6 @@ export function WorkoutDayView({
                     hasMultiple={hasMultiple}
                     totalItens={totalItens}
                     completedItems={completedItems}
-                    duracaoEstimadaMinutos={duracaoEstimadaMinutos}
                     grupos={grupos}
                     blocos={blocos}
                     blocosInicio={blocosInicio}
@@ -1124,7 +1073,6 @@ function TreinoCard({
   hasMultiple,
   totalItens,
   completedItems,
-  duracaoEstimadaMinutos,
   grupos,
   blocos,
   blocosInicio,
@@ -1152,7 +1100,6 @@ function TreinoCard({
   hasMultiple: boolean;
   totalItens: number;
   completedItems: number;
-  duracaoEstimadaMinutos: number;
   grupos: GrupoExercicio[];
   blocos: BlocoTreino[];
   blocosInicio: BlocoTreino[];
@@ -1199,7 +1146,6 @@ function TreinoCard({
           totalBlocos={blocos.length}
           progresso={progresso}
           treinoIniciado={isDiaIniciado}
-          duracaoEstimadaMinutos={duracaoEstimadaMinutos}
           onStartWorkout={treinoId ? () => iniciarRef.current?.() : undefined}
         />
 

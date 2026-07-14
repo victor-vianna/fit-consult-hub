@@ -244,16 +244,21 @@ export function useStudentAccess(studentId: string | undefined) {
           ? "manual_suspend"
           : "manual_release";
 
+      const payload: Record<string, string | null> = {
+        _student_id: studentId,
+        _event_type: eventType,
+        _reason_code: params.motivo ?? null,
+        _message_aluno: params.mensagemAluno ?? null,
+        _observation: params.observacao ?? null,
+      };
+
+      if (params.manualReleaseUntil) {
+        payload._manual_release_until = params.manualReleaseUntil;
+      }
+
       const { data, error } = await (supabase as any).rpc(
         "register_student_access_event",
-        {
-          _student_id: studentId,
-          _event_type: eventType,
-          _reason_code: params.motivo ?? null,
-          _message_aluno: params.mensagemAluno ?? null,
-          _observation: params.observacao ?? null,
-          _manual_release_until: params.manualReleaseUntil ?? null,
-        }
+        payload
       );
 
       if (error) throw error;

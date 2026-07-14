@@ -148,13 +148,20 @@ export function QuickStudentAccessActions({
       observation?: string | null;
       manualReleaseUntil?: string | null;
     }) => {
-      const { error } = await (supabase as any).rpc("register_student_access_event", {
+      const payload: Record<string, string | null> = {
         _student_id: student.id,
         _event_type: params.eventType,
         _reason_code: params.reasonCode ?? null,
         _message_aluno: params.message ?? null,
         _observation: params.observation ?? null,
-        _manual_release_until: params.manualReleaseUntil ?? null,
+      };
+
+      if (params.manualReleaseUntil) {
+        payload._manual_release_until = params.manualReleaseUntil;
+      }
+
+      const { error } = await (supabase as any).rpc("register_student_access_event", {
+        ...payload,
       });
 
       if (error) throw error;

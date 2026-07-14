@@ -37,6 +37,189 @@ interface WorkoutCompletionScreenProps {
   onClose: () => void;
 }
 
+function loadCanvasImage(src?: string | null): Promise<HTMLImageElement | null> {
+  if (!src) return Promise.resolve(null);
+
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = src;
+  });
+}
+
+function drawCircularLogo(
+  ctx: CanvasRenderingContext2D,
+  image: HTMLImageElement | null,
+  x: number,
+  y: number,
+  radius: number,
+  fallbackText = "FC"
+) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+
+  if (image) {
+    const scale = Math.max((radius * 2) / image.width, (radius * 2) / image.height);
+    const width = image.width * scale;
+    const height = image.height * scale;
+    ctx.drawImage(image, x - width / 2, y - height / 2, width, height);
+  } else {
+    const fallbackGradient = ctx.createLinearGradient(x - radius, y - radius, x + radius, y + radius);
+    fallbackGradient.addColorStop(0, "#2563eb");
+    fallbackGradient.addColorStop(1, "#06b6d4");
+    ctx.fillStyle = fallbackGradient;
+    ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `800 ${Math.round(radius * 0.54)}px Arial, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(fallbackText.slice(0, 3).toUpperCase(), x, y + 2);
+  }
+
+  ctx.restore();
+
+  ctx.save();
+  ctx.strokeStyle = "rgba(255,255,255,0.34)";
+  ctx.lineWidth = Math.max(3, radius * 0.05);
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawTrophyIcon(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = "#facc15";
+  ctx.strokeStyle = "#fde68a";
+  ctx.lineWidth = Math.max(3, size * 0.055);
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+
+  ctx.beginPath();
+  ctx.moveTo(size * 0.28, size * 0.18);
+  ctx.lineTo(size * 0.72, size * 0.18);
+  ctx.quadraticCurveTo(size * 0.68, size * 0.56, size * 0.5, size * 0.64);
+  ctx.quadraticCurveTo(size * 0.32, size * 0.56, size * 0.28, size * 0.18);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(size * 0.28, size * 0.25);
+  ctx.quadraticCurveTo(size * 0.1, size * 0.27, size * 0.12, size * 0.44);
+  ctx.quadraticCurveTo(size * 0.14, size * 0.58, size * 0.35, size * 0.56);
+  ctx.moveTo(size * 0.72, size * 0.25);
+  ctx.quadraticCurveTo(size * 0.9, size * 0.27, size * 0.88, size * 0.44);
+  ctx.quadraticCurveTo(size * 0.86, size * 0.58, size * 0.65, size * 0.56);
+  ctx.stroke();
+
+  ctx.fillStyle = "#facc15";
+  ctx.fillRect(size * 0.45, size * 0.62, size * 0.1, size * 0.18);
+  ctx.beginPath();
+  ctx.roundRect(size * 0.32, size * 0.78, size * 0.36, size * 0.08, size * 0.03);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.roundRect(size * 0.22, size * 0.87, size * 0.56, size * 0.1, size * 0.04);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawCenteredFitText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  initialSize: number,
+  font: string,
+  color: string,
+  weight = "800"
+) {
+  let size = initialSize;
+  do {
+    ctx.font = `${weight} ${size}px ${font}`;
+    if (ctx.measureText(text).width <= maxWidth || size <= 28) break;
+    size -= 4;
+  } while (size > 28);
+
+  ctx.fillStyle = color;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(text, x, y);
+}
+
+function drawWrappedCenteredText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number,
+  maxLines: number
+) {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let line = "";
+
+  words.forEach((word) => {
+    const testLine = line ? `${line} ${word}` : word;
+    if (ctx.measureText(testLine).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = testLine;
+    }
+  });
+
+  if (line) lines.push(line);
+  const visibleLines = lines.slice(0, maxLines);
+
+  if (lines.length > maxLines && visibleLines.length > 0) {
+    let lastLine = visibleLines[visibleLines.length - 1];
+    while (ctx.measureText(`${lastLine}...`).width > maxWidth && lastLine.length > 0) {
+      lastLine = lastLine.slice(0, -1);
+    }
+    visibleLines[visibleLines.length - 1] = `${lastLine.trim()}...`;
+  }
+
+  visibleLines.forEach((visibleLine, index) => {
+    ctx.fillText(visibleLine, x, y + index * lineHeight);
+  });
+}
+
+function downloadFile(file: File) {
+  const url = URL.createObjectURL(file);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = file.name;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function openInstagramStoryComposer() {
+  const userAgent = navigator.userAgent.toLowerCase();
+  const isAndroid = userAgent.includes("android");
+  const isIOS = /iphone|ipad|ipod/.test(userAgent);
+
+  if (isAndroid) {
+    window.location.href =
+      "intent://story-camera#Intent;scheme=instagram;package=com.instagram.android;end";
+    return true;
+  }
+
+  if (isIOS) {
+    window.location.href = "instagram://story-camera";
+    return true;
+  }
+
+  return false;
+}
+
 export function WorkoutCompletionScreen({
   data,
   treinoId,
@@ -161,6 +344,23 @@ export function WorkoutCompletionScreen({
   };
 
   const createStoryImage = async () => {
+    const { data: sessaoData } = await supabase
+      .from("treino_sessoes")
+      .select("personal_id")
+      .eq("treino_semanal_id", treinoId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const { data: personalSettings } = sessaoData?.personal_id
+      ? await supabase
+          .from("personal_settings")
+          .select("logo_url")
+          .eq("personal_id", sessaoData.personal_id)
+          .maybeSingle()
+      : { data: null };
+
+    const logoImage = await loadCanvasImage(personalSettings?.logo_url);
     const canvas = document.createElement("canvas");
     canvas.width = 1080;
     canvas.height = 1920;
@@ -168,56 +368,142 @@ export function WorkoutCompletionScreen({
     if (!ctx) return null;
 
     const gradient = ctx.createLinearGradient(0, 0, 1080, 1920);
-    gradient.addColorStop(0, "#07111f");
-    gradient.addColorStop(0.55, "#0b1628");
-    gradient.addColorStop(1, "#05070d");
+    gradient.addColorStop(0, "#06101f");
+    gradient.addColorStop(0.45, "#0b1729");
+    gradient.addColorStop(1, "#030712");
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 1080, 1920);
 
-    ctx.fillStyle = "rgba(59, 130, 246, 0.22)";
+    ctx.fillStyle = "rgba(37, 99, 235, 0.20)";
     ctx.beginPath();
-    ctx.arc(900, 220, 220, 0, Math.PI * 2);
+    ctx.arc(900, 170, 250, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(20, 184, 166, 0.14)";
+    ctx.beginPath();
+    ctx.arc(150, 1620, 260, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = "rgba(255,255,255,0.18)";
-    ctx.lineWidth = 2;
-    ctx.roundRect(92, 240, 896, 1180, 44);
+    ctx.strokeStyle = "rgba(255,255,255,0.11)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(76, 78, 928, 1764, 54);
     ctx.stroke();
 
+    drawCircularLogo(ctx, logoImage, 540, 170, 76);
+
+    const title = "Treino conclu\u00eddo";
+    ctx.font = "800 72px Arial, sans-serif";
+    const titleWidth = ctx.measureText(title).width;
+    const trophySize = 70;
+    const titleGroupWidth = trophySize + 24 + titleWidth;
+    drawTrophyIcon(ctx, 540 - titleGroupWidth / 2, 300, trophySize);
     ctx.fillStyle = "#ffffff";
-    ctx.font = "700 76px Arial, sans-serif";
-    ctx.fillText("Treino concluido", 140, 380);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(title, 540 - titleGroupWidth / 2 + trophySize + 24, 360);
 
     ctx.fillStyle = "rgba(255,255,255,0.68)";
-    ctx.font = "400 34px Arial, sans-serif";
-    ctx.fillText(data.data, 140, 440);
+    ctx.font = "500 34px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(data.data, 540, 420);
 
-    ctx.fillStyle = "#60a5fa";
-    ctx.font = "800 118px Arial, sans-serif";
-    ctx.fillText(tempoExibido, 140, 650);
+    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    ctx.beginPath();
+    ctx.roundRect(160, 545, 760, 270, 44);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(96,165,250,0.30)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
 
-    const metrics = [
-      ["Exercicios", `${data.exerciciosConcluidos}/${data.exerciciosTotal}`],
-      ["Cargas registradas", String(data.cargasRegistradas)],
-      ["Inicio / fim", `${data.horaInicio} - ${data.horaFim}`],
+    ctx.fillStyle = "rgba(255,255,255,0.58)";
+    ctx.font = "700 28px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Tempo total", 540, 615);
+
+    ctx.shadowColor = "rgba(96, 165, 250, 0.55)";
+    ctx.shadowBlur = 22;
+    drawCenteredFitText(
+      ctx,
+      tempoExibido,
+      540,
+      740,
+      700,
+      136,
+      "Arial, sans-serif",
+      "#60a5fa",
+      "900"
+    );
+    ctx.shadowBlur = 0;
+
+    const stats = [
+      {
+        label: "Exerc\u00edcios",
+        value: `${data.exerciciosConcluidos}/${data.exerciciosTotal}`,
+      },
+      {
+        label: "Cargas",
+        value: String(data.cargasRegistradas),
+      },
+      {
+        label: "Hor\u00e1rio",
+        value: `${data.horaInicio} - ${data.horaFim}`,
+      },
     ];
+    const statWidth = 284;
+    const statHeight = 184;
+    const statGap = 28;
+    const statsStartX = (1080 - statWidth * 3 - statGap * 2) / 2;
+    const statsY = 910;
 
-    metrics.forEach(([label, value], index) => {
-      const y = 820 + index * 170;
-      ctx.fillStyle = "rgba(255,255,255,0.12)";
-      ctx.roundRect(140, y, 800, 112, 24);
+    stats.forEach((stat, index) => {
+      const x = statsStartX + index * (statWidth + statGap);
+      ctx.fillStyle = "rgba(255,255,255,0.105)";
+      ctx.beginPath();
+      ctx.roundRect(x, statsY, statWidth, statHeight, 28);
       ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,0.62)";
-      ctx.font = "500 28px Arial, sans-serif";
-      ctx.fillText(label, 180, y + 42);
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "700 42px Arial, sans-serif";
-      ctx.fillText(value, 180, y + 88);
+      ctx.strokeStyle = "rgba(255,255,255,0.16)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = "rgba(255,255,255,0.58)";
+      ctx.font = "700 27px Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(stat.label, x + statWidth / 2, statsY + 58);
+
+      drawCenteredFitText(
+        ctx,
+        stat.value,
+        x + statWidth / 2,
+        statsY + 130,
+        statWidth - 44,
+        index === 2 ? 37 : 54,
+        "Arial, sans-serif",
+        "#ffffff",
+        "850"
+      );
     });
 
-    ctx.fillStyle = "rgba(255,255,255,0.74)";
-    ctx.font = "400 32px Arial, sans-serif";
-    ctx.fillText(data.mensagemMotivacional.slice(0, 92), 140, 1320);
+    ctx.fillStyle = "rgba(255,255,255,0.78)";
+    ctx.font = "italic 36px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    drawWrappedCenteredText(
+      ctx,
+      data.mensagemMotivacional,
+      540,
+      1300,
+      800,
+      50,
+      3
+    );
+
+    drawCircularLogo(ctx, logoImage, 540, 1668, 46);
+
+    ctx.fillStyle = "#60a5fa";
+    ctx.fillStyle = "rgba(255,255,255,0.38)";
+    ctx.font = "600 28px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("FitConsult", 540, 1754);
 
     return new Promise<File | null>((resolve) => {
       canvas.toBlob((blob) => {
@@ -237,37 +523,26 @@ export function WorkoutCompletionScreen({
 
   const handleShare = async () => {
     const storyFile = await createStoryImage();
+    if (!storyFile) {
+      toast.error("Erro ao gerar imagem do story");
+      return;
+    }
 
-    if (storyFile && navigator.share) {
-      const shareData: ShareData = {
-        title: "Treino concluido",
-        text: data.mensagemMotivacional,
-        files: [storyFile],
-      };
+    const openedInstagram = openInstagramStoryComposer();
 
-      try {
-        if (!navigator.canShare || navigator.canShare(shareData)) {
-          await navigator.share(shareData);
-          return;
+    if (openedInstagram) {
+      toast.success("Compositor do Instagram aberto");
+      window.setTimeout(() => {
+        if (!document.hidden) {
+          downloadFile(storyFile);
+          toast.info("Instagram nao abriu. PNG do story baixado.");
         }
-      } catch {
-        return;
-      }
+      }, 1200);
+      return;
     }
 
-    if (storyFile) {
-      const url = URL.createObjectURL(storyFile);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = storyFile.name;
-      link.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      toast.success("Imagem do story gerada. Escolha a imagem no Instagram.");
-    }
-
-    window.setTimeout(() => {
-      window.location.href = "instagram://story-camera";
-    }, 350);
+    downloadFile(storyFile);
+    toast.success("Dispositivo sem suporte. PNG do story baixado.");
   };
 
   const handleVoltar = async () => {

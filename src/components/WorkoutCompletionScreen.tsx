@@ -20,6 +20,7 @@ import {
   Clock,
   Dumbbell,
   MessageSquareText,
+  Download,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import type { WorkoutCompletionData } from "@/hooks/useWorkoutTimer";
@@ -201,25 +202,6 @@ function downloadFile(file: File) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function openInstagramStoryComposer() {
-  const userAgent = navigator.userAgent.toLowerCase();
-  const isAndroid = userAgent.includes("android");
-  const isIOS = /iphone|ipad|ipod/.test(userAgent);
-
-  if (isAndroid) {
-    window.location.href =
-      "intent://story-camera#Intent;scheme=instagram;package=com.instagram.android;end";
-    return true;
-  }
-
-  if (isIOS) {
-    window.location.href = "instagram://story-camera";
-    return true;
-  }
-
-  return false;
-}
-
 export function WorkoutCompletionScreen({
   data,
   treinoId,
@@ -228,6 +210,8 @@ export function WorkoutCompletionScreen({
   const [feedback, setFeedback] = useState("");
   const [rating, setRating] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [fallbackStoryFile, setFallbackStoryFile] = useState<File | null>(null);
 
   useLayoutEffect(() => {
     const body = document.body;
@@ -513,7 +497,7 @@ export function WorkoutCompletionScreen({
         }
 
         resolve(
-          new File([blob], "resumo-treino-story.png", {
+          new File([blob], "treino-fitconsult.png", {
             type: "image/png",
           })
         );
@@ -522,27 +506,38 @@ export function WorkoutCompletionScreen({
   };
 
   const handleShare = async () => {
-    const storyFile = await createStoryImage();
-    if (!storyFile) {
-      toast.error("Erro ao gerar imagem do story");
-      return;
-    }
+    setIsSharing(true);
 
-    const openedInstagram = openInstagramStoryComposer();
+    try {
+      const storyFile = await createStoryImage();
+      if (!storyFile) {
+        toast.error("Erro ao gerar imagem do story");
+        return;
+      }
 
-    if (openedInstagram) {
-      toast.success("Compositor do Instagram aberto");
-      window.setTimeout(() => {
-        if (!document.hidden) {
-          downloadFile(storyFile);
-          toast.info("Instagram nao abriu. PNG do story baixado.");
+      const shareData: ShareData = {
+        title: "Treino FitConsult",
+        text: "Treino concluido no FitConsult",
+        files: [storyFile],
+      };
+
+      if (navigator.share && (!navigator.canShare || navigator.canShare(shareData))) {
+        try {
+          await navigator.share(shareData);
+          setFallbackStoryFile(null);
+          return;
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") {
+            return;
+          }
         }
-      }, 1200);
-      return;
-    }
+      }
 
-    downloadFile(storyFile);
-    toast.success("Dispositivo sem suporte. PNG do story baixado.");
+      setFallbackStoryFile(storyFile);
+      toast.info("Compartilhamento indisponivel. Baixe a imagem para enviar manualmente.");
+    } finally {
+      setIsSharing(false);
+    }
   };
 
   const handleVoltar = async () => {
@@ -582,6 +577,7 @@ export function WorkoutCompletionScreen({
                     <button
                       type="button"
                       onClick={handleShare}
+                      disabled={isSharing}
                       className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                       aria-label="Compartilhar"
                     >
@@ -650,11 +646,30 @@ export function WorkoutCompletionScreen({
                 type="button"
                 variant="outline"
                 onClick={handleShare}
+                disabled={isSharing}
                 className="h-10 w-full shrink-0 gap-2 sm:h-11"
               >
                 <Share2 className="h-4 w-4" />
-                Compartilhar story
+                {isSharing ? "Gerando imagem..." : "Compartilhar story"}
               </Button>
+
+              {fallbackStoryFile && (
+                <div className="rounded-lg border border-dashed bg-muted/30 p-3 text-center">
+                  <p className="mb-2 text-xs leading-relaxed text-muted-foreground">
+                    Salve a imagem e compartilhe manualmente no Instagram.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="h-9 w-full gap-2"
+                    onClick={() => downloadFile(fallbackStoryFile)}
+                  >
+                    <Download className="h-4 w-4" />
+                    Baixar imagem
+                  </Button>
+                </div>
+              )}
 
               <p className="line-clamp-2 px-2 text-center text-xs italic text-muted-foreground sm:text-sm">
                 {data.mensagemMotivacional}

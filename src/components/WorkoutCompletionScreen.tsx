@@ -41,36 +41,37 @@ export function WorkoutCompletionScreen({
   useEffect(() => {
     const body = document.body;
     const root = document.documentElement;
-    const scrollY = window.scrollY;
     const previousBodyStyles = {
       overflow: body.style.overflow,
       overflowX: body.style.overflowX,
-      position: body.style.position,
-      top: body.style.top,
+      overscrollBehavior: body.style.overscrollBehavior,
+      touchAction: body.style.touchAction,
       width: body.style.width,
     };
     const previousRootStyles = {
       overflow: root.style.overflow,
       overflowX: root.style.overflowX,
+      overscrollBehavior: root.style.overscrollBehavior,
     };
 
     body.style.overflow = "hidden";
     body.style.overflowX = "hidden";
-    body.style.position = "fixed";
-    body.style.top = `-${scrollY}px`;
+    body.style.overscrollBehavior = "none";
+    body.style.touchAction = "none";
     body.style.width = "100%";
     root.style.overflow = "hidden";
     root.style.overflowX = "hidden";
+    root.style.overscrollBehavior = "none";
 
     return () => {
       body.style.overflow = previousBodyStyles.overflow;
       body.style.overflowX = previousBodyStyles.overflowX;
-      body.style.position = previousBodyStyles.position;
-      body.style.top = previousBodyStyles.top;
+      body.style.overscrollBehavior = previousBodyStyles.overscrollBehavior;
+      body.style.touchAction = previousBodyStyles.touchAction;
       body.style.width = previousBodyStyles.width;
       root.style.overflow = previousRootStyles.overflow;
       root.style.overflowX = previousRootStyles.overflowX;
-      window.scrollTo(0, scrollY);
+      root.style.overscrollBehavior = previousRootStyles.overscrollBehavior;
     };
   }, []);
 

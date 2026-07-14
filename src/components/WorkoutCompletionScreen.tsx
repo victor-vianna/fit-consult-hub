@@ -56,7 +56,9 @@ function drawCircularLogo(
   x: number,
   y: number,
   radius: number,
-  fallbackText = "FC"
+  fallbackText = "FC",
+  borderColor = "rgba(255,255,255,0.78)",
+  borderWidth = 2
 ) {
   ctx.save();
   ctx.beginPath();
@@ -85,8 +87,8 @@ function drawCircularLogo(
   ctx.restore();
 
   ctx.save();
-  ctx.strokeStyle = "rgba(255,255,255,0.34)";
-  ctx.lineWidth = Math.max(3, radius * 0.05);
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = borderWidth;
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, Math.PI * 2);
   ctx.stroke();
@@ -351,70 +353,56 @@ export function WorkoutCompletionScreen({
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
 
-    const gradient = ctx.createLinearGradient(0, 0, 1080, 1920);
-    gradient.addColorStop(0, "#06101f");
-    gradient.addColorStop(0.45, "#0b1729");
-    gradient.addColorStop(1, "#030712");
+    const gradient = ctx.createLinearGradient(0, 0, 0, 1920);
+    gradient.addColorStop(0, "#0a0f18");
+    gradient.addColorStop(1, "#0e1e35");
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 1080, 1920);
 
-    ctx.fillStyle = "rgba(37, 99, 235, 0.20)";
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.38)";
+    ctx.shadowBlur = 34;
+    ctx.shadowOffsetY = 16;
+    ctx.fillStyle = "rgba(0,0,0,0.34)";
     ctx.beginPath();
-    ctx.arc(900, 170, 250, 0, Math.PI * 2);
+    ctx.arc(540, 210, 82, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "rgba(20, 184, 166, 0.14)";
-    ctx.beginPath();
-    ctx.arc(150, 1620, 260, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.restore();
 
-    ctx.strokeStyle = "rgba(255,255,255,0.11)";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.roundRect(76, 78, 928, 1764, 54);
-    ctx.stroke();
-
-    drawCircularLogo(ctx, logoImage, 540, 170, 76);
+    drawCircularLogo(ctx, logoImage, 540, 210, 80, "FC", "#ffffff", 2);
 
     const title = "Treino conclu\u00eddo";
-    ctx.font = "800 72px Arial, sans-serif";
+    ctx.font = "900 86px Arial, sans-serif";
     const titleWidth = ctx.measureText(title).width;
-    const trophySize = 70;
-    const titleGroupWidth = trophySize + 24 + titleWidth;
-    drawTrophyIcon(ctx, 540 - titleGroupWidth / 2, 300, trophySize);
+    const trophySize = 80;
+    const titleGroupWidth = trophySize + 28 + titleWidth;
+    drawTrophyIcon(ctx, 540 - titleGroupWidth / 2, 360, trophySize);
     ctx.fillStyle = "#ffffff";
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
-    ctx.fillText(title, 540 - titleGroupWidth / 2 + trophySize + 24, 360);
+    ctx.fillText(title, 540 - titleGroupWidth / 2 + trophySize + 28, 427);
 
     ctx.fillStyle = "rgba(255,255,255,0.68)";
-    ctx.font = "500 34px Arial, sans-serif";
+    ctx.font = "500 36px Arial, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(data.data, 540, 420);
-
-    ctx.fillStyle = "rgba(255,255,255,0.12)";
-    ctx.beginPath();
-    ctx.roundRect(160, 545, 760, 270, 44);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(96,165,250,0.30)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    ctx.fillText(data.data, 540, 490);
 
     ctx.fillStyle = "rgba(255,255,255,0.58)";
-    ctx.font = "700 28px Arial, sans-serif";
+    ctx.font = "700 32px Arial, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("Tempo total", 540, 615);
+    ctx.fillText("Tempo total", 540, 665);
 
-    ctx.shadowColor = "rgba(96, 165, 250, 0.55)";
-    ctx.shadowBlur = 22;
+    ctx.shadowColor = "rgba(59, 130, 246, 0.42)";
+    ctx.shadowBlur = 26;
     drawCenteredFitText(
       ctx,
       tempoExibido,
       540,
-      740,
-      700,
-      136,
+      815,
+      820,
+      168,
       "Arial, sans-serif",
-      "#60a5fa",
+      "#3b82f6",
       "900"
     );
     ctx.shadowBlur = 0;
@@ -433,61 +421,60 @@ export function WorkoutCompletionScreen({
         value: `${data.horaInicio} - ${data.horaFim}`,
       },
     ];
-    const statWidth = 284;
-    const statHeight = 184;
-    const statGap = 28;
+    const statWidth = 286;
+    const statHeight = 190;
+    const statGap = 30;
     const statsStartX = (1080 - statWidth * 3 - statGap * 2) / 2;
-    const statsY = 910;
+    const statsY = 1010;
 
     stats.forEach((stat, index) => {
       const x = statsStartX + index * (statWidth + statGap);
-      ctx.fillStyle = "rgba(255,255,255,0.105)";
+      ctx.fillStyle = "rgba(255,255,255,0.07)";
       ctx.beginPath();
-      ctx.roundRect(x, statsY, statWidth, statHeight, 28);
+      ctx.roundRect(x, statsY, statWidth, statHeight, 18);
       ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,0.16)";
+      ctx.strokeStyle = "rgba(255,255,255,0.14)";
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      ctx.fillStyle = "rgba(255,255,255,0.58)";
-      ctx.font = "700 27px Arial, sans-serif";
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.font = "700 28px Arial, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(stat.label, x + statWidth / 2, statsY + 58);
+      ctx.fillText(stat.label, x + statWidth / 2, statsY + 62);
 
       drawCenteredFitText(
         ctx,
         stat.value,
         x + statWidth / 2,
-        statsY + 130,
+        statsY + 134,
         statWidth - 44,
-        index === 2 ? 37 : 54,
+        index === 2 ? 36 : 56,
         "Arial, sans-serif",
         "#ffffff",
         "850"
       );
     });
 
-    ctx.fillStyle = "rgba(255,255,255,0.78)";
-    ctx.font = "italic 36px Arial, sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.76)";
+    ctx.font = "italic 38px Arial, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
     drawWrappedCenteredText(
       ctx,
       data.mensagemMotivacional,
       540,
-      1300,
-      800,
-      50,
+      1365,
+      700,
+      54,
       3
     );
 
-    drawCircularLogo(ctx, logoImage, 540, 1668, 46);
+    drawCircularLogo(ctx, logoImage, 540, 1642, 58, "FC", "rgba(255,255,255,0.72)", 2);
 
-    ctx.fillStyle = "#60a5fa";
-    ctx.fillStyle = "rgba(255,255,255,0.38)";
-    ctx.font = "600 28px Arial, sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.28)";
+    ctx.font = "600 26px Arial, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("FitConsult", 540, 1754);
+    ctx.fillText("FitConsult", 540, 1738);
 
     return new Promise<File | null>((resolve) => {
       canvas.toBlob((blob) => {

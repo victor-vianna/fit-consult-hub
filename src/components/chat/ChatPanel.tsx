@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
   Check,
@@ -55,16 +55,7 @@ interface ChatPanelProps {
 
 type DeleteTarget = { id: string; isMine: boolean } | null;
 type ProfileSummary = { nome: string | null; telefone?: string | null };
-type ScrollSnapshot = {
-  top: number;
-  height: number;
-  atBottom: boolean;
-  savedAt: number;
-};
-
 const QUICK_EMOJIS = ["👍", "💪", "🔥", "👏", "✅"];
-
-const SCROLL_CACHE_PREFIX = "pf:chat-scroll";
 
 export function ChatPanel({
   personalId,
@@ -84,10 +75,9 @@ export function ChatPanel({
   const [profiles, setProfiles] = useState<Record<string, ProfileSummary>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const restoredScrollKeyRef = useRef<string | null>(null);
+  const openedConversationKeyRef = useRef<string | null>(null);
   const lastMessageCountRef = useRef(0);
   const nearBottomRef = useRef(true);
-  const saveScrollTimerRef = useRef<number | null>(null);
   const { toast } = useToast();
 
   const {
@@ -110,55 +100,21 @@ export function ChatPanel({
     profiles[otherUserId]?.nome || (currentUserId === personalId ? "Aluno" : "Personal");
   const initials = getInitials(otherName);
   const accent = themeColor || "hsl(var(--primary))";
-  const scrollCacheKey = useMemo(
-    () => `${SCROLL_CACHE_PREFIX}:${currentUserId}:${personalId}:${alunoId}`,
+  const conversationScrollKey = useMemo(
+    () => `${currentUserId}:${personalId}:${alunoId}`,
     [currentUserId, personalId, alunoId]
   );
-
-  const persistScrollSnapshot = (el: HTMLDivElement, atBottom: boolean) => {
-    if (typeof window === "undefined") return;
-    try {
-      const snapshot: ScrollSnapshot = {
-        top: el.scrollTop,
-        height: el.scrollHeight,
-        atBottom,
-        savedAt: Date.now(),
-      };
-      window.localStorage.setItem(scrollCacheKey, JSON.stringify(snapshot));
-    } catch {
-      // Cache best-effort.
-    }
-  };
-
-  const scheduleScrollSnapshot = (el: HTMLDivElement, atBottom: boolean) => {
-    if (typeof window === "undefined") return;
-    if (saveScrollTimerRef.current) {
-      window.clearTimeout(saveScrollTimerRef.current);
-    }
-    saveScrollTimerRef.current = window.setTimeout(() => {
-      persistScrollSnapshot(el, atBottom);
-      saveScrollTimerRef.current = null;
-    }, 120);
-  };
 
   useEffect(() => {
     marcarComoLidas();
   }, [marcarComoLidas]);
 
   useEffect(() => {
-    restoredScrollKeyRef.current = null;
+    openedConversationKeyRef.current = null;
     lastMessageCountRef.current = 0;
     nearBottomRef.current = true;
     setShowScrollButton(false);
-  }, [scrollCacheKey]);
-
-  useEffect(() => {
-    return () => {
-      if (saveScrollTimerRef.current && typeof window !== "undefined") {
-        window.clearTimeout(saveScrollTimerRef.current);
-      }
-    };
-  }, []);
+  }, [conversationScrollKey]);
 
   useEffect(() => {
     const handler = () => {
@@ -225,7 +181,35 @@ export function ChatPanel({
     });
   }, [visibleMessages, currentUserId]);
 
-  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+  const scrollPageContainerToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
+    if (typeof window === "undefined") return;
+
+    requestAnimationFrame(() => {
+      const el = scrollRef.current;
+      let parent = el?.parentElement;
+
+      while (parent && parent !== document.body) {
+        const style = window.getComputedStyle(parent);
+        const canScrollY =
+          /(auto|scroll)/.test(style.overflowY) &&
+          parent.scrollHeight > parent.clientHeight + 4;
+
+        if (canScrollY) {
+          parent.scrollTo({ top: parent.scrollHeight, behavior });
+          return;
+        }
+
+        parent = parent.parentElement;
+      }
+
+      window.scrollTo({
+        top: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight),
+        behavior,
+      });
+    });
+  }, []);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth", includePage = false) => {
     requestAnimationFrame(() => {
       const el = scrollRef.current;
       if (!el) return;
@@ -235,8 +219,12 @@ export function ChatPanel({
         top: el.scrollHeight,
         behavior,
       });
+
+      if (includePage) {
+        scrollPageContainerToBottom(behavior);
+      }
     });
-  };
+  }, [scrollPageContainerToBottom]);
 
   const scrollToMessage = (messageId: string) => {
     setFavoriteOnly(false);
@@ -252,30 +240,12 @@ export function ChatPanel({
     if (!el || searchTerm.trim()) return;
 
     requestAnimationFrame(() => {
-      const currentEl = scrollRef.current;
-      if (!currentEl) return;
-
-      const hasRestored = restoredScrollKeyRef.current === scrollCacheKey;
-      if (!hasRestored) {
-        const maxTop = Math.max(0, currentEl.scrollHeight - currentEl.clientHeight);
-
-        currentEl.scrollTop = maxTop;
-        const distanceFromBottom =
-          currentEl.scrollHeight - currentEl.scrollTop - currentEl.clientHeight;
-        nearBottomRef.current = distanceFromBottom < 120;
-        setShowScrollButton(distanceFromBottom > 180);
-        restoredScrollKeyRef.current = scrollCacheKey;
+      if (openedConversationKeyRef.current !== conversationScrollKey) {
+        scrollToBottom("auto", true);
+        openedConversationKeyRef.current = conversationScrollKey;
         lastMessageCountRef.current = mensagens.length;
-
-        window.setTimeout(() => {
-          const latestEl = scrollRef.current;
-          if (!latestEl) return;
-
-          latestEl.scrollTop = latestEl.scrollHeight;
-          nearBottomRef.current = true;
-          setShowScrollButton(false);
-          persistScrollSnapshot(latestEl, true);
-        }, 120);
+        window.setTimeout(() => scrollToBottom("auto", true), 80);
+        window.setTimeout(() => scrollToBottom("auto", true), 220);
 
         return;
       }
@@ -283,10 +253,10 @@ export function ChatPanel({
       const hasNewMessage = mensagens.length > lastMessageCountRef.current;
       lastMessageCountRef.current = mensagens.length;
       if (hasNewMessage && nearBottomRef.current) {
-        scrollToBottom("smooth");
+        scrollToBottom("smooth", true);
       }
     });
-  }, [mensagens.length, scrollCacheKey, searchTerm]);
+  }, [conversationScrollKey, mensagens.length, scrollToBottom, searchTerm]);
 
   const handleScroll = () => {
     const el = scrollRef.current;
@@ -295,7 +265,6 @@ export function ChatPanel({
     const atBottom = distanceFromBottom < 120;
     nearBottomRef.current = atBottom;
     setShowScrollButton(distanceFromBottom > 180);
-    scheduleScrollSnapshot(el, atBottom);
     if (distanceFromBottom < 80) marcarComoLidas();
   };
 

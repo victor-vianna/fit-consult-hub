@@ -1,7 +1,15 @@
 // src/components/WorkoutCompletionScreen.tsx
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogDescription,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Trophy,
@@ -13,7 +21,7 @@ import {
   Dumbbell,
   MessageSquareText,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import type { WorkoutCompletionData } from "@/hooks/useWorkoutTimer";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -38,14 +46,18 @@ export function WorkoutCompletionScreen({
   const [rating, setRating] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const body = document.body;
     const root = document.documentElement;
     const previousBodyStyles = {
       overflow: body.style.overflow,
       overflowX: body.style.overflowX,
+      position: body.style.position,
+      top: body.style.top,
+      bottom: body.style.bottom,
+      left: body.style.left,
+      right: body.style.right,
       overscrollBehavior: body.style.overscrollBehavior,
-      touchAction: body.style.touchAction,
       width: body.style.width,
     };
     const previousRootStyles = {
@@ -53,11 +65,16 @@ export function WorkoutCompletionScreen({
       overflowX: root.style.overflowX,
       overscrollBehavior: root.style.overscrollBehavior,
     };
+    const scrollY = window.scrollY;
 
     body.style.overflow = "hidden";
     body.style.overflowX = "hidden";
+    body.style.position = "fixed";
+    body.style.top = "0";
+    body.style.bottom = "0";
+    body.style.left = "0";
+    body.style.right = "0";
     body.style.overscrollBehavior = "none";
-    body.style.touchAction = "none";
     body.style.width = "100%";
     root.style.overflow = "hidden";
     root.style.overflowX = "hidden";
@@ -66,12 +83,17 @@ export function WorkoutCompletionScreen({
     return () => {
       body.style.overflow = previousBodyStyles.overflow;
       body.style.overflowX = previousBodyStyles.overflowX;
+      body.style.position = previousBodyStyles.position;
+      body.style.top = previousBodyStyles.top;
+      body.style.bottom = previousBodyStyles.bottom;
+      body.style.left = previousBodyStyles.left;
+      body.style.right = previousBodyStyles.right;
       body.style.overscrollBehavior = previousBodyStyles.overscrollBehavior;
-      body.style.touchAction = previousBodyStyles.touchAction;
       body.style.width = previousBodyStyles.width;
       root.style.overflow = previousRootStyles.overflow;
       root.style.overflowX = previousRootStyles.overflowX;
       root.style.overscrollBehavior = previousRootStyles.overscrollBehavior;
+      window.scrollTo(0, scrollY);
     };
   }, []);
 
@@ -256,29 +278,42 @@ export function WorkoutCompletionScreen({
   };
 
   return (
-    <AnimatePresence>
+    <Dialog open modal>
+      <DialogPortal>
+        <DialogOverlay className="fixed inset-0 z-[1000] touch-none bg-black/75" />
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex h-[100dvh] w-screen items-center justify-center overflow-hidden overscroll-none bg-background p-2 sm:p-4"
+          className="fixed inset-0 z-[1001] flex h-[100svh] w-screen items-center justify-center overflow-hidden p-3"
       >
-        <button
-          onClick={handleShare}
-          className="absolute right-3 top-3 z-10 rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:right-4 sm:top-4"
-          aria-label="Compartilhar"
-        >
-          <Share2 className="h-5 w-5" />
-        </button>
+          <DialogPrimitive.Content
+            onEscapeKeyDown={(event) => event.preventDefault()}
+            onInteractOutside={(event) => event.preventDefault()}
+            className="max-h-[90svh] w-[90vw] max-w-[420px] overflow-y-auto overscroll-contain rounded-xl outline-none"
+          >
+            <DialogTitle className="sr-only">Treino concluido</DialogTitle>
+            <DialogDescription className="sr-only">
+              Resumo do treino finalizado e envio opcional de feedback para o personal.
+            </DialogDescription>
 
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0, y: 20 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          transition={{ type: "spring", stiffness: 200, damping: 20 }}
-          className="max-h-[calc(100dvh-1rem)] w-full max-w-md overflow-hidden"
-        >
-          <Card className="max-h-[calc(100dvh-1rem)] overflow-hidden border-2 shadow-xl">
-            <CardContent className="flex max-h-[calc(100dvh-1rem)] flex-col gap-3 overflow-hidden p-4 sm:gap-4 sm:p-6">
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 220, damping: 24 }}
+            >
+              <Card className="border-2 shadow-xl">
+                <CardContent className="flex flex-col gap-3 p-4 sm:gap-4 sm:p-6">
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleShare}
+                      className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      aria-label="Compartilhar"
+                    >
+                      <Share2 className="h-5 w-5" />
+                    </button>
+                  </div>
+
               <div className="flex justify-center">
                 <motion.div
                   initial={{ scale: 0, rotate: -30 }}
@@ -401,10 +436,12 @@ export function WorkoutCompletionScreen({
                 <Home className="h-5 w-5" />
                 {isSubmitting ? "Enviando..." : "Finalizar"}
               </Button>
-            </CardContent>
-          </Card>
-        </motion.div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </DialogPrimitive.Content>
       </motion.div>
-    </AnimatePresence>
+      </DialogPortal>
+    </Dialog>
   );
 }

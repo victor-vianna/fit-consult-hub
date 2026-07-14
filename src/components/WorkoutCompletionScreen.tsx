@@ -1,22 +1,17 @@
 // src/components/WorkoutCompletionScreen.tsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import {
   Trophy,
   Share2,
   Home,
   Star,
-  ChevronDown,
   CheckCircle2,
   Clock,
   Dumbbell,
+  MessageSquareText,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { WorkoutCompletionData } from "@/hooks/useWorkoutTimer";
@@ -42,7 +37,42 @@ export function WorkoutCompletionScreen({
   const [feedback, setFeedback] = useState("");
   const [rating, setRating] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
+
+  useEffect(() => {
+    const body = document.body;
+    const root = document.documentElement;
+    const scrollY = window.scrollY;
+    const previousBodyStyles = {
+      overflow: body.style.overflow,
+      overflowX: body.style.overflowX,
+      position: body.style.position,
+      top: body.style.top,
+      width: body.style.width,
+    };
+    const previousRootStyles = {
+      overflow: root.style.overflow,
+      overflowX: root.style.overflowX,
+    };
+
+    body.style.overflow = "hidden";
+    body.style.overflowX = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.width = "100%";
+    root.style.overflow = "hidden";
+    root.style.overflowX = "hidden";
+
+    return () => {
+      body.style.overflow = previousBodyStyles.overflow;
+      body.style.overflowX = previousBodyStyles.overflowX;
+      body.style.position = previousBodyStyles.position;
+      body.style.top = previousBodyStyles.top;
+      body.style.width = previousBodyStyles.width;
+      root.style.overflow = previousRootStyles.overflow;
+      root.style.overflowX = previousRootStyles.overflowX;
+      window.scrollTo(0, scrollY);
+    };
+  }, []);
 
   const tempoExibido = (() => {
     const parts = data.tempoFormatado.split(":");
@@ -230,11 +260,11 @@ export function WorkoutCompletionScreen({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-background p-4"
+        className="fixed inset-0 z-50 flex h-[100dvh] w-screen items-center justify-center overflow-hidden overscroll-none bg-background p-2 sm:p-4"
       >
         <button
           onClick={handleShare}
-          className="absolute right-4 top-4 rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="absolute right-3 top-3 z-10 rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:right-4 sm:top-4"
           aria-label="Compartilhar"
         >
           <Share2 className="h-5 w-5" />
@@ -244,39 +274,39 @@ export function WorkoutCompletionScreen({
           initial={{ scale: 0.9, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 200, damping: 20 }}
-          className="w-full max-w-md"
+          className="max-h-[calc(100dvh-1rem)] w-full max-w-md overflow-hidden"
         >
-          <Card className="border-2 shadow-xl">
-            <CardContent className="space-y-6 p-8">
+          <Card className="max-h-[calc(100dvh-1rem)] overflow-hidden border-2 shadow-xl">
+            <CardContent className="flex max-h-[calc(100dvh-1rem)] flex-col gap-3 overflow-hidden p-4 sm:gap-4 sm:p-6">
               <div className="flex justify-center">
                 <motion.div
                   initial={{ scale: 0, rotate: -30 }}
                   animate={{ scale: 1, rotate: 0 }}
                   transition={{ delay: 0.2, type: "spring", bounce: 0.6 }}
-                  className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10"
+                  className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 sm:h-16 sm:w-16"
                 >
-                  <Trophy className="h-10 w-10 text-primary" />
+                  <Trophy className="h-7 w-7 text-primary sm:h-8 sm:w-8" />
                 </motion.div>
               </div>
 
-              <div className="space-y-1 text-center">
-                <h1 className="text-2xl font-bold tracking-tight">
+              <div className="text-center">
+                <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
                   Treino concluido
                 </h1>
                 <p className="text-sm text-muted-foreground">{data.data}</p>
               </div>
 
-              <div className="space-y-1.5 py-2 text-center">
+              <div className="space-y-1 text-center">
                 <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Tempo total
                 </p>
-                <p className="font-mono text-5xl font-bold tracking-tight text-foreground">
+                <p className="font-mono text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
                   {tempoExibido}
                 </p>
               </div>
 
               <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-lg border bg-muted/30 px-2 py-3">
+                <div className="rounded-lg border bg-muted/30 px-2 py-2 sm:py-3">
                   <p className="mb-1 flex items-center justify-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                     <Clock className="h-3 w-3" />
                     Tempo
@@ -285,7 +315,7 @@ export function WorkoutCompletionScreen({
                     {data.horaInicio} - {data.horaFim}
                   </p>
                 </div>
-                <div className="rounded-lg border bg-muted/30 px-2 py-3">
+                <div className="rounded-lg border bg-muted/30 px-2 py-2 sm:py-3">
                   <p className="mb-1 flex items-center justify-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                     <CheckCircle2 className="h-3 w-3" />
                     Feitos
@@ -294,7 +324,7 @@ export function WorkoutCompletionScreen({
                     {data.exerciciosConcluidos}/{data.exerciciosTotal}
                   </p>
                 </div>
-                <div className="rounded-lg border bg-muted/30 px-2 py-3">
+                <div className="rounded-lg border bg-muted/30 px-2 py-2 sm:py-3">
                   <p className="mb-1 flex items-center justify-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                     <Dumbbell className="h-3 w-3" />
                     Cargas
@@ -309,59 +339,62 @@ export function WorkoutCompletionScreen({
                 type="button"
                 variant="outline"
                 onClick={handleShare}
-                className="h-11 w-full gap-2"
+                className="h-10 w-full shrink-0 gap-2 sm:h-11"
               >
                 <Share2 className="h-4 w-4" />
                 Compartilhar story
               </Button>
 
-              <p className="px-2 text-center text-sm italic text-muted-foreground">
+              <p className="line-clamp-2 px-2 text-center text-xs italic text-muted-foreground sm:text-sm">
                 {data.mensagemMotivacional}
               </p>
 
-              <Collapsible open={feedbackOpen} onOpenChange={setFeedbackOpen}>
-                <CollapsibleTrigger asChild>
-                  <button className="flex w-full items-center justify-center gap-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground">
-                    Deixar feedback para o personal
-                    <ChevronDown
-                      className={`h-3 w-3 transition-transform ${
-                        feedbackOpen ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-3 pt-3">
-                  <div className="flex justify-center gap-1.5">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        onClick={() => setRating(star)}
-                        className="p-0.5 transition-transform hover:scale-110"
-                        aria-label={`${star} estrelas`}
-                      >
-                        <Star
-                          className={`h-6 w-6 ${
-                            rating && star <= rating
-                              ? "fill-yellow-400 text-yellow-400"
-                              : "text-muted-foreground/40"
-                          }`}
-                        />
-                      </button>
-                    ))}
+              <section className="rounded-xl border border-primary/35 bg-primary/5 p-3 shadow-sm ring-1 ring-primary/10">
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                    <MessageSquareText className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold leading-tight text-foreground">
+                      Feedback para o personal
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Avalie o treino em poucos segundos.
+                    </p>
                   </div>
-                  <Textarea
-                    placeholder="Como foi o treino? (opcional)"
-                    value={feedback}
-                    onChange={(event) => setFeedback(event.target.value)}
-                    className="resize-none text-sm"
-                    rows={3}
-                  />
-                </CollapsibleContent>
-              </Collapsible>
+                </div>
+
+                <div className="mb-2 flex justify-center gap-1.5">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setRating(star)}
+                      className="rounded-full p-0.5 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      aria-label={`${star} estrelas`}
+                    >
+                      <Star
+                        className={`h-6 w-6 sm:h-7 sm:w-7 ${
+                          rating && star <= rating
+                            ? "fill-yellow-400 text-yellow-400"
+                            : "text-muted-foreground/40"
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+                <Textarea
+                  placeholder="Como foi o treino? (opcional)"
+                  value={feedback}
+                  onChange={(event) => setFeedback(event.target.value)}
+                  className="min-h-[56px] resize-none text-sm sm:min-h-[68px]"
+                  rows={2}
+                />
+              </section>
 
               <Button
                 onClick={handleVoltar}
-                className="h-12 w-full gap-2 text-base"
+                className="h-11 w-full shrink-0 gap-2 text-base sm:h-12"
                 disabled={isSubmitting}
               >
                 <Home className="h-5 w-5" />

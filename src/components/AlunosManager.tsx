@@ -215,15 +215,50 @@ export default function AlunosManager() {
     isLoading: accessStatesLoading,
     isFetching: accessStatesFetching,
   } = useQuery<StudentAccessState[]>({
-    queryKey: ["students-access-states", user?.id],
+    queryKey: ["students-access-states", user?.id, alunos.map((aluno) => aluno.id).join("|")],
     queryFn: async () => {
       if (!user) return [];
+
+      const statesByStudent = new Map<string, StudentAccessState>();
       const { data, error } = await (supabase as any).rpc(
         "get_students_access_states",
         { _personal_id: user.id }
       );
-      if (error) throw error;
-      return (data || []) as StudentAccessState[];
+
+      if (error) {
+        console.error("Erro ao buscar acessos em lote:", error);
+      } else {
+        ((data || []) as StudentAccessState[]).forEach((state) => {
+          statesByStudent.set(state.student_id, state);
+        });
+      }
+
+      const missingStudents = alunos.filter((aluno) => !statesByStudent.has(aluno.id));
+      if (missingStudents.length > 0) {
+        const individualStates = await Promise.all(
+          missingStudents.map(async (aluno) => {
+            const { data: state, error: stateError } = await (supabase as any).rpc(
+              "get_student_access_state",
+              { _student_id: aluno.id }
+            );
+
+            if (stateError) {
+              console.error(`Erro ao buscar acesso de ${aluno.nome}:`, stateError);
+              return null;
+            }
+
+            return state as StudentAccessState | null;
+          })
+        );
+
+        individualStates.forEach((state) => {
+          if (state?.student_id) {
+            statesByStudent.set(state.student_id, state);
+          }
+        });
+      }
+
+      return Array.from(statesByStudent.values());
     },
     enabled: !!user && alunos.length > 0,
     staleTime: 0,

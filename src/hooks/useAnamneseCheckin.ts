@@ -5,16 +5,7 @@ import {
   CHECKIN_AVAILABLE_AFTER_DAYS,
   getDaysSinceAnamnese,
 } from "@/utils/anamneseDate";
-
-function getWeekNumber(date: Date): number {
-  const d = new Date(
-    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
-  );
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-}
+import { getCheckinWeekInfo } from "@/utils/checkinWeek";
 
 interface AnamneseCheckinStatus {
   anamnesePreenchida: boolean;
@@ -97,22 +88,36 @@ export function useAnamneseCheckin(
         return;
       }
 
-      // Verificar se já passou 7 dias desde a anamnese
+      const { count: totalCheckins, error: totalCheckinsError } = await supabase
+        .from("checkins_semanais")
+        .select("id", { count: "exact", head: true })
+        .eq("profile_id", profileId)
+        .eq("personal_id", personalId);
+
+      if (totalCheckinsError) {
+        console.error("Erro ao verificar histórico de check-ins:", totalCheckinsError);
+        throw totalCheckinsError;
+      }
+
+      const hasPreviousCheckins = (totalCheckins ?? 0) > 0;
+
+      // A tolerância inicial só vale para alunos sem nenhum feedback anterior.
+      // Renovar a anamnese não deve liberar uma semana de treinos sem check-in.
       const primeiraSemana =
+        !hasPreviousCheckins &&
         diasDesdeAnamnese !== null &&
         diasDesdeAnamnese < CHECKIN_AVAILABLE_AFTER_DAYS;
 
       // Verificar check-in semanal
-      const ano = new Date().getFullYear();
-      const semana = getWeekNumber(new Date());
+      const currentCheckinWeek = getCheckinWeekInfo();
 
       const { data: checkin, error: checkinError } = await supabase
         .from("checkins_semanais")
         .select("id")
         .eq("profile_id", profileId)
         .eq("personal_id", personalId)
-        .eq("ano", ano)
-        .eq("numero_semana", semana)
+        .eq("ano", currentCheckinWeek.year)
+        .eq("numero_semana", currentCheckinWeek.weekNumber)
         .maybeSingle();
 
       if (checkinError) {

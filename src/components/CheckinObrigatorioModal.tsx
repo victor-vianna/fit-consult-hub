@@ -33,13 +33,17 @@ export function CheckinObrigatorioModal({
   const [personalName, setPersonalName] = useState<string>("");
   const [lastCheckinDate, setLastCheckinDate] = useState<string | null>(null);
   const [firstAccessDate, setFirstAccessDate] = useState<Date | null>(null);
+  const [hasPreviousCheckins, setHasPreviousCheckins] = useState(false);
   const [internalOpen, setInternalOpen] = useState(open);
 
   const today = new Date();
 
   const alreadyOneWeek =
-    firstAccessDate &&
-    (today.getTime() - firstAccessDate.getTime()) / 1000 / 60 / 60 / 24 >= 7;
+    hasPreviousCheckins ||
+    Boolean(
+      firstAccessDate &&
+        (today.getTime() - firstAccessDate.getTime()) / 1000 / 60 / 60 / 24 >= 7
+    );
 
   useEffect(() => {
     setInternalOpen(open);
@@ -50,6 +54,7 @@ export function CheckinObrigatorioModal({
       fetchPersonalName();
       fetchLastCheckin();
       fetchFirstAccessDate();
+      fetchCheckinHistory();
     }
   }, [personalId, profileId]);
 
@@ -112,6 +117,23 @@ export function CheckinObrigatorioModal({
     }
   };
 
+  const fetchCheckinHistory = async () => {
+    try {
+      const { count, error } = await supabase
+        .from("checkins_semanais")
+        .select("id", { count: "exact", head: true })
+        .eq("profile_id", profileId)
+        .eq("personal_id", personalId);
+
+      if (error) throw error;
+
+      setHasPreviousCheckins((count ?? 0) > 0);
+    } catch (error) {
+      console.error("Erro ao verificar histórico de check-ins:", error);
+      setHasPreviousCheckins(false);
+    }
+  };
+
   const handleComplete = () => {
     setInternalOpen(false);
     onComplete();
@@ -128,19 +150,33 @@ export function CheckinObrigatorioModal({
     <Dialog
       open={internalOpen}
       onOpenChange={(isOpen) => {
-        if (!isOpen) {
-          setInternalOpen(false);
-          // Se está na primeira semana, chama onClose (dismiss)
-          // Se não, chama onComplete (foi preenchido ou fechou forçado)
-          if (!alreadyOneWeek && onClose) {
-            onClose();
-          } else {
-            onComplete();
-          }
+        if (isOpen) {
+          setInternalOpen(true);
+          return;
+        }
+
+        // Se já passou da primeira semana, o check-in é obrigatório e não pode
+        // ser dispensado fechando o modal.
+        if (alreadyOneWeek) {
+          setInternalOpen(true);
+          return;
+        }
+
+        setInternalOpen(false);
+        if (onClose) {
+          onClose();
         }
       }}
     >
-      <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-5xl max-h-[95vh] overflow-y-auto"
+        onEscapeKeyDown={(event) => {
+          if (alreadyOneWeek) event.preventDefault();
+        }}
+        onInteractOutside={(event) => {
+          if (alreadyOneWeek) event.preventDefault();
+        }}
+      >
         <DialogHeader>
           <div className="flex items-center gap-4 mb-2">
             <div

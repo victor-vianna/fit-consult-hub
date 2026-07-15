@@ -9,12 +9,12 @@ import { Slider } from "@/components/ui/slider";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, TrendingUp, AlertCircle, Calendar } from "lucide-react";
-import { format } from "date-fns";
 import {
   CHECKIN_AVAILABLE_AFTER_DAYS,
   getDaysSinceAnamnese,
 } from "@/utils/anamneseDate";
 import { formatDisplayDateRange } from "@/utils/dateFormat";
+import { getCheckinWeekInfo } from "@/utils/checkinWeek";
 
 interface Props {
   profileId: string;
@@ -42,30 +42,6 @@ interface CheckinExistente {
   mudanca_rotina?: string;
   semana_planejamento?: string;
   duvidas?: string;
-}
-
-function getWeekNumber(date: Date): number {
-  const d = new Date(
-    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
-  );
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-}
-
-function getStartOfWeek(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day;
-  return new Date(d.setDate(diff));
-}
-
-function getEndOfWeek(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() + (6 - day);
-  return new Date(d.setDate(diff));
 }
 
 export function CheckinSemanalForm({
@@ -102,11 +78,11 @@ export function CheckinSemanalForm({
     duvidas: "",
   });
 
-  const today = new Date();
-  const semanaAtual = getWeekNumber(today);
-  const anoAtual = today.getFullYear();
-  const inicioSemana = getStartOfWeek(today);
-  const fimSemana = getEndOfWeek(today);
+  const checkinWeek = getCheckinWeekInfo();
+  const semanaAtual = checkinWeek.weekNumber;
+  const anoAtual = checkinWeek.year;
+  const inicioSemana = checkinWeek.start;
+  const fimSemana = checkinWeek.end;
 
   useEffect(() => {
     verificarSePrimeiraVez();
@@ -128,10 +104,18 @@ export function CheckinSemanalForm({
       }
 
       const diasDesdeAnamnese = getDaysSinceAnamnese(anamnese);
+      const { count: totalCheckins, error: checkinsError } = await supabase
+        .from("checkins_semanais")
+        .select("id", { count: "exact", head: true })
+        .eq("profile_id", profileId)
+        .eq("personal_id", personalId);
+
+      if (checkinsError) throw checkinsError;
 
       setPodeMostrarCheckin(
-        diasDesdeAnamnese !== null &&
-          diasDesdeAnamnese >= CHECKIN_AVAILABLE_AFTER_DAYS
+        (totalCheckins ?? 0) > 0 ||
+          (diasDesdeAnamnese !== null &&
+            diasDesdeAnamnese >= CHECKIN_AVAILABLE_AFTER_DAYS)
       );
       setVerificandoPrimeiraVez(false);
     } catch (error) {
@@ -212,8 +196,8 @@ export function CheckinSemanalForm({
       personal_id: personalId,
       ano: anoAtual,
       numero_semana: semanaAtual,
-      data_inicio: format(inicioSemana, "yyyy-MM-dd"),
-      data_fim: format(fimSemana, "yyyy-MM-dd"),
+      data_inicio: checkinWeek.startIso,
+      data_fim: checkinWeek.endIso,
       peso_atual: formData.peso_atual ? Number(formData.peso_atual) : null,
       nota_empenho: notaEmpenho[0],
       justificativa_empenho: formData.justificativa_empenho,

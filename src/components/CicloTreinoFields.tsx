@@ -124,7 +124,7 @@ export function CicloTreinoFields({
           {cicloLabel && (
             <Badge
               variant="outline"
-              className="w-fit border-blue-400/70 bg-blue-500/25 text-xs font-semibold text-blue-100"
+              className="w-fit max-w-full whitespace-normal border-blue-300 bg-blue-50 text-left text-xs font-semibold text-blue-900 shadow-sm dark:border-blue-400/50 dark:bg-blue-500/15 dark:text-blue-100"
             >
               Atual: {cicloLabel}
             </Badge>

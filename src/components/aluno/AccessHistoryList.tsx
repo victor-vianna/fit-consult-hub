@@ -1,9 +1,4 @@
-import { ArrowRight, Clock } from "lucide-react";
-import {
-  AccessLogWithAuthor,
-  getAccessReasonLabel,
-} from "@/hooks/useStudentAccess";
-import { Badge } from "@/components/ui/badge";
+import { AccessLogWithAuthor } from "@/hooks/useStudentAccess";
 import { formatDisplayDateTime } from "@/utils/dateFormat";
 
 interface Props {
@@ -11,17 +6,39 @@ interface Props {
   limit?: number;
 }
 
-function getEffectLabel(effect: AccessLogWithAuthor["effect"]) {
-  if (effect === "allow") return "Liberou";
-  if (effect === "block") return "Bloqueou";
-  return "Registrou";
+function getReadableDescription(log: AccessLogWithAuthor) {
+  if (log.source === "payment" && log.effect === "allow") {
+    return "Pagamento aprovado e vigente";
+  }
+
+  if (
+    log.source === "payment" ||
+    log.event_type === "payment_block" ||
+    log.reason_code === "payment_required" ||
+    log.reason_code === "payment_expired" ||
+    log.reason_code === "payment_pending"
+  ) {
+    return "Acesso bloqueado por pagamento pendente";
+  }
+
+  if (log.event_type === "manual_release" || log.effect === "allow") {
+    return "Acesso liberado manualmente";
+  }
+
+  if (log.event_type === "manual_pause") {
+    return "Acesso pausado manualmente";
+  }
+
+  if (log.event_type === "manual_suspend" || log.effect === "block") {
+    return "Acesso suspenso manualmente";
+  }
+
+  return "Atualizacao de acesso registrada";
 }
 
-function getSourceLabel(source: string) {
-  if (source === "manual") return "Manual";
-  if (source === "payment") return "Pagamento";
-  if (source === "settings") return "Regra";
-  if (source === "legacy") return "Legado";
+function getActorLabel(log: AccessLogWithAuthor) {
+  if (log.actor_name) return `Por ${log.actor_name}`;
+  if (log.source === "payment") return "Automatico";
   return "Sistema";
 }
 
@@ -30,62 +47,27 @@ export function AccessHistoryList({ logs, limit }: Props) {
 
   if (items.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground text-center py-6">
+      <p className="py-6 text-center text-sm text-muted-foreground">
         Nenhuma alteracao de acesso registrada ainda.
       </p>
     );
   }
 
   return (
-    <ul className="space-y-3">
+    <ul className="divide-y divide-border">
       {items.map((log) => {
-        const motivoLabel = getAccessReasonLabel(log.reason_code);
+        const isBlock = log.effect === "block";
         return (
-          <li key={log.id} className="flex gap-3 p-3 rounded-md border bg-card text-sm">
-            <div className="flex flex-col items-center pt-1">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge
-                  variant={log.effect === "block" ? "destructive" : "secondary"}
-                  className="text-[10px]"
-                >
-                  {getEffectLabel(log.effect)}
-                </Badge>
-                <Badge variant="outline" className="text-[10px]">
-                  {getSourceLabel(log.source)}
-                </Badge>
-                {motivoLabel && (
-                  <Badge variant="secondary" className="text-[10px]">
-                    {motivoLabel}
-                  </Badge>
-                )}
-                {log.effect !== "neutral" && (
-                  <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
-                    {log.effect === "allow" ? "Bloqueado" : "Ativo"}
-                    <ArrowRight className="h-3 w-3" />
-                    {log.effect === "allow" ? "Ativo" : "Bloqueado"}
-                  </span>
-                )}
-              </div>
-
-              {log.message_aluno && (
-                <p className="mt-1 text-foreground">
-                  <span className="text-muted-foreground">Mensagem ao aluno: </span>
-                  {log.message_aluno}
-                </p>
-              )}
-
-              {log.observation && (
-                <p className="mt-1 text-muted-foreground italic">
-                  Nota interna: {log.observation}
-                </p>
-              )}
-
-              <p className="mt-1 text-xs text-muted-foreground">
-                {log.actor_name ? `Por ${log.actor_name} - ` : ""}
-                {formatDisplayDateTime(log.created_at)}
+          <li key={log.id} className="flex gap-3 py-4 text-sm">
+            <span
+              className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${
+                isBlock ? "bg-red-500" : "bg-green-500"
+              }`}
+            />
+            <div className="min-w-0">
+              <p className="font-medium text-foreground">{getReadableDescription(log)}</p>
+              <p className="mt-1 text-muted-foreground">
+                {getActorLabel(log)} - {formatDisplayDateTime(log.created_at)}
               </p>
             </div>
           </li>

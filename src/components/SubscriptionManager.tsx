@@ -64,6 +64,7 @@ interface SubscriptionManagerProps {
   studentName: string;
   embedded?: boolean;
   createButtonLabel?: string;
+  showCreateButton?: boolean;
   openCreateSignal?: number;
   onChanged?: () => void;
 }
@@ -81,6 +82,7 @@ export function SubscriptionManager({
   studentName,
   embedded = false,
   createButtonLabel = "Nova Assinatura",
+  showCreateButton = true,
   openCreateSignal = 0,
   onChanged,
 }: SubscriptionManagerProps) {
@@ -264,7 +266,7 @@ export function SubscriptionManager({
     if (sub.status_pagamento === "pago" && expirada) {
       if (hasLaterPaidSubscription(sub)) {
         return (
-          <Badge className="bg-blue-500">
+          <Badge className="bg-blue-500 text-white hover:bg-blue-500">
             <CheckCircle className="h-3 w-3 mr-1" />
             Renovado
           </Badge>
@@ -272,32 +274,32 @@ export function SubscriptionManager({
       }
 
       return (
-        <Badge className="bg-orange-500">
+        <Badge className="bg-red-500 text-white hover:bg-red-500">
           <AlertCircle className="h-3 w-3 mr-1" />
-          Não renovado
+          Vencido
         </Badge>
       );
     }
     switch (sub.status_pagamento) {
       case "pago":
         return (
-          <Badge className="bg-green-500">
+          <Badge className="bg-green-500 text-white hover:bg-green-500">
             <CheckCircle className="h-3 w-3 mr-1" />
             Pago
           </Badge>
         );
       case "pendente":
         return (
-          <Badge className="bg-yellow-500">
+          <Badge className="bg-amber-500 text-white hover:bg-amber-500">
             <AlertCircle className="h-3 w-3 mr-1" />
             Pendente
           </Badge>
         );
       case "atrasado":
         return (
-          <Badge className="bg-red-500">
+          <Badge className="bg-red-500 text-white hover:bg-red-500">
             <XCircle className="h-3 w-3 mr-1" />
-            Atrasado
+            Vencido
           </Badge>
         );
       default:
@@ -347,12 +349,14 @@ export function SubscriptionManager({
 
       {/* Botão Nova Assinatura */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogTrigger asChild>
-          <Button className="w-full">
-            <Plus className="h-4 w-4 mr-2" />
-            {createButtonLabel}
-          </Button>
-        </DialogTrigger>
+        {showCreateButton && (
+          <DialogTrigger asChild>
+            <Button className="w-full">
+              <Plus className="h-4 w-4 mr-2" />
+              {createButtonLabel}
+            </Button>
+          </DialogTrigger>
+        )}
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Criar Nova Assinatura</DialogTitle>
@@ -421,31 +425,53 @@ export function SubscriptionManager({
       </Dialog>
 
       {/* Lista de Assinaturas */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{embedded ? "Assinaturas e pagamentos" : "Histórico de Assinaturas"}</CardTitle>
-          <CardDescription>
-            Todas as assinaturas de {studentName}
-          </CardDescription>
+      <Card className={embedded ? "border-0 bg-transparent shadow-none" : undefined}>
+        <CardHeader className={embedded ? "px-0 pb-3" : undefined}>
+          <CardTitle>{embedded ? "Pagamentos registrados" : "Historico de Assinaturas"}</CardTitle>
+          {!embedded && (
+            <CardDescription>
+              Todas as assinaturas de {studentName}
+            </CardDescription>
+          )}
         </CardHeader>
-        <CardContent>
+        <CardContent className={embedded ? "px-0" : undefined}>
           <div className="space-y-3">
             {subscriptions.map((sub) => (
-              <Card key={sub.id}>
-                <CardContent className="pt-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
+              <Card
+                key={sub.id}
+                className={cn(
+                  "transition-colors",
+                  sub.status_pagamento === "pago" && new Date(sub.data_expiracao) > new Date()
+                    ? "border-green-500/45 bg-green-500/5"
+                    : "bg-card"
+                )}
+              >
+                <CardContent className="p-4">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
                         <span className="font-semibold capitalize">
                           {sub.plano}
                         </span>
                         {getStatusBadge(sub)}
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        R$ {sub.valor.toFixed(2)}
+                        {sub.data_pagamento
+                          ? `Pago em ${formatDisplayDateOnly(sub.data_pagamento)}`
+                          : "Pagamento ainda nao registrado"}{" "}
+                        - {new Date(sub.data_expiracao) < new Date() ? "Venceu" : "Vence"} em{" "}
+                        {formatDisplayDateOnly(sub.data_expiracao)}
+                        {sub.observacoes ? ` - ${sub.observacoes}` : ""}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between gap-3 sm:justify-end">
+                      <div className="min-w-[86px] text-right text-lg font-bold leading-tight">
+                        R$<br />
+                        {sub.valor.toLocaleString("pt-BR", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </div>
                       {sub.status_pagamento !== "pago" && (
                         <Dialog
                           open={
@@ -559,7 +585,7 @@ export function SubscriptionManager({
                       {/* Botão Editar */}
                       <Button 
                         size="icon" 
-                        variant="ghost"
+                        variant="outline"
                         onClick={() => handleOpenEdit(sub)}
                       >
                         <Edit className="h-4 w-4" />
@@ -568,8 +594,8 @@ export function SubscriptionManager({
                       {/* Botão Excluir */}
                       <Button 
                         size="icon" 
-                        variant="ghost"
-                        className="text-destructive hover:text-destructive"
+                        variant="outline"
+                        className="border-red-500/30 text-destructive hover:bg-red-500/10 hover:text-destructive"
                         onClick={() => {
                           setSubscriptionToDelete(sub.id);
                           setDeleteDialogOpen(true);
@@ -580,25 +606,6 @@ export function SubscriptionManager({
                     </div>
                   </div>
 
-                  <div className="space-y-1 text-sm">
-                    {sub.data_pagamento && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <CalendarIcon className="h-3 w-3" />
-                        Pago em:{" "}
-                        {formatDisplayDateOnly(sub.data_pagamento)}
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <CalendarIcon className="h-3 w-3" />
-                      Expira em:{" "}
-                      {formatDisplayDateOnly(sub.data_expiracao)}
-                    </div>
-                    {sub.observacoes && (
-                      <p className="text-muted-foreground italic">
-                        {sub.observacoes}
-                      </p>
-                    )}
-                  </div>
                 </CardContent>
               </Card>
             ))}

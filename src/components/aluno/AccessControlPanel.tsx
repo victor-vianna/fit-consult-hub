@@ -1,34 +1,20 @@
 import { useMemo, useState } from "react";
-import { formatDistanceToNow, parseISO } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
+  CalendarDays,
   CheckCircle2,
-  Pause,
-  ShieldAlert,
-  ChevronDown,
-  History,
   CreditCard,
-  Lock,
-  Unlock,
-  Settings,
+  ShieldAlert,
+  WalletCards,
+  XCircle,
 } from "lucide-react";
-import {
-  AccessStatus,
-  getAccessReasonLabel,
-  useStudentAccess,
-} from "@/hooks/useStudentAccess";
+import { AccessStatus, useStudentAccess } from "@/hooks/useStudentAccess";
+import { useSubscriptions, Subscription } from "@/hooks/useSubscriptions";
 import { ManageAccessDialog } from "./ManageAccessDialog";
 import { AccessHistoryList } from "./AccessHistoryList";
 import { SubscriptionManager } from "@/components/SubscriptionManager";
-import { formatDisplayDateTime } from "@/utils/dateFormat";
+import { formatDisplayDateOnly } from "@/utils/dateFormat";
 
 interface Props {
   studentId: string;
@@ -36,298 +22,210 @@ interface Props {
   studentName: string;
 }
 
-const STATUS_META: Record<
+const ACCESS_META: Record<
   AccessStatus,
-  { label: string; icon: typeof CheckCircle2; classes: string; desc: string }
+  { label: string; classes: string; icon: typeof CheckCircle2 }
 > = {
   ativo: {
     label: "Liberado",
     icon: CheckCircle2,
-    classes: "text-green-700 dark:text-green-400 bg-green-500/10 border-green-500/30",
-    desc: "O aluno pode acessar a plataforma.",
+    classes: "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-300",
   },
   pausado: {
-    label: "Bloqueado",
-    icon: Pause,
-    classes: "text-amber-700 dark:text-amber-400 bg-amber-500/10 border-amber-500/30",
-    desc: "Acesso pausado manualmente.",
+    label: "Suspenso",
+    icon: ShieldAlert,
+    classes: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
   },
   suspenso: {
-    label: "Bloqueado",
+    label: "Suspenso",
     icon: ShieldAlert,
-    classes: "text-destructive bg-destructive/10 border-destructive/30",
-    desc: "Acesso suspenso manualmente.",
+    classes: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300",
   },
   pagamento_pendente: {
     label: "Bloqueado",
-    icon: ShieldAlert,
-    classes: "text-destructive bg-destructive/10 border-destructive/30",
-    desc: "Acesso bloqueado por pagamento pendente.",
+    icon: XCircle,
+    classes: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300",
   },
 };
 
-function getSourceLabel(source?: string | null) {
-  if (source === "manual") return "acao manual";
-  if (source === "payment") return "pagamento";
-  if (source === "settings") return "regra de acesso";
-  return "sistema";
+const PLAN_LABELS: Record<Subscription["plano"], string> = {
+  mensal: "Mensal",
+  trimestral: "Trimestral",
+  semestral: "Semestral",
+  anual: "Anual",
+};
+
+function formatCurrency(value?: number | null) {
+  if (typeof value !== "number" || Number.isNaN(value)) return "R$ 0,00";
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
 }
 
-function getFactorBadgeClasses(active: boolean, winning: boolean) {
-  if (winning) return "border-primary/60 bg-primary/10 text-primary";
-  if (active) return "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-400";
-  return "border-border bg-muted/40 text-muted-foreground";
+function getReferenceTime(sub: Subscription) {
+  const value = sub.data_pagamento || sub.created_at || sub.data_expiracao;
+  const time = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
+function getLatestSubscription(subscriptions: Subscription[]) {
+  return [...subscriptions].sort((a, b) => getReferenceTime(b) - getReferenceTime(a))[0];
+}
+
+function getFinanceSummary(subscriptions: Subscription[]) {
+  const now = new Date();
+  const active = [...subscriptions]
+    .filter((sub) => sub.status_pagamento === "pago" && new Date(sub.data_expiracao) > now)
+    .sort((a, b) => new Date(b.data_expiracao).getTime() - new Date(a.data_expiracao).getTime())[0];
+
+  const latest = active ?? getLatestSubscription(subscriptions);
+
+  if (!latest) {
+    return {
+      status: "Pagamento pendente",
+      tone: "pending" as const,
+      dueText: "Sem vencimento cadastrado",
+      planText: "Nenhum plano ativo",
+      valueText: "Valor nao informado",
+    };
+  }
+
+  const expired = new Date(latest.data_expiracao) < now;
+  const isPending = latest.status_pagamento === "pendente" || latest.status_pagamento === "atrasado";
+  const status = active ? "Em dia" : expired ? "Vencido" : isPending ? "Pagamento pendente" : "Pagamento pendente";
+
+  return {
+    status,
+    tone: active ? ("ok" as const) : expired ? ("danger" as const) : ("pending" as const),
+    dueText: `${expired ? "Venceu em" : "Vence em"} ${formatDisplayDateOnly(latest.data_expiracao)}`,
+    planText: `Plano ${PLAN_LABELS[latest.plano] ?? latest.plano}`,
+    valueText: formatCurrency(latest.valor),
+  };
+}
+
+function getBannerClasses(tone: "ok" | "pending" | "danger") {
+  if (tone === "ok") {
+    return {
+      shell: "border-green-500/35 bg-green-500/10",
+      icon: "bg-green-500/15 text-green-700 dark:text-green-300",
+    };
+  }
+  if (tone === "danger") {
+    return {
+      shell: "border-red-500/35 bg-red-500/10",
+      icon: "bg-red-500/15 text-red-700 dark:text-red-300",
+    };
+  }
+  return {
+    shell: "border-amber-500/35 bg-amber-500/10",
+    icon: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  };
 }
 
 export function AccessControlPanel({ studentId, personalId, studentName }: Props) {
-  const { status, state, lastLog, logs, loading, mutate, isMutating, refresh } =
-    useStudentAccess(studentId);
+  const { status, logs, loading, mutate, isMutating, refresh } = useStudentAccess(studentId);
+  const { subscriptions, loading: subscriptionsLoading } = useSubscriptions(studentId, personalId);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [subscriptionsOpen, setSubscriptionsOpen] = useState(false);
   const [openCreateSignal, setOpenCreateSignal] = useState(0);
 
-  const meta = STATUS_META[status] ?? STATUS_META.suspenso;
-  const StatusIcon = meta.icon;
-  const motivoLabel =
-    getAccessReasonLabel(state?.reason_code) || getAccessReasonLabel(lastLog?.reason_code);
-  const isManualBlock = state?.allowed === false && state.source === "manual";
-  const isPaymentWinner = state?.allowed === false && state.source === "payment";
-  const hasManualRelease = state?.allowed === true && state.source === "manual";
-
-  const decisionText = useMemo(() => {
-    if (!state) return meta.desc;
-    if (state.allowed && hasManualRelease) {
-      return "Liberado por liberacao manual. O resultado acima vence outras regras de acesso.";
-    }
-    if (state.allowed && state.has_active_payment) {
-      return "Liberado por pagamento ativo.";
-    }
-    if (state.allowed) {
-      return "Liberado porque nenhuma regra ativa esta bloqueando o aluno.";
-    }
-    if (isManualBlock) {
-      const actor = lastLog?.actor_name ? ` por ${lastLog.actor_name}` : "";
-      return `Bloqueado por ${state.status === "pausado" ? "pausa" : "suspensao"} manual${actor}.`;
-    }
-    if (isPaymentWinner) {
-      return state.reason || "Bloqueado porque o pagamento necessario nao esta ativo.";
-    }
-    return state.reason || meta.desc;
-  }, [hasManualRelease, isManualBlock, isPaymentWinner, lastLog?.actor_name, meta.desc, state]);
-
-  const factors = [
-    {
-      label: "Pagamento",
-      icon: CreditCard,
-      active: !!state?.payment_required,
-      winning: isPaymentWinner,
-      badge: state?.payment_required
-        ? state.has_active_payment
-          ? "Em dia"
-          : "Pendente"
-        : "Nao exigido",
-      description: state?.payment_required
-        ? state.has_active_payment
-          ? "Existe uma assinatura paga e vigente."
-          : "A regra atual exige pagamento ativo."
-        : "Pagamento nao esta sendo usado para bloquear este aluno.",
-    },
-    {
-      label: "Liberacao manual",
-      icon: Unlock,
-      active: hasManualRelease,
-      winning: hasManualRelease,
-      badge: hasManualRelease ? "Ativa" : "Inativa",
-      description: hasManualRelease
-        ? "Ultima acao manual liberou o aluno."
-        : "Nenhuma liberacao manual esta vencendo agora.",
-    },
-    {
-      label: "Suspensao manual",
-      icon: Lock,
-      active: isManualBlock,
-      winning: isManualBlock,
-      badge: isManualBlock ? "Ativa" : "Inativa",
-      description: isManualBlock
-        ? "Esta suspensao tem prioridade sobre pagamento."
-        : "Nenhuma suspensao manual esta bloqueando agora.",
-    },
-  ];
+  const accessMeta = ACCESS_META[status] ?? ACCESS_META.suspenso;
+  const AccessIcon = accessMeta.icon;
+  const finance = useMemo(() => getFinanceSummary(subscriptions), [subscriptions]);
+  const bannerClasses = getBannerClasses(finance.tone);
+  const FinanceIcon = finance.tone === "ok" ? CheckCircle2 : finance.tone === "danger" ? XCircle : WalletCards;
 
   return (
-    <Card className="border-2">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              Acesso do aluno
-            </CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              Uma unica visao para status, pagamento, acoes manuais e historico.
-            </p>
+    <section className="space-y-5">
+      <div className={`rounded-xl border p-4 sm:p-5 ${bannerClasses.shell}`}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-4">
+            <div
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${bannerClasses.icon}`}
+            >
+              <FinanceIcon className="h-6 w-6" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-muted-foreground">Situacao financeira</p>
+              <h3 className="mt-1 text-2xl font-semibold leading-tight text-foreground">
+                {subscriptionsLoading ? "Carregando..." : finance.status}
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {finance.dueText} - {finance.planText} - {finance.valueText}
+              </p>
+            </div>
           </div>
-          <Badge variant="outline" className={`${meta.classes} border gap-1.5 px-3 py-1`}>
-            <StatusIcon className="h-3.5 w-3.5" />
-            {meta.label}
+
+          <Badge
+            variant="outline"
+            className={`w-fit gap-2 rounded-full border px-4 py-2 text-sm font-semibold ${accessMeta.classes}`}
+          >
+            <AccessIcon className="h-4 w-4" />
+            {accessMeta.label}
           </Badge>
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="space-y-5">
-        <div className={`p-3 rounded-md border ${meta.classes}`}>
-          <p className="text-sm font-medium">{decisionText}</p>
-          {motivoLabel && (
-            <p className="mt-1 text-sm">
-              <span className="font-medium">Motivo:</span> {motivoLabel}
-            </p>
-          )}
-          {(state?.message_aluno || lastLog?.message_aluno) && (
-            <p className="mt-1 text-sm">
-              <span className="font-medium">Mensagem ao aluno:</span>{" "}
-              {state?.message_aluno || lastLog?.message_aluno}
-            </p>
-          )}
-          {state && (
-            <p className="mt-1 text-xs opacity-80">
-              Fonte atual: {getSourceLabel(state.source)} - Recalculado em{" "}
-              {formatDisplayDateTime(state.calculated_at)}
-            </p>
-          )}
-          {lastLog?.created_at && (
-            <p className="mt-1 text-xs opacity-80">
-              Ultimo evento{" "}
-              {formatDistanceToNow(parseISO(lastLog.created_at), {
-                locale: ptBR,
-                addSuffix: true,
-              })}
-              {lastLog.actor_name ? ` por ${lastLog.actor_name}` : ""}
-            </p>
-          )}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Button
+          size="lg"
+          className="gap-2"
+          onClick={() => setOpenCreateSignal((value) => value + 1)}
+          disabled={loading}
+        >
+          <CreditCard className="h-4 w-4" />
+          Registrar novo pagamento
+        </Button>
+        <Button
+          size="lg"
+          variant="outline"
+          className="gap-2 border-red-500/35 text-red-700 hover:bg-red-500/10 hover:text-red-700 dark:text-red-300"
+          onClick={() => setDialogOpen(true)}
+          disabled={loading || isMutating}
+        >
+          <ShieldAlert className="h-4 w-4" />
+          Suspender acesso
+        </Button>
+      </div>
+
+      <SubscriptionManager
+        studentId={studentId}
+        personalId={personalId}
+        studentName={studentName}
+        embedded
+        showCreateButton={false}
+        openCreateSignal={openCreateSignal}
+        onChanged={refresh}
+      />
+
+      <div className="border-t pt-5">
+        <div className="mb-3 flex items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-base font-semibold">Historico de acesso</h3>
         </div>
+        <AccessHistoryList logs={logs} />
+      </div>
 
-        <div className="grid gap-3 md:grid-cols-3">
-          {factors.map((factor) => {
-            const FactorIcon = factor.icon;
-            return (
-              <div
-                key={factor.label}
-                className={`rounded-md border p-3 ${getFactorBadgeClasses(
-                  factor.active,
-                  factor.winning
-                )}`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 font-medium text-sm">
-                    <FactorIcon className="h-4 w-4" />
-                    {factor.label}
-                  </div>
-                  <Badge variant="outline" className="text-[10px] bg-background/70">
-                    {factor.winning ? "Decidindo" : factor.badge}
-                  </Badge>
-                </div>
-                <p className="mt-2 text-xs opacity-85">{factor.description}</p>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="grid gap-2 sm:grid-cols-2">
-          <Button onClick={() => setDialogOpen(true)} disabled={loading}>
-            <ShieldAlert className="h-4 w-4 mr-2" />
-            Suspender acesso manualmente
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setSubscriptionsOpen(true);
-              setOpenCreateSignal((value) => value + 1);
-            }}
-          >
-            <CreditCard className="h-4 w-4 mr-2" />
-            Criar assinatura/pagamento
-          </Button>
-        </div>
-
-        {isManualBlock && (
-          <Button
-            onClick={() =>
-              mutate({
-                acao: "reativar",
-                observacao: "Suspensao manual desfeita pelo painel do aluno.",
-              })
-            }
-            disabled={isMutating}
-            variant="outline"
-            className="w-full sm:w-auto"
-          >
-            Desfazer suspensao manual
-          </Button>
-        )}
-
-        <Collapsible open={subscriptionsOpen} onOpenChange={setSubscriptionsOpen}>
-          <CollapsibleTrigger asChild>
-            <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-              <CreditCard className="h-4 w-4" />
-              Assinaturas e pagamentos
-              <ChevronDown
-                className={`h-4 w-4 transition-transform ${
-                  subscriptionsOpen ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="pt-3">
-            <SubscriptionManager
-              studentId={studentId}
-              personalId={personalId}
-              studentName={studentName}
-              embedded
-              createButtonLabel="Nova assinatura"
-              openCreateSignal={openCreateSignal}
-              onChanged={refresh}
-            />
-          </CollapsibleContent>
-        </Collapsible>
-
-        <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
-          <CollapsibleTrigger asChild>
-            <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-              <History className="h-4 w-4" />
-              Historico unificado de acesso ({logs.length})
-              <ChevronDown
-                className={`h-4 w-4 transition-transform ${
-                  historyOpen ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="pt-3">
-            <AccessHistoryList logs={logs} />
-          </CollapsibleContent>
-        </Collapsible>
-
-        <ManageAccessDialog
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          studentName={studentName}
-          status={status}
-          isMutating={isMutating}
-          onConfirm={(p) => mutate(p)}
-        />
-      </CardContent>
-    </Card>
+      <ManageAccessDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        studentName={studentName}
+        status={status}
+        isMutating={isMutating}
+        onConfirm={(p) => mutate(p)}
+      />
+    </section>
   );
 }
 
 export function AccessStatusBadge({ studentId }: { studentId: string }) {
   const { status, loading } = useStudentAccess(studentId);
   if (loading) return null;
-  const meta = STATUS_META[status] ?? STATUS_META.suspenso;
+  const meta = ACCESS_META[status] ?? ACCESS_META.suspenso;
   const StatusIcon = meta.icon;
+
   return (
-    <Badge variant="outline" className={`${meta.classes} border gap-1`}>
+    <Badge variant="outline" className={`gap-1 rounded-full border ${meta.classes}`}>
       <StatusIcon className="h-3 w-3" />
       {meta.label}
     </Badge>

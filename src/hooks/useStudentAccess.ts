@@ -267,6 +267,7 @@ export function useStudentAccess(studentId: string | undefined) {
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ["student-access-state", studentId] });
       queryClient.invalidateQueries({ queryKey: ["student-access-events", studentId] });
+      queryClient.invalidateQueries({ queryKey: ["students-access-states"] });
       queryClient.invalidateQueries({ queryKey: ["platform-access", studentId] });
       queryClient.invalidateQueries({ queryKey: ["alunos"] });
       queryClient.invalidateQueries({ queryKey: ["aluno", studentId] });

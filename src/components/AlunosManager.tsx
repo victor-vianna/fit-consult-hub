@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -202,12 +202,19 @@ export default function AlunosManager() {
     staleTime: 60_000,
   });
 
-  const fetchAlunos = () => {
-    queryClient.invalidateQueries({ queryKey: ["alunos", user?.id] });
-    queryClient.invalidateQueries({ queryKey: ["students-access-states", user?.id] });
-  };
+  const refreshStudentsAndAccess = useCallback(() => {
+    if (!user?.id) return;
+    queryClient.invalidateQueries({ queryKey: ["alunos", user.id] });
+    queryClient.invalidateQueries({ queryKey: ["students-access-states", user.id] });
+  }, [queryClient, user?.id]);
 
-  const { data: accessStates = [] } = useQuery<StudentAccessState[]>({
+  const fetchAlunos = refreshStudentsAndAccess;
+
+  const {
+    data: accessStates = [],
+    isLoading: accessStatesLoading,
+    isFetching: accessStatesFetching,
+  } = useQuery<StudentAccessState[]>({
     queryKey: ["students-access-states", user?.id],
     queryFn: async () => {
       if (!user) return [];
@@ -219,12 +226,80 @@ export default function AlunosManager() {
       return (data || []) as StudentAccessState[];
     },
     enabled: !!user && alunos.length > 0,
-    staleTime: 15_000,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const refreshAccessList = () => {
+      refreshStudentsAndAccess();
+    };
+
+    const accessStateChannel = supabase
+      .channel(`students-access-list-state:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "student_access_state",
+          filter: `personal_id=eq.${user.id}`,
+        },
+        refreshAccessList
+      )
+      .subscribe();
+
+    const accessEventsChannel = supabase
+      .channel(`students-access-list-events:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "student_access_events",
+          filter: `personal_id=eq.${user.id}`,
+        },
+        refreshAccessList
+      )
+      .subscribe();
+
+    const profilesChannel = supabase
+      .channel(`students-access-list-profiles:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "profiles",
+          filter: `personal_id=eq.${user.id}`,
+        },
+        refreshAccessList
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(accessStateChannel);
+      supabase.removeChannel(accessEventsChannel);
+      supabase.removeChannel(profilesChannel);
+    };
+  }, [refreshStudentsAndAccess, user?.id]);
 
   const accessByStudent = useMemo(() => {
     return Object.fromEntries(accessStates.map((state) => [state.student_id, state]));
   }, [accessStates]);
+
+  const resolveAccessAllowed = useCallback(
+    (aluno: Aluno): boolean | null => {
+      const officialState = accessByStudent[aluno.id];
+      if (officialState) return officialState.allowed;
+      if (aluno.is_active === false) return false;
+      return null;
+    },
+    [accessByStudent]
+  );
 
   const alunosFiltrados = useMemo(() => {
     let resultado = [...alunos];
@@ -238,9 +313,9 @@ export default function AlunosManager() {
     }
 
     if (filtroStatus === "ativos") {
-      resultado = resultado.filter((aluno) => accessByStudent[aluno.id]?.allowed ?? aluno.is_active);
+      resultado = resultado.filter((aluno) => resolveAccessAllowed(aluno) === true);
     } else if (filtroStatus === "inativos") {
-      resultado = resultado.filter((aluno) => !(accessByStudent[aluno.id]?.allowed ?? aluno.is_active));
+      resultado = resultado.filter((aluno) => resolveAccessAllowed(aluno) === false);
     }
 
     resultado.sort((a, b) => {
@@ -258,7 +333,7 @@ export default function AlunosManager() {
     });
 
     return resultado;
-  }, [accessByStudent, alunos, searchTerm, filtroStatus, ordenacao]);
+  }, [alunos, searchTerm, filtroStatus, ordenacao, resolveAccessAllowed]);
 
   const handleCreateAluno = async () => {
     if (!novoAluno.nome || !novoAluno.email || !novoAluno.password) {
@@ -382,10 +457,10 @@ export default function AlunosManager() {
   };
 
   const alunosAtivos = alunos.filter(
-    (a) => accessByStudent[a.id]?.allowed ?? a.is_active
+    (a) => resolveAccessAllowed(a) === true
   ).length;
   const alunosInativos = alunos.filter(
-    (a) => !(accessByStudent[a.id]?.allowed ?? a.is_active)
+    (a) => resolveAccessAllowed(a) === false
   ).length;
 
   return (
@@ -634,10 +709,14 @@ export default function AlunosManager() {
               const hasPriority = flags.length > 0;
               const status = statusByAluno[aluno.id];
               const accessState = accessByStudent[aluno.id];
-              const isAccessAllowed = accessState?.allowed ?? aluno.is_active;
+              const resolvedAccessAllowed = resolveAccessAllowed(aluno);
+              const isAccessUnknown = resolvedAccessAllowed === null;
+              const isAccessAllowed = resolvedAccessAllowed !== false;
               const corCustom = coresCustom[aluno.id];
 
-              const prioridade: "bloqueado" | "urgente" | "atencao" | "importante" | "ativo" = !isAccessAllowed
+              const prioridade: "sincronizando" | "bloqueado" | "urgente" | "atencao" | "importante" | "ativo" = isAccessUnknown
+                ? "sincronizando"
+                : !isAccessAllowed
                 ? "bloqueado"
                 : hasHighPriority
                 ? "urgente"
@@ -648,6 +727,7 @@ export default function AlunosManager() {
                 : "ativo";
 
               const prioridadeStyles = {
+                sincronizando: { ring: "border-muted", bar: "bg-muted-foreground/50", chip: "bg-muted text-muted-foreground", icon: Clock, label: "Sincronizando" },
                 bloqueado: { ring: "border-muted", bar: "bg-muted-foreground", chip: "bg-muted text-muted-foreground", icon: UserX, label: "Bloqueado" },
                 urgente:   { ring: "border-destructive/50 ring-1 ring-destructive/20", bar: "bg-destructive", chip: "bg-destructive text-destructive-foreground", icon: Flame, label: "Urgente" },
                 atencao:   { ring: "border-yellow-500/60 ring-1 ring-yellow-500/20", bar: "bg-yellow-500", chip: "bg-yellow-500 text-black", icon: FileWarning, label: "Atenção" },
@@ -724,6 +804,7 @@ export default function AlunosManager() {
                           student={aluno}
                           personalId={user.id}
                           accessState={accessState}
+                          accessLoading={isAccessUnknown || accessStatesLoading || accessStatesFetching}
                           onChanged={fetchAlunos}
                         />
                       )}

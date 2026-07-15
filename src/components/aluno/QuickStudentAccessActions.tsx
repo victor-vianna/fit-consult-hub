@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Clock3,
   CreditCard,
+  Loader2,
   Lock,
   MoreHorizontal,
   Pause,
@@ -51,6 +52,7 @@ interface Props {
   student: StudentSummary;
   personalId: string;
   accessState?: StudentAccessState | null;
+  accessLoading?: boolean;
   onChanged?: () => void;
 }
 
@@ -74,6 +76,11 @@ const STATUS_META = {
     label: "Pausado",
     icon: Pause,
     className: "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-400",
+  },
+  sincronizando: {
+    label: "Sincronizando",
+    icon: Loader2,
+    className: "border-muted bg-muted/40 text-muted-foreground",
   },
 } as const;
 
@@ -99,6 +106,7 @@ export function QuickStudentAccessActions({
   student,
   personalId,
   accessState,
+  accessLoading,
   onChanged,
 }: Props) {
   const { toast } = useToast();
@@ -112,7 +120,7 @@ export function QuickStudentAccessActions({
   const [customUntil, setCustomUntil] = useState(() => toDatetimeLocal(addDuration("24h")));
 
   const state = accessState;
-  const status = state?.status ?? "ativo";
+  const status = state?.status ?? "sincronizando";
   const meta = STATUS_META[status as keyof typeof STATUS_META] ?? STATUS_META.ativo;
   const StatusIcon = meta.icon;
   const temporaryUntil = state?.manual_release_until;
@@ -234,7 +242,7 @@ export function QuickStudentAccessActions({
     <div className="space-y-2" onClick={(event) => event.stopPropagation()}>
       <div className="flex items-center justify-between gap-2">
         <Badge variant="outline" className={cn("gap-1.5 border px-2 py-1 text-[11px]", meta.className)}>
-          <StatusIcon className="h-3.5 w-3.5" />
+          <StatusIcon className={cn("h-3.5 w-3.5", accessLoading && !state && "animate-spin")} />
           {meta.label}
         </Badge>
 

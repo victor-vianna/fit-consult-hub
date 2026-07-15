@@ -121,20 +121,21 @@ export function calculateBodyComposition(input: {
     "suprailiaca",
     "femural",
   ].reduce((sum, key) => sum + (input.dobrasMedias[key] || 0), 0);
-  const idade = input.idade || 30;
-  const sexo = (input.sexo || "").toLowerCase();
-
   let densidade: number | null = null;
   let percentualGordura: number | null = null;
 
-  if (sum7 > 0) {
+  const idade = input.idade;
+  const sexo = (input.sexo || "").toLowerCase();
+  const hasReferenceData = Boolean(idade && (sexo.startsWith("f") || sexo.startsWith("m")));
+
+  if (sum7 > 0 && hasReferenceData && idade) {
     if (sexo.startsWith("f")) {
       densidade = 1.097 - 0.00046971 * sum7 + 0.00000056 * sum7 * sum7 - 0.00012828 * idade;
     } else {
       densidade = 1.112 - 0.00043499 * sum7 + 0.00000055 * sum7 * sum7 - 0.00028826 * idade;
     }
     percentualGordura = densidade > 0 ? round(495 / densidade - 450, 1) : null;
-  } else if ((input.fase || "").toLowerCase() === "crianca" && imc) {
+  } else if ((input.fase || "").toLowerCase() === "crianca" && imc && hasReferenceData && idade) {
     const sexFlag = sexo.startsWith("m") ? 1 : 0;
     percentualGordura = round(1.51 * imc - 0.7 * idade - 3.6 * sexFlag + 1.4, 1);
   }
@@ -207,4 +208,183 @@ export function formatMetricValue(value: any, unit = "") {
   const numeric = typeof value === "number" ? value : Number(value);
   const formatted = Number.isFinite(numeric) ? String(round(numeric, unit === "" ? 2 : 1)) : String(value);
   return `${formatted}${unit ? ` ${unit}` : ""}`;
+}
+
+export type ClassificationTone = "success" | "info" | "warning" | "danger" | "muted";
+
+export interface MetricClassification {
+  label: string;
+  tone: ClassificationTone;
+  detail?: string;
+}
+
+export interface BodyFatRange {
+  label: string;
+  min: number;
+  max: number;
+  tone: ClassificationTone;
+}
+
+const BODY_FAT_RANGES = {
+  masculino: [
+    {
+      minAge: 18,
+      maxAge: 29,
+      ranges: [
+        { label: "Muito magro", min: 0, max: 7, tone: "warning" },
+        { label: "Excelente", min: 7, max: 11, tone: "success" },
+        { label: "Bom", min: 11, max: 14, tone: "success" },
+        { label: "Razoavel", min: 14, max: 18, tone: "info" },
+        { label: "Ruim", min: 18, max: 23, tone: "warning" },
+        { label: "Muito ruim", min: 23, max: 35, tone: "danger" },
+      ],
+    },
+    {
+      minAge: 30,
+      maxAge: 39,
+      ranges: [
+        { label: "Muito magro", min: 0, max: 10, tone: "warning" },
+        { label: "Excelente", min: 10, max: 14, tone: "success" },
+        { label: "Bom", min: 14, max: 17, tone: "success" },
+        { label: "Razoavel", min: 17, max: 21, tone: "info" },
+        { label: "Ruim", min: 21, max: 25, tone: "warning" },
+        { label: "Muito ruim", min: 25, max: 37, tone: "danger" },
+      ],
+    },
+    {
+      minAge: 40,
+      maxAge: 49,
+      ranges: [
+        { label: "Muito magro", min: 0, max: 12, tone: "warning" },
+        { label: "Excelente", min: 12, max: 16, tone: "success" },
+        { label: "Bom", min: 16, max: 20, tone: "success" },
+        { label: "Razoavel", min: 20, max: 23, tone: "info" },
+        { label: "Ruim", min: 23, max: 27, tone: "warning" },
+        { label: "Muito ruim", min: 27, max: 39, tone: "danger" },
+      ],
+    },
+    {
+      minAge: 50,
+      maxAge: 120,
+      ranges: [
+        { label: "Muito magro", min: 0, max: 14, tone: "warning" },
+        { label: "Excelente", min: 14, max: 18, tone: "success" },
+        { label: "Bom", min: 18, max: 21, tone: "success" },
+        { label: "Razoavel", min: 21, max: 25, tone: "info" },
+        { label: "Ruim", min: 25, max: 29, tone: "warning" },
+        { label: "Muito ruim", min: 29, max: 42, tone: "danger" },
+      ],
+    },
+  ],
+  feminino: [
+    {
+      minAge: 18,
+      maxAge: 29,
+      ranges: [
+        { label: "Muito magro", min: 0, max: 14, tone: "warning" },
+        { label: "Excelente", min: 14, max: 17, tone: "success" },
+        { label: "Bom", min: 17, max: 21, tone: "success" },
+        { label: "Razoavel", min: 21, max: 24, tone: "info" },
+        { label: "Ruim", min: 24, max: 29, tone: "warning" },
+        { label: "Muito ruim", min: 29, max: 43, tone: "danger" },
+      ],
+    },
+    {
+      minAge: 30,
+      maxAge: 39,
+      ranges: [
+        { label: "Muito magro", min: 0, max: 15, tone: "warning" },
+        { label: "Excelente", min: 15, max: 18, tone: "success" },
+        { label: "Bom", min: 18, max: 22, tone: "success" },
+        { label: "Razoavel", min: 22, max: 25, tone: "info" },
+        { label: "Ruim", min: 25, max: 30, tone: "warning" },
+        { label: "Muito ruim", min: 30, max: 45, tone: "danger" },
+      ],
+    },
+    {
+      minAge: 40,
+      maxAge: 49,
+      ranges: [
+        { label: "Muito magro", min: 0, max: 16, tone: "warning" },
+        { label: "Excelente", min: 16, max: 20, tone: "success" },
+        { label: "Bom", min: 20, max: 23, tone: "success" },
+        { label: "Razoavel", min: 23, max: 27, tone: "info" },
+        { label: "Ruim", min: 27, max: 32, tone: "warning" },
+        { label: "Muito ruim", min: 32, max: 47, tone: "danger" },
+      ],
+    },
+    {
+      minAge: 50,
+      maxAge: 120,
+      ranges: [
+        { label: "Muito magro", min: 0, max: 17, tone: "warning" },
+        { label: "Excelente", min: 17, max: 21, tone: "success" },
+        { label: "Bom", min: 21, max: 25, tone: "success" },
+        { label: "Razoavel", min: 25, max: 29, tone: "info" },
+        { label: "Ruim", min: 29, max: 34, tone: "warning" },
+        { label: "Muito ruim", min: 34, max: 50, tone: "danger" },
+      ],
+    },
+  ],
+} satisfies Record<string, Array<{ minAge: number; maxAge: number; ranges: BodyFatRange[] }>>;
+
+export function normalizeAssessmentSex(sexo?: string | null) {
+  const normalized = (sexo || "").toLowerCase();
+  if (normalized.startsWith("f")) return "feminino";
+  if (normalized.startsWith("m")) return "masculino";
+  return null;
+}
+
+export function getBodyFatRanges(idade?: number | null, sexo?: string | null) {
+  const normalizedSex = normalizeAssessmentSex(sexo);
+  if (!idade || !normalizedSex) return null;
+  return BODY_FAT_RANGES[normalizedSex].find(
+    (item) => idade >= item.minAge && idade <= item.maxAge
+  )?.ranges ?? null;
+}
+
+export function classifyBodyFat(value?: number | null, idade?: number | null, sexo?: string | null): MetricClassification {
+  if (value === null || value === undefined) return { label: "Sem dado", tone: "muted" };
+  const ranges = getBodyFatRanges(idade, sexo);
+  if (!ranges) return { label: "Sem referencia", tone: "muted", detail: "Informe idade e sexo." };
+  const matched = ranges.find((range) => value >= range.min && value < range.max) ?? ranges[ranges.length - 1];
+  return { label: matched.label, tone: matched.tone };
+}
+
+export function classifyBmi(value?: number | null): MetricClassification {
+  if (value === null || value === undefined) return { label: "Sem dado", tone: "muted" };
+  if (value < 18.5) return { label: "Baixo peso", tone: "warning" };
+  if (value < 25) return { label: "Normal", tone: "success" };
+  if (value < 30) return { label: "Sobrepeso", tone: "warning" };
+  return { label: "Risco alto", tone: "danger" };
+}
+
+export function classifyAbdominalCircumference(
+  value?: number | null,
+  sexo?: string | null
+): MetricClassification {
+  if (value === null || value === undefined) return { label: "Sem dado", tone: "muted" };
+  const normalizedSex = normalizeAssessmentSex(sexo);
+  if (!normalizedSex) return { label: "Sem referencia", tone: "muted", detail: "Informe sexo." };
+  const increased = normalizedSex === "feminino" ? 80 : 94;
+  const high = normalizedSex === "feminino" ? 88 : 102;
+  if (value >= high) return { label: "Risco alto", tone: "danger" };
+  if (value >= increased) return { label: "Atenção", tone: "warning" };
+  return { label: "Normal", tone: "success" };
+}
+
+export function classifyLeanFatBalance(
+  massaMagra?: number | null,
+  massaGorda?: number | null,
+  peso?: number | null,
+  idade?: number | null,
+  sexo?: string | null
+): MetricClassification {
+  if (!massaMagra || !massaGorda || !peso) return { label: "Sem dado", tone: "muted" };
+  const bodyFatPercent = (massaGorda / peso) * 100;
+  const bodyFat = classifyBodyFat(bodyFatPercent, idade, sexo);
+  if (bodyFat.tone === "danger") return { label: "Desequilibrado", tone: "danger" };
+  if (bodyFat.tone === "warning") return { label: "Atenção", tone: "warning" };
+  if (bodyFat.tone === "muted") return { label: "Sem referencia", tone: "muted" };
+  return { label: "Saudável", tone: "success" };
 }

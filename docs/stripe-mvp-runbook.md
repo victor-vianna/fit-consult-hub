@@ -59,7 +59,44 @@ npx supabase functions deploy stripe-create-checkout
 npx supabase functions deploy stripe-webhook
 npx supabase functions deploy stripe-customer-portal
 npx supabase functions deploy stripe-cancel-subscription
+npx supabase functions deploy stripe-manage-subscription
 ```
+
+## Taxa Da Plataforma E Descontos
+
+`STRIPE_APPLICATION_FEE_PERCENT` e a taxa percentual da plataforma aplicada nos checkouts Stripe Connect.
+
+A UI de `/financeiro` usa esse mesmo secret, retornado por `stripe-connect-account`, para mostrar:
+
+1. valor bruto cobrado do aluno;
+2. taxa Stripe estimada, consolidando taxa configurada da plataforma e processamento Stripe;
+3. liquido final estimado apos a taxa Stripe;
+4. desconto dos planos trimestral, semestral e anual comparado ao valor mensal cheio do mesmo periodo.
+
+O percentual exibido em `Taxa Stripe` consolida os percentuais aplicados. Exemplo: com taxa configurada de 5% e cartao nacional standard, a UI mostra `8,99% + R$ 0,39`.
+
+Exemplo: se o mensal for R$ 100,00 e o trimestral for R$ 270,00, o desconto exibido sera R$ 30,00 ou 10% frente ao valor cheio de R$ 300,00.
+
+Por padrao, a estimativa usa tarifas standard BR da Stripe:
+
+1. cartao nacional: `3.99% + R$ 0.39`;
+2. Pix: `1.19%`;
+3. boleto: `R$ 3.45`.
+
+Se a conta tiver precificacao personalizada, configure os overrides:
+
+```bash
+npx supabase secrets set STRIPE_CARD_PROCESSING_FEE_PERCENT=3.99
+npx supabase secrets set STRIPE_CARD_PROCESSING_FEE_FIXED=0.39
+npx supabase secrets set STRIPE_PIX_PROCESSING_FEE_PERCENT=1.19
+npx supabase secrets set STRIPE_PIX_PROCESSING_FEE_FIXED=0
+npx supabase secrets set STRIPE_BOLETO_PROCESSING_FEE_PERCENT=0
+npx supabase secrets set STRIPE_BOLETO_PROCESSING_FEE_FIXED=3.45
+```
+
+Importante: pagamentos manuais exibem somente a taxa configurada da plataforma. Em pagamentos via Stripe, a taxa Stripe exibida tambem inclui processamento estimado quando a tarifa real nao estiver salva no banco.
+
+Na troca de plano, o app envia `proration_behavior=none` para desativar rateio proporcional. Ainda assim, ao mudar periodicidade, a Stripe pode reiniciar o ciclo e cobrar o novo periodo conforme a regra de Billing.
 
 ## Configurar Stripe Dashboard
 
@@ -163,7 +200,13 @@ Para manter simples:
 2. Use `/p/:slug` como origem principal de alunos.
 3. Mantenha webhooks idempotentes.
 4. Nao edite assinatura direto no banco, exceto ajustes administrativos controlados.
-5. Use `/admin/monitoramento` para acompanhar:
+5. Para assinaturas Stripe, use as acoes do app em vez do Dashboard sempre que possivel:
+   - cancelar renovacao no fim do ciclo;
+   - reativar renovacao;
+   - trocar plano com rateio proporcional desativado;
+   - abrir/copiar portal do aluno;
+   - cancelar imediatamente quando necessario.
+6. Use `/admin/monitoramento` para acompanhar:
    - status Connect de cada personal;
    - webhooks falhos;
    - assinaturas vencidas ainda marcadas como pagas;

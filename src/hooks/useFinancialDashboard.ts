@@ -46,6 +46,8 @@ export interface PaymentDetail {
   dataPagamento: string;
   status: string;
   metodo: string;
+  platformFeeAmount: number | null;
+  isStripePayment: boolean;
 }
 
 export function useFinancialDashboard(personalId: string) {
@@ -231,6 +233,11 @@ export function useFinancialDashboard(personalId: string) {
           dataPagamento: p.data_pagamento,
           status: "pago",
           metodo: p.metodo_pagamento || "—",
+          platformFeeAmount:
+            typeof (p as any).stripe_application_fee_amount === "number"
+              ? Number((p as any).stripe_application_fee_amount)
+              : null,
+          isStripePayment: !!(p as any).stripe_invoice_id || String(p.metodo_pagamento ?? "").includes("stripe"),
         };
       });
 
@@ -252,6 +259,8 @@ export function useFinancialDashboard(personalId: string) {
           dataPagamento: sub.data_expiracao,
           status: "pendente",
           metodo: "—",
+          platformFeeAmount: null,
+          isStripePayment: false,
         });
       }
 

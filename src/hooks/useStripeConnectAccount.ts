@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import type { StripeProcessingFeeConfig } from "@/utils/billing";
 
 export interface StripeConnectAccount {
   id: string;
@@ -18,6 +19,18 @@ export interface StripeConnectAccount {
   requirements_past_due: string[];
   disabled_reason: string | null;
   last_synced_at: string | null;
+}
+
+export interface StripeBillingConfig {
+  application_fee_percent: number;
+  application_fee_configured: boolean;
+  stripe_processing_fees: StripeProcessingFeeConfig;
+}
+
+export interface StripeConnectStatus {
+  connected: boolean;
+  account: StripeConnectAccount | null;
+  billing_config: StripeBillingConfig;
 }
 
 async function getFunctionErrorMessage(error: any) {
@@ -41,7 +54,7 @@ export function useStripeConnectAccount(personalId?: string) {
   const query = useQuery({
     queryKey: ["stripe_connect_account", personalId],
     enabled: !!personalId,
-    queryFn: async (): Promise<{ connected: boolean; account: StripeConnectAccount | null }> => {
+    queryFn: async (): Promise<StripeConnectStatus> => {
       const { data, error } = await supabase.functions.invoke("stripe-connect-account", {
         body: { action: "status" },
       });
@@ -50,6 +63,24 @@ export function useStripeConnectAccount(personalId?: string) {
       return {
         connected: !!(data as any)?.connected,
         account: ((data as any)?.account ?? null) as StripeConnectAccount | null,
+        billing_config: {
+          application_fee_percent: Number((data as any)?.billing_config?.application_fee_percent ?? 0),
+          application_fee_configured: !!(data as any)?.billing_config?.application_fee_configured,
+          stripe_processing_fees: {
+            card: {
+              percent: Number((data as any)?.billing_config?.stripe_processing_fees?.card?.percent ?? 3.99),
+              fixed: Number((data as any)?.billing_config?.stripe_processing_fees?.card?.fixed ?? 0.39),
+            },
+            pix: {
+              percent: Number((data as any)?.billing_config?.stripe_processing_fees?.pix?.percent ?? 1.19),
+              fixed: Number((data as any)?.billing_config?.stripe_processing_fees?.pix?.fixed ?? 0),
+            },
+            boleto: {
+              percent: Number((data as any)?.billing_config?.stripe_processing_fees?.boleto?.percent ?? 0),
+              fixed: Number((data as any)?.billing_config?.stripe_processing_fees?.boleto?.fixed ?? 3.45),
+            },
+          },
+        },
       };
     },
   });

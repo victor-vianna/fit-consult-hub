@@ -13,6 +13,13 @@ export interface Subscription {
   data_pagamento: string | null;
   data_expiracao: string;
   observacoes: string | null;
+  parcelas?: number;
+  stripe_subscription_id?: string | null;
+  stripe_customer_id?: string | null;
+  stripe_account_id?: string | null;
+  stripe_checkout_session_id?: string | null;
+  cancela_no_fim_do_ciclo?: boolean;
+  cancelado_em?: string | null;
   created_at: string;
   updated_at: string;
 }

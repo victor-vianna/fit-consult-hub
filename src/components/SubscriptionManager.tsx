@@ -30,6 +30,19 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar as DateCalendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useSubscriptions, Subscription } from "@/hooks/useSubscriptions";
+import { usePersonalPlanPrices, Plano } from "@/hooks/usePersonalPlanPrices";
+import { useStripeConnectAccount } from "@/hooks/useStripeConnectAccount";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  calculatePlanDiscount,
+  calculateNetAfterFees,
+  DEFAULT_STRIPE_PROCESSING_FEES,
+  formatCurrencyBRL,
+  formatPercentBR,
+  formatTotalStripeFeeRule,
+  normalizeStripePaymentMethod,
+} from "@/utils/billing";
 import {
   CreditCard,
   Plus,
@@ -39,7 +52,22 @@ import {
   Calendar as CalendarIcon,
   Edit,
   Trash2,
+  MoreHorizontal,
+  Ban,
+  RotateCcw,
+  ArrowLeftRight,
+  ExternalLink,
+  Copy,
+  Loader2,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -76,6 +104,47 @@ const PLANOS = [
   { value: "anual", label: "Anual", meses: 12 },
 ];
 
+type StripeSubscriptionAction = "cancel_at_period_end" | "resume_renewal" | "cancel_now";
+
+const STRIPE_ACTION_COPY: Record<
+  StripeSubscriptionAction,
+  { title: string; description: string; confirm: string; destructive?: boolean }
+> = {
+  cancel_at_period_end: {
+    title: "Cancelar renovacao?",
+    description:
+      "A assinatura continua ativa ate o fim do ciclo atual e nao sera renovada automaticamente.",
+    confirm: "Cancelar renovacao",
+  },
+  resume_renewal: {
+    title: "Reativar renovacao?",
+    description:
+      "A assinatura volta a renovar automaticamente na Stripe enquanto o pagamento estiver ativo.",
+    confirm: "Reativar",
+  },
+  cancel_now: {
+    title: "Cancelar agora?",
+    description:
+      "A assinatura sera encerrada imediatamente na Stripe. Use apenas quando o acesso tambem deve ser encerrado agora.",
+    confirm: "Cancelar agora",
+    destructive: true,
+  },
+};
+
+async function getFunctionErrorMessage(error: any) {
+  const fallback = error?.message ?? "Tente novamente.";
+  const context = error?.context;
+
+  if (!context || typeof context.json !== "function") return fallback;
+
+  try {
+    const body = await context.json();
+    return body?.error || body?.message || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export function SubscriptionManager({
   studentId,
   personalId,
@@ -94,7 +163,11 @@ export function SubscriptionManager({
     registerPayment,
     deleteSubscription,
     getActiveSubscription,
-  } = useSubscriptions(studentId);
+    refetch,
+  } = useSubscriptions(studentId, personalId);
+  const { data: planPrices } = usePersonalPlanPrices(personalId);
+  const { data: stripeStatus } = useStripeConnectAccount(personalId);
+  const { toast } = useToast();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -103,6 +176,13 @@ export function SubscriptionManager({
   const [selectedSubscription, setSelectedSubscription] = useState<string>("");
   const [subscriptionToEdit, setSubscriptionToEdit] = useState<Subscription | null>(null);
   const [subscriptionToDelete, setSubscriptionToDelete] = useState<string | null>(null);
+  const [stripeAction, setStripeAction] = useState<StripeSubscriptionAction | null>(null);
+  const [stripeActionTarget, setStripeActionTarget] = useState<Subscription | null>(null);
+  const [stripeActionLoading, setStripeActionLoading] = useState(false);
+  const [changePlanDialogOpen, setChangePlanDialogOpen] = useState(false);
+  const [changePlanTarget, setChangePlanTarget] = useState<Subscription | null>(null);
+  const [newStripePlan, setNewStripePlan] = useState<Plano>("mensal");
+  const [copyingPortalFor, setCopyingPortalFor] = useState<string | null>(null);
 
   // Form states
   const [plano, setPlano] = useState<string>("mensal");
@@ -123,6 +203,13 @@ export function SubscriptionManager({
   const [dataPagamento, setDataPagamento] = useState<string>(formatDateForInput(new Date()));
   const [metodoPagamento, setMetodoPagamento] = useState<string>("");
   const [observacoesPagamento, setObservacoesPagamento] = useState<string>("");
+
+  const platformFeePercent = stripeStatus?.billing_config.application_fee_percent ?? 0;
+  const stripeProcessingFees =
+    stripeStatus?.billing_config.stripe_processing_fees ?? DEFAULT_STRIPE_PROCESSING_FEES;
+  const monthlyPlanValue = Number(
+    planPrices?.find((price) => price.plano === "mensal")?.valor ?? 0
+  );
 
   useEffect(() => {
     if (openCreateSignal > 0) {
@@ -208,7 +295,6 @@ export function SubscriptionManager({
     // que exista um registro correspondente no histórico de pagamentos.
     if (editStatus === "pago" && novaDataPagamento) {
       try {
-        const { supabase } = await import("@/integrations/supabase/client");
         const dataDia = novaDataPagamento.split("T")[0];
         const { data: existentes } = await supabase
           .from("payment_history")
@@ -243,6 +329,136 @@ export function SubscriptionManager({
     setDeleteDialogOpen(false);
     setSubscriptionToDelete(null);
     onChanged?.();
+  };
+
+  const refreshAfterStripeAction = async () => {
+    await refetch();
+    onChanged?.();
+  };
+
+  const invokeStripeAction = async (
+    action: StripeSubscriptionAction | "change_plan" | "customer_portal",
+    sub: Subscription,
+    body: Record<string, unknown> = {}
+  ) => {
+    const { data, error } = await supabase.functions.invoke("stripe-manage-subscription", {
+      body: {
+        action,
+        subscription_id: sub.id,
+        return_url: window.location.href,
+        ...body,
+      },
+    });
+
+    if (error) throw new Error(await getFunctionErrorMessage(error));
+    if ((data as any)?.error) throw new Error((data as any).error);
+    return data as any;
+  };
+
+  const openStripeActionConfirm = (sub: Subscription, action: StripeSubscriptionAction) => {
+    setStripeActionTarget(sub);
+    setStripeAction(action);
+  };
+
+  const handleConfirmStripeAction = async () => {
+    if (!stripeAction || !stripeActionTarget) return;
+
+    setStripeActionLoading(true);
+    try {
+      await invokeStripeAction(stripeAction, stripeActionTarget);
+      const copy = STRIPE_ACTION_COPY[stripeAction];
+      toast({
+        title: "Acao enviada para a Stripe",
+        description: copy.confirm,
+      });
+      await refreshAfterStripeAction();
+      setStripeAction(null);
+      setStripeActionTarget(null);
+    } catch (e: any) {
+      toast({
+        title: "Erro na acao Stripe",
+        description: e?.message ?? "Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setStripeActionLoading(false);
+    }
+  };
+
+  const handleOpenChangePlan = (sub: Subscription) => {
+    setChangePlanTarget(sub);
+    setNewStripePlan(sub.plano as Plano);
+    setChangePlanDialogOpen(true);
+  };
+
+  const handleChangeStripePlan = async () => {
+    if (!changePlanTarget || !newStripePlan) return;
+
+    setStripeActionLoading(true);
+    try {
+      await invokeStripeAction("change_plan", changePlanTarget, { plano: newStripePlan });
+      toast({
+        title: "Plano alterado",
+        description: "A assinatura foi atualizada na Stripe com rateio proporcional desativado.",
+      });
+      await refreshAfterStripeAction();
+      setChangePlanDialogOpen(false);
+      setChangePlanTarget(null);
+    } catch (e: any) {
+      toast({
+        title: "Erro ao trocar plano",
+        description: e?.message ?? "Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setStripeActionLoading(false);
+    }
+  };
+
+  const getCustomerPortalUrl = async (sub: Subscription) => {
+    const data = await invokeStripeAction("customer_portal", sub);
+    if (!data?.url) throw new Error("A Stripe nao retornou o link do portal.");
+    return data.url as string;
+  };
+
+  const handleOpenCustomerPortal = async (sub: Subscription) => {
+    setCopyingPortalFor(sub.id);
+    try {
+      const url = await getCustomerPortalUrl(sub);
+      window.open(url, "_blank", "noopener,noreferrer");
+      toast({
+        title: "Portal do aluno aberto",
+        description: "Use este link para atualizar pagamento, faturas e dados de cobranca.",
+      });
+    } catch (e: any) {
+      toast({
+        title: "Erro ao abrir portal",
+        description: e?.message ?? "Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setCopyingPortalFor(null);
+    }
+  };
+
+  const handleCopyCustomerPortal = async (sub: Subscription) => {
+    setCopyingPortalFor(sub.id);
+    try {
+      const url = await getCustomerPortalUrl(sub);
+      await navigator.clipboard.writeText(url);
+      toast({
+        title: "Link copiado",
+        description: "Envie ao aluno para atualizar dados de pagamento ou consultar faturas.",
+      });
+    } catch (e: any) {
+      toast({
+        title: "Erro ao copiar link",
+        description: e?.message ?? "Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setCopyingPortalFor(null);
+    }
   };
 
   const getSubscriptionReferenceTime = (sub: Subscription) => {
@@ -308,6 +524,25 @@ export function SubscriptionManager({
   };
 
   const activeSubscription = getActiveSubscription();
+  const activeStripePlanPrices = (planPrices ?? []).filter(
+    (price) => price.ativo && price.stripe_price_id
+  );
+  const selectedChangePlanPrice = activeStripePlanPrices.find(
+    (price) => price.plano === newStripePlan
+  );
+  const selectedChangePlanValue = Number(selectedChangePlanPrice?.valor ?? 0);
+  const selectedChangeFee = calculateNetAfterFees({
+    grossValue: selectedChangePlanValue,
+    platformFeePercent,
+    stripeMethod: "card",
+    stripeFeeConfig: stripeProcessingFees,
+  });
+  const selectedChangeDiscount = calculatePlanDiscount(
+    newStripePlan,
+    selectedChangePlanValue,
+    monthlyPlanValue
+  );
+  const stripeActionCopy = stripeAction ? STRIPE_ACTION_COPY[stripeAction] : null;
 
   if (loading) {
     return <div>Carregando...</div>;
@@ -436,7 +671,22 @@ export function SubscriptionManager({
         </CardHeader>
         <CardContent className={embedded ? "px-0" : undefined}>
           <div className="space-y-3">
-            {subscriptions.map((sub) => (
+            {subscriptions.map((sub) => {
+              const isStripeSubscription = !!sub.stripe_subscription_id;
+              const stripeMethod = normalizeStripePaymentMethod(
+                sub.observacoes,
+                isStripeSubscription,
+              );
+              const fee = calculateNetAfterFees({
+                grossValue: Number(sub.valor) || 0,
+                platformFeePercent,
+                stripeMethod,
+                stripeFeeConfig: stripeProcessingFees,
+              });
+              const cancellationScheduled = !!sub.cancela_no_fim_do_ciclo;
+              const portalLoading = copyingPortalFor === sub.id;
+
+              return (
               <Card
                 key={sub.id}
                 className={cn(
@@ -454,6 +704,17 @@ export function SubscriptionManager({
                           {sub.plano}
                         </span>
                         {getStatusBadge(sub)}
+                        {isStripeSubscription && (
+                          <Badge variant="outline" className="gap-1">
+                            <CreditCard className="h-3 w-3" />
+                            Stripe
+                          </Badge>
+                        )}
+                        {cancellationScheduled && (
+                          <Badge className="bg-amber-500 text-white hover:bg-amber-500">
+                            Renovacao cancelada
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-sm text-muted-foreground">
                         {sub.data_pagamento
@@ -463,14 +724,28 @@ export function SubscriptionManager({
                         {formatDisplayDateOnly(sub.data_expiracao)}
                         {sub.observacoes ? ` - ${sub.observacoes}` : ""}
                       </p>
+                      <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
+                        <div className="rounded-md border bg-background/80 px-3 py-2">
+                          <p className="text-muted-foreground">Cobrado</p>
+                          <p className="font-semibold">{formatCurrencyBRL(fee.gross)}</p>
+                        </div>
+                        <div className="rounded-md border bg-background/80 px-3 py-2">
+                          <p className="text-muted-foreground">Taxa Stripe</p>
+                          <p className="font-semibold">{formatCurrencyBRL(fee.totalFees)}</p>
+                          <p className="text-muted-foreground">
+                            {formatTotalStripeFeeRule(platformFeePercent, fee.stripeFee)}
+                          </p>
+                        </div>
+                        <div className="rounded-md border bg-background/80 px-3 py-2">
+                          <p className="text-muted-foreground">Liquido final est.</p>
+                          <p className="font-semibold">{formatCurrencyBRL(fee.netAfterFees)}</p>
+                          <p className="text-muted-foreground">Apos taxas</p>
+                        </div>
+                      </div>
                     </div>
                     <div className="flex items-center justify-between gap-3 sm:justify-end">
                       <div className="min-w-[86px] text-right text-lg font-bold leading-tight">
-                        R$<br />
-                        {sub.valor.toLocaleString("pt-BR", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
+                        {formatCurrencyBRL(Number(sub.valor) || 0)}
                       </div>
                       {sub.status_pagamento !== "pago" && (
                         <Dialog
@@ -582,6 +857,73 @@ export function SubscriptionManager({
                         </Dialog>
                       )}
                       
+                      {isStripeSubscription && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              disabled={stripeActionLoading || portalLoading}
+                            >
+                              {portalLoading ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <MoreHorizontal className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-64">
+                            <DropdownMenuLabel>Ações Stripe</DropdownMenuLabel>
+                            <DropdownMenuItem onSelect={() => handleOpenChangePlan(sub)}>
+                              <ArrowLeftRight className="mr-2 h-4 w-4" />
+                              Trocar plano
+                            </DropdownMenuItem>
+                            {cancellationScheduled ? (
+                              <DropdownMenuItem
+                                onSelect={() => openStripeActionConfirm(sub, "resume_renewal")}
+                              >
+                                <RotateCcw className="mr-2 h-4 w-4" />
+                                Reativar renovação
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem
+                                onSelect={() => openStripeActionConfirm(sub, "cancel_at_period_end")}
+                              >
+                                <Ban className="mr-2 h-4 w-4" />
+                                Cancelar renovação
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onSelect={(event) => {
+                                event.preventDefault();
+                                handleOpenCustomerPortal(sub);
+                              }}
+                            >
+                              <ExternalLink className="mr-2 h-4 w-4" />
+                              Abrir portal do aluno
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onSelect={(event) => {
+                                event.preventDefault();
+                                handleCopyCustomerPortal(sub);
+                              }}
+                            >
+                              <Copy className="mr-2 h-4 w-4" />
+                              Copiar link do portal
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onSelect={() => openStripeActionConfirm(sub, "cancel_now")}
+                            >
+                              <XCircle className="mr-2 h-4 w-4" />
+                              Cancelar agora
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+
                       {/* Botão Editar */}
                       <Button 
                         size="icon" 
@@ -608,7 +950,8 @@ export function SubscriptionManager({
 
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
 
             {subscriptions.length === 0 && (
               <p className="text-center text-muted-foreground py-8">
@@ -707,6 +1050,134 @@ export function SubscriptionManager({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={changePlanDialogOpen}
+        onOpenChange={(open) => {
+          setChangePlanDialogOpen(open);
+          if (!open) setChangePlanTarget(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Trocar plano na Stripe</DialogTitle>
+            <DialogDescription>
+              Atualiza a assinatura real do aluno com rateio proporcional desativado. Em troca de
+              periodicidade, a Stripe pode reiniciar o ciclo e cobrar o novo periodo.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label>Novo plano</Label>
+              <Select
+                value={newStripePlan}
+                onValueChange={(value) => setNewStripePlan(value as Plano)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PLANOS.map((p) => {
+                    const price = activeStripePlanPrices.find((item) => item.plano === p.value);
+                    return (
+                      <SelectItem key={p.value} value={p.value} disabled={!price}>
+                        {p.label}
+                        {price ? ` - ${formatCurrencyBRL(Number(price.valor) || 0)}` : " - nao sincronizado"}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2 text-sm sm:grid-cols-3">
+              <div className="rounded-md border bg-background/80 p-3">
+                <p className="text-xs text-muted-foreground">Novo valor</p>
+                <p className="font-semibold">{formatCurrencyBRL(selectedChangeFee.gross)}</p>
+              </div>
+              <div className="rounded-md border bg-background/80 p-3">
+                <p className="text-xs text-muted-foreground">Taxa Stripe</p>
+                <p className="font-semibold">{formatCurrencyBRL(selectedChangeFee.totalFees)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {formatTotalStripeFeeRule(platformFeePercent, selectedChangeFee.stripeFee)}
+                </p>
+              </div>
+              <div className="rounded-md border bg-background/80 p-3">
+                <p className="text-xs text-muted-foreground">Liquido final est.</p>
+                <p className="font-semibold">{formatCurrencyBRL(selectedChangeFee.netAfterFees)}</p>
+                <p className="text-xs text-muted-foreground">Apos taxas</p>
+              </div>
+            </div>
+
+            <div className="rounded-md border bg-muted/30 p-3 text-sm">
+              <p className="font-medium">Desconto vs mensal</p>
+              <p className="text-muted-foreground">
+                Valor cheio: {formatCurrencyBRL(selectedChangeDiscount.fullValue)}. Desconto:{" "}
+                {formatCurrencyBRL(selectedChangeDiscount.discountValue)} (
+                {formatPercentBR(selectedChangeDiscount.discountPercent)}).
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setChangePlanDialogOpen(false)}
+              disabled={stripeActionLoading}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleChangeStripePlan}
+              disabled={stripeActionLoading || !selectedChangePlanPrice}
+            >
+              {stripeActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Trocar plano
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={!!stripeAction}
+        onOpenChange={(open) => {
+          if (!open && !stripeActionLoading) {
+            setStripeAction(null);
+            setStripeActionTarget(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{stripeActionCopy?.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {stripeActionCopy?.description}
+              {stripeActionTarget?.data_expiracao
+                ? ` Ciclo atual: ${formatDisplayDateOnly(stripeActionTarget.data_expiracao)}.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={stripeActionLoading}>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                handleConfirmStripeAction();
+              }}
+              disabled={stripeActionLoading}
+              className={
+                stripeActionCopy?.destructive
+                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  : undefined
+              }
+            >
+              {stripeActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {stripeActionCopy?.confirm}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Dialog de Confirmação de Exclusão */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

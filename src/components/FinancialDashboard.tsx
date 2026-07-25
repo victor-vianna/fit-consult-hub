@@ -25,8 +25,15 @@ import {
 } from "lucide-react";
 import { useFinancialDashboard } from "@/hooks/useFinancialDashboard";
 import { useAuth } from "@/hooks/useAuth";
+import { useStripeConnectAccount } from "@/hooks/useStripeConnectAccount";
 import { PersonalPlanPricingForm } from "@/components/PersonalPlanPricingForm";
 import { StripeConnectOnboardingCard } from "@/components/StripeConnectOnboardingCard";
+import {
+  calculateNetAfterFees,
+  DEFAULT_STRIPE_PROCESSING_FEES,
+  formatTotalStripeFeeRule,
+  normalizeStripePaymentMethod,
+} from "@/utils/billing";
 import {
   LineChart,
   Line,
@@ -94,9 +101,13 @@ export function FinancialDashboard() {
   const { user } = useAuth();
   const userId = useMemo(() => user?.id || "", [user?.id]);
   const [paymentFilters, setPaymentFilters] = useState(DEFAULT_PAYMENT_FILTERS);
+  const { data: stripeStatus } = useStripeConnectAccount(userId);
 
   const { metrics, monthlyRevenue, inadimplentesList, paymentDetails, loading } =
     useFinancialDashboard(userId);
+  const platformFeePercent = stripeStatus?.billing_config.application_fee_percent ?? 0;
+  const stripeProcessingFees =
+    stripeStatus?.billing_config.stripe_processing_fees ?? DEFAULT_STRIPE_PROCESSING_FEES;
 
   const planOptions = useMemo(
     () =>
@@ -176,6 +187,46 @@ export function FinancialDashboard() {
         .reduce((sum, payment) => sum + payment.valorParcela, 0),
     [filteredPaymentDetails]
   );
+
+  const filteredPlatformFeeTotal = useMemo(
+    () =>
+      filteredPaymentDetails
+        .filter((payment) => payment.status === "pago")
+        .reduce(
+          (sum, payment) => {
+            const estimated = calculateNetAfterFees({
+              grossValue: payment.valorParcela,
+              platformFeePercent,
+              stripeMethod: normalizeStripePaymentMethod(payment.metodo, payment.isStripePayment),
+              stripeFeeConfig: stripeProcessingFees,
+            });
+            return sum + (typeof payment.platformFeeAmount === "number"
+              ? payment.platformFeeAmount
+              : estimated.platformFee);
+          },
+          0
+        ),
+    [filteredPaymentDetails, platformFeePercent, stripeProcessingFees]
+  );
+
+  const filteredStripeFeeTotal = useMemo(
+    () =>
+      filteredPaymentDetails
+        .filter((payment) => payment.status === "pago")
+        .reduce((sum, payment) => {
+          const estimated = calculateNetAfterFees({
+            grossValue: payment.valorParcela,
+            platformFeePercent,
+            stripeMethod: normalizeStripePaymentMethod(payment.metodo, payment.isStripePayment),
+            stripeFeeConfig: stripeProcessingFees,
+          });
+          return sum + estimated.stripeFee.amount;
+        }, 0),
+    [filteredPaymentDetails, platformFeePercent, stripeProcessingFees]
+  );
+
+  const filteredTotalFee = filteredPlatformFeeTotal + filteredStripeFeeTotal;
+  const filteredNetTotal = filteredReceivedTotal - filteredTotalFee;
 
   const hasActivePaymentFilters = useMemo(
     () => JSON.stringify(paymentFilters) !== JSON.stringify(DEFAULT_PAYMENT_FILTERS),
@@ -557,15 +608,27 @@ export function FinancialDashboard() {
                 </div>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                 <div className="rounded-lg border bg-background p-3">
                   <p className="text-xs text-muted-foreground">Registros encontrados</p>
                   <p className="text-xl font-semibold">{filteredPaymentDetails.length}</p>
                 </div>
                 <div className="rounded-lg border bg-background p-3">
-                  <p className="text-xs text-muted-foreground">Recebido no filtro</p>
+                  <p className="text-xs text-muted-foreground">Recebido bruto</p>
                   <p className="text-xl font-semibold text-green-600 dark:text-green-400">
                     {formatCurrency(filteredReceivedTotal)}
+                  </p>
+                </div>
+                <div className="rounded-lg border bg-background p-3">
+                  <p className="text-xs text-muted-foreground">Taxa Stripe est.</p>
+                  <p className="text-xl font-semibold text-amber-600 dark:text-amber-400">
+                    {formatCurrency(filteredTotalFee)}
+                  </p>
+                </div>
+                <div className="rounded-lg border bg-background p-3">
+                  <p className="text-xs text-muted-foreground">Liquido final est.</p>
+                  <p className="text-xl font-semibold">
+                    {formatCurrency(filteredNetTotal)}
                   </p>
                 </div>
                 <div className="rounded-lg border bg-background p-3">
@@ -593,13 +656,32 @@ export function FinancialDashboard() {
                         <th className="text-right py-3 px-2 font-medium">Valor Total</th>
                         <th className="text-center py-3 px-2 font-medium">Parcela</th>
                         <th className="text-right py-3 px-2 font-medium">Valor Parcela</th>
+                        <th className="text-right py-3 px-2 font-medium">Taxa Stripe</th>
+                        <th className="text-right py-3 px-2 font-medium">Liquido Final</th>
                         <th className="text-center py-3 px-2 font-medium">Data</th>
                         <th className="text-center py-3 px-2 font-medium">Método</th>
                         <th className="text-center py-3 px-2 font-medium">Status</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredPaymentDetails.map((p) => (
+                      {filteredPaymentDetails.map((p) => {
+                        const estimated = calculateNetAfterFees({
+                          grossValue: p.valorParcela,
+                          platformFeePercent,
+                          stripeMethod: normalizeStripePaymentMethod(p.metodo, p.isStripePayment),
+                          stripeFeeConfig: stripeProcessingFees,
+                        });
+                        const platformFee =
+                          p.status === "pago"
+                            ? typeof p.platformFeeAmount === "number"
+                              ? p.platformFeeAmount
+                              : estimated.platformFee
+                            : 0;
+                        const stripeFee = p.status === "pago" ? estimated.stripeFee.amount : 0;
+                        const totalFee = platformFee + stripeFee;
+                        const net = p.status === "pago" ? p.valorParcela - totalFee : 0;
+
+                        return (
                         <tr key={p.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
                           <td className="py-3 px-2 font-medium">{p.studentName}</td>
                           <td className="py-3 px-2">{p.plano}</td>
@@ -611,6 +693,15 @@ export function FinancialDashboard() {
                           </td>
                           <td className="py-3 px-2 text-right font-medium">
                             {formatCurrency(p.valorParcela)}
+                          </td>
+                          <td className="py-3 px-2 text-right text-muted-foreground">
+                            <span className="block">{formatCurrency(totalFee)}</span>
+                            <span className="block text-xs">
+                              {formatTotalStripeFeeRule(platformFeePercent, estimated.stripeFee)}
+                            </span>
+                          </td>
+                          <td className="py-3 px-2 text-right font-medium">
+                            {formatCurrency(net)}
                           </td>
                           <td className="py-3 px-2 text-center text-muted-foreground">
                             {formatDisplayDate(p.dataPagamento)}
@@ -629,7 +720,8 @@ export function FinancialDashboard() {
                             </Badge>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

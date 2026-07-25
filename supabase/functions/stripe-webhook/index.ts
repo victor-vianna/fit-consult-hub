@@ -265,6 +265,10 @@ Deno.serve(async (req) => {
 
         if (existingPayment) break;
 
+        const applicationFeeAmount = typeof (inv as any).application_fee_amount === "number"
+          ? (inv as any).application_fee_amount / 100
+          : null;
+
         await admin.from("payment_history").insert({
           subscription_id: row.id,
           student_id: row.student_id,
@@ -274,6 +278,7 @@ Deno.serve(async (req) => {
           metodo_pagamento: stripeAccountId ? "stripe_connect" : "stripe",
           stripe_account_id: stripeAccountId ?? null,
           stripe_invoice_id: inv.id,
+          stripe_application_fee_amount: applicationFeeAmount,
           stripe_payment_intent_id: typeof (inv as any).payment_intent === "string"
             ? (inv as any).payment_intent
             : null,
@@ -306,6 +311,12 @@ Deno.serve(async (req) => {
         const updates: any = {
           cancela_no_fim_do_ciclo: !!sub.cancel_at_period_end,
         };
+        const plano = sub.metadata?.plano as Plano | undefined;
+        if (plano) updates.plano = plano;
+        const unitAmount = sub.items.data[0]?.price?.unit_amount;
+        if (typeof unitAmount === "number") {
+          updates.valor = unitAmount / 100;
+        }
         if ((sub as any).current_period_end) {
           updates.data_expiracao = new Date((sub as any).current_period_end * 1000).toISOString();
         }

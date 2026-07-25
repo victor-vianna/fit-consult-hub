@@ -14,7 +14,16 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePersonalPlanPrices, Plano } from "@/hooks/usePersonalPlanPrices";
+import { useStripeConnectAccount } from "@/hooks/useStripeConnectAccount";
 import { cn } from "@/lib/utils";
+import {
+  calculatePlanDiscount,
+  calculateNetAfterFees,
+  DEFAULT_STRIPE_PROCESSING_FEES,
+  formatCurrencyBRL,
+  formatPercentBR,
+  formatTotalStripeFeeRule,
+} from "@/utils/billing";
 import {
   Tooltip,
   TooltipContent,
@@ -34,19 +43,10 @@ interface FormState {
   ativo: boolean;
 }
 
-function formatCurrency(value: string) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) return "R$ 0,00";
-
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(parsed);
-}
-
 export function PersonalPlanPricingForm() {
   const { user } = useAuth();
   const { data: prices, isLoading, savePrices } = usePersonalPlanPrices(user?.id);
+  const { data: stripeStatus } = useStripeConnectAccount(user?.id);
   const [editingPlan, setEditingPlan] = useState<Plano | null>(null);
   const [form, setForm] = useState<Record<Plano, FormState>>({
     mensal: { valor: "", ativo: true },
@@ -70,6 +70,12 @@ export function PersonalPlanPricingForm() {
     setForm(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prices]);
+
+  const platformFeePercent = stripeStatus?.billing_config.application_fee_percent ?? 0;
+  const stripeProcessingFees =
+    stripeStatus?.billing_config.stripe_processing_fees ?? DEFAULT_STRIPE_PROCESSING_FEES;
+  const feeConfigured = stripeStatus?.billing_config.application_fee_configured ?? false;
+  const monthlyValue = Number(form.mensal.valor) || 0;
 
   const handleSave = () => {
     const payload = PLANOS
@@ -112,12 +118,48 @@ export function PersonalPlanPricingForm() {
           </div>
         ) : (
           <>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-lg border bg-background/70 p-4">
+                <p className="text-xs text-muted-foreground">Taxa Stripe</p>
+                <p className="mt-1 text-xl font-semibold">
+                  {formatPercentBR(platformFeePercent)}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {feeConfigured
+                    ? "Aplicada automaticamente nos checkouts Stripe."
+                    : "Nao configurada no secret STRIPE_APPLICATION_FEE_PERCENT."}
+                </p>
+              </div>
+              <div className="rounded-lg border bg-background/70 p-4">
+                <p className="text-xs text-muted-foreground">Desconto dos planos</p>
+                <p className="mt-1 text-xl font-semibold">Vs mensal</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Trimestral, semestral e anual usam o mensal como base cheia.
+                </p>
+              </div>
+              <div className="rounded-lg border bg-background/70 p-4">
+                <p className="text-xs text-muted-foreground">Liquido estimado</p>
+                <p className="mt-1 text-xl font-semibold">Apos taxas</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Subtrai a taxa Stripe estimada exibida nos planos.
+                </p>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {PLANOS.map(({ plano, label, descricao }) => {
                 const existing = prices?.find((p) => p.plano === plano);
                 const isActive = form[plano].ativo;
                 const isEditing = editingPlan === plano;
                 const isSynced = existing?.stripe_price_id && existing?.stripe_account_id;
+                const planValue = Number(form[plano].valor) || 0;
+                const fee = calculateNetAfterFees({
+                  grossValue: planValue,
+                  platformFeePercent,
+                  stripeMethod: "card",
+                  stripeFeeConfig: stripeProcessingFees,
+                });
+                const discount = calculatePlanDiscount(plano, planValue, monthlyValue);
                 return (
                   <div
                     key={plano}
@@ -202,13 +244,43 @@ export function PersonalPlanPricingForm() {
                           )}
                         >
                           <span className="text-3xl font-bold tracking-normal">
-                            {formatCurrency(form[plano].valor)}
+                            {formatCurrencyBRL(planValue)}
                           </span>
                           <span className="mb-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
                             <Pencil className="h-3.5 w-3.5" />
                             Editar
                           </span>
                         </button>
+                      )}
+                    </div>
+
+                    <div className="mt-4 grid gap-2 text-xs sm:grid-cols-2">
+                      <div className="rounded-md border bg-background/80 p-2">
+                        <p className="text-muted-foreground">Taxa Stripe</p>
+                        <p className="font-semibold">{formatCurrencyBRL(fee.totalFees)}</p>
+                        <p className="text-muted-foreground">
+                          {formatTotalStripeFeeRule(platformFeePercent, fee.stripeFee)}
+                        </p>
+                      </div>
+                      <div className="rounded-md border bg-background/80 p-2">
+                        <p className="text-muted-foreground">
+                          Liquido final
+                        </p>
+                        <p className="font-semibold">{formatCurrencyBRL(fee.netAfterFees)}</p>
+                        <p className="text-muted-foreground">
+                          Apos taxas
+                        </p>
+                      </div>
+                      {plano !== "mensal" && (
+                        <div className="rounded-md border bg-background/80 p-2 sm:col-span-2">
+                          <p className="text-muted-foreground">Desconto vs mensal</p>
+                          <p className="font-semibold">
+                            {formatCurrencyBRL(discount.discountValue)} ({formatPercentBR(discount.discountPercent)})
+                          </p>
+                          <p className="text-muted-foreground">
+                            Valor cheio: {formatCurrencyBRL(discount.fullValue)}
+                          </p>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -223,11 +295,11 @@ export function PersonalPlanPricingForm() {
                     <TooltipTrigger asChild>
                       <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground sm:mr-auto">
                         <Info className="h-3.5 w-3.5" />
-                        Valores enviados para a Stripe ao salvar.
+                        Valores, taxa Stripe e descontos ficam visiveis antes de salvar.
                       </span>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs">
-                      Mudar um valor desativa o preco antigo e cria um novo. Assinaturas existentes seguem com o valor original.
+                      Mudar um valor desativa o preco antigo e cria um novo. Assinaturas existentes seguem com o valor original ate serem alteradas.
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>

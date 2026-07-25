@@ -16,6 +16,48 @@ function json(body: unknown, status = 200) {
   });
 }
 
+function getApplicationFeePercent() {
+  const raw = Deno.env.get("STRIPE_APPLICATION_FEE_PERCENT");
+  if (!raw) return { percent: 0, configured: false };
+
+  const fee = Number(raw);
+  if (!Number.isFinite(fee) || fee < 0 || fee >= 100) {
+    return { percent: 0, configured: false };
+  }
+
+  return { percent: Math.round(fee * 100) / 100, configured: true };
+}
+
+function getNumberEnv(name: string, fallback: number) {
+  const raw = Deno.env.get(name);
+  if (!raw) return fallback;
+
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? Math.round(value * 100) / 100 : fallback;
+}
+
+function getBillingConfig() {
+  const fee = getApplicationFeePercent();
+  return {
+    application_fee_percent: fee.percent,
+    application_fee_configured: fee.configured,
+    stripe_processing_fees: {
+      card: {
+        percent: getNumberEnv("STRIPE_CARD_PROCESSING_FEE_PERCENT", 3.99),
+        fixed: getNumberEnv("STRIPE_CARD_PROCESSING_FEE_FIXED", 0.39),
+      },
+      pix: {
+        percent: getNumberEnv("STRIPE_PIX_PROCESSING_FEE_PERCENT", 1.19),
+        fixed: getNumberEnv("STRIPE_PIX_PROCESSING_FEE_FIXED", 0),
+      },
+      boleto: {
+        percent: getNumberEnv("STRIPE_BOLETO_PROCESSING_FEE_PERCENT", 0),
+        fixed: getNumberEnv("STRIPE_BOLETO_PROCESSING_FEE_FIXED", 3.45),
+      },
+    },
+  };
+}
+
 function normalizeRequirements(values?: string[] | null) {
   return Array.isArray(values) ? values : [];
 }
@@ -127,9 +169,10 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     let stripeAccountId = existing?.stripe_account_id as string | undefined;
+    const billingConfig = getBillingConfig();
 
     if (!stripeAccountId && action === "status") {
-      return json({ connected: false, account: null });
+      return json({ connected: false, account: null, billing_config: billingConfig });
     }
 
     if (!stripeAccountId) {
@@ -158,11 +201,12 @@ Deno.serve(async (req) => {
     if (action === "dashboard") {
       if (accountType === "express") {
         const loginLink = await stripe.accounts.createLoginLink(stripeAccountId);
-        return json({ connected: true, account: synced, url: loginLink.url });
+        return json({ connected: true, account: synced, billing_config: billingConfig, url: loginLink.url });
       }
       return json({
         connected: true,
         account: synced,
+        billing_config: billingConfig,
         url: "https://dashboard.stripe.com",
       });
     }
@@ -178,10 +222,10 @@ Deno.serve(async (req) => {
         type: "account_onboarding",
       });
 
-      return json({ connected: true, account: synced, url: accountLink.url });
+      return json({ connected: true, account: synced, billing_config: billingConfig, url: accountLink.url });
     }
 
-    return json({ connected: true, account: synced });
+    return json({ connected: true, account: synced, billing_config: billingConfig });
   } catch (err: any) {
     console.error("[stripe-connect-account]", err);
     return json({ error: err?.message || "Internal error" }, 500);

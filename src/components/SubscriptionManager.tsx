@@ -203,6 +203,7 @@ export function SubscriptionManager({
   const [dataPagamento, setDataPagamento] = useState<string>(formatDateForInput(new Date()));
   const [metodoPagamento, setMetodoPagamento] = useState<string>("");
   const [observacoesPagamento, setObservacoesPagamento] = useState<string>("");
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
 
   const platformFeePercent = stripeStatus?.billing_config.application_fee_percent ?? 0;
   const stripeProcessingFees =
@@ -246,22 +247,27 @@ export function SubscriptionManager({
   };
 
   const handleRegisterPayment = async () => {
-    if (!selectedSubscription || !valorPagamento) return;
+    if (!selectedSubscription || !valorPagamento || paymentSubmitting) return;
 
-    await registerPayment(selectedSubscription, {
-      valor: parseFloat(valorPagamento),
-      data_pagamento: dataPagamento,
-      metodo_pagamento: metodoPagamento || undefined,
-      observacoes: observacoesPagamento || undefined,
-    });
+    setPaymentSubmitting(true);
+    try {
+      await registerPayment(selectedSubscription, {
+        valor: parseFloat(valorPagamento),
+        data_pagamento: dataPagamento,
+        metodo_pagamento: metodoPagamento || undefined,
+        observacoes: observacoesPagamento || undefined,
+      });
 
-    // Reset form
-    setValorPagamento("");
-    setDataPagamento(formatDateForInput(new Date()));
-    setMetodoPagamento("");
-    setObservacoesPagamento("");
-    setPaymentDialogOpen(false);
-    onChanged?.();
+      // Reset form
+      setValorPagamento("");
+      setDataPagamento(formatDateForInput(new Date()));
+      setMetodoPagamento("");
+      setObservacoesPagamento("");
+      setPaymentDialogOpen(false);
+      onChanged?.();
+    } finally {
+      setPaymentSubmitting(false);
+    }
   };
 
   const handleOpenEdit = (sub: Subscription) => {
@@ -290,33 +296,6 @@ export function SubscriptionManager({
       status_pagamento: editStatus as any,
       observacoes: editObservacoes || null,
     });
-
-    // Se o status passou a "pago" e há data de pagamento informada, garantir
-    // que exista um registro correspondente no histórico de pagamentos.
-    if (editStatus === "pago" && novaDataPagamento) {
-      try {
-        const dataDia = novaDataPagamento.split("T")[0];
-        const { data: existentes } = await supabase
-          .from("payment_history")
-          .select("id, data_pagamento")
-          .eq("subscription_id", subscriptionToEdit.id);
-        const jaExiste = (existentes ?? []).some(
-          (p) => (p.data_pagamento || "").split("T")[0] === dataDia
-        );
-        if (!jaExiste) {
-          await supabase.from("payment_history").insert({
-            subscription_id: subscriptionToEdit.id,
-            student_id: subscriptionToEdit.student_id,
-            personal_id: subscriptionToEdit.personal_id,
-            valor: parseFloat(editValor),
-            data_pagamento: novaDataPagamento,
-            observacoes: editObservacoes || "Pagamento registrado via edição da assinatura",
-          });
-        }
-      } catch (e) {
-        console.error("Falha ao sincronizar histórico de pagamentos:", e);
-      }
-    }
 
     setEditDialogOpen(false);
     setSubscriptionToEdit(null);
@@ -753,6 +732,7 @@ export function SubscriptionManager({
                             paymentDialogOpen && selectedSubscription === sub.id
                           }
                           onOpenChange={(open) => {
+                            if (paymentSubmitting) return;
                             setPaymentDialogOpen(open);
                             if (open) {
                               setSelectedSubscription(sub.id);
@@ -846,11 +826,15 @@ export function SubscriptionManager({
                               <Button
                                 variant="outline"
                                 onClick={() => setPaymentDialogOpen(false)}
+                                disabled={paymentSubmitting}
                               >
                                 Cancelar
                               </Button>
-                              <Button onClick={handleRegisterPayment}>
-                                Confirmar Pagamento
+                              <Button
+                                onClick={handleRegisterPayment}
+                                disabled={paymentSubmitting || !valorPagamento}
+                              >
+                                {paymentSubmitting ? "Registrando..." : "Confirmar Pagamento"}
                               </Button>
                             </DialogFooter>
                           </DialogContent>

@@ -36,6 +36,48 @@ export interface PaymentHistory {
   created_at: string;
 }
 
+type PaymentHistoryDraft = {
+  subscription_id: string;
+  student_id: string;
+  personal_id: string;
+  valor: number;
+  data_pagamento: string;
+  metodo_pagamento?: string;
+  observacoes?: string;
+};
+
+type ExistingPaymentHistory = {
+  id: string;
+  valor: number;
+  data_pagamento: string;
+  metodo_pagamento: string | null;
+  observacoes: string | null;
+};
+
+const roundCurrency = (value: number) => Math.round(Number(value || 0) * 100) / 100;
+
+const getPaymentDayKey = (date: string) => {
+  const parsed = new Date(date);
+  if (!Number.isFinite(parsed.getTime())) return String(date || "");
+  return parsed.toISOString().split("T")[0];
+};
+
+const normalizePaymentText = (value: unknown) =>
+  String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const isSameFinancialPayment = (
+  existing: ExistingPaymentHistory,
+  draft: PaymentHistoryDraft
+) =>
+  getPaymentDayKey(existing.data_pagamento) === getPaymentDayKey(draft.data_pagamento) &&
+  Math.abs(roundCurrency(existing.valor) - roundCurrency(draft.valor)) <= 0.01 &&
+  normalizePaymentText(existing.metodo_pagamento) === normalizePaymentText(draft.metodo_pagamento) &&
+  normalizePaymentText(existing.observacoes) === normalizePaymentText(draft.observacoes);
+
 export function useSubscriptions(studentId?: string, personalId?: string) {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
@@ -186,7 +228,7 @@ export function useSubscriptions(studentId?: string, personalId?: string) {
 
       // Registrar no histórico - com suporte a parcelas
       const valorParcela = paymentData.valor / parcelas;
-      const paymentRecords = [];
+      const paymentRecords: PaymentHistoryDraft[] = [];
 
       for (let i = 0; i < parcelas; i++) {
         const dataParcela = new Date(dataPagamentoBase);
@@ -205,9 +247,31 @@ export function useSubscriptions(studentId?: string, personalId?: string) {
         });
       }
 
+      const { data: existingPayments, error: existingPaymentsError } = await supabase
+        .from("payment_history")
+        .select("id, valor, data_pagamento, metodo_pagamento, observacoes")
+        .eq("subscription_id", subscriptionId);
+
+      if (existingPaymentsError) throw existingPaymentsError;
+
+      const newPaymentRecords = paymentRecords.filter(
+        (record) =>
+          !(existingPayments || []).some((existing) =>
+            isSameFinancialPayment(existing, record)
+          )
+      );
+
+      if (newPaymentRecords.length === 0) {
+        toast({
+          title: "Pagamento já registrado",
+          description: "Esta baixa já existe no histórico financeiro.",
+        });
+        return;
+      }
+
       const { error: historyError } = await supabase
         .from("payment_history")
-        .insert(paymentRecords);
+        .insert(newPaymentRecords);
 
       if (historyError) throw historyError;
 

@@ -24,6 +24,9 @@ type FinancialPaymentRow = {
   stripe_account_id?: string | null;
   stripe_invoice_id?: string | null;
   stripe_application_fee_amount?: number | null;
+  stripe_payment_method_type?: string | null;
+  stripe_processing_fee_amount?: number | null;
+  stripe_net_amount?: number | null;
 };
 
 export interface FinancialMetrics {
@@ -70,6 +73,9 @@ export interface PaymentDetail {
   status: string;
   metodo: string;
   platformFeeAmount: number | null;
+  stripePaymentMethodType: string | null;
+  stripeProcessingFeeAmount: number | null;
+  stripeNetAmount: number | null;
   isStripePayment: boolean;
 }
 
@@ -409,10 +415,21 @@ export function useFinancialDashboard(personalId: string) {
           parcelaAtual,
           dataPagamento: p.data_pagamento,
           status: "pago",
-          metodo: p.metodo_pagamento || "—",
+          metodo: p.stripe_payment_method_type
+            ? `stripe_${p.stripe_payment_method_type}`
+            : p.metodo_pagamento || "—",
           platformFeeAmount:
             typeof p.stripe_application_fee_amount === "number"
               ? Number(p.stripe_application_fee_amount)
+              : null,
+          stripePaymentMethodType: p.stripe_payment_method_type ?? null,
+          stripeProcessingFeeAmount:
+            typeof p.stripe_processing_fee_amount === "number"
+              ? Number(p.stripe_processing_fee_amount)
+              : null,
+          stripeNetAmount:
+            typeof p.stripe_net_amount === "number"
+              ? Number(p.stripe_net_amount)
               : null,
           isStripePayment: !!p.stripe_invoice_id || String(p.metodo_pagamento ?? "").includes("stripe"),
         };
@@ -437,6 +454,9 @@ export function useFinancialDashboard(personalId: string) {
           status: "pendente",
           metodo: "—",
           platformFeeAmount: null,
+          stripePaymentMethodType: null,
+          stripeProcessingFeeAmount: null,
+          stripeNetAmount: null,
           isStripePayment: false,
         });
       }

@@ -23,7 +23,7 @@ import {
   Search,
   FilterX,
 } from "lucide-react";
-import { useFinancialDashboard } from "@/hooks/useFinancialDashboard";
+import { useFinancialDashboard, type PaymentDetail } from "@/hooks/useFinancialDashboard";
 import { useAuth } from "@/hooks/useAuth";
 import { useStripeConnectAccount } from "@/hooks/useStripeConnectAccount";
 import { PersonalPlanPricingForm } from "@/components/PersonalPlanPricingForm";
@@ -77,6 +77,85 @@ const getDateTime = (value: string, endOfDay = false) => {
   const time = date.getTime();
   return Number.isFinite(time) ? time : null;
 };
+
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value);
+
+const roundCurrencyValue = (value: number) => Math.round(Number(value || 0) * 100) / 100;
+
+const formatPaymentMethod = (method: string) => {
+  const normalized = normalizeText(method).replace(/^stripe_/, "");
+
+  if (!normalized || normalized === "—") return "—";
+  if (normalized === "pix") return "Pix";
+  if (normalized === "card" || normalized === "cartao") return "Cartao";
+  if (normalized === "boleto") return "Boleto";
+  if (normalized === "connect" || normalized === "stripe") return "Stripe";
+
+  return method.replace(/^stripe_/i, "");
+};
+
+function getPaymentFinancialAmounts(
+  payment: PaymentDetail,
+  platformFeePercent: number,
+  stripeProcessingFees: typeof DEFAULT_STRIPE_PROCESSING_FEES
+) {
+  const estimated = calculateNetAfterFees({
+    grossValue: payment.valorParcela,
+    platformFeePercent,
+    stripeMethod: normalizeStripePaymentMethod(payment.metodo, payment.isStripePayment),
+    stripeFeeConfig: stripeProcessingFees,
+  });
+
+  if (payment.status !== "pago") {
+    return {
+      estimated,
+      platformFee: 0,
+      stripeProcessingFee: 0,
+      totalFee: 0,
+      net: 0,
+      feeLabel: formatTotalStripeFeeRule(platformFeePercent, estimated.stripeFee),
+    };
+  }
+
+  const gross = roundCurrencyValue(payment.valorParcela);
+  const platformFee = isFiniteNumber(payment.platformFeeAmount)
+    ? roundCurrencyValue(payment.platformFeeAmount)
+    : estimated.platformFee;
+
+  if (isFiniteNumber(payment.stripeNetAmount)) {
+    const net = roundCurrencyValue(payment.stripeNetAmount);
+    const totalFee = Math.max(0, roundCurrencyValue(gross - net));
+    const stripeProcessingFee = isFiniteNumber(payment.stripeProcessingFeeAmount)
+      ? roundCurrencyValue(payment.stripeProcessingFeeAmount)
+      : Math.max(0, roundCurrencyValue(totalFee - platformFee));
+
+    return {
+      estimated,
+      platformFee,
+      stripeProcessingFee,
+      totalFee,
+      net,
+      feeLabel: "Valor real Stripe",
+    };
+  }
+
+  const stripeProcessingFee = isFiniteNumber(payment.stripeProcessingFeeAmount)
+    ? roundCurrencyValue(payment.stripeProcessingFeeAmount)
+    : estimated.stripeFee.amount;
+  const totalFee = roundCurrencyValue(platformFee + stripeProcessingFee);
+
+  return {
+    estimated,
+    platformFee,
+    stripeProcessingFee,
+    totalFee,
+    net: roundCurrencyValue(gross - totalFee),
+    feeLabel: isFiniteNumber(payment.stripeProcessingFeeAmount)
+      ? "Valor real Stripe"
+      : formatTotalStripeFeeRule(platformFeePercent, estimated.stripeFee),
+  };
+}
 
 function ComparisonBadge({ value, label }: { value: number; label: string }) {
   return (
@@ -146,6 +225,7 @@ export function FinancialDashboard() {
           payment.studentName,
           payment.plano,
           payment.metodo,
+          formatPaymentMethod(payment.metodo),
           payment.status,
           payment.parcelaAtual,
           payment.valorTotal,
@@ -188,45 +268,31 @@ export function FinancialDashboard() {
     [filteredPaymentDetails]
   );
 
-  const filteredPlatformFeeTotal = useMemo(
+  const filteredTotalFee = useMemo(
     () =>
       filteredPaymentDetails
         .filter((payment) => payment.status === "pago")
         .reduce(
-          (sum, payment) => {
-            const estimated = calculateNetAfterFees({
-              grossValue: payment.valorParcela,
-              platformFeePercent,
-              stripeMethod: normalizeStripePaymentMethod(payment.metodo, payment.isStripePayment),
-              stripeFeeConfig: stripeProcessingFees,
-            });
-            return sum + (typeof payment.platformFeeAmount === "number"
-              ? payment.platformFeeAmount
-              : estimated.platformFee);
-          },
+          (sum, payment) =>
+            sum +
+            getPaymentFinancialAmounts(payment, platformFeePercent, stripeProcessingFees).totalFee,
           0
         ),
     [filteredPaymentDetails, platformFeePercent, stripeProcessingFees]
   );
 
-  const filteredStripeFeeTotal = useMemo(
+  const filteredNetTotal = useMemo(
     () =>
       filteredPaymentDetails
         .filter((payment) => payment.status === "pago")
-        .reduce((sum, payment) => {
-          const estimated = calculateNetAfterFees({
-            grossValue: payment.valorParcela,
-            platformFeePercent,
-            stripeMethod: normalizeStripePaymentMethod(payment.metodo, payment.isStripePayment),
-            stripeFeeConfig: stripeProcessingFees,
-          });
-          return sum + estimated.stripeFee.amount;
-        }, 0),
+        .reduce(
+          (sum, payment) =>
+            sum +
+            getPaymentFinancialAmounts(payment, platformFeePercent, stripeProcessingFees).net,
+          0
+        ),
     [filteredPaymentDetails, platformFeePercent, stripeProcessingFees]
   );
-
-  const filteredTotalFee = filteredPlatformFeeTotal + filteredStripeFeeTotal;
-  const filteredNetTotal = filteredReceivedTotal - filteredTotalFee;
 
   const hasActivePaymentFilters = useMemo(
     () => JSON.stringify(paymentFilters) !== JSON.stringify(DEFAULT_PAYMENT_FILTERS),
@@ -530,7 +596,7 @@ export function FinancialDashboard() {
                         <SelectItem value="all">Todos</SelectItem>
                         {methodOptions.map((method) => (
                           <SelectItem key={method} value={method}>
-                            {method}
+                            {formatPaymentMethod(method)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -665,21 +731,11 @@ export function FinancialDashboard() {
                     </thead>
                     <tbody>
                       {filteredPaymentDetails.map((p) => {
-                        const estimated = calculateNetAfterFees({
-                          grossValue: p.valorParcela,
+                        const amounts = getPaymentFinancialAmounts(
+                          p,
                           platformFeePercent,
-                          stripeMethod: normalizeStripePaymentMethod(p.metodo, p.isStripePayment),
-                          stripeFeeConfig: stripeProcessingFees,
-                        });
-                        const platformFee =
-                          p.status === "pago"
-                            ? typeof p.platformFeeAmount === "number"
-                              ? p.platformFeeAmount
-                              : estimated.platformFee
-                            : 0;
-                        const stripeFee = p.status === "pago" ? estimated.stripeFee.amount : 0;
-                        const totalFee = platformFee + stripeFee;
-                        const net = p.status === "pago" ? p.valorParcela - totalFee : 0;
+                          stripeProcessingFees
+                        );
 
                         return (
                         <tr key={p.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
@@ -695,18 +751,18 @@ export function FinancialDashboard() {
                             {formatCurrency(p.valorParcela)}
                           </td>
                           <td className="py-3 px-2 text-right text-muted-foreground">
-                            <span className="block">{formatCurrency(totalFee)}</span>
+                            <span className="block">{formatCurrency(amounts.totalFee)}</span>
                             <span className="block text-xs">
-                              {formatTotalStripeFeeRule(platformFeePercent, estimated.stripeFee)}
+                              {amounts.feeLabel}
                             </span>
                           </td>
                           <td className="py-3 px-2 text-right font-medium">
-                            {formatCurrency(net)}
+                            {formatCurrency(amounts.net)}
                           </td>
                           <td className="py-3 px-2 text-center text-muted-foreground">
                             {formatDisplayDate(p.dataPagamento)}
                           </td>
-                          <td className="py-3 px-2 text-center capitalize">{p.metodo}</td>
+                          <td className="py-3 px-2 text-center">{formatPaymentMethod(p.metodo)}</td>
                           <td className="py-3 px-2 text-center">
                             <Badge
                               variant={p.status === "pago" ? "default" : "secondary"}

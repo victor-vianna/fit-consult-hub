@@ -18,6 +18,104 @@ function normalizeRequirements(values?: string[] | null) {
   return Array.isArray(values) ? values : [];
 }
 
+function stripeOptions(stripeAccountId?: string | null) {
+  return stripeAccountId ? { stripeAccount: stripeAccountId } : undefined;
+}
+
+function centsToMoney(value?: number | null) {
+  return typeof value === "number" ? value / 100 : null;
+}
+
+function normalizePaymentMethodType(value?: string | null) {
+  const method = String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  if (method.includes("pix")) return "pix";
+  if (method.includes("boleto")) return "boleto";
+  if (method.includes("card") || method.includes("cartao")) return "card";
+  return method || null;
+}
+
+function getObjectId(value: unknown): string | null {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "object" && "id" in value) {
+    const id = (value as { id?: unknown }).id;
+    return typeof id === "string" ? id : null;
+  }
+  return null;
+}
+
+async function retrieveStripePaymentDetails(
+  stripe: Stripe,
+  invoice: Stripe.Invoice,
+  stripeAccountId?: string | null,
+) {
+  const options = stripeOptions(stripeAccountId);
+  const invoiceAny = invoice as any;
+  const paymentIntentId = getObjectId(invoiceAny.payment_intent);
+  let paymentIntent: any = null;
+  let charge: any = null;
+
+  if (paymentIntentId) {
+    paymentIntent = await stripe.paymentIntents.retrieve(
+      paymentIntentId,
+      { expand: ["payment_method", "latest_charge.balance_transaction"] },
+      options,
+    );
+    charge = typeof paymentIntent.latest_charge === "object"
+      ? paymentIntent.latest_charge
+      : null;
+  }
+
+  const invoiceChargeId = getObjectId(invoiceAny.charge);
+  const chargeId = getObjectId(charge) || invoiceChargeId;
+  if (!charge && chargeId) {
+    charge = await stripe.charges.retrieve(
+      chargeId,
+      { expand: ["balance_transaction"] },
+      options,
+    );
+  }
+
+  const paymentMethodType = normalizePaymentMethodType(
+    charge?.payment_method_details?.type ||
+      paymentIntent?.payment_method?.type ||
+      paymentIntent?.payment_method_types?.[0] ||
+      invoiceAny.payment_settings?.payment_method_types?.[0],
+  );
+
+  const balanceTransaction =
+    typeof charge?.balance_transaction === "object"
+      ? charge.balance_transaction
+      : getObjectId(charge?.balance_transaction)
+        ? await stripe.balanceTransactions.retrieve(
+          getObjectId(charge.balance_transaction)!,
+          {},
+          options,
+        )
+        : null;
+
+  const applicationFeeId = getObjectId(charge?.application_fee);
+  const applicationFeeAmount =
+    centsToMoney(invoiceAny.application_fee_amount) ??
+    centsToMoney(charge?.application_fee_amount);
+
+  return {
+    paymentIntentId,
+    chargeId,
+    balanceTransactionId: getObjectId(balanceTransaction),
+    paymentMethodType,
+    processingFeeAmount: centsToMoney(balanceTransaction?.fee),
+    netAmount: centsToMoney(balanceTransaction?.net),
+    applicationFeeId,
+    applicationFeeAmount,
+    currency: balanceTransaction?.currency || invoice.currency || null,
+  };
+}
+
 async function constructStripeEvent(
   stripe: Stripe,
   rawBody: string,
@@ -265,9 +363,31 @@ Deno.serve(async (req) => {
 
         if (existingPayment) break;
 
-        const applicationFeeAmount = typeof (inv as any).application_fee_amount === "number"
-          ? (inv as any).application_fee_amount / 100
-          : null;
+        let paymentDetails = {
+          paymentIntentId: getObjectId((inv as any).payment_intent),
+          chargeId: getObjectId((inv as any).charge),
+          balanceTransactionId: null as string | null,
+          paymentMethodType: null as string | null,
+          processingFeeAmount: null as number | null,
+          netAmount: null as number | null,
+          applicationFeeId: null as string | null,
+          applicationFeeAmount: centsToMoney((inv as any).application_fee_amount),
+          currency: inv.currency ?? null,
+        };
+
+        try {
+          paymentDetails = await retrieveStripePaymentDetails(
+            stripe,
+            inv,
+            stripeAccountId ?? null,
+          );
+        } catch (detailError) {
+          console.error("Falha ao buscar detalhes financeiros Stripe:", detailError);
+        }
+
+        const methodLabel = paymentDetails.paymentMethodType
+          ? `stripe_${paymentDetails.paymentMethodType}`
+          : stripeAccountId ? "stripe_connect" : "stripe";
 
         await admin.from("payment_history").insert({
           subscription_id: row.id,
@@ -275,14 +395,18 @@ Deno.serve(async (req) => {
           personal_id: row.personal_id,
           valor: (inv.amount_paid ?? 0) / 100,
           data_pagamento: new Date().toISOString(),
-          metodo_pagamento: stripeAccountId ? "stripe_connect" : "stripe",
+          metodo_pagamento: methodLabel,
           stripe_account_id: stripeAccountId ?? null,
           stripe_invoice_id: inv.id,
-          stripe_application_fee_amount: applicationFeeAmount,
-          stripe_payment_intent_id: typeof (inv as any).payment_intent === "string"
-            ? (inv as any).payment_intent
-            : null,
-          stripe_currency: inv.currency ?? null,
+          stripe_application_fee_id: paymentDetails.applicationFeeId,
+          stripe_application_fee_amount: paymentDetails.applicationFeeAmount,
+          stripe_payment_intent_id: paymentDetails.paymentIntentId,
+          stripe_charge_id: paymentDetails.chargeId,
+          stripe_balance_transaction_id: paymentDetails.balanceTransactionId,
+          stripe_payment_method_type: paymentDetails.paymentMethodType,
+          stripe_processing_fee_amount: paymentDetails.processingFeeAmount,
+          stripe_net_amount: paymentDetails.netAmount,
+          stripe_currency: paymentDetails.currency,
           observacoes: stripeAccountId ? "Pagamento via Stripe Connect" : "Pagamento via Stripe",
         });
         break;

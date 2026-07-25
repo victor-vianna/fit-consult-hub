@@ -104,6 +104,8 @@ interface Aluno {
   updated_at: string;
 }
 
+const FILE_PICKER_GUARD_RELEASE_DELAY_MS = 800;
+
 export default function AlunoDetalhes() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -115,6 +117,13 @@ export default function AlunoDetalhes() {
   const [materiais, setMateriais] = useState<Material[]>([]);
   const [loading, setLoading] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
+  const [materialDraft, setMaterialDraft] = useState({
+    titulo: "",
+    tipo: "",
+    descricao: "",
+  });
+  const [materialFile, setMaterialFile] = useState<File | null>(null);
+  const [filePickerActive, setFilePickerActive] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const { settings: personalSettings } = usePersonalSettings(user?.id);
@@ -167,6 +176,33 @@ export default function AlunoDetalhes() {
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  useEffect(() => {
+    if (!filePickerActive) return;
+
+    const releaseFilePickerGuard = () => {
+      window.setTimeout(
+        () => setFilePickerActive(false),
+        FILE_PICKER_GUARD_RELEASE_DELAY_MS
+      );
+    };
+
+    const releaseWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        releaseFilePickerGuard();
+      }
+    };
+
+    window.addEventListener("focus", releaseFilePickerGuard);
+    window.addEventListener("pageshow", releaseFilePickerGuard);
+    document.addEventListener("visibilitychange", releaseWhenVisible);
+
+    return () => {
+      window.removeEventListener("focus", releaseFilePickerGuard);
+      window.removeEventListener("pageshow", releaseFilePickerGuard);
+      document.removeEventListener("visibilitychange", releaseWhenVisible);
+    };
+  }, [filePickerActive]);
 
   useEffect(() => {
     if (id && user) {
@@ -226,14 +262,65 @@ export default function AlunoDetalhes() {
     }
   };
 
+  const resetMaterialUploadForm = () => {
+    setMaterialDraft({
+      titulo: "",
+      tipo: "",
+      descricao: "",
+    });
+    setMaterialFile(null);
+    setFilePickerActive(false);
+  };
+
+  const handleMaterialDialogOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && (filePickerActive || loading)) {
+      return;
+    }
+
+    setOpenDialog(nextOpen);
+  };
+
+  const handleMaterialFileChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    setMaterialFile(event.target.files?.[0] || null);
+    window.setTimeout(
+      () => setFilePickerActive(false),
+      FILE_PICKER_GUARD_RELEASE_DELAY_MS
+    );
+  };
+
   const handleEnviarMaterial = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!user || !id) return;
 
     setLoading(true);
 
-    const formData = new FormData(e.currentTarget);
-    const arquivo = formData.get("arquivo") as File;
+    const arquivo = materialFile;
+
+    if (!arquivo) {
+      toast({
+        title: "Arquivo obrigatório",
+        description: "Selecione um arquivo para enviar",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
+    const titulo = materialDraft.titulo.trim();
+    const tipo = materialDraft.tipo;
+    const descricao = materialDraft.descricao.trim();
+
+    if (!titulo || !tipo) {
+      toast({
+        title: "Dados obrigatórios",
+        description: "Informe o título e a categoria do material.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
 
     const MAX_SIZE = 10 * 1024 * 1024;
     if (arquivo.size > MAX_SIZE) {
@@ -246,13 +333,19 @@ export default function AlunoDetalhes() {
       return;
     }
 
+    const fileExt = arquivo.name.split(".").pop()?.toLowerCase() || "";
     const ALLOWED_TYPES = [
       "application/pdf",
       "image/jpeg",
       "image/png",
       "image/jpg",
     ];
-    if (!ALLOWED_TYPES.includes(arquivo.type)) {
+    const ALLOWED_EXTENSIONS = ["pdf", "jpg", "jpeg", "png"];
+    const isAllowedFile =
+      ALLOWED_TYPES.includes(arquivo.type) ||
+      ALLOWED_EXTENSIONS.includes(fileExt);
+
+    if (!isAllowedFile) {
       toast({
         title: "Erro",
         description: "Tipo de arquivo não permitido. Use PDF ou imagens.",
@@ -262,18 +355,7 @@ export default function AlunoDetalhes() {
       return;
     }
 
-    if (!arquivo) {
-      toast({
-        title: "Arquivo obrigatório",
-        description: "Selecione um arquivo para enviar",
-        variant: "destructive",
-      });
-      setLoading(false);
-      return;
-    }
-
     try {
-      const fileExt = arquivo.name.split(".").pop();
       const fileName = `${user.id}/${id}/${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
@@ -286,9 +368,9 @@ export default function AlunoDetalhes() {
       const { error: dbError } = await supabase.from("materiais").insert({
         profile_id: id,
         personal_id: user.id,
-        titulo: formData.get("titulo") as string,
-        descricao: formData.get("descricao") as string,
-        tipo: formData.get("tipo") as string,
+        titulo,
+        descricao,
+        tipo,
         arquivo_url: fileName,
         arquivo_nome: arquivo.name,
       });
@@ -300,6 +382,7 @@ export default function AlunoDetalhes() {
         description: "Material enviado com sucesso",
       });
 
+      resetMaterialUploadForm();
       setOpenDialog(false);
       fetchData();
     } catch (error: any) {
@@ -819,6 +902,146 @@ export default function AlunoDetalhes() {
                   </Button>
                 }
               />
+              <Dialog
+                open={openDialog}
+                onOpenChange={handleMaterialDialogOpenChange}
+              >
+                <DialogContent
+                  className="max-h-[calc(100dvh-2rem)] max-w-lg overflow-y-auto"
+                  onInteractOutside={(event) => {
+                    if (filePickerActive || loading) {
+                      event.preventDefault();
+                    }
+                  }}
+                  onEscapeKeyDown={(event) => {
+                    if (loading) {
+                      event.preventDefault();
+                    }
+                  }}
+                >
+                  <DialogHeader>
+                    <DialogTitle className="text-xl">
+                      Enviar novo material
+                    </DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleEnviarMaterial} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="material-titulo">
+                        Título do material
+                      </Label>
+                      <Input
+                        id="material-titulo"
+                        value={materialDraft.titulo}
+                        onChange={(event) =>
+                          setMaterialDraft((current) => ({
+                            ...current,
+                            titulo: event.target.value,
+                          }))
+                        }
+                        placeholder="Ex: Treino de hipertrofia"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="material-tipo">Categoria</Label>
+                      <Select
+                        value={materialDraft.tipo}
+                        onValueChange={(tipo) =>
+                          setMaterialDraft((current) => ({
+                            ...current,
+                            tipo,
+                          }))
+                        }
+                        required
+                      >
+                        <SelectTrigger id="material-tipo">
+                          <SelectValue placeholder="Selecione a categoria" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="treino">Treino</SelectItem>
+                          <SelectItem value="dieta">Dieta</SelectItem>
+                          <SelectItem value="avaliacao">Avaliação</SelectItem>
+                          <SelectItem value="outro">Outro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="material-descricao">
+                        Descrição (opcional)
+                      </Label>
+                      <Textarea
+                        id="material-descricao"
+                        value={materialDraft.descricao}
+                        onChange={(event) =>
+                          setMaterialDraft((current) => ({
+                            ...current,
+                            descricao: event.target.value,
+                          }))
+                        }
+                        placeholder="Adicione detalhes sobre este material..."
+                        rows={3}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="material-arquivo">Arquivo</Label>
+                      <Input
+                        id="material-arquivo"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        required={!materialFile}
+                        className="cursor-pointer"
+                        onPointerDown={() => setFilePickerActive(true)}
+                        onClick={() => setFilePickerActive(true)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            setFilePickerActive(true);
+                          }
+                        }}
+                        onChange={handleMaterialFileChange}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {materialFile
+                          ? `Selecionado: ${materialFile.name}`
+                          : "PDF ou imagens (máx. 10MB)"}
+                      </p>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-[1fr_2fr]">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={loading}
+                        onClick={() => {
+                          resetMaterialUploadForm();
+                          setOpenDialog(false);
+                        }}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={loading}
+                        style={{
+                          backgroundColor:
+                            personalSettings?.theme_color || undefined,
+                        }}
+                      >
+                        {loading ? (
+                          <>
+                            <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                            Enviando...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="mr-2 h-4 w-4" />
+                            Enviar material
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
               <Card className="hidden border-2 shadow-md">
                 <CardHeader className="bg-gradient-to-r from-card to-muted/20">
                   <div className="flex items-center justify-between">
@@ -832,7 +1055,7 @@ export default function AlunoDetalhes() {
                         enviado{materiais.length === 1 ? "" : "s"}
                       </p>
                     </div>
-                    <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+                    <Dialog open={false}>
                       <DialogTrigger asChild>
                         <Button
                           size={isMobile ? "sm" : "default"}

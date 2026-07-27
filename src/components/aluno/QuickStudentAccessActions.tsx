@@ -35,7 +35,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SubscriptionManager } from "@/components/SubscriptionManager";
+import { RegisterPaymentDialog } from "@/components/RegisterPaymentDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import type { StudentAccessState } from "@/hooks/useStudentAccess";
@@ -115,7 +115,6 @@ export function QuickStudentAccessActions({
   const [releaseDialogOpen, setReleaseDialogOpen] = useState(false);
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [openCreateSignal, setOpenCreateSignal] = useState(0);
   const [releaseOption, setReleaseOption] = useState<ReleaseOption>("24h");
   const [customUntil, setCustomUntil] = useState(() => toDatetimeLocal(addDuration("24h")));
 
@@ -270,7 +269,6 @@ export function QuickStudentAccessActions({
             <DropdownMenuItem
               onSelect={() => {
                 setPaymentDialogOpen(true);
-                setOpenCreateSignal((value) => value + 1);
               }}
             >
               <CreditCard className="mr-2 h-4 w-4" />
@@ -381,29 +379,18 @@ export function QuickStudentAccessActions({
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Registrar pagamento</DialogTitle>
-            <DialogDescription>
-              Dar baixa ou criar assinatura para {student.nome}.
-            </DialogDescription>
-          </DialogHeader>
-          <SubscriptionManager
-            studentId={student.id}
-            personalId={personalId}
-            studentName={student.nome}
-            embedded
-            createButtonLabel="Nova baixa"
-            openCreateSignal={openCreateSignal}
-            onChanged={() => {
-              queryClient.invalidateQueries({ queryKey: ["students-access-states", personalId] });
-              queryClient.invalidateQueries({ queryKey: ["alunos", personalId] });
-              onChanged?.();
-            }}
-          />
-        </DialogContent>
-      </Dialog>
+      <RegisterPaymentDialog
+        open={paymentDialogOpen}
+        onOpenChange={setPaymentDialogOpen}
+        studentId={student.id}
+        personalId={personalId}
+        studentName={student.nome}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["students-access-states", personalId] });
+          queryClient.invalidateQueries({ queryKey: ["alunos", personalId] });
+          onChanged?.();
+        }}
+      />
     </div>
   );
 }

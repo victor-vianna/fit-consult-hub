@@ -14,7 +14,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -34,6 +33,7 @@ import { usePersonalPlanPrices, Plano } from "@/hooks/usePersonalPlanPrices";
 import { useStripeConnectAccount } from "@/hooks/useStripeConnectAccount";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { RegisterPaymentDialog } from "@/components/RegisterPaymentDialog";
 import {
   calculatePlanDiscount,
   calculateNetAfterFees,
@@ -59,6 +59,7 @@ import {
   ExternalLink,
   Copy,
   Loader2,
+  FileText,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -150,7 +151,7 @@ export function SubscriptionManager({
   personalId,
   studentName,
   embedded = false,
-  createButtonLabel = "Nova Assinatura",
+  createButtonLabel = "Registrar pagamento",
   showCreateButton = true,
   openCreateSignal = 0,
   onChanged,
@@ -158,9 +159,7 @@ export function SubscriptionManager({
   const {
     subscriptions,
     loading,
-    createSubscription,
     updateSubscription,
-    registerPayment,
     deleteSubscription,
     getActiveSubscription,
     refetch,
@@ -171,9 +170,7 @@ export function SubscriptionManager({
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedSubscription, setSelectedSubscription] = useState<string>("");
   const [subscriptionToEdit, setSubscriptionToEdit] = useState<Subscription | null>(null);
   const [subscriptionToDelete, setSubscriptionToDelete] = useState<string | null>(null);
   const [stripeAction, setStripeAction] = useState<StripeSubscriptionAction | null>(null);
@@ -184,12 +181,6 @@ export function SubscriptionManager({
   const [newStripePlan, setNewStripePlan] = useState<Plano>("mensal");
   const [copyingPortalFor, setCopyingPortalFor] = useState<string | null>(null);
 
-  // Form states
-  const [plano, setPlano] = useState<string>("mensal");
-  const [valor, setValor] = useState<string>("");
-  const [dataInicio, setDataInicio] = useState<string>(formatDateForInput(new Date()));
-  const [observacoes, setObservacoes] = useState<string>("");
-
   // Edit form states
   const [editPlano, setEditPlano] = useState<string>("mensal");
   const [editValor, setEditValor] = useState<string>("");
@@ -197,13 +188,6 @@ export function SubscriptionManager({
   const [editDataPagamento, setEditDataPagamento] = useState<string>("");
   const [editStatus, setEditStatus] = useState<string>("pendente");
   const [editObservacoes, setEditObservacoes] = useState<string>("");
-
-  // Payment form states
-  const [valorPagamento, setValorPagamento] = useState<string>("");
-  const [dataPagamento, setDataPagamento] = useState<string>(formatDateForInput(new Date()));
-  const [metodoPagamento, setMetodoPagamento] = useState<string>("");
-  const [observacoesPagamento, setObservacoesPagamento] = useState<string>("");
-  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
 
   const platformFeePercent = stripeStatus?.billing_config.application_fee_percent ?? 0;
   const stripeProcessingFees =
@@ -218,65 +202,14 @@ export function SubscriptionManager({
     }
   }, [openCreateSignal]);
 
-  const handleCreateSubscription = async () => {
-    if (!valor || !plano) return;
-
-    const dataExpiracao = parseDateInputValue(dataInicio);
-    if (!dataExpiracao) return;
-
-    const meses = PLANOS.find((p) => p.value === plano)?.meses || 1;
-    dataExpiracao.setMonth(dataExpiracao.getMonth() + meses);
-
-    await createSubscription({
-      student_id: studentId,
-      personal_id: personalId,
-      plano: plano as any,
-      valor: parseFloat(valor),
-      data_pagamento: null,
-      data_expiracao: dataExpiracao.toISOString(),
-      observacoes: observacoes || null,
-    });
-
-    // Reset form
-    setPlano("mensal");
-    setValor("");
-    setDataInicio(formatDateForInput(new Date()));
-    setObservacoes("");
-    setDialogOpen(false);
-    onChanged?.();
-  };
-
-  const handleRegisterPayment = async () => {
-    if (!selectedSubscription || !valorPagamento || paymentSubmitting) return;
-
-    setPaymentSubmitting(true);
-    try {
-      await registerPayment(selectedSubscription, {
-        valor: parseFloat(valorPagamento),
-        data_pagamento: dataPagamento,
-        metodo_pagamento: metodoPagamento || undefined,
-        observacoes: observacoesPagamento || undefined,
-      });
-
-      // Reset form
-      setValorPagamento("");
-      setDataPagamento(formatDateForInput(new Date()));
-      setMetodoPagamento("");
-      setObservacoesPagamento("");
-      setPaymentDialogOpen(false);
-      onChanged?.();
-    } finally {
-      setPaymentSubmitting(false);
-    }
-  };
-
   const handleOpenEdit = (sub: Subscription) => {
+    const isStripeRecord = !!sub.stripe_subscription_id || !!sub.stripe_checkout_session_id;
     setSubscriptionToEdit(sub);
     setEditPlano(sub.plano);
     setEditValor(sub.valor.toString());
     setEditDataExpiracao(formatDateForInput(sub.data_expiracao));
     setEditDataPagamento(formatDateForInput(sub.data_pagamento));
-    setEditStatus(sub.status_pagamento);
+    setEditStatus(!isStripeRecord && sub.status_pagamento === "pendente" ? "pago" : sub.status_pagamento);
     setEditObservacoes(sub.observacoes || "");
     setEditDialogOpen(true);
   };
@@ -288,12 +221,16 @@ export function SubscriptionManager({
     const novaDataExpiracao = dateInputToIsoString(editDataExpiracao);
     if (!novaDataExpiracao) return;
 
+    const isStripeRecord =
+      !!subscriptionToEdit.stripe_subscription_id ||
+      !!subscriptionToEdit.stripe_checkout_session_id;
+
     await updateSubscription(subscriptionToEdit.id, {
       plano: editPlano as any,
       valor: parseFloat(editValor),
       data_expiracao: novaDataExpiracao,
       data_pagamento: novaDataPagamento,
-      status_pagamento: editStatus as any,
+      status_pagamento: (!isStripeRecord && editStatus === "pendente" ? "pago" : editStatus) as any,
       observacoes: editObservacoes || null,
     });
 
@@ -561,87 +498,27 @@ export function SubscriptionManager({
         </Card>
       )}
 
-      {/* Botão Nova Assinatura */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        {showCreateButton && (
-          <DialogTrigger asChild>
+      <RegisterPaymentDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        studentId={studentId}
+        personalId={personalId}
+        studentName={studentName}
+        trigger={
+          showCreateButton ? (
             <Button className="w-full">
               <Plus className="h-4 w-4 mr-2" />
               {createButtonLabel}
             </Button>
-          </DialogTrigger>
-        )}
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Criar Nova Assinatura</DialogTitle>
-            <DialogDescription>
-              Criar assinatura para {studentName}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="plano">Plano</Label>
-              <Select value={plano} onValueChange={setPlano}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PLANOS.map((p) => (
-                    <SelectItem key={p.value} value={p.value}>
-                      {p.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="valor">Valor (R$)</Label>
-              <Input
-                id="valor"
-                type="number"
-                step="0.01"
-                value={valor}
-                onChange={(e) => setValor(e.target.value)}
-                placeholder="0.00"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="dataInicio">Data de Início</Label>
-              <LocalizedDateInput
-                id="dataInicio"
-                value={dataInicio}
-                onChange={setDataInicio}
-                placeholder="Selecione a data de inicio"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="observacoes">Observações</Label>
-              <Textarea
-                id="observacoes"
-                value={observacoes}
-                onChange={(e) => setObservacoes(e.target.value)}
-                placeholder="Observações adicionais..."
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleCreateSubscription}>Criar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          ) : undefined
+        }
+        onSuccess={onChanged}
+      />
 
       {/* Lista de Assinaturas */}
       <Card className={embedded ? "border-0 bg-transparent shadow-none" : undefined}>
         <CardHeader className={embedded ? "px-0 pb-3" : undefined}>
-          <CardTitle>{embedded ? "Pagamentos registrados" : "Historico de Assinaturas"}</CardTitle>
+          <CardTitle>{embedded ? "Pagamentos registrados" : "Historico de Pagamentos"}</CardTitle>
           {!embedded && (
             <CardDescription>
               Todas as assinaturas de {studentName}
@@ -689,6 +566,12 @@ export function SubscriptionManager({
                             Stripe
                           </Badge>
                         )}
+                        {!isStripeSubscription && sub.status_pagamento === "pago" && (
+                          <Badge variant="outline" className="gap-1">
+                            <FileText className="h-3 w-3" />
+                            Manual
+                          </Badge>
+                        )}
                         {cancellationScheduled && (
                           <Badge className="bg-amber-500 text-white hover:bg-amber-500">
                             Renovacao cancelada
@@ -726,121 +609,6 @@ export function SubscriptionManager({
                       <div className="min-w-[86px] text-right text-lg font-bold leading-tight">
                         {formatCurrencyBRL(Number(sub.valor) || 0)}
                       </div>
-                      {sub.status_pagamento !== "pago" && (
-                        <Dialog
-                          open={
-                            paymentDialogOpen && selectedSubscription === sub.id
-                          }
-                          onOpenChange={(open) => {
-                            if (paymentSubmitting) return;
-                            setPaymentDialogOpen(open);
-                            if (open) {
-                              setSelectedSubscription(sub.id);
-                              setValorPagamento(sub.valor.toString());
-                            }
-                          }}
-                        >
-                          <DialogTrigger asChild>
-                            <Button size="sm">
-                              <CreditCard className="h-4 w-4 mr-2" />
-                              Pagar
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Registrar Pagamento</DialogTitle>
-                              <DialogDescription>
-                                Registrar pagamento da assinatura {sub.plano}
-                              </DialogDescription>
-                            </DialogHeader>
-
-                            <div className="space-y-4">
-                              <div>
-                                <Label htmlFor="valorPagamento">Valor (R$)</Label>
-                                <Input
-                                  id="valorPagamento"
-                                  type="number"
-                                  step="0.01"
-                                  value={valorPagamento}
-                                  onChange={(e) =>
-                                    setValorPagamento(e.target.value)
-                                  }
-                                />
-                              </div>
-
-                              <div>
-                                <Label htmlFor="dataPagamento">
-                                  Data do Pagamento
-                                </Label>
-                                <LocalizedDateInput
-                                  id="dataPagamento"
-                                  value={dataPagamento}
-                                  onChange={setDataPagamento}
-                                  placeholder="Selecione a data do pagamento"
-                                />
-                              </div>
-
-                              <div>
-                                <Label htmlFor="metodoPagamento">
-                                  Método de Pagamento
-                                </Label>
-                                <Select
-                                  value={metodoPagamento}
-                                  onValueChange={setMetodoPagamento}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Selecione..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="pix">PIX</SelectItem>
-                                    <SelectItem value="cartao">
-                                      Cartão de Crédito
-                                    </SelectItem>
-                                    <SelectItem value="boleto">Boleto</SelectItem>
-                                    <SelectItem value="dinheiro">
-                                      Dinheiro
-                                    </SelectItem>
-                                    <SelectItem value="transferencia">
-                                      Transferência
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-                              <div>
-                                <Label htmlFor="observacoesPagamento">
-                                  Observações
-                                </Label>
-                                <Textarea
-                                  id="observacoesPagamento"
-                                  value={observacoesPagamento}
-                                  onChange={(e) =>
-                                    setObservacoesPagamento(e.target.value)
-                                  }
-                                  placeholder="Observações sobre o pagamento..."
-                                />
-                              </div>
-                            </div>
-
-                            <DialogFooter>
-                              <Button
-                                variant="outline"
-                                onClick={() => setPaymentDialogOpen(false)}
-                                disabled={paymentSubmitting}
-                              >
-                                Cancelar
-                              </Button>
-                              <Button
-                                onClick={handleRegisterPayment}
-                                disabled={paymentSubmitting || !valorPagamento}
-                              >
-                                {paymentSubmitting ? "Registrando..." : "Confirmar Pagamento"}
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                      )}
-                      
                       {isStripeSubscription && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -990,7 +758,10 @@ export function SubscriptionManager({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pendente">Pendente</SelectItem>
+                  {(subscriptionToEdit?.stripe_subscription_id ||
+                    subscriptionToEdit?.stripe_checkout_session_id) && (
+                    <SelectItem value="pendente">Pendente</SelectItem>
+                  )}
                   <SelectItem value="pago">Pago</SelectItem>
                   <SelectItem value="atrasado">Atrasado</SelectItem>
                 </SelectContent>

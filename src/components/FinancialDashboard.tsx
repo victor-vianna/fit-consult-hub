@@ -16,10 +16,13 @@ import {
   AlertTriangle,
   Users,
   Calendar,
+  CreditCard,
   ArrowUpRight,
   ArrowDownRight,
   BarChart3,
   Receipt,
+  FileText,
+  Plus,
   Search,
   FilterX,
 } from "lucide-react";
@@ -28,6 +31,16 @@ import { useAuth } from "@/hooks/useAuth";
 import { useStripeConnectAccount } from "@/hooks/useStripeConnectAccount";
 import { PersonalPlanPricingForm } from "@/components/PersonalPlanPricingForm";
 import { StripeConnectOnboardingCard } from "@/components/StripeConnectOnboardingCard";
+import { RegisterPaymentForm } from "@/components/RegisterPaymentDialog";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   calculateNetAfterFees,
   DEFAULT_STRIPE_PROCESSING_FEES,
@@ -64,6 +77,13 @@ const DEFAULT_PAYMENT_FILTERS = {
   maxValue: "",
 };
 
+type FinanceStudent = {
+  id: string;
+  nome: string;
+  email: string;
+  telefone: string | null;
+};
+
 const normalizeText = (value: unknown) =>
   String(value ?? "")
     .normalize("NFD")
@@ -85,6 +105,14 @@ const roundCurrencyValue = (value: number) => Math.round(Number(value || 0) * 10
 
 const formatPaymentMethod = (method: string) => {
   const normalized = normalizeText(method).replace(/^stripe_/, "");
+  const original = normalizeText(method);
+
+  if (original === "stripe_pending") return "Link Stripe";
+  if (!normalized || normalized === "—" || normalized === "â€”") return "—";
+  if (normalized === "pix") return "PIX";
+  if (normalized === "dinheiro") return "Dinheiro";
+  if (normalized === "transferencia") return "Transferencia";
+  if (normalized === "outro") return "Outro";
 
   if (!normalized || normalized === "—") return "—";
   if (normalized === "pix") return "Pix";
@@ -93,6 +121,13 @@ const formatPaymentMethod = (method: string) => {
   if (normalized === "connect" || normalized === "stripe") return "Stripe";
 
   return method.replace(/^stripe_/i, "");
+};
+
+const getPaymentOriginText = (payment: PaymentDetail) => {
+  const method = formatPaymentMethod(payment.metodo);
+  return payment.paymentOrigin === "stripe"
+    ? `${method} · pago pela plataforma`
+    : `${method} · registrado manualmente`;
 };
 
 function getPaymentFinancialAmounts(
@@ -119,6 +154,17 @@ function getPaymentFinancialAmounts(
   }
 
   const gross = roundCurrencyValue(payment.valorParcela);
+  if (payment.paymentOrigin === "manual") {
+    return {
+      estimated,
+      platformFee: 0,
+      stripeProcessingFee: 0,
+      totalFee: 0,
+      net: gross,
+      feeLabel: "Sem taxa Stripe",
+    };
+  }
+
   const platformFee = isFiniteNumber(payment.platformFeeAmount)
     ? roundCurrencyValue(payment.platformFeeAmount)
     : estimated.platformFee;
@@ -179,14 +225,35 @@ function ComparisonBadge({ value, label }: { value: number; label: string }) {
 export function FinancialDashboard() {
   const { user } = useAuth();
   const userId = useMemo(() => user?.id || "", [user?.id]);
+  const queryClient = useQueryClient();
   const [paymentFilters, setPaymentFilters] = useState(DEFAULT_PAYMENT_FILTERS);
+  const [registerDialogOpen, setRegisterDialogOpen] = useState(false);
+  const [selectedStudentId, setSelectedStudentId] = useState("");
   const { data: stripeStatus } = useStripeConnectAccount(userId);
 
-  const { metrics, monthlyRevenue, inadimplentesList, paymentDetails, loading } =
+  const { metrics, monthlyRevenue, inadimplentesList, paymentDetails, loading, refetch } =
     useFinancialDashboard(userId);
+  const { data: students = [] } = useQuery<FinanceStudent[]>({
+    queryKey: ["alunos", userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, nome, email, telefone")
+        .eq("personal_id", userId)
+        .order("nome");
+      if (error) throw error;
+      return (data || []) as FinanceStudent[];
+    },
+    staleTime: 60_000,
+  });
   const platformFeePercent = stripeStatus?.billing_config.application_fee_percent ?? 0;
   const stripeProcessingFees =
     stripeStatus?.billing_config.stripe_processing_fees ?? DEFAULT_STRIPE_PROCESSING_FEES;
+  const selectedStudent = useMemo(
+    () => students.find((student) => student.id === selectedStudentId) ?? null,
+    [students, selectedStudentId]
+  );
 
   const planOptions = useMemo(
     () =>
@@ -226,6 +293,8 @@ export function FinancialDashboard() {
           payment.plano,
           payment.metodo,
           formatPaymentMethod(payment.metodo),
+          payment.paymentOrigin,
+          getPaymentOriginText(payment),
           payment.status,
           payment.parcelaAtual,
           payment.valorTotal,
@@ -333,6 +402,65 @@ export function FinancialDashboard() {
           Visão geral das suas finanças e pagamentos
         </h1>
       </div>
+
+      <div className="flex justify-end">
+        <Button className="gap-2" onClick={() => setRegisterDialogOpen(true)}>
+          <Plus className="h-4 w-4" />
+          Registrar pagamento
+        </Button>
+      </div>
+
+      <Dialog
+        open={registerDialogOpen}
+        onOpenChange={(open) => {
+          setRegisterDialogOpen(open);
+          if (!open) setSelectedStudentId("");
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Registrar pagamento</DialogTitle>
+            <DialogDescription>
+              Selecione o aluno e registre um pagamento ja recebido.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <Label>Aluno</Label>
+              <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um aluno" />
+                </SelectTrigger>
+                <SelectContent>
+                  {students.map((student) => (
+                    <SelectItem key={student.id} value={student.id}>
+                      {student.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedStudent && (
+              <RegisterPaymentForm
+                key={selectedStudent.id}
+                studentId={selectedStudent.id}
+                personalId={userId}
+                studentName={selectedStudent.nome}
+                onCancel={() => setRegisterDialogOpen(false)}
+                onSuccess={() => {
+                  refetch();
+                  queryClient.invalidateQueries({ queryKey: ["alunos", userId] });
+                  queryClient.invalidateQueries({ queryKey: ["students-access-states", userId] });
+                  setSelectedStudentId("");
+                  setRegisterDialogOpen(false);
+                }}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <StripeConnectOnboardingCard personalId={userId} />
       <PersonalPlanPricingForm />
@@ -725,7 +853,7 @@ export function FinancialDashboard() {
                         <th className="text-right py-3 px-2 font-medium">Taxa Stripe</th>
                         <th className="text-right py-3 px-2 font-medium">Liquido Final</th>
                         <th className="text-center py-3 px-2 font-medium">Data</th>
-                        <th className="text-center py-3 px-2 font-medium">Método</th>
+                        <th className="text-center py-3 px-2 font-medium">Origem</th>
                         <th className="text-center py-3 px-2 font-medium">Status</th>
                       </tr>
                     </thead>
@@ -762,7 +890,28 @@ export function FinancialDashboard() {
                           <td className="py-3 px-2 text-center text-muted-foreground">
                             {formatDisplayDate(p.dataPagamento)}
                           </td>
-                          <td className="py-3 px-2 text-center">{formatPaymentMethod(p.metodo)}</td>
+                          <td className="py-3 px-2 text-center">
+                            <div className="flex flex-col items-center gap-1">
+                              <Badge
+                                variant="outline"
+                                className={
+                                  p.paymentOrigin === "stripe"
+                                    ? "gap-1 border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300"
+                                    : "gap-1 border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300"
+                                }
+                              >
+                                {p.paymentOrigin === "stripe" ? (
+                                  <CreditCard className="h-3 w-3" />
+                                ) : (
+                                  <FileText className="h-3 w-3" />
+                                )}
+                                {p.paymentOrigin === "stripe" ? "Stripe" : "Manual"}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {getPaymentOriginText(p)}
+                              </span>
+                            </div>
+                          </td>
                           <td className="py-3 px-2 text-center">
                             <Badge
                               variant={p.status === "pago" ? "default" : "secondary"}

@@ -7,8 +7,15 @@ const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 type FinancialSubscriptionRow = {
   id: string;
+  student_id?: string | null;
   plano?: string | null;
   valor?: number | null;
+  parcelas?: number | null;
+  status_pagamento?: string | null;
+  data_expiracao?: string | null;
+  stripe_account_id?: string | null;
+  stripe_checkout_session_id?: string | null;
+  stripe_subscription_id?: string | null;
 };
 
 type FinancialPaymentRow = {
@@ -77,6 +84,7 @@ export interface PaymentDetail {
   stripeProcessingFeeAmount: number | null;
   stripeNetAmount: number | null;
   isStripePayment: boolean;
+  paymentOrigin: "stripe" | "manual";
 }
 
 const normalizePaymentText = (value: unknown) =>
@@ -404,6 +412,11 @@ export function useFinancialDashboard(personalId: string) {
         // Extract parcela info from observacoes (e.g. "Parcela 1/3")
         const parcelaMatch = p.observacoes?.match(/Parcela (\d+\/\d+)/);
         const parcelaAtual = parcelaMatch ? parcelaMatch[1] : "1/1";
+        const isStripePayment =
+          !!p.stripe_invoice_id ||
+          !!p.stripe_account_id ||
+          !!p.stripe_payment_method_type ||
+          normalizePaymentText(p.metodo_pagamento).includes("stripe");
 
         return {
           id: p.id,
@@ -431,13 +444,18 @@ export function useFinancialDashboard(personalId: string) {
             typeof p.stripe_net_amount === "number"
               ? Number(p.stripe_net_amount)
               : null,
-          isStripePayment: !!p.stripe_invoice_id || String(p.metodo_pagamento ?? "").includes("stripe"),
+          isStripePayment,
+          paymentOrigin: isStripePayment ? "stripe" : "manual",
         };
       });
 
       // Add pending subscriptions as upcoming payments
-      const pendingSubs = subscriptions?.filter(
-        (s) => s.status_pagamento === "pendente" && new Date(s.data_expiracao) >= now
+      const pendingSubs = ((subscriptions || []) as unknown as FinancialSubscriptionRow[]).filter(
+        (s) =>
+          s.status_pagamento === "pendente" &&
+          !!s.data_expiracao &&
+          new Date(s.data_expiracao) >= now &&
+          !!(s.stripe_checkout_session_id || s.stripe_subscription_id || s.stripe_account_id)
       ) || [];
 
       for (const sub of pendingSubs) {
@@ -445,19 +463,20 @@ export function useFinancialDashboard(personalId: string) {
         paymentDetailsMapped.push({
           id: `pending-${sub.id}`,
           studentName: profile?.nome || "Desconhecido",
-          plano: sub.plano,
-          valorTotal: sub.valor,
+          plano: sub.plano || "—",
+          valorTotal: sub.valor || 0,
           parcelas: sub.parcelas || 1,
-          valorParcela: sub.valor / (sub.parcelas || 1),
+          valorParcela: (sub.valor || 0) / (sub.parcelas || 1),
           parcelaAtual: "—",
-          dataPagamento: sub.data_expiracao,
+          dataPagamento: sub.data_expiracao || new Date().toISOString(),
           status: "pendente",
-          metodo: "—",
+          metodo: "stripe_pending",
           platformFeeAmount: null,
           stripePaymentMethodType: null,
           stripeProcessingFeeAmount: null,
           stripeNetAmount: null,
-          isStripePayment: false,
+          isStripePayment: true,
+          paymentOrigin: "stripe",
         });
       }
 

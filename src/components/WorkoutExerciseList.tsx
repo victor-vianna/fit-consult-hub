@@ -6,6 +6,11 @@ import { WorkoutBlockCard } from "./WorkoutBlockCard";
 import { CheckCircle, Trophy } from "lucide-react";
 import type { BlocoTreino } from "@/types/workoutBlocks";
 import type { GrupoExercicio } from "@/hooks/useExerciseGroups";
+import {
+  getIsolatedExercises,
+  normalizeExerciseGroups,
+  normalizeWorkoutBlocks,
+} from "@/utils/workoutNormalization";
 
 interface Exercicio {
   id: string;
@@ -53,8 +58,11 @@ function buildUnifiedList(
   blocos: BlocoTreino[]
 ): UnifiedItem[] {
   const items: UnifiedItem[] = [];
+  const exerciciosNormalizados = getIsolatedExercises(exerciciosIsolados);
+  const gruposNormalizados = normalizeExerciseGroups(grupos);
+  const blocosNormalizados = normalizeWorkoutBlocks(blocos);
 
-  exerciciosIsolados.forEach((ex) => {
+  exerciciosNormalizados.forEach((ex) => {
     items.push({
       type: "exercise",
       ordem: ex.ordem ?? 0,
@@ -62,7 +70,7 @@ function buildUnifiedList(
     });
   });
 
-  grupos.forEach((grupo: any) => {
+  gruposNormalizados.forEach((grupo: any) => {
     const minOrdem =
       grupo.exercicios?.length > 0
         ? Math.min(...grupo.exercicios.map((e: any) => e.ordem ?? 0))
@@ -74,7 +82,7 @@ function buildUnifiedList(
     });
   });
 
-  blocos.forEach((bloco: any) => {
+  blocosNormalizados.forEach((bloco: any) => {
     items.push({
       type: "block",
       ordem: bloco.ordem ?? 0,

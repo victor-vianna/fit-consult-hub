@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TreinoDia } from "@/types/treino";
+import { getIsolatedExercises } from "@/utils/workoutNormalization";
 
 interface MultiplosTreinosDiaProps {
   dia: number;
@@ -136,8 +137,9 @@ export function MultiplosTreinosDia({
   // Se há apenas 1 treino, mostrar de forma simplificada
   if (treinos.length === 1) {
     const treino = treinos[0];
-    const totalItens = treino.exercicios.length;
-    const concluidos = treino.exercicios.filter((e) => e.concluido).length;
+    const exercicios = getIsolatedExercises(treino.exercicios);
+    const totalItens = exercicios.length;
+    const concluidos = exercicios.filter((e) => e.concluido).length;
     const progresso = totalItens > 0 ? Math.round((concluidos / totalItens) * 100) : 0;
 
     return (
@@ -275,8 +277,9 @@ export function MultiplosTreinosDia({
         {treinos
           .sort((a, b) => (a.ordem_no_dia || 1) - (b.ordem_no_dia || 1))
           .map((treino) => {
-            const totalItens = treino.exercicios.length;
-            const concluidos = treino.exercicios.filter((e) => e.concluido).length;
+            const exercicios = getIsolatedExercises(treino.exercicios);
+            const totalItens = exercicios.length;
+            const concluidos = exercicios.filter((e) => e.concluido).length;
             const progresso = totalItens > 0 ? Math.round((concluidos / totalItens) * 100) : 0;
 
             return (

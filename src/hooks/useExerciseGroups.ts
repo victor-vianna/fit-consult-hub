@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { normalizeExerciseGroups } from "@/utils/workoutNormalization";
 
 type TipoAgrupamento =
   | "normal"
@@ -210,7 +211,7 @@ export function useExerciseGroups({
 
         // Ordenar grupos por ordem
         Object.keys(resultado).forEach((tid) => {
-          resultado[tid].sort((a, b) => a.ordem - b.ordem);
+          resultado[tid] = normalizeExerciseGroups(resultado[tid]);
         });
 
         console.log(
@@ -580,7 +581,7 @@ export function useExerciseGroups({
   // Função auxiliar para obter grupos de um treino específico
   const obterGruposDoTreino = useCallback(
     (treinoSemanalId: string): GrupoExercicio[] => {
-      return gruposPorTreino[treinoSemanalId] || [];
+      return normalizeExerciseGroups(gruposPorTreino[treinoSemanalId] || []);
     },
     [gruposPorTreino]
   );

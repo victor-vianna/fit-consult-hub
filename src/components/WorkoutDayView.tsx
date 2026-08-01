@@ -19,6 +19,12 @@ import { useWorkoutSession } from "@/hooks/useWorkoutSession";
 import { useExerciseProgress } from "@/hooks/useExerciseProgress";
 import { usePersistedState } from "@/hooks/usePersistedState";
 import { formatDisplayMonthDay } from "@/utils/dateFormat";
+import {
+  getIsolatedExercises,
+  normalizeExerciseGroups,
+  normalizeExercises,
+  normalizeWorkoutBlocks,
+} from "@/utils/workoutNormalization";
 
 interface WorkoutDayViewProps {
   treinos: TreinoDia[];
@@ -55,13 +61,15 @@ function countCompletedItems(
   grupos: GrupoExercicio[],
   blocos: BlocoTreino[]
 ) {
-  const isolatedDone = exercicios.filter((exercicio) => exercicio.concluido).length;
-  const groupDone = grupos.reduce(
+  const isolatedDone = getIsolatedExercises(exercicios).filter(
+    (exercicio) => exercicio.concluido
+  ).length;
+  const groupDone = normalizeExerciseGroups(grupos).reduce(
     (total, grupo) =>
       total + (grupo.exercicios ?? []).filter((ex: any) => ex.concluido).length,
     0
   );
-  const blocksDone = blocos.filter((bloco) => bloco.concluido).length;
+  const blocksDone = normalizeWorkoutBlocks(blocos).filter((bloco) => bloco.concluido).length;
 
   return isolatedDone + groupDone + blocksDone;
 }
@@ -107,8 +115,7 @@ function buildWorkoutResumeItems(
 ): WorkoutResumeItem[] {
   const items: WorkoutResumeItem[] = [];
 
-  treino.exercicios
-    .filter((ex) => !ex.grupo_id)
+  getIsolatedExercises(treino.exercicios)
     .forEach((ex, index) => {
       items.push({
         id: ex.id,
@@ -120,7 +127,7 @@ function buildWorkoutResumeItems(
       });
     });
 
-  grupos.forEach((grupo, grupoIndex) => {
+  normalizeExerciseGroups(grupos).forEach((grupo, grupoIndex) => {
     const grupoOrdem =
       grupo.exercicios?.length > 0
         ? Math.min(...grupo.exercicios.map((ex: any) => ex.ordem ?? grupoIndex))
@@ -138,7 +145,7 @@ function buildWorkoutResumeItems(
     });
   });
 
-  blocos.forEach((bloco, index) => {
+  normalizeWorkoutBlocks(blocos).forEach((bloco, index) => {
     items.push({
       id: bloco.id,
       type: "block",
@@ -230,7 +237,11 @@ export function WorkoutDayView({
     // Mesclar progresso local com dados do servidor
     const treinosMesclados = treinos.map(treino => ({
       ...treino,
-      exercicios: mesclarProgressoExercicios(treino.exercicios),
+      exercicios: normalizeExercises(
+        mesclarProgressoExercicios(treino.exercicios)
+      ),
+      grupos: normalizeExerciseGroups(treino.grupos ?? []),
+      blocos: normalizeWorkoutBlocks(treino.blocos ?? []),
     }));
     setLocalTreinos(treinosMesclados);
   }, [treinos, mesclarProgressoExercicios]);
@@ -239,10 +250,12 @@ export function WorkoutDayView({
     // Mesclar grupos com progresso local
     const gruposMesclados: Record<string, GrupoExercicio[]> = {};
     Object.keys(gruposPorTreino).forEach(treinoId => {
-      gruposMesclados[treinoId] = gruposPorTreino[treinoId].map(grupo => ({
-        ...grupo,
-        exercicios: mesclarProgressoExercicios(grupo.exercicios),
-      }));
+      gruposMesclados[treinoId] = normalizeExerciseGroups(
+        gruposPorTreino[treinoId].map(grupo => ({
+          ...grupo,
+          exercicios: mesclarProgressoExercicios(grupo.exercicios),
+        }))
+      ) as GrupoExercicio[];
     });
     setLocalGrupos(gruposMesclados);
   }, [gruposPorTreino, mesclarProgressoExercicios]);
@@ -254,7 +267,9 @@ export function WorkoutDayView({
     
     // Primeiro, processar blocos da prop
     Object.keys(blocosPorTreino).forEach(treinoId => {
-      blocosAtualizados[treinoId] = mesclarProgressoBlocos(blocosPorTreino[treinoId]);
+      blocosAtualizados[treinoId] = normalizeWorkoutBlocks(
+        mesclarProgressoBlocos(blocosPorTreino[treinoId])
+      );
     });
     
     // Depois, adicionar blocos de cada treino se não existirem
@@ -263,7 +278,9 @@ export function WorkoutDayView({
       if (treinoId && treino.blocos && treino.blocos.length > 0) {
         // Se não existe na prop ou está vazio, usa os blocos do treino
         if (!blocosAtualizados[treinoId] || blocosAtualizados[treinoId].length === 0) {
-          blocosAtualizados[treinoId] = mesclarProgressoBlocos(treino.blocos as BlocoTreino[]);
+          blocosAtualizados[treinoId] = normalizeWorkoutBlocks(
+            mesclarProgressoBlocos(treino.blocos as BlocoTreino[])
+          );
         }
       }
     });
@@ -284,14 +301,14 @@ export function WorkoutDayView({
       let exerciciosConcluidos = 0;
 
       // Exercícios isolados
-      const exerciciosIsolados = treino.exercicios.filter((ex) => !ex.grupo_id);
+      const exerciciosIsolados = getIsolatedExercises(treino.exercicios);
       totalExercicios += exerciciosIsolados.length;
       exerciciosConcluidos += exerciciosIsolados.filter(
         (ex) => ex.concluido
       ).length;
 
       // Exercícios em grupos
-      grupos.forEach((grupo) => {
+      normalizeExerciseGroups(grupos).forEach((grupo) => {
         if (grupo.exercicios && grupo.exercicios.length > 0) {
           totalExercicios += grupo.exercicios.length;
           exerciciosConcluidos += grupo.exercicios.filter(
@@ -309,14 +326,12 @@ export function WorkoutDayView({
   // 🔧 Calcular total de itens de treino (exercícios isolados + exercícios em grupos + blocos)
   const calcularTotalItens = useCallback(
     (treino: TreinoDia, grupos: GrupoExercicio[], blocos: BlocoTreino[]): number => {
-      const exerciciosIsolados = treino.exercicios.filter(
-        (ex) => !ex.grupo_id
-      ).length;
-      const exerciciosEmGrupos = grupos.reduce(
+      const exerciciosIsolados = getIsolatedExercises(treino.exercicios).length;
+      const exerciciosEmGrupos = normalizeExerciseGroups(grupos).reduce(
         (total, grupo) => total + (grupo.exercicios?.length || 0),
         0
       );
-      const totalBlocos = blocos.length;
+      const totalBlocos = normalizeWorkoutBlocks(blocos).length;
       return exerciciosIsolados + exerciciosEmGrupos + totalBlocos;
     },
     []
@@ -515,13 +530,15 @@ export function WorkoutDayView({
 
   const resetLocalProgressForTreino = useCallback((treinoId: string) => {
     const treinoAtual = localTreinos.find((treino) => getTreinoId(treino) === treinoId);
-    const exercicioIds = [
-      ...(treinoAtual?.exercicios.map((ex) => ex.id) || []),
-      ...((localGrupos[treinoId] || []).flatMap((grupo) =>
+    const exercicioIds = Array.from(new Set([
+      ...(normalizeExercises(treinoAtual?.exercicios ?? []).map((ex) => ex.id) || []),
+      ...(normalizeExerciseGroups(localGrupos[treinoId] || []).flatMap((grupo) =>
         grupo.exercicios.map((ex: any) => ex.id)
       )),
-    ];
-    const blocoIds = (localBlocos[treinoId] || []).map((bloco) => bloco.id);
+    ]));
+    const blocoIds = Array.from(
+      new Set(normalizeWorkoutBlocks(localBlocos[treinoId] || []).map((bloco) => bloco.id))
+    );
 
     limparProgressoLocal(exercicioIds, blocoIds);
     exercicioIds.forEach((exercicioId) => {
@@ -591,9 +608,9 @@ export function WorkoutDayView({
   const primeiroDiaComConteudo =
     localTreinos.find((t) => {
       const treinoId = getTreinoId(t);
-      const grupos = treinoId ? localGrupos[treinoId] ?? [] : [];
-      const blocos = treinoId ? localBlocos[treinoId] ?? [] : [];
-      return t.exercicios.length > 0 || grupos.length > 0 || blocos.length > 0;
+      const grupos = treinoId ? normalizeExerciseGroups(localGrupos[treinoId] ?? []) : [];
+      const blocos = treinoId ? normalizeWorkoutBlocks(localBlocos[treinoId] ?? []) : [];
+      return getIsolatedExercises(t.exercicios).length > 0 || grupos.length > 0 || blocos.length > 0;
     })?.dia || 1;
 
   // 🔧 Persistir aba do dia ativa por aluno+personal (sobrevive a navegação/reload)
@@ -657,8 +674,8 @@ export function WorkoutDayView({
       return {
         treino,
         treinoId,
-        grupos: localGrupos[treinoId] ?? [],
-        blocos: localBlocos[treinoId] ?? [],
+        grupos: normalizeExerciseGroups(localGrupos[treinoId] ?? []),
+        blocos: normalizeWorkoutBlocks(localBlocos[treinoId] ?? []),
       };
     },
     [getTreinoId, localBlocos, localGrupos, localTreinos]
@@ -932,11 +949,11 @@ export function WorkoutDayView({
             
             treinosDoDia.forEach((treino) => {
               const treinoId = getTreinoId(treino);
-              const grupos = treinoId ? localGrupos[treinoId] ?? [] : [];
-              const blocos = treinoId ? localBlocos[treinoId] ?? [] : [];
+              const grupos = treinoId ? normalizeExerciseGroups(localGrupos[treinoId] ?? []) : [];
+              const blocos = treinoId ? normalizeWorkoutBlocks(localBlocos[treinoId] ?? []) : [];
               totalItens += calcularTotalItens(treino, grupos, blocos);
               const p = calcularProgresso(treino, grupos);
-              if (p > 0 || treino.exercicios.length > 0) {
+              if (p > 0 || getIsolatedExercises(treino.exercicios).length > 0 || grupos.length > 0) {
                 progressoTotal += p;
                 treinoCount++;
               }
@@ -991,8 +1008,8 @@ export function WorkoutDayView({
             >
               {treinosDoDia.map((treino, treinoIndex) => {
                 const treinoId = getTreinoId(treino);
-                const grupos = treinoId ? localGrupos[treinoId] ?? [] : [];
-                const blocos = treinoId ? localBlocos[treinoId] ?? [] : [];
+                const grupos = treinoId ? normalizeExerciseGroups(localGrupos[treinoId] ?? []) : [];
+                const blocos = treinoId ? normalizeWorkoutBlocks(localBlocos[treinoId] ?? []) : [];
 
                 const totalItens = calcularTotalItens(treino, grupos, blocos);
                 const treinoTemConteudo = totalItens > 0;
@@ -1002,9 +1019,7 @@ export function WorkoutDayView({
                 const blocosMeio = blocos.filter((b) => b.posicao === "meio");
                 const blocosFim = blocos.filter((b) => b.posicao === "fim");
 
-                const exerciciosIsolados = treino.exercicios.filter(
-                  (ex) => !ex.grupo_id
-                );
+                const exerciciosIsolados = getIsolatedExercises(treino.exercicios);
                 const completedItems = countCompletedItems(
                   exerciciosIsolados,
                   grupos,

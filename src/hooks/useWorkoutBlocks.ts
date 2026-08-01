@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { BlocoTreino } from "@/types/workoutBlocks";
 import { hidratarBlocoComTemplate } from "@/types/workoutBlocks";
+import { normalizeWorkoutBlocks } from "@/utils/workoutNormalization";
 
 
 interface UseWorkoutBlocksProps {
@@ -133,6 +134,10 @@ export function useWorkoutBlocks({
           const tid = (bloco as any).treino_semanal_id;
           if (!agrupados[tid]) agrupados[tid] = [];
           agrupados[tid].push(hidratarBlocoComTemplate(bloco as any as BlocoTreino));
+        });
+
+        Object.keys(agrupados).forEach((tid) => {
+          agrupados[tid] = normalizeWorkoutBlocks(agrupados[tid]);
         });
 
         console.log(
@@ -429,7 +434,7 @@ export function useWorkoutBlocks({
   // Função auxiliar para obter blocos de um treino específico
   const obterBlocos = useCallback(
     (treinoSemanalId: string): BlocoTreino[] => {
-      return blocosPorTreino[treinoSemanalId] || [];
+      return normalizeWorkoutBlocks(blocosPorTreino[treinoSemanalId] || []);
     },
     [blocosPorTreino]
   );

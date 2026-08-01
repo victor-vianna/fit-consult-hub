@@ -86,6 +86,11 @@ import { usePersistedState } from "@/hooks/usePersistedState";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { AnamneseWorkoutNotes } from "@/components/AnamneseWorkoutNotes";
 import { StudentWorkoutPreview } from "@/components/StudentWorkoutPreview";
+import {
+  getIsolatedExercises,
+  normalizeExerciseGroups,
+  normalizeWorkoutBlocks,
+} from "@/utils/workoutNormalization";
 
 import {
   DndContext,
@@ -152,6 +157,8 @@ export function TreinosManager({
 }: TreinosManagerProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const isAluno = user?.id === profileId;
+  const isPersonal = user?.id === personalId;
   const {
     treinos,
     loading,
@@ -175,7 +182,11 @@ export function TreinosManager({
     deletarTreino,
     marcarConcluidoTreino,
     treinosPorDia,
-  } = useTreinos({ profileId, personalId });
+  } = useTreinos({
+    profileId,
+    personalId,
+    followActiveWeek: isAluno,
+  });
 
   // Buscar nome do aluno
   const { data: alunoProfile } = useQuery({
@@ -195,9 +206,6 @@ export function TreinosManager({
 
   // Buscar configurações do personal para exportação
   const { settings: personalSettings } = usePersonalSettings(personalId);
-
-  const isAluno = user?.id === profileId;
-  const isPersonal = user?.id === personalId;
 
   // 🆕 Hook de modelos de treino
   const {
@@ -386,8 +394,11 @@ export function TreinosManager({
     blocos: any[]
   ): UnifiedItem[] => {
     const items: UnifiedItem[] = [];
+    const exerciciosNormalizados = getIsolatedExercises(exerciciosIsolados);
+    const gruposNormalizados = normalizeExerciseGroups(grupos);
+    const blocosNormalizados = normalizeWorkoutBlocks(blocos);
 
-    exerciciosIsolados.forEach((ex) => {
+    exerciciosNormalizados.forEach((ex) => {
       items.push({
         sortableId: ex.id,
         type: "exercise",
@@ -396,7 +407,7 @@ export function TreinosManager({
       });
     });
 
-    grupos.forEach((grupo: any) => {
+    gruposNormalizados.forEach((grupo: any) => {
       // Use the minimum ordem of the group's exercises to position the group
       const minOrdem = grupo.exercicios?.length > 0
         ? Math.min(...grupo.exercicios.map((e: any) => e.ordem ?? 0))
@@ -409,7 +420,7 @@ export function TreinosManager({
       });
     });
 
-    blocos.forEach((bloco: any) => {
+    blocosNormalizados.forEach((bloco: any) => {
       items.push({
         sortableId: `block-${bloco.id}`,
         type: "block",
@@ -596,21 +607,20 @@ export function TreinosManager({
   };
 
   const calcularProgresso = (treino: TreinoDia) => {
-    if (treino.exercicios.length === 0) return 0;
-    const concluidos = treino.exercicios.filter((e) => e.concluido).length;
-    return Math.round((concluidos / treino.exercicios.length) * 100);
+    const exercicios = getIsolatedExercises(treino.exercicios);
+    if (exercicios.length === 0) return 0;
+    const concluidos = exercicios.filter((e) => e.concluido).length;
+    return Math.round((concluidos / exercicios.length) * 100);
   };
 
   // 🔧 Esta função conta TODOS os itens de treino (exercícios isolados + em grupos + blocos)
   const calcularTotalItens = (treino: TreinoDia): number => {
     const treinoId = getTreinoId(treino);
-    const grupos = treinoId ? obterGruposDoTreino(treinoId) : [];
-    const blocos = treinoId ? obterBlocos(treinoId) : [];
+    const grupos = treinoId ? normalizeExerciseGroups(obterGruposDoTreino(treinoId)) : [];
+    const blocos = treinoId ? normalizeWorkoutBlocks(obterBlocos(treinoId)) : [];
 
     // Exercícios isolados (não estão em nenhum grupo)
-    const exerciciosIsolados = treino.exercicios.filter(
-      (ex) => !ex.grupo_id
-    ).length;
+    const exerciciosIsolados = getIsolatedExercises(treino.exercicios).length;
 
     // Exercícios dentro de grupos
     const exerciciosEmGrupos = grupos.reduce((total, grupo) => {
@@ -889,8 +899,8 @@ export function TreinosManager({
       : treinosDoDiaArr[0] || treinos.find((t) => t.dia === selectedDia);
 
     const treinoId = treino ? getTreinoId(treino) : null;
-    const grupos = treinoId ? obterGruposDoTreino(treinoId) : [];
-    const blocos = treinoId ? obterBlocos(treinoId) : [];
+    const grupos = treinoId ? normalizeExerciseGroups(obterGruposDoTreino(treinoId)) : [];
+    const blocos = treinoId ? normalizeWorkoutBlocks(obterBlocos(treinoId)) : [];
 
     const totalExercicios = (treino?.exercicios?.length || 0);
     const totalAgrupados = grupos.reduce(
@@ -905,8 +915,7 @@ export function TreinosManager({
 
     try {
       // Mapear exercícios isolados
-      const exerciciosIsolados = treino.exercicios
-        .filter((ex) => !ex.grupo_id)
+      const exerciciosIsolados = getIsolatedExercises(treino.exercicios)
         .map((ex, index) => ({
           nome: ex.nome,
           link_video: ex.link_video ?? undefined,
@@ -1279,18 +1288,15 @@ export function TreinosManager({
                 : treinosDoDiaArr[0] || treinos.find((t) => t.dia === selectedDia);
               if (!treino) return null;
 
+              const treinoId = getTreinoId(treino);
+              const grupos = treinoId ? normalizeExerciseGroups(obterGruposDoTreino(treinoId)) : [];
+              const blocos = treinoId ? normalizeWorkoutBlocks(obterBlocos(treinoId)) : [];
+              const exerciciosIsolados = getIsolatedExercises(treino.exercicios);
+
               const progresso = calcularProgresso(treino);
               const diaInfo = diasSemana[treino.dia - 1];
-              const temExercicios = treino.exercicios.length > 0;
-
-              const treinoId = getTreinoId(treino);
-              const grupos = treinoId ? obterGruposDoTreino(treinoId) : [];
-              const blocos = treinoId ? obterBlocos(treinoId) : [];
+              const temExercicios = exerciciosIsolados.length > 0 || grupos.length > 0;
               const temBlocos = blocos.length > 0;
-
-              const exerciciosIsolados = treino.exercicios.filter(
-                (ex) => !ex.grupo_id
-              );
 
               // Build unified list for drag-and-drop
               const unifiedList = buildUnifiedList(exerciciosIsolados, grupos, blocos);

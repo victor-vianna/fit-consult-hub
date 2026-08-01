@@ -31,6 +31,12 @@ import {
 import type { ModeloTreino, LinkDemonstracao } from "@/hooks/useModelosTreino";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import {
+  getIsolatedExercises,
+  normalizeExerciseGroups,
+  normalizeExercises,
+  normalizeWorkoutBlocks,
+} from "@/utils/workoutNormalization";
 
 interface ModeloVisualizacaoModalProps {
   modelo: ModeloTreino | null;
@@ -105,8 +111,10 @@ export function ModeloVisualizacaoModal({
 
   if (!modelo) return null;
 
-  const totalExercicios = modelo.exercicios?.length || 0;
-  const totalBlocos = modelo.blocos?.length || 0;
+  const exerciciosModelo = normalizeExercises(modelo.exercicios || []);
+  const blocosModelo = normalizeWorkoutBlocks(modelo.blocos || []);
+  const totalExercicios = exerciciosModelo.length;
+  const totalBlocos = blocosModelo.length;
   const tempoRelativo = formatDistanceToNow(new Date(modelo.created_at), {
     addSuffix: true,
     locale: ptBR,
@@ -225,14 +233,14 @@ export function ModeloVisualizacaoModal({
         <ScrollArea className="min-h-0 flex-1 -mx-4 px-4 sm:-mx-6 sm:px-6">
           <div className="space-y-4 py-2">
             {/* Blocos */}
-            {modelo.blocos && modelo.blocos.length > 0 && (
+            {blocosModelo.length > 0 && (
               <div className="space-y-2">
                 <h4 className="text-sm font-semibold flex items-center gap-2">
                   <Blocks className="h-4 w-4" />
                   Blocos de Treino
                 </h4>
                 <div className="space-y-2">
-                  {modelo.blocos.map((bloco, idx) => (
+                  {blocosModelo.map((bloco, idx) => (
                     <div
                       key={bloco.id || idx}
                       className="flex min-w-0 items-center gap-3 rounded-lg border bg-card p-3"
@@ -264,11 +272,11 @@ export function ModeloVisualizacaoModal({
             )}
 
             {/* Exercícios */}
-            {modelo.exercicios && modelo.exercicios.length > 0 && (() => {
+            {exerciciosModelo.length > 0 && (() => {
               // Agrupar exercícios: isolados + grupos
-              const isolados = modelo.exercicios!.filter(ex => !ex.grupo_id);
-              const gruposMap = new Map<string, typeof modelo.exercicios>();
-              modelo.exercicios!.filter(ex => ex.grupo_id).forEach(ex => {
+              const isolados = getIsolatedExercises(exerciciosModelo);
+              const gruposMap = new Map<string, typeof exerciciosModelo>();
+              exerciciosModelo.filter(ex => ex.grupo_id).forEach(ex => {
                 const key = ex.grupo_id!;
                 if (!gruposMap.has(key)) gruposMap.set(key, []);
                 gruposMap.get(key)!.push(ex);
@@ -277,9 +285,17 @@ export function ModeloVisualizacaoModal({
               // Ordenar itens por ordem
               const items: { type: "isolado" | "grupo"; ordem: number; exercicio?: typeof isolados[0]; grupoId?: string; exercicios?: typeof isolados; tipoAgrupamento?: string }[] = [];
               isolados.forEach(ex => items.push({ type: "isolado", ordem: ex.ordem, exercicio: ex }));
-              gruposMap.forEach((exs, grupoId) => {
-                const sorted = exs.sort((a, b) => (a.ordem_no_grupo || 0) - (b.ordem_no_grupo || 0));
-                items.push({ type: "grupo", ordem: Math.min(...exs.map(e => e.ordem)), grupoId, exercicios: sorted, tipoAgrupamento: exs[0]?.tipo_agrupamento || "super_set" });
+              normalizeExerciseGroups(
+                Array.from(gruposMap.entries()).map(([grupoId, exs]) => ({
+                  grupo_id: grupoId,
+                  tipo_agrupamento: exs[0]?.tipo_agrupamento || "super_set",
+                  descanso_entre_grupos: exs[0]?.descanso_entre_grupos ?? null,
+                  ordem: Math.min(...exs.map(e => e.ordem)),
+                  exercicios: exs,
+                }))
+              ).forEach((grupo) => {
+                const sorted = grupo.exercicios || [];
+                items.push({ type: "grupo", ordem: grupo.ordem, grupoId: grupo.grupo_id, exercicios: sorted, tipoAgrupamento: grupo.tipo_agrupamento || "super_set" });
               });
               items.sort((a, b) => a.ordem - b.ordem);
 

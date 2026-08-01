@@ -20,12 +20,18 @@ import {
 import { useExerciseProgress } from "@/hooks/useExerciseProgress";
 import { hidratarBlocoComTemplate } from "@/types/workoutBlocks";
 import { WORKOUT_EVENTS, dispatchWorkoutEvent } from "@/constants/workoutStatus";
+import {
+  normalizeExerciseGroups,
+  normalizeExercises,
+  normalizeWorkoutBlocks,
+} from "@/utils/workoutNormalization";
 
 
 interface UseTreinosProps {
   profileId: string;
   personalId: string;
   initialWeek?: string;
+  followActiveWeek?: boolean;
 }
 
 const buildQueryKey = (
@@ -63,14 +69,13 @@ const validarDiaSemana = (dia: number): number => {
   return diaValido;
 };
 
-export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosProps) {
+export function useTreinos({
+  profileId,
+  personalId,
+  initialWeek,
+  followActiveWeek = false,
+}: UseTreinosProps) {
   const queryClient = useQueryClient();
-  const { obterGruposDoTreino } = useExerciseGroups({
-    profileId,
-    personalId,
-    enabled: true,
-  });
-  
   // 🔧 Hook para persistência de progresso PWA
   const {
     salvarProgressoLocal,
@@ -84,7 +89,7 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
   );
 
   // Query separada para buscar semana ativa do personal
-  const { data: semanaAtivaData } = useQuery({
+  const { data: semanaAtivaData, isLoading: loadingSemanaAtiva } = useQuery({
     queryKey: ["semana-ativa", profileId, personalId],
     queryFn: async () => {
       const { data } = await supabase
@@ -101,11 +106,21 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
   });
 
   // ✅ A semana a ser buscada: prioriza semana selecionada, depois ativa, depois atual
-  const semanaParaBuscar = semanaSelecionada;
+  const semanaParaBuscar =
+    followActiveWeek && semanaAtivaData ? semanaAtivaData : semanaSelecionada;
+  const canFetchWorkoutWeek =
+    !!profileId && !!personalId && (!followActiveWeek || !loadingSemanaAtiva);
+
+  const { obterGruposDoTreino } = useExerciseGroups({
+    profileId,
+    personalId,
+    semana: semanaParaBuscar,
+    enabled: canFetchWorkoutWeek,
+  });
 
   const {
     data: treinos = buildInitialTreinos(),
-    isLoading: loading,
+    isLoading: loadingTreinos,
     error,
     refetch,
   } = useQuery({
@@ -173,7 +188,8 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
             }
 
             // Mapear cada registro do banco para o tipo Exercicio com conversões corretas
-            const exerciciosTipados: Exercicio[] = mesclarProgressoExercicios((exercicios || []).map(
+            const exerciciosTipados: Exercicio[] = normalizeExercises(
+              mesclarProgressoExercicios((exercicios || []).map(
               (ex: any) => {
                 const mapped: Exercicio = {
                   id: String(ex.id),
@@ -212,10 +228,13 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
                 };
                 return mapped;
               }
-            ));
+            ))
+            );
 
             // Buscar grupos associados ao treino
-            const grupos = await obterGruposDoTreino(treino.id);
+            const grupos = normalizeExerciseGroups(
+              await obterGruposDoTreino(treino.id)
+            );
 
             // Buscar blocos do treino
             const { data: blocos } = await supabase
@@ -226,8 +245,8 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
               .order("posicao", { ascending: true })
               .order("ordem", { ascending: true });
 
-            const blocosHidratados = (blocos ?? []).map((b: any) =>
-              hidratarBlocoComTemplate(b)
+            const blocosHidratados = normalizeWorkoutBlocks(
+              (blocos ?? []).map((b: any) => hidratarBlocoComTemplate(b))
             );
 
             todosTreinos.push({
@@ -364,7 +383,7 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
     setSemanaSelecionada(getWeekStart());
   }, []);
 
-  const isSemanaAtual = isCurrentWeek(semanaSelecionada);
+  const isSemanaAtual = isCurrentWeek(semanaParaBuscar);
 
   // ---------- Mutations ----------
   const adicionarExercicioMutation = useMutation({
@@ -391,8 +410,12 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
 
       // ✅ Usar treinoId alvo se fornecido, senão criar/encontrar
       const treinoId = treinoIdAlvo || await criarTreinoSeNecessario(diaValido, treinoIdAlvo);
-      const treino = treinos.find((t) => t.treinoId === treinoId) || treinos.find((t) => t.dia === diaValido);
-      const proximaOrdem = treino ? treino.exercicios.length : 0;
+      const treino =
+        treinos.find((t) => t.treinoId === treinoId) ||
+        treinos.find((t) => t.dia === diaValido);
+      const proximaOrdem = treino
+        ? Math.max(0, ...treino.exercicios.map((ex) => Number(ex.ordem) || 0)) + 1
+        : 1;
 
       const { data, error } = await supabase
         .from("exercicios")
@@ -864,10 +887,10 @@ export function useTreinos({ profileId, personalId, initialWeek }: UseTreinosPro
 
   return {
     treinos,
-    loading,
+    loading: loadingTreinos || (followActiveWeek && loadingSemanaAtiva),
     error,
     // Navegação de semanas
-    semanaSelecionada,
+    semanaSelecionada: semanaParaBuscar,
     setSemanaSelecionada,
     irParaSemanaAnterior,
     irParaProximaSemana,

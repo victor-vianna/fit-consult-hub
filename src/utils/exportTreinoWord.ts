@@ -21,6 +21,11 @@ import type { TreinoDia } from "@/types/treino";
 import type { PersonalSettings } from "@/hooks/usePersonalSettings";
 import { formatDisplayDate } from "@/utils/dateFormat";
 import { organizeForExport } from "./exportOrganizer";
+import {
+  getIsolatedExercises,
+  normalizeExerciseGroups,
+  normalizeWorkoutBlocks,
+} from "@/utils/workoutNormalization";
 
 async function fetchImageBytes(url: string): Promise<{ bytes: Uint8Array; type: "png" | "jpg" }> {
   const res = await fetch(url);
@@ -208,9 +213,9 @@ export async function exportTreinoWord(params: ExportTreinoParams) {
   // Days
   treinos.forEach((treino) => {
     const treinoId = treino.treinoId;
-    const exerciciosIsolados = treino.exercicios.filter((ex) => !ex.grupo_id);
-    const grupos = treinoId ? (gruposPorTreino[treinoId] || []) : [];
-    const blocos = treinoId ? (blocosPorTreino[treinoId] || []) : [];
+    const exerciciosIsolados = getIsolatedExercises(treino.exercicios);
+    const grupos = treinoId ? normalizeExerciseGroups(gruposPorTreino[treinoId] || []) : [];
+    const blocos = treinoId ? normalizeWorkoutBlocks(blocosPorTreino[treinoId] || []) : [];
 
     const hasContent = exerciciosIsolados.length > 0 || grupos.length > 0 || blocos.length > 0;
     if (!hasContent) return;

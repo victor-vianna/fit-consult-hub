@@ -32,6 +32,7 @@ interface UseTreinosProps {
   personalId: string;
   initialWeek?: string;
   followActiveWeek?: boolean;
+  preferActiveWeek?: boolean;
 }
 
 const buildQueryKey = (
@@ -74,6 +75,7 @@ export function useTreinos({
   personalId,
   initialWeek,
   followActiveWeek = false,
+  preferActiveWeek = false,
 }: UseTreinosProps) {
   const queryClient = useQueryClient();
   // 🔧 Hook para persistência de progresso PWA
@@ -87,6 +89,8 @@ export function useTreinos({
   const [semanaSelecionada, setSemanaSelecionada] = useState<string>(
     initialWeek || getWeekStart()
   );
+  const [preferredActiveWeekApplied, setPreferredActiveWeekApplied] =
+    useState<string | null>(null);
 
   // Query separada para buscar semana ativa do personal
   const { data: semanaAtivaData, isLoading: loadingSemanaAtiva } = useQuery({
@@ -105,11 +109,26 @@ export function useTreinos({
     staleTime: 1000 * 60 * 5,
   });
 
-  // ✅ A semana a ser buscada: prioriza semana selecionada, depois ativa, depois atual
+  // Aluno acompanha a semana ativa; personal abre nela e depois pode navegar.
+  const shouldUseActiveWeek =
+    followActiveWeek ||
+    (preferActiveWeek &&
+      !!semanaAtivaData &&
+      preferredActiveWeekApplied !== semanaAtivaData);
+
+  useEffect(() => {
+    if (!preferActiveWeek || !semanaAtivaData) return;
+    if (preferredActiveWeekApplied === semanaAtivaData) return;
+
+    setSemanaSelecionada(semanaAtivaData);
+    setPreferredActiveWeekApplied(semanaAtivaData);
+  }, [preferActiveWeek, semanaAtivaData, preferredActiveWeekApplied]);
+
   const semanaParaBuscar =
-    followActiveWeek && semanaAtivaData ? semanaAtivaData : semanaSelecionada;
+    shouldUseActiveWeek && semanaAtivaData ? semanaAtivaData : semanaSelecionada;
+  const waitsForActiveWeek = followActiveWeek || preferActiveWeek;
   const canFetchWorkoutWeek =
-    !!profileId && !!personalId && (!followActiveWeek || !loadingSemanaAtiva);
+    !!profileId && !!personalId && (!waitsForActiveWeek || !loadingSemanaAtiva);
 
   const { obterGruposDoTreino } = useExerciseGroups({
     profileId,
@@ -267,7 +286,7 @@ export function useTreinos({
       return todosTreinos;
     },
     staleTime: 1000 * 60 * 2,
-    enabled: !!profileId && !!personalId,
+    enabled: canFetchWorkoutWeek,
     // 🔧 CORREÇÃO: Desabilitar refetchOnWindowFocus para evitar race condition
     // A sincronização é feita manualmente via visibilitychange com ordem controlada
     refetchOnWindowFocus: false,
@@ -887,8 +906,9 @@ export function useTreinos({
 
   return {
     treinos,
-    loading: loadingTreinos || (followActiveWeek && loadingSemanaAtiva),
+    loading: loadingTreinos || (waitsForActiveWeek && loadingSemanaAtiva),
     error,
+    workoutWeekReady: canFetchWorkoutWeek,
     // Navegação de semanas
     semanaSelecionada: semanaParaBuscar,
     setSemanaSelecionada,

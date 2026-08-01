@@ -85,7 +85,6 @@ import { ExportTreinoDialog } from "@/components/ExportTreinoDialog";
 import { usePersistedState } from "@/hooks/usePersistedState";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { AnamneseWorkoutNotes } from "@/components/AnamneseWorkoutNotes";
-import { StudentWorkoutPreview } from "@/components/StudentWorkoutPreview";
 import {
   getIsolatedExercises,
   normalizeExerciseGroups,
@@ -125,8 +124,6 @@ interface TreinosManagerProps {
   readOnly?: boolean;
   onWorkoutFinished?: () => void;
 }
-
-type WorkoutViewMode = "editor" | "preview" | "split";
 
 type DialogExercicio = {
   id?: string;
@@ -182,10 +179,12 @@ export function TreinosManager({
     deletarTreino,
     marcarConcluidoTreino,
     treinosPorDia,
+    workoutWeekReady,
   } = useTreinos({
     profileId,
     personalId,
     followActiveWeek: isAluno,
+    preferActiveWeek: isPersonal && !readOnly,
   });
 
   // Buscar nome do aluno
@@ -258,7 +257,7 @@ export function TreinosManager({
     profileId,
     personalId,
     semana: semanaSelecionada,
-    enabled: true,
+    enabled: workoutWeekReady,
   });
 
   // 🆕 Hook de blocos
@@ -277,7 +276,7 @@ export function TreinosManager({
     profileId,
     personalId,
     semana: semanaSelecionada,
-    enabled: true,
+    enabled: workoutWeekReady,
   });
 
   const [exercicioDialogOpen, setExercicioDialogOpen] = usePersistedState<boolean>(
@@ -305,12 +304,6 @@ export function TreinosManager({
     "treinos",
     { storage: "session" }
   );
-  const [workoutViewMode, setWorkoutViewMode] =
-    usePersistedState<WorkoutViewMode>(
-      `tm-workout-view-mode:${profileId}`,
-      "editor",
-      { storage: "session" }
-    );
   const [exercicioTemp, setExercicioTemp] =
     useState<Partial<DialogExercicio> | null>(null);
   const [loadingStates, setLoadingStates] = useState({
@@ -377,16 +370,6 @@ export function TreinosManager({
     data: any;
   };
 
-  const parseItemId = (id: string): { type: DraggableItemType; realId: string } => {
-    if (id.startsWith("group-")) {
-      return { type: "group", realId: id.replace("group-", "") };
-    }
-    if (id.startsWith("block-")) {
-      return { type: "block", realId: id.replace("block-", "") };
-    }
-    return { type: "exercise", realId: id };
-  };
-
   // Build unified list merging exercises, groups and blocks sorted by ordem
   const buildUnifiedList = (
     exerciciosIsolados: any[],
@@ -433,14 +416,14 @@ export function TreinosManager({
     return items;
   };
 
-  const handleUnifiedDragEnd = async (event: DragEndEvent, dia: number, unifiedList: UnifiedItem[]) => {
+  const handleUnifiedDragEnd = async (
+    event: DragEndEvent,
+    treinoId: string | null,
+    unifiedList: UnifiedItem[],
+    orderOffset = 0
+  ) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-
-    const treino = treinos.find((t) => t.dia === dia);
-    if (!treino) return;
-
-    const treinoId = getTreinoId(treino);
     if (!treinoId) return;
 
     const oldIndex = unifiedList.findIndex((item) => item.sortableId === String(active.id));
@@ -456,7 +439,7 @@ export function TreinosManager({
       const groupUpdates: { grupo_id: string; ordem: number }[] = [];
 
       newOrder.forEach((item, idx) => {
-        const globalOrdem = (idx + 1) * 10; // Start at 10, multiples of 10
+        const globalOrdem = (orderOffset + idx + 1) * 10; // Start at 10, multiples of 10
         if (item.type === "exercise") {
           exerciseTargets.push({ id: item.data.id, ordem: globalOrdem });
         } else if (item.type === "block") {
@@ -500,6 +483,150 @@ export function TreinosManager({
       console.error("[TreinosManager] Erro ao reordenar:", error);
       toast.error("Erro ao reordenar itens");
     }
+  };
+
+  const renderWorkoutEditorItem = (
+    item: UnifiedItem,
+    index: number,
+    treino: TreinoDia,
+    treinoId: string | null
+  ) => {
+    if (item.type === "block") {
+      const bloco = item.data;
+      return (
+        <SortableBlockCard
+          key={bloco.id}
+          bloco={bloco}
+          index={index}
+          readOnly={readOnly}
+          onEdit={
+            isPersonal
+              ? () => {
+                  setBlocoEditando(bloco);
+                  setBlockDialogOpen(true);
+                }
+              : undefined
+          }
+          onDelete={isPersonal ? () => handleDeleteBlock(bloco.id) : undefined}
+          onToggleConcluido={
+            isAluno
+              ? (blocoId, concluido) =>
+                  marcarBlocoConcluido(blocoId, concluido)
+              : undefined
+          }
+          onSaveAsTemplate={isPersonal ? salvarBlocoComoTemplate : undefined}
+        />
+      );
+    }
+
+    if (item.type === "group") {
+      const grupo = item.data;
+      return (
+        <SortableGroupCard
+          key={grupo.grupo_id ?? `grupo-${index}`}
+          grupo={grupo}
+          index={index}
+          readOnly={readOnly}
+          onEdit={
+            isPersonal
+              ? () => {
+                  if (!grupo.grupo_id || !treinoId) return;
+                  setSelectedDia(treino.dia);
+                  setGrupoEditando({
+                    grupo_id: grupo.grupo_id,
+                    treino_semanal_id: treinoId,
+                    tipo_agrupamento: grupo.tipo_agrupamento,
+                    descanso_entre_grupos: grupo.descanso_entre_grupos,
+                    exercicios: grupo.exercicios || [],
+                  });
+                  setExercicioDialogOpen(true);
+                }
+              : undefined
+          }
+          onDelete={
+            isPersonal
+              ? () => {
+                  if (grupo.grupo_id) {
+                    handleDeleteGroup(grupo.grupo_id);
+                  }
+                }
+              : undefined
+          }
+        />
+      );
+    }
+
+    const exercicio = item.data;
+    const cardEx = {
+      id: exercicio.id,
+      nome: exercicio.nome,
+      link_video: exercicio.link_video ?? null,
+      ordem: exercicio.ordem,
+      series: exercicio.series,
+      repeticoes: exercicio.repeticoes,
+      descanso: exercicio.descanso,
+      carga: exercicio.carga != null ? String(exercicio.carga) : undefined,
+      observacoes: exercicio.observacoes ?? undefined,
+      concluido: !!exercicio.concluido,
+    };
+
+    return (
+      <SortableExercicioCard
+        key={exercicio.id}
+        exercicio={cardEx}
+        index={index}
+        readOnly={readOnly}
+        onEdit={
+          isPersonal
+            ? () => {
+                setExercicioEditando(treinoExToDialog(exercicio));
+                setExercicioDialogOpen(true);
+              }
+            : undefined
+        }
+        onDelete={isPersonal ? handleRemover : undefined}
+      />
+    );
+  };
+
+  const renderWorkoutEditorSection = (
+    label: string,
+    items: UnifiedItem[],
+    treino: TreinoDia,
+    treinoId: string | null,
+    orderOffset = 0
+  ) => {
+    if (items.length === 0) return null;
+
+    return (
+      <section className="space-y-2">
+        <div className="flex items-center gap-3">
+          <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {label}
+          </span>
+          <span className="h-px flex-1 bg-border" />
+        </div>
+
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={(event) =>
+            handleUnifiedDragEnd(event, treinoId, items, orderOffset)
+          }
+        >
+          <SortableContext
+            items={items.map((item) => item.sortableId)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-3">
+              {items.map((item, idx) =>
+                renderWorkoutEditorItem(item, orderOffset + idx, treino, treinoId)
+              )}
+            </div>
+          </SortableContext>
+        </DndContext>
+      </section>
+    );
   };
 
   const handleExerciseSelect = (exercise: Exercise) => {
@@ -1298,13 +1425,16 @@ export function TreinosManager({
               const temExercicios = exerciciosIsolados.length > 0 || grupos.length > 0;
               const temBlocos = blocos.length > 0;
 
-              // Build unified list for drag-and-drop
-              const unifiedList = buildUnifiedList(exerciciosIsolados, grupos, blocos);
-              const canUsePreviewMode = isPersonal && !readOnly;
-              const showEditorPane =
-                !canUsePreviewMode || workoutViewMode !== "preview";
-              const showPreviewPane =
-                canUsePreviewMode && workoutViewMode !== "editor";
+              const aquecimentoList = buildUnifiedList(
+                [],
+                [],
+                blocos.filter((bloco) => bloco.posicao === "inicio")
+              );
+              const principalList = buildUnifiedList(
+                exerciciosIsolados,
+                grupos,
+                blocos.filter((bloco) => bloco.posicao !== "inicio")
+              );
 
               return (
                 <Collapsible
@@ -1617,44 +1747,6 @@ export function TreinosManager({
 
                     <CollapsibleContent>
                       <CardContent className="pt-0">
-                        {canUsePreviewMode && (
-                          <div className="mb-4 flex flex-col gap-2 rounded-lg border bg-muted/20 p-2 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium">
-                                Modo de edição
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                Edite o treino e valide a experiência do aluno.
-                              </p>
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-1 rounded-md bg-background p-1">
-                              {(
-                                [
-                                  ["editor", "Editor"],
-                                  ["split", "Lado a lado"],
-                                  ["preview", "Prévia"],
-                                ] as const
-                              ).map(([mode, label]) => (
-                                <Button
-                                  key={mode}
-                                  type="button"
-                                  size="sm"
-                                  variant={
-                                    workoutViewMode === mode
-                                      ? "default"
-                                      : "ghost"
-                                  }
-                                  className="h-8 px-2 text-xs"
-                                  onClick={() => setWorkoutViewMode(mode)}
-                                >
-                                  {label}
-                                </Button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
                         {!temExercicios && !temBlocos && grupos.length === 0 ? (
                           <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
                             <div className="p-3 bg-muted rounded-full">
@@ -1671,144 +1763,19 @@ export function TreinosManager({
                             </div>
                           </div>
                         ) : (
-                          <div
-                            className={cn(
-                              "gap-4",
-                              showEditorPane && showPreviewPane
-                                ? "grid xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.9fr)]"
-                                : "space-y-4"
+                          <div className="space-y-4">
+                            {renderWorkoutEditorSection(
+                              "Aquecimento",
+                              aquecimentoList,
+                              treino,
+                              treinoId
                             )}
-                          >
-                            {showEditorPane && (
-                              <div className="min-w-0 space-y-3">
-                                <DndContext
-                                  sensors={sensors}
-                                  collisionDetection={closestCenter}
-                                  onDragEnd={(event) =>
-                                    handleUnifiedDragEnd(event, treino.dia, unifiedList)
-                                  }
-                                >
-                                  <SortableContext
-                                    items={unifiedList.map((item) => item.sortableId)}
-                                    strategy={verticalListSortingStrategy}
-                                  >
-                                    <div className="space-y-3">
-                                {unifiedList.map((item, idx) => {
-                                  if (item.type === "block") {
-                                    const bloco = item.data;
-                                    return (
-                                      <SortableBlockCard
-                                        key={bloco.id}
-                                        bloco={bloco}
-                                        index={idx}
-                                        readOnly={readOnly}
-                                        onEdit={
-                                          isPersonal
-                                            ? () => {
-                                                setBlocoEditando(bloco);
-                                                setBlockDialogOpen(true);
-                                              }
-                                            : undefined
-                                        }
-                                        onDelete={
-                                          isPersonal
-                                            ? () => handleDeleteBlock(bloco.id)
-                                            : undefined
-                                        }
-                                        onToggleConcluido={
-                                          isAluno
-                                            ? (blocoId, concluido) =>
-                                                marcarBlocoConcluido(blocoId, concluido)
-                                            : undefined
-                                        }
-                                        onSaveAsTemplate={
-                                          isPersonal
-                                            ? salvarBlocoComoTemplate
-                                            : undefined
-                                        }
-                                      />
-                                    );
-                                  }
-
-                                  if (item.type === "group") {
-                                    const grupo = item.data;
-                                    return (
-                                      <SortableGroupCard
-                                        key={grupo.grupo_id ?? `grupo-${idx}`}
-                                        grupo={grupo}
-                                        index={idx}
-                                        readOnly={readOnly}
-                                        onEdit={
-                                          isPersonal
-                                            ? () => {
-                                                if (!grupo.grupo_id || !treinoId) return;
-                                                setSelectedDia(treino.dia);
-                                                setGrupoEditando({
-                                                  grupo_id: grupo.grupo_id,
-                                                  treino_semanal_id: treinoId,
-                                                  tipo_agrupamento: grupo.tipo_agrupamento,
-                                                  descanso_entre_grupos: grupo.descanso_entre_grupos,
-                                                  exercicios: grupo.exercicios || [],
-                                                });
-                                                setExercicioDialogOpen(true);
-                                              }
-                                            : undefined
-                                        }
-                                        onDelete={
-                                          isPersonal
-                                            ? () => {
-                                                if (grupo.grupo_id) {
-                                                  handleDeleteGroup(grupo.grupo_id);
-                                                }
-                                              }
-                                            : undefined
-                                        }
-                                      />
-                                    );
-                                  }
-
-                                  // exercise
-                                  const exercicio = item.data;
-                                  const cardEx = {
-                                    id: exercicio.id,
-                                    nome: exercicio.nome,
-                                    link_video: exercicio.link_video ?? null,
-                                    ordem: exercicio.ordem,
-                                    series: exercicio.series,
-                                    repeticoes: exercicio.repeticoes,
-                                    descanso: exercicio.descanso,
-                                    carga: exercicio.carga != null ? String(exercicio.carga) : undefined,
-                                    observacoes: exercicio.observacoes ?? undefined,
-                                    concluido: !!exercicio.concluido,
-                                  };
-
-                                  return (
-                                    <SortableExercicioCard
-                                      key={exercicio.id}
-                                      exercicio={cardEx}
-                                      index={idx}
-                                      readOnly={readOnly}
-                                      onEdit={() => {
-                                        setExercicioEditando(treinoExToDialog(exercicio));
-                                        setExercicioDialogOpen(true);
-                                      }}
-                                      onDelete={handleRemover}
-                                    />
-                                  );
-                                })}
-                                    </div>
-                                  </SortableContext>
-                                </DndContext>
-                              </div>
-                            )}
-
-                            {showPreviewPane && (
-                              <StudentWorkoutPreview
-                                items={unifiedList}
-                                diaNome={diaInfo.nome}
-                                treinoNome={treino.nome_treino}
-                                className="min-w-0"
-                              />
+                            {renderWorkoutEditorSection(
+                              "Treino principal",
+                              principalList,
+                              treino,
+                              treinoId,
+                              aquecimentoList.length
                             )}
                           </div>
                         )}

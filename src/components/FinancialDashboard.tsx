@@ -31,7 +31,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { useStripeConnectAccount } from "@/hooks/useStripeConnectAccount";
 import { PersonalPlanPricingForm } from "@/components/PersonalPlanPricingForm";
 import { StripeConnectOnboardingCard } from "@/components/StripeConnectOnboardingCard";
-import { RegisterPaymentForm } from "@/components/RegisterPaymentDialog";
+import {
+  RegisterPaymentForm,
+  REGISTER_PAYMENT_DIALOG_BODY_CLASS,
+  REGISTER_PAYMENT_DIALOG_CONTENT_CLASS,
+  REGISTER_PAYMENT_DIALOG_HEADER_CLASS,
+} from "@/components/RegisterPaymentDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -417,15 +422,16 @@ export function FinancialDashboard() {
           if (!open) setSelectedStudentId("");
         }}
       >
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
+        <DialogContent className={REGISTER_PAYMENT_DIALOG_CONTENT_CLASS}>
+          <DialogHeader className={REGISTER_PAYMENT_DIALOG_HEADER_CLASS}>
             <DialogTitle>Registrar pagamento</DialogTitle>
             <DialogDescription>
               Selecione o aluno e registre um pagamento ja recebido.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5">
+          <div className={REGISTER_PAYMENT_DIALOG_BODY_CLASS}>
+            <div className="space-y-5">
             <div className="space-y-2">
               <Label>Aluno</Label>
               <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
@@ -458,6 +464,7 @@ export function FinancialDashboard() {
                 }}
               />
             )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

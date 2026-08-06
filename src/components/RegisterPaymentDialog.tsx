@@ -62,6 +62,15 @@ function formatMoneyInput(value: number) {
   return Number.isFinite(value) && value > 0 ? value.toFixed(2) : "";
 }
 
+export const REGISTER_PAYMENT_DIALOG_CONTENT_CLASS =
+  "top-2 max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-2xl translate-y-0 grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:top-[50%] sm:max-h-[90dvh] sm:w-full sm:translate-y-[-50%]";
+
+export const REGISTER_PAYMENT_DIALOG_HEADER_CLASS =
+  "shrink-0 border-b px-4 py-4 pr-12 sm:px-6";
+
+export const REGISTER_PAYMENT_DIALOG_BODY_CLASS =
+  "min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6";
+
 interface RegisterPaymentFormProps {
   studentId: string;
   personalId: string;
@@ -136,7 +145,7 @@ export function RegisterPaymentForm({
     (origemPagamento === "manual" && !metodoManual);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pb-1">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="register-payment-plan">Plano</Label>
@@ -264,7 +273,7 @@ export function RegisterPaymentForm({
         />
       </div>
 
-      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+      <div className="sticky bottom-0 z-10 -mx-1 flex flex-col-reverse gap-2 bg-background/95 px-1 pb-[calc(env(safe-area-inset-bottom)+0.25rem)] pt-3 backdrop-blur sm:static sm:m-0 sm:flex-row sm:justify-end sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
         {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel} disabled={submitting}>
             Cancelar
@@ -295,21 +304,23 @@ export function RegisterPaymentDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
+      <DialogContent className={REGISTER_PAYMENT_DIALOG_CONTENT_CLASS}>
+        <DialogHeader className={REGISTER_PAYMENT_DIALOG_HEADER_CLASS}>
           <DialogTitle>Registrar pagamento</DialogTitle>
           <DialogDescription>
             Registre um pagamento ja recebido para {formProps.studentName}.
           </DialogDescription>
         </DialogHeader>
-        <RegisterPaymentForm
-          {...formProps}
-          onCancel={() => onOpenChange(false)}
-          onSuccess={() => {
-            onSuccess?.();
-            onOpenChange(false);
-          }}
-        />
+        <div className={REGISTER_PAYMENT_DIALOG_BODY_CLASS}>
+          <RegisterPaymentForm
+            {...formProps}
+            onCancel={() => onOpenChange(false)}
+            onSuccess={() => {
+              onSuccess?.();
+              onOpenChange(false);
+            }}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );

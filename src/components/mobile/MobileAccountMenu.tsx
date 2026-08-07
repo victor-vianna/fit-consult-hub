@@ -35,10 +35,10 @@ export function MobileAccountMenu({ userName }: MobileAccountMenuProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-10 w-10 rounded-full"
+          className="h-12 w-12 rounded-full [&_svg]:!size-[27px]"
           aria-label="Abrir menu da conta"
         >
-          <UserCircle className="h-6 w-6" />
+          <UserCircle className="!h-[27px] !w-[27px]" strokeWidth={2.25} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">

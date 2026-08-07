@@ -3,10 +3,11 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthGuard } from "./components/AuthGuard";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { InstallPWAPrompt } from "./components/InstallPWAPrompt";
+import { useAuth, type UserRole } from "./hooks/useAuth";
 import Auth from "./pages/Auth";
 import AdminLayout from "./components/Admin/AdminLayout";
 import Personal from "./pages/Personal";
@@ -47,6 +48,33 @@ const queryClient = new QueryClient({
   },
 });
 
+function getRolePath(role: UserRole) {
+  if (role === "admin") return "/admin";
+  if (role === "personal") return "/personal";
+  return "/aluno";
+}
+
+function StartRedirect() {
+  const { user, role, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-primary" />
+          <p className="mt-4 text-muted-foreground">Carregando acesso...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (user && role) {
+    return <Navigate to={getRolePath(role)} replace />;
+  }
+
+  return <Navigate to="/auth" replace />;
+}
+
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
@@ -58,7 +86,9 @@ const App = () => (
           <PushNotificationsBootstrap />
           <ErrorBoundary>
             <Routes>
-              <Route path="/" element={<Landing />} />
+              <Route path="/" element={<StartRedirect />} />
+              <Route path="/inicio" element={<Landing />} />
+              <Route path="/login" element={<Navigate to="/auth" replace />} />
               <Route path="/p/:slug" element={<PublicPersonal />} />
               <Route path="/auth" element={<Auth />} />
               <Route

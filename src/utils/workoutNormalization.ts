@@ -1,8 +1,8 @@
 import type { Exercicio } from "@/types/treino";
 import type { BlocoTreino } from "@/types/workoutBlocks";
 
-type ExerciseLike = Partial<Exercicio> & Record<string, any>;
-type BlockLike = Partial<BlocoTreino> & Record<string, any>;
+export type ExerciseLike = Partial<Exercicio> & Record<string, any>;
+export type BlockLike = Partial<BlocoTreino> & Record<string, any>;
 
 export type ExerciseGroupLike<TExercise extends ExerciseLike = ExerciseLike> = {
   grupo_id?: string | null;
@@ -12,6 +12,15 @@ export type ExerciseGroupLike<TExercise extends ExerciseLike = ExerciseLike> = {
   exercicios?: TExercise[] | null;
   [key: string]: any;
 };
+
+export type OrderedWorkoutItem<
+  TExercise extends ExerciseLike = ExerciseLike,
+  TGroup extends ExerciseGroupLike<TExercise> = ExerciseGroupLike<TExercise>,
+  TBlock extends BlockLike = BlockLike
+> =
+  | { type: "exercise"; ordem: number; data: TExercise }
+  | { type: "group"; ordem: number; data: TGroup }
+  | { type: "block"; ordem: number; data: TBlock };
 
 const POSITION_ORDER: Record<string, number> = {
   inicio: 1,
@@ -228,11 +237,15 @@ function getBlockSignature(bloco: BlockLike) {
 
 function sortBlocks<T extends BlockLike>(blocos: T[]) {
   return [...blocos].sort((a, b) => {
+    const ordem = normalizeNumber(a.ordem, 0) - normalizeNumber(b.ordem, 0);
+    if (ordem !== 0) return ordem;
+
     const posicao =
       (POSITION_ORDER[String(a.posicao ?? "")] ?? 99) -
       (POSITION_ORDER[String(b.posicao ?? "")] ?? 99);
     if (posicao !== 0) return posicao;
-    return normalizeNumber(a.ordem, 0) - normalizeNumber(b.ordem, 0);
+
+    return normalizeText(a.nome).localeCompare(normalizeText(b.nome));
   });
 }
 
@@ -268,4 +281,49 @@ export function getIsolatedExercises<T extends ExerciseLike>(
   exercicios: T[] | null | undefined
 ): T[] {
   return normalizeExercises(exercicios).filter((exercicio) => !exercicio.grupo_id);
+}
+
+export function buildOrderedWorkoutItems<
+  TExercise extends ExerciseLike,
+  TGroup extends ExerciseGroupLike<TExercise>,
+  TBlock extends BlockLike
+>(
+  exerciciosIsolados: TExercise[] | null | undefined,
+  grupos: TGroup[] | null | undefined,
+  blocos: TBlock[] | null | undefined
+): OrderedWorkoutItem<TExercise, TGroup, TBlock>[] {
+  const items: OrderedWorkoutItem<TExercise, TGroup, TBlock>[] = [];
+
+  getIsolatedExercises(exerciciosIsolados).forEach((exercicio, index) => {
+    items.push({
+      type: "exercise",
+      ordem: normalizeNumber(exercicio.ordem, index + 1),
+      data: exercicio,
+    });
+  });
+
+  normalizeExerciseGroups(grupos).forEach((grupo, index) => {
+    items.push({
+      type: "group",
+      ordem: normalizeNumber(grupo.ordem, index + 1),
+      data: grupo,
+    });
+  });
+
+  normalizeWorkoutBlocks(blocos).forEach((bloco, index) => {
+    items.push({
+      type: "block",
+      ordem: normalizeNumber(bloco.ordem, index + 1),
+      data: bloco,
+    });
+  });
+
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => {
+      const ordem = a.item.ordem - b.item.ordem;
+      if (ordem !== 0) return ordem;
+      return a.index - b.index;
+    })
+    .map(({ item }) => item);
 }

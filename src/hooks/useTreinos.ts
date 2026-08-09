@@ -261,7 +261,6 @@ export function useTreinos({
               .select("*")
               .eq("treino_semanal_id", treino.id)
               .is("deleted_at", null)
-              .order("posicao", { ascending: true })
               .order("ordem", { ascending: true });
 
             const blocosHidratados = normalizeWorkoutBlocks(

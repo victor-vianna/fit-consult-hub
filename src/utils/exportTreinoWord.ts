@@ -279,14 +279,16 @@ export async function exportTreinoWord(params: ExportTreinoParams) {
         })
       );
 
-      if (section.type === "exercicios") {
-        // Exercise table
-        const rows: TableRow[] = [createHeaderRow(themeColor)];
+      const rows: TableRow[] = [createHeaderRow(themeColor)];
 
-        section.items.forEach((ex) => rows.push(createExerciseRow(ex)));
+      section.items.forEach((item) => {
+        if (item.type === "exercise") {
+          rows.push(createExerciseRow(item.data));
+          return;
+        }
 
-        // Groups
-        grupos.forEach((grupo: any) => {
+        if (item.type === "group") {
+          const grupo = item.data;
           const tipoLabel = grupo.tipo_agrupamento || "Grupo";
           (grupo.exercicios || [])
             .sort((a: any, b: any) => (a.ordem_no_grupo || 0) - (b.ordem_no_grupo || 0))
@@ -294,18 +296,38 @@ export async function exportTreinoWord(params: ExportTreinoParams) {
               const prefix = idx === 0 ? `[${tipoLabel}]` : "  >";
               rows.push(createExerciseRow(ex, prefix));
             });
-        });
-
-        if (rows.length > 1) {
-          children.push(
-            new Table({
-              rows,
-              width: { size: CONTENT_WIDTH, type: WidthType.DXA },
-              columnWidths: COL_WIDTHS,
-            })
-          );
+          return;
         }
-      } else {
+
+        const bloco = item.data;
+        const details: string[] = [];
+        if (bloco.duracao_estimada_minutos) details.push(`${bloco.duracao_estimada_minutos} min`);
+        if (bloco.descricao) details.push(bloco.descricao);
+        rows.push(
+          createExerciseRow(
+            {
+              nome: bloco.nome,
+              series: null,
+              repeticoes: bloco.tipo || "-",
+              carga: null,
+              descanso: null,
+              observacoes: details.join(" - ") || bloco.observacoes || "-",
+            },
+            "[Bloco]"
+          )
+        );
+      });
+
+      if (rows.length > 1) {
+        children.push(
+          new Table({
+            rows,
+            width: { size: CONTENT_WIDTH, type: WidthType.DXA },
+            columnWidths: COL_WIDTHS,
+          })
+        );
+      }
+      if (false) {
         // Blocks
         section.items.forEach((bloco: any) => {
           const parts: string[] = [bloco.nome];

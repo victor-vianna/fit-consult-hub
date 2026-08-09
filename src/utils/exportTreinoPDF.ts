@@ -189,11 +189,11 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
       doc.line(14, y, 70, y);
       y += 2;
 
-      if (section.type === "exercicios") {
-        // Exercise table
-        const tableData: string[][] = [];
+      const tableData: string[][] = [];
 
-        section.items.forEach((ex) => {
+      section.items.forEach((item) => {
+        if (item.type === "exercise") {
+          const ex = item.data;
           tableData.push([
             ex.nome,
             ex.series ? String(ex.series) : "-",
@@ -202,10 +202,11 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
             ex.descanso ? `${ex.descanso}s` : "-",
             ex.observacoes || "-",
           ]);
-        });
+          return;
+        }
 
-        // Groups
-        grupos.forEach((grupo: any) => {
+        if (item.type === "group") {
+          const grupo = item.data;
           const tipoLabel = grupo.tipo_agrupamento || "Grupo";
           (grupo.exercicios || [])
             .sort((a: any, b: any) => (a.ordem_no_grupo || 0) - (b.ordem_no_grupo || 0))
@@ -220,53 +221,46 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
                 ex.observacoes || "-",
               ]);
             });
-        });
-
-        if (tableData.length > 0) {
-          autoTable(doc, {
-            startY: y + 1,
-            head: [["Exercicio", "Series", "Reps", "Carga", "Descanso", "Obs."]],
-            body: tableData,
-            theme: "grid",
-            headStyles: {
-              fillColor: rgb,
-              textColor: [255, 255, 255],
-              fontSize: 8,
-              fontStyle: "bold",
-              halign: "center",
-            },
-            bodyStyles: { fontSize: 8, textColor: [40, 40, 40] },
-            columnStyles: {
-              0: { halign: "left", cellWidth: "auto" },
-              1: { halign: "center", cellWidth: 15 },
-              2: { halign: "center", cellWidth: 18 },
-              3: { halign: "center", cellWidth: 18 },
-              4: { halign: "center", cellWidth: 18 },
-              5: { halign: "left", cellWidth: 30 },
-            },
-            margin: { left: 14, right: 14, top: pageTopY, bottom: pageHeight - pageBottomLimit },
-          });
-          y = (doc as any).lastAutoTable.finalY + 2;
+          return;
         }
-      } else {
-        // Blocks rendered as a compact table
-        const blocosData = section.items.map((bloco: any) => {
-          const parts = [bloco.nome];
-          if (bloco.duracao_estimada_minutos) parts.push(`${bloco.duracao_estimada_minutos} min`);
-          if (bloco.descricao) parts.push(bloco.descricao);
-          return [parts.join(" - ")];
-        });
 
+        const bloco = item.data;
+        const details: string[] = [];
+        if (bloco.duracao_estimada_minutos) details.push(`${bloco.duracao_estimada_minutos} min`);
+        if (bloco.descricao) details.push(bloco.descricao);
+        tableData.push([
+          `[Bloco] ${bloco.nome}`,
+          "-",
+          bloco.tipo || "-",
+          "-",
+          "-",
+          details.join(" - ") || bloco.observacoes || "-",
+        ]);
+      });
+
+      if (tableData.length > 0) {
         autoTable(doc, {
           startY: y + 1,
-          body: blocosData,
-          theme: "plain",
-          bodyStyles: {
+          head: [["Exercicio / Bloco", "Series", "Reps/Tipo", "Carga", "Descanso", "Obs."]],
+          body: tableData,
+          theme: "grid",
+          headStyles: {
+            fillColor: rgb,
+            textColor: [255, 255, 255],
             fontSize: 8,
-            textColor: [40, 40, 40],
-            cellPadding: 2,
+            fontStyle: "bold",
+            halign: "center",
           },
-          margin: { left: 16, right: 14, top: pageTopY, bottom: pageHeight - pageBottomLimit },
+          bodyStyles: { fontSize: 8, textColor: [40, 40, 40] },
+          columnStyles: {
+            0: { halign: "left", cellWidth: "auto" },
+            1: { halign: "center", cellWidth: 15 },
+            2: { halign: "center", cellWidth: 18 },
+            3: { halign: "center", cellWidth: 18 },
+            4: { halign: "center", cellWidth: 18 },
+            5: { halign: "left", cellWidth: 30 },
+          },
+          margin: { left: 14, right: 14, top: pageTopY, bottom: pageHeight - pageBottomLimit },
         });
         y = (doc as any).lastAutoTable.finalY + 2;
       }

@@ -32,6 +32,7 @@ import type { ModeloTreino, LinkDemonstracao } from "@/hooks/useModelosTreino";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
+  buildOrderedWorkoutItems,
   getIsolatedExercises,
   normalizeExerciseGroups,
   normalizeExercises,
@@ -113,6 +114,30 @@ export function ModeloVisualizacaoModal({
 
   const exerciciosModelo = normalizeExercises(modelo.exercicios || []);
   const blocosModelo = normalizeWorkoutBlocks(modelo.blocos || []);
+  const gruposModelo = normalizeExerciseGroups(
+    Array.from(
+      exerciciosModelo
+        .filter((ex) => ex.grupo_id)
+        .reduce((map, ex) => {
+          const grupoId = ex.grupo_id!;
+          if (!map.has(grupoId)) map.set(grupoId, []);
+          map.get(grupoId)!.push(ex);
+          return map;
+        }, new Map<string, typeof exerciciosModelo>())
+        .entries()
+    ).map(([grupoId, exs]) => ({
+      grupo_id: grupoId,
+      tipo_agrupamento: exs[0]?.tipo_agrupamento || "super_set",
+      descanso_entre_grupos: exs[0]?.descanso_entre_grupos ?? null,
+      ordem: Math.min(...exs.map((ex) => ex.ordem ?? 0)),
+      exercicios: exs,
+    }))
+  );
+  const orderedModeloItems = buildOrderedWorkoutItems<any, any, any>(
+    getIsolatedExercises(exerciciosModelo),
+    gruposModelo,
+    blocosModelo
+  );
   const totalExercicios = exerciciosModelo.length;
   const totalBlocos = blocosModelo.length;
   const tempoRelativo = formatDistanceToNow(new Date(modelo.created_at), {
@@ -232,8 +257,101 @@ export function ModeloVisualizacaoModal({
         {/* Conteúdo */}
         <ScrollArea className="min-h-0 flex-1 -mx-4 px-4 sm:-mx-6 sm:px-6">
           <div className="space-y-4 py-2">
+            {orderedModeloItems.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold flex items-center gap-2">
+                  <Dumbbell className="h-4 w-4" />
+                  Sequencia do treino
+                </h4>
+                <div className="space-y-2">
+                  {orderedModeloItems.map((item, idx) => {
+                    if (item.type === "block") {
+                      const bloco = item.data;
+                      return (
+                        <div key={`block-${bloco.id || idx}`} className="flex min-w-0 items-center gap-3 rounded-lg border bg-card p-3">
+                          <Badge variant="outline" className="shrink-0">{idx + 1}</Badge>
+                          <Blocks className="h-4 w-4 shrink-0 text-primary" />
+                          <div className="min-w-0 flex-1">
+                            <p className="break-words font-medium">{bloco.nome}</p>
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                              <Badge variant="secondary" className="text-xs">{bloco.tipo}</Badge>
+                              {bloco.duracao_estimada_minutos && (
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {bloco.duracao_estimada_minutos}min
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (item.type === "group") {
+                      const grupo = item.data;
+                      const label = grupo.tipo_agrupamento === "bi_set"
+                        ? "Bi-Set"
+                        : grupo.tipo_agrupamento === "tri_set"
+                          ? "Tri-Set"
+                          : grupo.tipo_agrupamento === "drop_set"
+                            ? "Drop-Set"
+                            : "Super-Set";
+
+                      return (
+                        <div key={`group-${grupo.grupo_id || idx}`} className="min-w-0 max-w-full space-y-2 overflow-hidden rounded-lg border-2 border-primary/20 p-3">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="shrink-0">{idx + 1}</Badge>
+                            <Badge variant="secondary" className="text-xs">{label}</Badge>
+                          </div>
+                          {(grupo.exercicios || []).map((ex: any, exIdx: number) => (
+                            <div key={ex.id || exIdx} className="rounded-lg border bg-card p-3">
+                              <p className="break-words font-medium">{ex.nome}</p>
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                                <span>{ex.series}x{ex.repeticoes}</span>
+                                {ex.carga && <span>- {ex.carga}</span>}
+                                <span>- {ex.descanso}s descanso</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
+
+                    const ex = item.data;
+                    const links = ex.links_demonstracao || (ex.link_video ? [{ label: "Video", url: ex.link_video }] : []);
+                    return (
+                      <div key={`exercise-${ex.id || idx}`} className="flex min-w-0 max-w-full items-start gap-3 overflow-hidden rounded-lg border bg-card p-3">
+                        <Badge variant="outline" className="shrink-0 mt-0.5">{idx + 1}</Badge>
+                        <div className="min-w-0 flex-1">
+                          <p className="break-words font-medium">{ex.nome}</p>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                            <span>{ex.series}x{ex.repeticoes}</span>
+                            {ex.carga && <span>- {ex.carga}</span>}
+                            <span>- {ex.descanso}s descanso</span>
+                          </div>
+                          {ex.observacoes && (
+                            <p className="mt-1 break-words text-xs italic text-muted-foreground">{ex.observacoes}</p>
+                          )}
+                          {links.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-1.5">
+                              {links.map((link: LinkDemonstracao, linkIdx: number) => (
+                                <a key={linkIdx} href={link.url} target="_blank" rel="noopener noreferrer" className="inline-flex max-w-full items-center gap-1 text-xs text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+                                  <ExternalLink className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">{link.label}</span>
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Blocos */}
-            {blocosModelo.length > 0 && (
+            {false && blocosModelo.length > 0 && (
               <div className="space-y-2">
                 <h4 className="text-sm font-semibold flex items-center gap-2">
                   <Blocks className="h-4 w-4" />
@@ -272,7 +390,7 @@ export function ModeloVisualizacaoModal({
             )}
 
             {/* Exercícios */}
-            {exerciciosModelo.length > 0 && (() => {
+            {false && exerciciosModelo.length > 0 && (() => {
               // Agrupar exercícios: isolados + grupos
               const isolados = getIsolatedExercises(exerciciosModelo);
               const gruposMap = new Map<string, typeof exerciciosModelo>();

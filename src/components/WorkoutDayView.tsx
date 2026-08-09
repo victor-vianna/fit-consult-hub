@@ -1015,9 +1015,9 @@ export function WorkoutDayView({
                 const treinoTemConteudo = totalItens > 0;
                 const progresso = calcularProgresso(treino, grupos);
 
-                const blocosInicio = blocos.filter((b) => b.posicao === "inicio");
-                const blocosMeio = blocos.filter((b) => b.posicao === "meio");
-                const blocosFim = blocos.filter((b) => b.posicao === "fim");
+                const blocosInicio = blocos;
+                const blocosMeio: BlocoTreino[] = [];
+                const blocosFim: BlocoTreino[] = [];
 
                 const exerciciosIsolados = getIsolatedExercises(treino.exercicios);
                 const completedItems = countCompletedItems(

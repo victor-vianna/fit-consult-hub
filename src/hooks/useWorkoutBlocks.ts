@@ -123,7 +123,6 @@ export function useWorkoutBlocks({
           .select("*")
           .in("treino_semanal_id", treinoIds)
           .is("deleted_at", null)
-          .order("posicao", { ascending: true })
           .order("ordem", { ascending: true });
 
         if (blocosError) throw blocosError;

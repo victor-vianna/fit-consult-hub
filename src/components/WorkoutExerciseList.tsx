@@ -7,9 +7,8 @@ import { CheckCircle, Trophy } from "lucide-react";
 import type { BlocoTreino } from "@/types/workoutBlocks";
 import type { GrupoExercicio } from "@/hooks/useExerciseGroups";
 import {
-  getIsolatedExercises,
-  normalizeExerciseGroups,
-  normalizeWorkoutBlocks,
+  buildOrderedWorkoutItems,
+  type OrderedWorkoutItem,
 } from "@/utils/workoutNormalization";
 
 interface Exercicio {
@@ -29,11 +28,7 @@ interface Exercicio {
   ordem?: number;
 }
 
-type UnifiedItem = {
-  type: "exercise" | "group" | "block";
-  ordem: number;
-  data: any;
-};
+type UnifiedItem = OrderedWorkoutItem<any, any, any>;
 
 interface WorkoutExerciseListProps {
   exerciciosIsolados: Exercicio[];
@@ -52,48 +47,6 @@ interface WorkoutExerciseListProps {
   resumeItemId?: string | null;
 }
 
-function buildUnifiedList(
-  exerciciosIsolados: Exercicio[],
-  grupos: GrupoExercicio[],
-  blocos: BlocoTreino[]
-): UnifiedItem[] {
-  const items: UnifiedItem[] = [];
-  const exerciciosNormalizados = getIsolatedExercises(exerciciosIsolados);
-  const gruposNormalizados = normalizeExerciseGroups(grupos);
-  const blocosNormalizados = normalizeWorkoutBlocks(blocos);
-
-  exerciciosNormalizados.forEach((ex) => {
-    items.push({
-      type: "exercise",
-      ordem: ex.ordem ?? 0,
-      data: ex,
-    });
-  });
-
-  gruposNormalizados.forEach((grupo: any) => {
-    const minOrdem =
-      grupo.exercicios?.length > 0
-        ? Math.min(...grupo.exercicios.map((e: any) => e.ordem ?? 0))
-        : 0;
-    items.push({
-      type: "group",
-      ordem: minOrdem,
-      data: grupo,
-    });
-  });
-
-  blocosNormalizados.forEach((bloco: any) => {
-    items.push({
-      type: "block",
-      ordem: bloco.ordem ?? 0,
-      data: bloco,
-    });
-  });
-
-  items.sort((a, b) => a.ordem - b.ordem);
-  return items;
-}
-
 export function WorkoutExerciseList({
   exerciciosIsolados,
   grupos,
@@ -110,11 +63,10 @@ export function WorkoutExerciseList({
   treinoId,
   resumeItemId,
 }: WorkoutExerciseListProps) {
-  const aquecimentoList = buildUnifiedList([], [], blocosInicio);
-  const mainList = buildUnifiedList(
+  const orderedItems = buildOrderedWorkoutItems(
     exerciciosIsolados,
     grupos,
-    [...blocosMeio, ...blocosFim]
+    [...blocosInicio, ...blocosMeio, ...blocosFim]
   );
 
   const renderItem = (item: UnifiedItem, idx: number) => {
@@ -171,28 +123,11 @@ export function WorkoutExerciseList({
     );
   };
 
-  const renderSection = (label: string, items: UnifiedItem[], offset = 0) => {
-    if (items.length === 0) return null;
-
-    return (
-      <section className="space-y-2">
-        <div className="flex items-center gap-3">
-          <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {label}
-          </span>
-          <span className="h-px flex-1 bg-border" />
-        </div>
-        <div className="space-y-2">
-          {items.map((item, idx) => renderItem(item, offset + idx))}
-        </div>
-      </section>
-    );
-  };
-
   return (
     <div className="space-y-4">
-      {renderSection("Aquecimento", aquecimentoList)}
-      {renderSection("Treino principal", mainList, aquecimentoList.length)}
+      <div className="space-y-2">
+        {orderedItems.map((item, idx) => renderItem(item, idx))}
+      </div>
 
       {isWorkoutActive && onFinalizarTreino && (
         <div className="mt-6 border-t border-border/50 pt-4">

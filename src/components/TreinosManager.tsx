@@ -86,6 +86,7 @@ import { usePersistedState } from "@/hooks/usePersistedState";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { AnamneseWorkoutNotes } from "@/components/AnamneseWorkoutNotes";
 import {
+  buildOrderedWorkoutItems,
   getIsolatedExercises,
   normalizeExerciseGroups,
   normalizeWorkoutBlocks,
@@ -376,44 +377,36 @@ export function TreinosManager({
     grupos: any[],
     blocos: any[]
   ): UnifiedItem[] => {
-    const items: UnifiedItem[] = [];
-    const exerciciosNormalizados = getIsolatedExercises(exerciciosIsolados);
-    const gruposNormalizados = normalizeExerciseGroups(grupos);
-    const blocosNormalizados = normalizeWorkoutBlocks(blocos);
+    return buildOrderedWorkoutItems<any, any, any>(
+      exerciciosIsolados,
+      grupos,
+      blocos
+    ).map((item, index) => {
+      if (item.type === "exercise") {
+        return {
+          sortableId: item.data.id,
+          type: "exercise",
+          ordem: item.ordem,
+          data: item.data,
+        } as UnifiedItem;
+      }
 
-    exerciciosNormalizados.forEach((ex) => {
-      items.push({
-        sortableId: ex.id,
-        type: "exercise",
-        ordem: ex.ordem ?? 0,
-        data: ex,
-      });
-    });
+      if (item.type === "group") {
+        return {
+          sortableId: `group-${item.data.grupo_id ?? index}`,
+          type: "group",
+          ordem: item.ordem,
+          data: item.data,
+        } as UnifiedItem;
+      }
 
-    gruposNormalizados.forEach((grupo: any) => {
-      // Use the minimum ordem of the group's exercises to position the group
-      const minOrdem = grupo.exercicios?.length > 0
-        ? Math.min(...grupo.exercicios.map((e: any) => e.ordem ?? 0))
-        : 0;
-      items.push({
-        sortableId: `group-${grupo.grupo_id}`,
-        type: "group",
-        ordem: minOrdem,
-        data: grupo,
-      });
-    });
-
-    blocosNormalizados.forEach((bloco: any) => {
-      items.push({
-        sortableId: `block-${bloco.id}`,
+      return {
+        sortableId: `block-${item.data.id ?? index}`,
         type: "block",
-        ordem: bloco.ordem ?? 0,
-        data: bloco,
-      });
+        ordem: item.ordem,
+        data: item.data,
+      } as UnifiedItem;
     });
-
-    items.sort((a, b) => a.ordem - b.ordem);
-    return items;
   };
 
   const handleUnifiedDragEnd = async (
@@ -1051,12 +1044,12 @@ export function TreinosManager({
           descanso: ex.descanso ?? 60,
           carga: ex.carga ?? undefined,
           observacoes: ex.observacoes ?? undefined,
-          ordem: index,
+          ordem: ex.ordem ?? index + 1,
         }));
 
       // Mapear exercícios em grupos
       const exerciciosEmGrupos = grupos.flatMap((grupo: any) =>
-        grupo.exercicios.map((ex: any) => ({
+        grupo.exercicios.map((ex: any, index: number) => ({
           nome: ex.nome,
           link_video: ex.link_video ?? undefined,
           series: ex.series ?? 3,
@@ -1064,10 +1057,10 @@ export function TreinosManager({
           descanso: ex.descanso ?? 60,
           carga: ex.carga ?? undefined,
           observacoes: ex.observacoes ?? undefined,
-          ordem: ex.ordem_no_grupo ?? 0,
+          ordem: ex.ordem ?? grupo.ordem ?? index + 1,
           grupo_id: grupo.grupo_id,
           tipo_agrupamento: grupo.tipo_agrupamento,
-          ordem_no_grupo: ex.ordem_no_grupo,
+          ordem_no_grupo: ex.ordem_no_grupo ?? index + 1,
           descanso_entre_grupos: grupo.descanso_entre_grupos,
         }))
       );
@@ -1087,7 +1080,7 @@ export function TreinosManager({
         config_aquecimento: bloco.config_aquecimento ?? undefined,
         config_outro: bloco.config_outro ?? undefined,
         posicao: bloco.posicao,
-        ordem: index,
+        ordem: bloco.ordem ?? index + 1,
       }));
 
       const modeloInput: CriarModeloInput = {
@@ -1425,15 +1418,10 @@ export function TreinosManager({
               const temExercicios = exerciciosIsolados.length > 0 || grupos.length > 0;
               const temBlocos = blocos.length > 0;
 
-              const aquecimentoList = buildUnifiedList(
-                [],
-                [],
-                blocos.filter((bloco) => bloco.posicao === "inicio")
-              );
-              const principalList = buildUnifiedList(
+              const orderedWorkoutItems = buildUnifiedList(
                 exerciciosIsolados,
                 grupos,
-                blocos.filter((bloco) => bloco.posicao !== "inicio")
+                blocos
               );
 
               return (
@@ -1765,17 +1753,10 @@ export function TreinosManager({
                         ) : (
                           <div className="space-y-4">
                             {renderWorkoutEditorSection(
-                              "Aquecimento",
-                              aquecimentoList,
+                              "Sequência do treino",
+                              orderedWorkoutItems,
                               treino,
                               treinoId
-                            )}
-                            {renderWorkoutEditorSection(
-                              "Treino principal",
-                              principalList,
-                              treino,
-                              treinoId,
-                              aquecimentoList.length
                             )}
                           </div>
                         )}

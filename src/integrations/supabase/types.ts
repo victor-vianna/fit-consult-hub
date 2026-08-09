@@ -1811,6 +1811,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          aluno_card_color: string | null
           controle_acesso_por_pagamento: boolean | null
           created_at: string | null
           email: string
@@ -1822,6 +1823,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          aluno_card_color?: string | null
           controle_acesso_por_pagamento?: boolean | null
           created_at?: string | null
           email: string
@@ -1833,6 +1835,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          aluno_card_color?: string | null
           controle_acesso_por_pagamento?: boolean | null
           created_at?: string | null
           email?: string

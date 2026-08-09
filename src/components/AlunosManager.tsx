@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { differenceInCalendarDays, formatDistanceToNow, parseISO, startOfDay } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -43,8 +47,6 @@ import {
   ArrowUpDown,
   Filter,
   Mail,
-  Phone,
-  Eye,
   Users,
   Dumbbell,
   Activity,
@@ -58,12 +60,23 @@ import {
   Settings as SettingsIcon,
   CreditCard,
   MessageSquare,
+  MoreVertical,
+  Edit,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 
@@ -72,8 +85,9 @@ import { usePriorityStudents } from "@/hooks/usePriorityStudents";
 import { useAlunosQuickStatus } from "@/hooks/useAlunosQuickStatus";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileAccountMenu } from "@/components/mobile/MobileAccountMenu";
-import { QuickStudentAccessActions } from "@/components/aluno/QuickStudentAccessActions";
 import type { StudentAccessState } from "@/hooks/useStudentAccess";
+import { CHAT_CONVERSATION_SEPARATOR, getAlunoIdFromConversationKey } from "@/utils/chat";
+import { formatDisplayDate } from "@/utils/dateFormat";
 
 interface Aluno {
   id: string;
@@ -81,7 +95,35 @@ interface Aluno {
   email: string;
   telefone: string | null;
   is_active: boolean;
+  aluno_card_color: string | null;
   created_at: string;
+}
+
+type IndicatorTone = "alert" | "warn" | "ok" | "neutral";
+
+interface StudentCardSummary {
+  chat: {
+    tone: IndicatorTone;
+    label: string;
+    detail?: string;
+    unread: number;
+    lastMessageAt?: string | null;
+  };
+  treino: {
+    tone: IndicatorTone;
+    label: string;
+    detail?: string;
+  };
+  planilha: {
+    tone: IndicatorTone;
+    label: string;
+    detail?: string;
+  };
+  financeiro: {
+    tone: IndicatorTone;
+    label: string;
+    detail?: string;
+  };
 }
 
 export default function AlunosManager() {
@@ -117,33 +159,183 @@ export default function AlunosManager() {
     password: "",
     telefone: "",
   });
+  const [editandoAluno, setEditandoAluno] = useState<Aluno | null>(null);
+  const [editAlunoForm, setEditAlunoForm] = useState({ nome: "", telefone: "" });
+  const [alunoCorDialog, setAlunoCorDialog] = useState<Aluno | null>(null);
 
   const { settings: personalSettings } = usePersonalSettings(user?.id);
   const { flagsByStudent } = usePriorityStudents(user?.id);
   const { statusByAluno } = useAlunosQuickStatus(user?.id);
 
-  // 🎨 Cores customizadas por aluno (persistidas em localStorage)
-  const COLOR_KEY = "alunos-card-colors";
-  const [coresCustom, setCoresCustom] = useState<Record<string, string>>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(COLOR_KEY) || "{}");
-    } catch {
-      return {};
+  // Cor de identidade do aluno, separada do indicador de status.
+  const corPalette = [
+    "#ef4444",
+    "#f59e0b",
+    "#eab308",
+    "#22c55e",
+    "#06b6d4",
+    "#3b82f6",
+    "#a855f7",
+    "#ec4899",
+  ];
+
+  const setCorAluno = async (id: string, cor: string | null) => {
+    if (!user?.id) return;
+    if (cor && !/^#[0-9A-Fa-f]{6}$/.test(cor)) {
+      toast({
+        title: "Cor invalida",
+        description: "Escolha uma cor no formato hexadecimal.",
+        variant: "destructive",
+      });
+      return;
     }
-  });
-  const setCorAluno = (id: string, cor: string | null) => {
-    setCoresCustom((prev) => {
-      const next = { ...prev };
-      if (!cor) delete next[id];
-      else next[id] = cor;
-      try {
-        localStorage.setItem(COLOR_KEY, JSON.stringify(next));
-      } catch {}
-      return next;
-    });
+
+    const queryKey = ["alunos", user.id];
+    const previous = queryClient.getQueryData<Aluno[]>(queryKey);
+
+    queryClient.setQueryData<Aluno[]>(queryKey, (current = []) =>
+      current.map((aluno) =>
+        aluno.id === id ? { ...aluno, aluno_card_color: cor } : aluno
+      )
+    );
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ aluno_card_color: cor })
+      .eq("id", id)
+      .eq("personal_id", user.id);
+
+    if (error) {
+      queryClient.setQueryData(queryKey, previous);
+      toast({
+        title: "Nao foi possivel salvar a cor",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   // 🔔 Preferências de notificações exibidas nos cards (persistidas)
+  const openEditarAluno = (aluno: Aluno) => {
+    setEditandoAluno(aluno);
+    setEditAlunoForm({
+      nome: aluno.nome,
+      telefone: aluno.telefone || "",
+    });
+  };
+
+  const handleUpdateAluno = async () => {
+    if (!user?.id || !editandoAluno) return;
+
+    const nome = editAlunoForm.nome.trim();
+    const telefone = editAlunoForm.telefone.trim() || null;
+
+    if (!nome) {
+      toast({
+        title: "Nome obrigatorio",
+        description: "Informe o nome do aluno.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const queryKey = ["alunos", user.id];
+    const previous = queryClient.getQueryData<Aluno[]>(queryKey);
+
+    queryClient.setQueryData<Aluno[]>(queryKey, (current = []) =>
+      current.map((aluno) =>
+        aluno.id === editandoAluno.id ? { ...aluno, nome, telefone } : aluno
+      )
+    );
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ nome, telefone })
+      .eq("id", editandoAluno.id)
+      .eq("personal_id", user.id);
+
+    if (error) {
+      queryClient.setQueryData(queryKey, previous);
+      toast({
+        title: "Nao foi possivel editar o aluno",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setEditandoAluno(null);
+    toast({ title: "Aluno atualizado" });
+  };
+
+  const handleToggleAlunoAccess = async (aluno: Aluno, shouldAllow: boolean) => {
+    if (!user?.id) return;
+
+    const alunosKey = ["alunos", user.id];
+    const previousAlunos = queryClient.getQueryData<Aluno[]>(alunosKey);
+    const previousAccessQueries = queryClient.getQueriesData<StudentAccessState[]>({
+      queryKey: ["students-access-states", user.id],
+    });
+    const now = new Date().toISOString();
+
+    queryClient.setQueryData<Aluno[]>(alunosKey, (current = []) =>
+      current.map((item) =>
+        item.id === aluno.id ? { ...item, is_active: shouldAllow } : item
+      )
+    );
+
+    queryClient.setQueriesData<StudentAccessState[]>(
+      { queryKey: ["students-access-states", user.id] },
+      (current) =>
+        current?.map((state) =>
+          state.student_id === aluno.id
+            ? {
+                ...state,
+                allowed: shouldAllow,
+                status: shouldAllow ? "ativo" : "suspenso",
+                status_label: shouldAllow ? "Liberado" : "Suspenso",
+                reason_code: shouldAllow ? "manual_release" : "manual_suspend",
+                reason: shouldAllow
+                  ? "Aluno liberado manualmente pelo personal."
+                  : "Aluno bloqueado manualmente pelo personal.",
+                source: "manual",
+                manual_release_until: null,
+                calculated_at: now,
+                updated_at: now,
+              }
+            : state
+        )
+    );
+
+    const { error } = await (supabase as any).rpc("register_student_access_event", {
+      _student_id: aluno.id,
+      _event_type: shouldAllow ? "manual_release" : "manual_suspend",
+      _reason_code: shouldAllow ? "manual_release" : "outro",
+      _message_aluno: shouldAllow
+        ? null
+        : "Seu acesso foi temporariamente suspenso. Entre em contato com seu personal trainer.",
+      _observation: shouldAllow
+        ? "Acesso liberado pelo menu do card do aluno."
+        : "Bloqueio executado pelo menu do card do aluno.",
+    });
+
+    if (error) {
+      queryClient.setQueryData(alunosKey, previousAlunos);
+      previousAccessQueries.forEach(([key, data]) => {
+        queryClient.setQueryData(key, data);
+      });
+      toast({
+        title: "Erro ao alterar acesso",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    refreshStudentsAndAccess();
+    toast({ title: shouldAllow ? "Aluno desbloqueado" : "Aluno bloqueado" });
+  };
+
   const NOTIF_PREFS_KEY = "alunos-card-notif-prefs";
   const NOTIF_TYPES: { id: string; label: string }[] = [
     { id: "treino_hoje", label: "Treinou hoje / Sem treino" },
@@ -210,11 +402,7 @@ export default function AlunosManager() {
 
   const fetchAlunos = refreshStudentsAndAccess;
 
-  const {
-    data: accessStates = [],
-    isLoading: accessStatesLoading,
-    isFetching: accessStatesFetching,
-  } = useQuery<StudentAccessState[]>({
+  const { data: accessStates = [] } = useQuery<StudentAccessState[]>({
     queryKey: ["students-access-states", user?.id, alunos.map((aluno) => aluno.id).join("|")],
     queryFn: async () => {
       if (!user) return [];
@@ -325,6 +513,190 @@ export default function AlunosManager() {
   const accessByStudent = useMemo(() => {
     return Object.fromEntries(accessStates.map((state) => [state.student_id, state]));
   }, [accessStates]);
+
+  const { data: cardSummaries = {} } = useQuery<Record<string, StudentCardSummary>>({
+    queryKey: ["alunos-card-summaries", user?.id, alunos.map((aluno) => aluno.id).join("|")],
+    queryFn: async () => {
+      if (!user?.id || alunos.length === 0) return {};
+
+      const studentIds = alunos.map((aluno) => aluno.id);
+      const today = startOfDay(new Date());
+      const currentWeekStart = new Date(today);
+      currentWeekStart.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+
+      const [
+        { data: mensagens },
+        { data: treinos },
+        { data: planilhas },
+        { data: subscriptions },
+      ] = await Promise.all([
+        supabase
+          .from("mensagens_chat")
+          .select("conversa_key, remetente_id, destinatario_id, conteudo, lida, created_at")
+          .like("conversa_key", `${user.id}${CHAT_CONVERSATION_SEPARATOR}%`)
+          .order("created_at", { ascending: false })
+          .limit(500),
+        supabase
+          .from("treinos_semanais")
+          .select("profile_id, semana, updated_at")
+          .eq("personal_id", user.id)
+          .in("profile_id", studentIds)
+          .order("semana", { ascending: false }),
+        supabase
+          .from("planilhas_treino")
+          .select("profile_id, data_prevista_fim, status")
+          .eq("personal_id", user.id)
+          .in("profile_id", studentIds)
+          .order("data_prevista_fim", { ascending: false }),
+        supabase
+          .from("subscriptions")
+          .select("student_id, data_expiracao, status_pagamento")
+          .eq("personal_id", user.id)
+          .in("student_id", studentIds)
+          .order("data_expiracao", { ascending: false }),
+      ]);
+
+      const chatByStudent = new Map<string, StudentCardSummary["chat"]>();
+      (mensagens || []).forEach((msg: any) => {
+        const alunoId = getAlunoIdFromConversationKey(msg.conversa_key);
+        if (!alunoId || !studentIds.includes(alunoId)) return;
+        const current =
+          chatByStudent.get(alunoId) ||
+          ({
+            tone: "neutral",
+            label: "Sem mensagens",
+            unread: 0,
+            lastMessageAt: null,
+          } as StudentCardSummary["chat"]);
+
+        if (!current.lastMessageAt) {
+          current.lastMessageAt = msg.created_at;
+          current.detail = formatDistanceToNow(new Date(msg.created_at), {
+            addSuffix: true,
+            locale: ptBR,
+          });
+        }
+        if (msg.destinatario_id === user.id && !msg.lida) {
+          current.unread += 1;
+        }
+        chatByStudent.set(alunoId, current);
+      });
+
+      chatByStudent.forEach((chat) => {
+        if (chat.unread > 0) {
+          chat.tone = "warn";
+          chat.label =
+            chat.unread === 1 ? "1 nova mensagem" : `${chat.unread} novas mensagens`;
+        } else if (chat.lastMessageAt) {
+          chat.tone = "ok";
+          chat.label = "Chat em dia";
+        }
+      });
+
+      const treinoByStudent = new Map<string, StudentCardSummary["treino"]>();
+      (treinos || []).forEach((treino: any) => {
+        if (treinoByStudent.has(treino.profile_id)) return;
+        const semana = startOfDay(parseISO(treino.semana));
+        const diffWeeks = Math.floor(
+          differenceInCalendarDays(currentWeekStart, semana) / 7
+        );
+        if (diffWeeks <= 0) {
+          treinoByStudent.set(treino.profile_id, {
+            tone: "ok",
+            label: "Treino ativo",
+            detail: "Semana atual",
+          });
+        } else {
+          treinoByStudent.set(treino.profile_id, {
+            tone: "warn",
+            label: "Treino expirado",
+            detail: diffWeeks === 1 ? "ha 1 semana" : `ha ${diffWeeks} semanas`,
+          });
+        }
+      });
+
+      const planilhaByStudent = new Map<string, StudentCardSummary["planilha"]>();
+      (planilhas || []).forEach((planilha: any) => {
+        if (planilhaByStudent.has(planilha.profile_id) || !planilha.data_prevista_fim) return;
+        const fim = startOfDay(parseISO(planilha.data_prevista_fim));
+        const dias = differenceInCalendarDays(fim, today);
+        if (dias < 0) {
+          planilhaByStudent.set(planilha.profile_id, {
+            tone: "alert",
+            label: "Planilha expirada",
+            detail: `ha ${Math.abs(dias)}d`,
+          });
+        } else if (dias <= 5) {
+          planilhaByStudent.set(planilha.profile_id, {
+            tone: "warn",
+            label: "Proxima do vencimento",
+            detail: dias === 0 ? "expira hoje" : `expira em ${dias}d`,
+          });
+        } else {
+          planilhaByStudent.set(planilha.profile_id, {
+            tone: "ok",
+            label: "Planilha valida",
+            detail: `expira em ${dias}d`,
+          });
+        }
+      });
+
+      const financeiroByStudent = new Map<string, StudentCardSummary["financeiro"]>();
+      (subscriptions || []).forEach((sub: any) => {
+        if (financeiroByStudent.has(sub.student_id)) return;
+        const expiration = startOfDay(parseISO(sub.data_expiracao));
+        const dias = differenceInCalendarDays(expiration, today);
+        const isPendente = ["pendente", "atrasado"].includes(String(sub.status_pagamento));
+        if (dias < 0 || sub.status_pagamento === "atrasado") {
+          financeiroByStudent.set(sub.student_id, {
+            tone: "alert",
+            label: "Atrasado",
+            detail: "acesso bloqueado",
+          });
+        } else if (isPendente || dias <= 3) {
+          financeiroByStudent.set(sub.student_id, {
+            tone: "warn",
+            label: dias <= 1 ? "Vence amanha" : "Vence em breve",
+            detail: formatDisplayDate(sub.data_expiracao),
+          });
+        } else {
+          financeiroByStudent.set(sub.student_id, {
+            tone: "ok",
+            label: "Pagamento em dia",
+            detail: `proximo em ${formatDisplayDate(sub.data_expiracao)}`,
+          });
+        }
+      });
+
+      const result: Record<string, StudentCardSummary> = {};
+      studentIds.forEach((studentId) => {
+        result[studentId] = {
+          chat: chatByStudent.get(studentId) || {
+            tone: "neutral",
+            label: "Sem mensagens",
+            unread: 0,
+          },
+          treino: treinoByStudent.get(studentId) || {
+            tone: "alert",
+            label: "Sem treino cadastrado",
+          },
+          planilha: planilhaByStudent.get(studentId) || {
+            tone: "neutral",
+            label: "Sem planilha",
+          },
+          financeiro: financeiroByStudent.get(studentId) || {
+            tone: "neutral",
+            label: "Sem financeiro",
+          },
+        };
+      });
+
+      return result;
+    },
+    enabled: !!user?.id && alunos.length > 0,
+    staleTime: 60_000,
+    refetchOnWindowFocus: true,
+  });
 
   const resolveAccessAllowed = useCallback(
     (aluno: Aluno): boolean | null => {
@@ -497,6 +869,10 @@ export default function AlunosManager() {
   const alunosInativos = alunos.filter(
     (a) => resolveAccessAllowed(a) === false
   ).length;
+  const hasAlunoFilters = searchTerm.trim().length > 0 || filtroStatus !== "todos";
+  const alunoCorAtual = alunoCorDialog
+    ? alunos.find((aluno) => aluno.id === alunoCorDialog.id) || alunoCorDialog
+    : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
@@ -515,13 +891,15 @@ export default function AlunosManager() {
                 Gerenciar Alunos
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
-                {alunosFiltrados.length} de {alunos.length} alunos
+                {hasAlunoFilters
+                  ? `${alunosFiltrados.length} alunos encontrados`
+                  : "Acompanhe seus alunos cadastrados"}
               </p>
             </div>
 
             <div className="flex items-center gap-2">
               {isMobile && <MobileAccountMenu userName={profile?.nome} />}
-              <Dialog open={openNotifSettings} onOpenChange={setOpenNotifSettings}>
+              {false && <Dialog open={openNotifSettings} onOpenChange={setOpenNotifSettings}>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="default" title="Gerenciar notificações dos cards">
                     <SettingsIcon className="h-4 w-4 sm:mr-2" />
@@ -553,7 +931,7 @@ export default function AlunosManager() {
                     ))}
                   </div>
                 </DialogContent>
-              </Dialog>
+              </Dialog>}
 
               <Dialog open={openDialog} onOpenChange={setOpenDialog}>
               <DialogTrigger asChild>
@@ -645,46 +1023,50 @@ export default function AlunosManager() {
       </header>
 
       <main className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <div className="grid grid-cols-3 md:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6">
-              <CardTitle className="text-[11px] sm:text-sm font-medium leading-tight">
-                Total
-              </CardTitle>
-              <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-              <div className="text-xl sm:text-2xl font-bold">{alunos.length}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6">
-              <CardTitle className="text-[11px] sm:text-sm font-medium leading-tight">
-                Ativos
-              </CardTitle>
-              <UserCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-600" />
-            </CardHeader>
-            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-              <div className="text-xl sm:text-2xl font-bold text-green-600">
-                {alunosAtivos}
+        <div className="mb-4 rounded-xl border bg-card/70 px-3 py-2 shadow-sm sm:mb-5 sm:px-4">
+          <div className="grid grid-cols-3 divide-x divide-border/70">
+            <div className="flex min-w-0 items-center gap-2 pr-2">
+              <div className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted/70 text-muted-foreground sm:flex">
+                <Users className="h-4 w-4" />
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6">
-              <CardTitle className="text-[11px] sm:text-sm font-medium leading-tight">
-                Bloqueados
-              </CardTitle>
-              <UserX className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-600" />
-            </CardHeader>
-            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-              <div className="text-xl sm:text-2xl font-bold text-red-600">
-                {alunosInativos}
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium leading-none text-muted-foreground sm:text-xs">
+                  Total
+                </p>
+                <p className="mt-1 text-lg font-bold leading-none sm:text-xl">
+                  {alunos.length}
+                </p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+
+            <div className="flex min-w-0 items-center justify-center gap-2 px-2">
+              <div className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-md bg-green-500/10 text-green-500 sm:flex">
+                <UserCheck className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium leading-none text-muted-foreground sm:text-xs">
+                  Ativos
+                </p>
+                <p className="mt-1 text-lg font-bold leading-none text-green-500 sm:text-xl">
+                  {alunosAtivos}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex min-w-0 items-center justify-end gap-2 pl-2">
+              <div className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-md bg-red-500/10 text-red-500 sm:flex">
+                <UserX className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 text-right">
+                <p className="text-[11px] font-medium leading-none text-muted-foreground sm:text-xs">
+                  Bloqueados
+                </p>
+                <p className="mt-1 text-lg font-bold leading-none text-red-500 sm:text-xl">
+                  {alunosInativos}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <Card className="mb-6 border-2">
@@ -747,7 +1129,7 @@ export default function AlunosManager() {
               const resolvedAccessAllowed = resolveAccessAllowed(aluno);
               const isAccessUnknown = resolvedAccessAllowed === null;
               const isAccessAllowed = resolvedAccessAllowed !== false;
-              const corCustom = coresCustom[aluno.id];
+              const corCustom = aluno.aluno_card_color;
 
               const prioridade: "sincronizando" | "bloqueado" | "urgente" | "atencao" | "importante" | "ativo" = isAccessUnknown
                 ? "sincronizando"
@@ -770,81 +1152,233 @@ export default function AlunosManager() {
                 ativo:     { ring: "", bar: "bg-green-500", chip: "bg-green-600 text-white", icon: UserCheck, label: "Ativo" },
               }[prioridade];
 
-              const PrioIcon = prioridadeStyles.icon;
-              const corPalette = ["#ef4444", "#f59e0b", "#eab308", "#22c55e", "#06b6d4", "#3b82f6", "#a855f7", "#ec4899"];
+              const statusBadge = isAccessUnknown
+                ? {
+                    label: "Sincronizando",
+                    icon: Clock,
+                    className: "bg-muted text-muted-foreground",
+                  }
+                : isAccessAllowed
+                ? {
+                    label: "Ativo",
+                    icon: UserCheck,
+                    className: "bg-green-600 text-white",
+                  }
+                : {
+                    label: "Bloqueado",
+                    icon: UserX,
+                    className: "bg-muted text-muted-foreground",
+                  };
+              const StatusIcon = statusBadge.icon;
+              const summary = cardSummaries[aluno.id] || {
+                chat: { tone: "neutral", label: "Sem mensagens", unread: 0 },
+                treino: { tone: "alert", label: "Sem treino cadastrado" },
+                planilha: { tone: "neutral", label: "Sem planilha" },
+                financeiro: { tone: "neutral", label: "Sem financeiro" },
+              };
+              const financeiroSummary =
+                accessState &&
+                accessState.allowed === false &&
+                (accessState.source === "payment" ||
+                  accessState.reason_code === "payment_required" ||
+                  accessState.reason_code === "payment_pending" ||
+                  accessState.reason_code === "payment_expired")
+                  ? {
+                      tone: "alert" as IndicatorTone,
+                      label: "Atrasado",
+                      detail: "acesso bloqueado",
+                    }
+                  : summary.financeiro;
+              const indicatorToneStyles: Record<IndicatorTone, string> = {
+                alert:
+                  "border-red-500/80 bg-red-500/15 text-red-700 ring-1 ring-red-500/35 shadow-sm dark:bg-red-950/50 dark:text-red-100",
+                warn:
+                  "border-orange-500/45 bg-orange-500/10 text-orange-700 dark:text-orange-300",
+                ok:
+                  "border-emerald-500/25 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400",
+                neutral:
+                  "border-border bg-muted/20 text-muted-foreground",
+              };
+              const indicatorItems = [
+                {
+                  id: "chat",
+                  title: "Chat",
+                  icon: MessageSquare,
+                  ...summary.chat,
+                  onClick: () => navigate(`/chat?aluno=${aluno.id}`),
+                },
+                {
+                  id: "treino",
+                  title: "Treino",
+                  icon: Dumbbell,
+                  ...summary.treino,
+                  onClick: () => navigate(`/aluno/${aluno.id}?tab=treinos`),
+                },
+                {
+                  id: "planilha",
+                  title: "Planilha",
+                  icon: Calendar,
+                  ...summary.planilha,
+                  onClick: () => navigate(`/aluno/${aluno.id}?tab=geral`),
+                },
+                {
+                  id: "financeiro",
+                  title: "Financeiro",
+                  icon: CreditCard,
+                  ...financeiroSummary,
+                  onClick: () => navigate(`/aluno/${aluno.id}?tab=financeiro`),
+                },
+              ].sort((a, b) => {
+                const weight: Record<IndicatorTone, number> = {
+                  alert: 0,
+                  warn: 1,
+                  ok: 2,
+                  neutral: 3,
+                };
+                return weight[a.tone] - weight[b.tone];
+              });
 
               return (
                 <Card
                   key={aluno.id}
-                  className={`group hover:shadow-xl transition-all duration-300 border-2 cursor-pointer relative overflow-hidden touch-target ${corCustom ? "" : prioridadeStyles.ring}`}
-                  style={corCustom ? { borderColor: corCustom, boxShadow: `0 0 0 1px ${corCustom}33` } : undefined}
+                  className={`group hover:shadow-xl transition-all duration-300 border-2 cursor-pointer relative overflow-hidden touch-target ${prioridadeStyles.ring}`}
                   onClick={() => navigate(`/aluno/${aluno.id}`)}
                 >
                   <div
-                    className={`absolute left-0 top-0 bottom-0 w-1 ${corCustom ? "" : prioridadeStyles.bar}`}
-                    style={corCustom ? { backgroundColor: corCustom } : undefined}
+                    className={`absolute left-0 top-0 bottom-0 w-1 ${prioridadeStyles.bar}`}
                   />
 
-                  <div className="absolute top-2 right-2 z-10 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                    <Badge className={`${prioridadeStyles.chip} gap-1 text-[10px] py-0.5 px-2`}>
-                      <PrioIcon className="h-3 w-3" />
-                      {prioridadeStyles.label}
-                    </Badge>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" title="Personalizar cor">
-                          <Palette className="h-3.5 w-3.5" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-2" align="end">
-                        <div className="grid grid-cols-4 gap-1.5">
-                          {corPalette.map((c) => (
-                            <button
-                              key={c}
-                              onClick={() => setCorAluno(aluno.id, c)}
-                              className="h-6 w-6 rounded-full border-2 border-background hover:scale-110 transition-transform"
-                              style={{ backgroundColor: c }}
-                              aria-label={`Cor ${c}`}
-                            />
-                          ))}
-                        </div>
-                        {corCustom && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="w-full mt-2 h-7 text-xs"
-                            onClick={() => setCorAluno(aluno.id, null)}
-                          >
-                            Remover cor
-                          </Button>
-                        )}
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  <CardContent className="pt-10 pl-4 sm:pl-5 pr-3 pb-4">
+                  <CardContent className="pt-4 pl-4 sm:pl-5 pr-3 pb-4">
                     <div className="space-y-3">
-                      <div>
-                        <h3 className="font-bold text-base leading-tight pr-2 group-hover:text-primary transition-colors truncate">
-                          {aluno.nome}
-                        </h3>
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                          <Mail className="h-3 w-3 flex-shrink-0" />
-                          <span className="truncate">{aluno.email}</span>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex min-w-0 items-center gap-2 pr-1">
+                            {corCustom && (
+                              <span
+                                className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-background"
+                                style={{ backgroundColor: corCustom }}
+                                title="Cor personalizada do aluno"
+                              />
+                            )}
+                            <h3 className="min-w-0 truncate text-base font-bold leading-tight transition-colors group-hover:text-primary">
+                              {aluno.nome}
+                            </h3>
+                          </div>
+                          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Mail className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">{aluno.email}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <Badge className={`${statusBadge.className} gap-1 text-[10px] py-0.5 px-2`}>
+                            <StatusIcon className="h-3 w-3" />
+                            {statusBadge.label}
+                          </Badge>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                aria-label={`Acoes de ${aluno.nome}`}
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                              <DropdownMenuItem onSelect={() => openEditarAluno(aluno)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Editar aluno
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={() => handleToggleAlunoAccess(aluno, !isAccessAllowed)}
+                              >
+                                {isAccessAllowed ? (
+                                  <Lock className="mr-2 h-4 w-4" />
+                                ) : (
+                                  <Unlock className="mr-2 h-4 w-4" />
+                                )}
+                                {isAccessAllowed ? "Bloquear" : "Desbloquear"}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => setAlunoCorDialog(aluno)}>
+                                <Palette className="mr-2 h-4 w-4" />
+                                Alterar cor
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onSelect={(event) => event.preventDefault()}
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Excluir
+                                  </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Confirmar Exclusao</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Tem certeza que deseja remover <strong>{aluno.nome}</strong>?
+                                      Esta acao nao pode ser desfeita e todos os dados do aluno
+                                      serao permanentemente excluidos.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDeleteAluno(aluno.id)}
+                                      className="bg-destructive hover:bg-destructive/90"
+                                    >
+                                      Remover Aluno
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
 
-                      {user?.id && (
-                        <QuickStudentAccessActions
-                          student={aluno}
-                          personalId={user.id}
-                          accessState={accessState}
-                          accessLoading={isAccessUnknown || accessStatesLoading || accessStatesFetching}
-                          onChanged={fetchAlunos}
-                        />
-                      )}
+                      <div
+                        className="grid grid-cols-2 gap-2"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {indicatorItems.map((item) => {
+                          const Icon = item.icon;
+                          const isUrgent = item.tone === "alert";
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={item.onClick}
+                              className={`min-h-[86px] rounded-lg border p-2.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[74px] ${
+                                indicatorToneStyles[item.tone]
+                              } ${isUrgent ? "animate-pulse" : ""}`}
+                            >
+                              <div className="flex items-start gap-2.5">
+                                <Icon className={`${isUrgent ? "h-5 w-5 text-red-500 dark:text-red-300" : "h-4 w-4"} mt-0.5 shrink-0`} />
+                                <div className="min-w-0 flex-1">
+                                  <p className="break-words text-[11px] font-bold uppercase leading-tight tracking-wide opacity-90">
+                                    {item.title}
+                                  </p>
+                                  <p className="mt-1 break-words text-[13px] font-bold leading-snug sm:text-xs">
+                                    {item.label}
+                                  </p>
+                                  {item.detail && (
+                                    <p className="mt-1 break-words text-[11px] leading-snug opacity-85">
+                                      {item.detail}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
 
-                      {(() => {
+                      {false && (() => {
                         // Montar lista de notificações ativas conforme preferências
                         type Item = { id: string; label: string; detail?: string; tone: "ok" | "info" | "warn" | "alert"; icon: any };
                         const items: Item[] = [];
@@ -954,38 +1488,9 @@ export default function AlunosManager() {
                         );
                       })()}
 
-                      <div
-                        className="pt-3 flex gap-2 border-t"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => navigate(`/aluno/${aluno.id}`)}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          Ver Perfil
-                        </Button>
 
-                        {aluno.telefone && (
-                          <Button variant="outline" size="sm" asChild title={aluno.telefone}>
-                            <a href={`tel:${aluno.telefone}`} onClick={(e) => e.stopPropagation()}>
-                              <Phone className="h-4 w-4" />
-                            </a>
-                          </Button>
-                        )}
-
+                      {false && (
                         <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="hover:bg-red-50 hover:border-red-300"
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
                               <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
@@ -1006,7 +1511,7 @@ export default function AlunosManager() {
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
-                      </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -1041,6 +1546,89 @@ export default function AlunosManager() {
             </CardContent>
           </Card>
         )}
+
+        <Dialog open={!!editandoAluno} onOpenChange={(open) => !open && setEditandoAluno(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Editar aluno</DialogTitle>
+              <DialogDescription>
+                Atualize as informacoes basicas exibidas no card.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-aluno-nome">Nome</Label>
+                <Input
+                  id="edit-aluno-nome"
+                  value={editAlunoForm.nome}
+                  onChange={(event) =>
+                    setEditAlunoForm((prev) => ({ ...prev, nome: event.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-aluno-telefone">Telefone</Label>
+                <Input
+                  id="edit-aluno-telefone"
+                  value={editAlunoForm.telefone}
+                  onChange={(event) =>
+                    setEditAlunoForm((prev) => ({ ...prev, telefone: event.target.value }))
+                  }
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditandoAluno(null)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleUpdateAluno}>Salvar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!alunoCorAtual} onOpenChange={(open) => !open && setAlunoCorDialog(null)}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Alterar cor</DialogTitle>
+              <DialogDescription>
+                Defina uma cor de identificacao para {alunoCorAtual?.nome}.
+              </DialogDescription>
+            </DialogHeader>
+            {alunoCorAtual && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-4 gap-2">
+                  {corPalette.map((cor) => (
+                    <button
+                      key={cor}
+                      onClick={() => setCorAluno(alunoCorAtual.id, cor)}
+                      className="h-9 w-9 rounded-full border-2 border-background ring-offset-background transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      style={{ backgroundColor: cor }}
+                      aria-label={`Cor ${cor}`}
+                    />
+                  ))}
+                </div>
+                <Label className="flex items-center justify-between gap-3 text-sm">
+                  Cor customizada
+                  <Input
+                    type="color"
+                    value={alunoCorAtual.aluno_card_color || "#3b82f6"}
+                    onChange={(event) => setCorAluno(alunoCorAtual.id, event.target.value)}
+                    className="h-9 w-14 cursor-pointer border-0 bg-transparent p-0"
+                    aria-label="Escolher cor customizada"
+                  />
+                </Label>
+                <Button
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => setCorAluno(alunoCorAtual.id, null)}
+                  disabled={!alunoCorAtual.aluno_card_color}
+                >
+                  Remover cor personalizada
+                </Button>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

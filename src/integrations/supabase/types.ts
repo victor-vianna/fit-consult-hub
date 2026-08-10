@@ -1812,6 +1812,7 @@ export type Database = {
       profiles: {
         Row: {
           aluno_card_color: string | null
+          archived_at: string | null
           controle_acesso_por_pagamento: boolean | null
           created_at: string | null
           email: string
@@ -1824,6 +1825,7 @@ export type Database = {
         }
         Insert: {
           aluno_card_color?: string | null
+          archived_at?: string | null
           controle_acesso_por_pagamento?: boolean | null
           created_at?: string | null
           email: string
@@ -1836,6 +1838,7 @@ export type Database = {
         }
         Update: {
           aluno_card_color?: string | null
+          archived_at?: string | null
           controle_acesso_por_pagamento?: boolean | null
           created_at?: string | null
           email?: string
@@ -2704,6 +2707,10 @@ export type Database = {
       reordenar_exercicios: {
         Args: { p_ordem_ids: string[]; p_treino_semanal_id: string }
         Returns: undefined
+      }
+      set_student_archived: {
+        Args: { _archived: boolean; _student_id: string }
+        Returns: Database["public"]["Tables"]["profiles"]["Row"]
       }
       update_subscription_status: { Args: never; Returns: undefined }
       verificar_anamnese_preenchida: {

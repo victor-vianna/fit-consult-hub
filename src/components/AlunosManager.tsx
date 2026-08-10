@@ -64,6 +64,8 @@ import {
   Edit,
   Lock,
   Unlock,
+  Archive,
+  ArchiveRestore,
 } from "lucide-react";
 import {
   Popover,
@@ -96,6 +98,7 @@ interface Aluno {
   telefone: string | null;
   is_active: boolean;
   aluno_card_color: string | null;
+  archived_at: string | null;
   created_at: string;
 }
 
@@ -147,7 +150,7 @@ export default function AlunosManager() {
   const [openDialog, setOpenDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState<string>(initialFilters.searchTerm);
   const [filtroStatus, setFiltroStatus] = useState<
-    "todos" | "ativos" | "inativos"
+    "todos" | "ativos" | "inativos" | "arquivados"
   >(initialFilters.filtroStatus);
   const [ordenacao, setOrdenacao] = useState<"nome" | "recente" | "antigo">(
     initialFilters.ordenacao
@@ -336,6 +339,54 @@ export default function AlunosManager() {
     toast({ title: shouldAllow ? "Aluno desbloqueado" : "Aluno bloqueado" });
   };
 
+  const handleToggleAlunoArchive = async (aluno: Aluno, shouldArchive: boolean) => {
+    if (!user?.id) return;
+
+    if (shouldArchive && resolveAccessAllowed(aluno) !== false) {
+      toast({
+        title: "Bloqueie antes de arquivar",
+        description: "O arquivamento organiza a lista, mas o bloqueio controla o acesso do aluno.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const alunosKey = ["alunos", user.id];
+    const previousAlunos = queryClient.getQueryData<Aluno[]>(alunosKey);
+    const now = new Date().toISOString();
+
+    queryClient.setQueryData<Aluno[]>(alunosKey, (current = []) =>
+      current.map((item) =>
+        item.id === aluno.id
+          ? { ...item, archived_at: shouldArchive ? item.archived_at || now : null }
+          : item
+      )
+    );
+
+    const { error } = await supabase.rpc("set_student_archived", {
+      _student_id: aluno.id,
+      _archived: shouldArchive,
+    });
+
+    if (error) {
+      queryClient.setQueryData(alunosKey, previousAlunos);
+      toast({
+        title: shouldArchive ? "Nao foi possivel arquivar" : "Nao foi possivel restaurar",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    refreshStudentsAndAccess();
+    toast({
+      title: shouldArchive ? "Aluno arquivado" : "Aluno restaurado",
+      description: shouldArchive
+        ? "Ele saiu da lista principal e continua disponivel em Arquivados."
+        : "Ele voltou para a lista principal.",
+    });
+  };
+
   const NOTIF_PREFS_KEY = "alunos-card-notif-prefs";
   const NOTIF_TYPES: { id: string; label: string }[] = [
     { id: "treino_hoje", label: "Treinou hoje / Sem treino" },
@@ -394,6 +445,17 @@ export default function AlunosManager() {
     staleTime: 60_000,
   });
 
+  const alunosNaoArquivados = useMemo(
+    () => alunos.filter((aluno) => !aluno.archived_at),
+    [alunos]
+  );
+  const alunosArquivadosLista = useMemo(
+    () => alunos.filter((aluno) => Boolean(aluno.archived_at)),
+    [alunos]
+  );
+  const alunosParaDadosDoCard =
+    filtroStatus === "arquivados" ? alunosArquivadosLista : alunosNaoArquivados;
+
   const refreshStudentsAndAccess = useCallback(() => {
     if (!user?.id) return;
     queryClient.invalidateQueries({ queryKey: ["alunos", user.id] });
@@ -403,7 +465,11 @@ export default function AlunosManager() {
   const fetchAlunos = refreshStudentsAndAccess;
 
   const { data: accessStates = [] } = useQuery<StudentAccessState[]>({
-    queryKey: ["students-access-states", user?.id, alunos.map((aluno) => aluno.id).join("|")],
+    queryKey: [
+      "students-access-states",
+      user?.id,
+      alunosParaDadosDoCard.map((aluno) => aluno.id).join("|"),
+    ],
     queryFn: async () => {
       if (!user) return [];
 
@@ -421,7 +487,7 @@ export default function AlunosManager() {
         });
       }
 
-      const missingStudents = alunos.filter((aluno) => !statesByStudent.has(aluno.id));
+      const missingStudents = alunosParaDadosDoCard.filter((aluno) => !statesByStudent.has(aluno.id));
       if (missingStudents.length > 0) {
         const individualStates = await Promise.all(
           missingStudents.map(async (aluno) => {
@@ -448,7 +514,7 @@ export default function AlunosManager() {
 
       return Array.from(statesByStudent.values());
     },
-    enabled: !!user && alunos.length > 0,
+    enabled: !!user && alunosParaDadosDoCard.length > 0,
     staleTime: 0,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
@@ -515,11 +581,15 @@ export default function AlunosManager() {
   }, [accessStates]);
 
   const { data: cardSummaries = {} } = useQuery<Record<string, StudentCardSummary>>({
-    queryKey: ["alunos-card-summaries", user?.id, alunos.map((aluno) => aluno.id).join("|")],
+    queryKey: [
+      "alunos-card-summaries",
+      user?.id,
+      alunosParaDadosDoCard.map((aluno) => aluno.id).join("|"),
+    ],
     queryFn: async () => {
-      if (!user?.id || alunos.length === 0) return {};
+      if (!user?.id || alunosParaDadosDoCard.length === 0) return {};
 
-      const studentIds = alunos.map((aluno) => aluno.id);
+      const studentIds = alunosParaDadosDoCard.map((aluno) => aluno.id);
       const today = startOfDay(new Date());
       const currentWeekStart = new Date(today);
       currentWeekStart.setDate(today.getDate() - ((today.getDay() + 6) % 7));
@@ -693,7 +763,7 @@ export default function AlunosManager() {
 
       return result;
     },
-    enabled: !!user?.id && alunos.length > 0,
+    enabled: !!user?.id && alunosParaDadosDoCard.length > 0,
     staleTime: 60_000,
     refetchOnWindowFocus: true,
   });
@@ -709,7 +779,8 @@ export default function AlunosManager() {
   );
 
   const alunosFiltrados = useMemo(() => {
-    let resultado = [...alunos];
+    let resultado =
+      filtroStatus === "arquivados" ? [...alunosArquivadosLista] : [...alunosNaoArquivados];
 
     if (searchTerm) {
       resultado = resultado.filter(
@@ -740,7 +811,14 @@ export default function AlunosManager() {
     });
 
     return resultado;
-  }, [alunos, searchTerm, filtroStatus, ordenacao, resolveAccessAllowed]);
+  }, [
+    alunosArquivadosLista,
+    alunosNaoArquivados,
+    searchTerm,
+    filtroStatus,
+    ordenacao,
+    resolveAccessAllowed,
+  ]);
 
   const handleCreateAluno = async () => {
     if (!novoAluno.nome || !novoAluno.email || !novoAluno.password) {
@@ -863,12 +941,14 @@ export default function AlunosManager() {
     }
   };
 
-  const alunosAtivos = alunos.filter(
+  const totalAlunosGerenciados = alunosNaoArquivados.length;
+  const alunosAtivos = alunosNaoArquivados.filter(
     (a) => resolveAccessAllowed(a) === true
   ).length;
-  const alunosInativos = alunos.filter(
+  const alunosInativos = alunosNaoArquivados.filter(
     (a) => resolveAccessAllowed(a) === false
   ).length;
+  const alunosArquivados = alunosArquivadosLista.length;
   const hasAlunoFilters = searchTerm.trim().length > 0 || filtroStatus !== "todos";
   const alunoCorAtual = alunoCorDialog
     ? alunos.find((aluno) => aluno.id === alunoCorDialog.id) || alunoCorDialog
@@ -1024,7 +1104,7 @@ export default function AlunosManager() {
 
       <main className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="mb-4 rounded-xl border bg-card/70 px-3 py-2 shadow-sm sm:mb-5 sm:px-4">
-          <div className="grid grid-cols-3 divide-x divide-border/70">
+          <div className="grid grid-cols-2 gap-y-3 sm:grid-cols-4 sm:divide-x sm:divide-border/70">
             <div className="flex min-w-0 items-center gap-2 pr-2">
               <div className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted/70 text-muted-foreground sm:flex">
                 <Users className="h-4 w-4" />
@@ -1034,7 +1114,7 @@ export default function AlunosManager() {
                   Total
                 </p>
                 <p className="mt-1 text-lg font-bold leading-none sm:text-xl">
-                  {alunos.length}
+                  {totalAlunosGerenciados}
                 </p>
               </div>
             </div>
@@ -1066,6 +1146,20 @@ export default function AlunosManager() {
                 </p>
               </div>
             </div>
+
+            <div className="flex min-w-0 items-center justify-end gap-2 pl-2 sm:pl-4">
+              <div className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-500/10 text-slate-500 sm:flex">
+                <Archive className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 text-right">
+                <p className="text-[11px] font-medium leading-none text-muted-foreground sm:text-xs">
+                  Arquivados
+                </p>
+                <p className="mt-1 text-lg font-bold leading-none text-slate-500 sm:text-xl">
+                  {alunosArquivados}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1094,6 +1188,7 @@ export default function AlunosManager() {
                   <SelectItem value="todos">Todos os Alunos</SelectItem>
                   <SelectItem value="ativos">Apenas Ativos</SelectItem>
                   <SelectItem value="inativos">Apenas Bloqueados</SelectItem>
+                  <SelectItem value="arquivados">Arquivados</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -1130,8 +1225,11 @@ export default function AlunosManager() {
               const isAccessUnknown = resolvedAccessAllowed === null;
               const isAccessAllowed = resolvedAccessAllowed !== false;
               const corCustom = aluno.aluno_card_color;
+              const isArchived = Boolean(aluno.archived_at);
 
-              const prioridade: "sincronizando" | "bloqueado" | "urgente" | "atencao" | "importante" | "ativo" = isAccessUnknown
+              const prioridade: "arquivado" | "sincronizando" | "bloqueado" | "urgente" | "atencao" | "importante" | "ativo" = isArchived
+                ? "arquivado"
+                : isAccessUnknown
                 ? "sincronizando"
                 : !isAccessAllowed
                 ? "bloqueado"
@@ -1144,6 +1242,7 @@ export default function AlunosManager() {
                 : "ativo";
 
               const prioridadeStyles = {
+                arquivado: { ring: "border-muted bg-muted/30", bar: "bg-muted-foreground/50", chip: "bg-muted text-muted-foreground", icon: Archive, label: "Arquivado" },
                 sincronizando: { ring: "border-muted", bar: "bg-muted-foreground/50", chip: "bg-muted text-muted-foreground", icon: Clock, label: "Sincronizando" },
                 bloqueado: { ring: "border-muted", bar: "bg-muted-foreground", chip: "bg-muted text-muted-foreground", icon: UserX, label: "Bloqueado" },
                 urgente:   { ring: "border-destructive/50 ring-1 ring-destructive/20", bar: "bg-destructive", chip: "bg-destructive text-destructive-foreground", icon: Flame, label: "Urgente" },
@@ -1152,7 +1251,13 @@ export default function AlunosManager() {
                 ativo:     { ring: "", bar: "bg-green-500", chip: "bg-green-600 text-white", icon: UserCheck, label: "Ativo" },
               }[prioridade];
 
-              const statusBadge = isAccessUnknown
+              const statusBadge = isArchived
+                ? {
+                    label: "Arquivado",
+                    icon: Archive,
+                    className: "bg-muted text-muted-foreground",
+                  }
+                : isAccessUnknown
                 ? {
                     label: "Sincronizando",
                     icon: Clock,
@@ -1241,7 +1346,9 @@ export default function AlunosManager() {
               return (
                 <Card
                   key={aluno.id}
-                  className={`group hover:shadow-xl transition-all duration-300 border-2 cursor-pointer relative overflow-hidden touch-target ${prioridadeStyles.ring}`}
+                  className={`group hover:shadow-xl transition-all duration-300 border-2 cursor-pointer relative overflow-hidden touch-target ${prioridadeStyles.ring} ${
+                    isArchived ? "opacity-80" : ""
+                  }`}
                   onClick={() => navigate(`/aluno/${aluno.id}`)}
                 >
                   <div
@@ -1304,6 +1411,16 @@ export default function AlunosManager() {
                               <DropdownMenuItem onSelect={() => setAlunoCorDialog(aluno)}>
                                 <Palette className="mr-2 h-4 w-4" />
                                 Alterar cor
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={() => handleToggleAlunoArchive(aluno, !isArchived)}
+                              >
+                                {isArchived ? (
+                                  <ArchiveRestore className="mr-2 h-4 w-4" />
+                                ) : (
+                                  <Archive className="mr-2 h-4 w-4" />
+                                )}
+                                {isArchived ? "Restaurar" : "Arquivar"}
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <AlertDialog>
@@ -1528,7 +1645,9 @@ export default function AlunosManager() {
                 Nenhum aluno encontrado
               </h3>
               <p className="text-sm text-muted-foreground mb-6">
-                {searchTerm || filtroStatus !== "todos"
+                {filtroStatus === "arquivados" && !searchTerm
+                  ? "Nenhum aluno arquivado"
+                  : searchTerm || filtroStatus !== "todos"
                   ? "Tente ajustar os filtros de busca"
                   : "Comece cadastrando seu primeiro aluno"}
               </p>

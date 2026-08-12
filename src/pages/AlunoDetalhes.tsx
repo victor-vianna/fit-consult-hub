@@ -78,6 +78,7 @@ import { PlanilhaStatusCard } from "@/components/PlanilhaStatusCard";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { BroadcastMessageDialog } from "@/components/chat/BroadcastMessageDialog";
 import { useChatMessages } from "@/hooks/useChatMessages";
+import { usePriorityStudents, type PriorityReason } from "@/hooks/usePriorityStudents";
 import { WeightProgressionPanel } from "@/components/WeightProgressionPanel";
 import { MaterialFileExplorer } from "@/components/materials/MaterialFileExplorer";
 import { MobileAccountMenu } from "@/components/mobile/MobileAccountMenu";
@@ -105,6 +106,28 @@ interface Aluno {
 }
 
 const FILE_PICKER_GUARD_RELEASE_DELAY_MS = 800;
+
+type DetailTabWithNotification = "treinos" | "checkins" | "chat" | "financeiro";
+
+const TAB_BY_PRIORITY_REASON: Record<PriorityReason, DetailTabWithNotification> = {
+  plano_vencendo: "financeiro",
+  plano_vencido: "financeiro",
+  pagamento_pendente: "financeiro",
+  feedback_nao_respondido: "checkins",
+  mensagem_nao_lida: "chat",
+  planilha_vencendo: "treinos",
+  planilha_vencida: "treinos",
+};
+
+function TabNotificationBadge({ count }: { count?: number }) {
+  if (!count) return null;
+
+  return (
+    <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold leading-none text-destructive-foreground shadow-sm ring-2 ring-background">
+      {count > 9 ? "9+" : count}
+    </span>
+  );
+}
 
 export default function AlunoDetalhes() {
   const { id } = useParams();
@@ -167,6 +190,17 @@ export default function AlunoDetalhes() {
     currentUserId: user?.id || "",
   });
   const chatNaoLidas = chatHook.naoLidas;
+  const { flagsByStudent: priorityFlagsByStudent } = usePriorityStudents(user?.id);
+  const priorityFlags = id ? priorityFlagsByStudent[id] || [] : [];
+  const tabNotificationCounts = priorityFlags.reduce<
+    Partial<Record<DetailTabWithNotification, number>>
+  >((counts, flag) => {
+    const tab = TAB_BY_PRIORITY_REASON[flag.reason];
+    counts[tab] = (counts[tab] || 0) + 1;
+    return counts;
+  }, {});
+  const chatBadgeCount =
+    chatNaoLidas > 0 ? chatNaoLidas : tabNotificationCounts.chat || 0;
 
   useEffect(() => {
     const checkMobile = () => {
@@ -734,12 +768,13 @@ export default function AlunoDetalhes() {
                   value="treinos"
                   className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
                     isMobile ? "flex-shrink-0 px-6 py-3" : "flex-shrink-0 px-3 py-3 text-xs lg:text-sm"
-                  }`}
+                  } relative`}
                 >
                   <Dumbbell
                     className={`${isMobile ? "h-5 w-5" : "h-4 w-4 mr-2"}`}
                   />
                   {!isMobile && "Treinos"}
+                  <TabNotificationBadge count={tabNotificationCounts.treinos} />
                 </TabsTrigger>
                 <TabsTrigger
                   value="historico"
@@ -789,12 +824,13 @@ export default function AlunoDetalhes() {
                   value="checkins"
                   className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
                     isMobile ? "flex-shrink-0 px-6 py-3" : "flex-shrink-0 px-3 py-3 text-xs lg:text-sm"
-                  }`}
+                  } relative`}
                 >
                   <ClipboardCheck
                     className={`${isMobile ? "h-5 w-5" : "h-4 w-4 mr-2"}`}
                   />
                   {!isMobile && "Feedbacks Semanais"}
+                  <TabNotificationBadge count={tabNotificationCounts.checkins} />
                 </TabsTrigger>
                 <TabsTrigger
                   value="chat"
@@ -806,22 +842,19 @@ export default function AlunoDetalhes() {
                     className={`${isMobile ? "h-5 w-5" : "h-4 w-4 mr-2"}`}
                   />
                   {!isMobile && "Chat"}
-                  {chatNaoLidas > 0 && (
-                    <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center">
-                      {chatNaoLidas > 9 ? "9+" : chatNaoLidas}
-                    </span>
-                  )}
+                  <TabNotificationBadge count={chatBadgeCount} />
                 </TabsTrigger>
                 <TabsTrigger
                   value="financeiro"
                   className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
                     isMobile ? "flex-shrink-0 px-6 py-3" : "flex-shrink-0 px-3 py-3 text-xs lg:text-sm"
-                  }`}
+                  } relative`}
                 >
                   <CreditCard
                     className={`${isMobile ? "h-5 w-5" : "h-4 w-4 mr-2"}`}
                   />
                   {!isMobile && "Financeiro"}
+                  <TabNotificationBadge count={tabNotificationCounts.financeiro} />
                 </TabsTrigger>
               </TabsList>
             </div>

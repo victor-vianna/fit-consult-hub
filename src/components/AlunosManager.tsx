@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, type CSSProperties } from "react";
+import { useState, useEffect, useMemo, useCallback, type CSSProperties, type ComponentType } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { differenceInCalendarDays, formatDistanceToNow, parseISO, startOfDay } from "date-fns";
@@ -83,7 +83,7 @@ import { Switch } from "@/components/ui/switch";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 
 import { AppLayout } from "@/components/AppLayout";
-import { usePriorityStudents } from "@/hooks/usePriorityStudents";
+import { usePriorityStudents, type PriorityFlag, type PriorityReason } from "@/hooks/usePriorityStudents";
 import { useAlunosQuickStatus } from "@/hooks/useAlunosQuickStatus";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileAccountMenu } from "@/components/mobile/MobileAccountMenu";
@@ -129,6 +129,70 @@ const COR_PALETTE = [
 const normalizeHexColor = (color: string | null) => color?.toLowerCase() || null;
 
 const getCorLabel = (color: string) => COR_LABELS[color] || color.toUpperCase();
+
+type IndicatorItem = {
+  id: string;
+  title: string;
+  label: string;
+  detail?: string;
+  tone: IndicatorTone;
+  icon: ComponentType<{ className?: string }>;
+  onClick: () => void;
+};
+
+const FLAG_INDICATOR_CONFIG: Record<
+  PriorityReason,
+  {
+    title: string;
+    icon: ComponentType<{ className?: string }>;
+    path: (alunoId: string) => string;
+  }
+> = {
+  plano_vencendo: {
+    title: "Plano",
+    icon: Calendar,
+    path: (alunoId) => `/aluno/${alunoId}?tab=financeiro`,
+  },
+  plano_vencido: {
+    title: "Plano",
+    icon: AlertTriangle,
+    path: (alunoId) => `/aluno/${alunoId}?tab=financeiro`,
+  },
+  pagamento_pendente: {
+    title: "Financeiro",
+    icon: CreditCard,
+    path: (alunoId) => `/aluno/${alunoId}?tab=financeiro`,
+  },
+  feedback_nao_respondido: {
+    title: "Feedback",
+    icon: MessageSquare,
+    path: (alunoId) => `/aluno/${alunoId}?tab=checkins`,
+  },
+  mensagem_nao_lida: {
+    title: "Chat",
+    icon: MessageSquare,
+    path: (alunoId) => `/chat?aluno=${alunoId}`,
+  },
+  planilha_vencendo: {
+    title: "Planilha",
+    icon: FileWarning,
+    path: (alunoId) => `/aluno/${alunoId}?tab=treinos`,
+  },
+  planilha_vencida: {
+    title: "Planilha",
+    icon: FileWarning,
+    path: (alunoId) => `/aluno/${alunoId}?tab=treinos`,
+  },
+};
+
+const getFlagTone = (flag: PriorityFlag): IndicatorTone =>
+  flag.severity === "alta" ? "alert" : "warn";
+
+const normalizeAttentionTone = (tone: IndicatorTone): IndicatorTone =>
+  tone === "ok" ? "ok" : tone === "alert" ? "alert" : "warn";
+
+const shouldShowSummaryAttention = (summary: { tone: IndicatorTone; label: string }) =>
+  summary.tone !== "ok" && summary.label !== "Sem mensagens";
 
 const hexToRgba = (hex: string, alpha: number) => {
   const normalized = hex.replace("#", "");
@@ -1398,35 +1462,100 @@ export default function AlunosManager() {
                 neutral:
                   "border-border bg-muted/20 text-muted-foreground",
               };
-              const indicatorItems = [
+              const flagReasons = new Set(flags.map((flag) => flag.reason));
+              const priorityIndicatorItems: IndicatorItem[] = flags.map((flag, index) => {
+                const config = FLAG_INDICATOR_CONFIG[flag.reason];
+                return {
+                  id: `flag-${flag.reason}-${index}`,
+                  title: config.title,
+                  icon: config.icon,
+                  label: flag.label,
+                  detail: flag.detail,
+                  tone: getFlagTone(flag),
+                  onClick: () => navigate(config.path(aluno.id)),
+                };
+              });
+              const summaryAttentionCandidates: (IndicatorItem & { duplicatedByFlag: boolean })[] = [
                 {
-                  id: "chat",
+                  id: "chat-alert",
                   title: "Chat",
                   icon: MessageSquare,
                   ...summary.chat,
+                  tone: normalizeAttentionTone(summary.chat.tone),
                   onClick: () => navigate(`/chat?aluno=${aluno.id}`),
+                  duplicatedByFlag: flagReasons.has("mensagem_nao_lida"),
                 },
                 {
-                  id: "treino",
+                  id: "treino-alert",
                   title: "Treino",
                   icon: Dumbbell,
                   ...summary.treino,
+                  tone: normalizeAttentionTone(summary.treino.tone),
                   onClick: () => navigate(`/aluno/${aluno.id}?tab=treinos`),
+                  duplicatedByFlag: false,
                 },
                 {
-                  id: "planilha",
+                  id: "planilha-alert",
                   title: "Planilha",
-                  icon: Calendar,
+                  icon: FileWarning,
                   ...summary.planilha,
-                  onClick: () => navigate(`/aluno/${aluno.id}?tab=geral`),
+                  tone: normalizeAttentionTone(summary.planilha.tone),
+                  onClick: () => navigate(`/aluno/${aluno.id}?tab=treinos`),
+                  duplicatedByFlag:
+                    flagReasons.has("planilha_vencendo") ||
+                    flagReasons.has("planilha_vencida"),
                 },
                 {
-                  id: "financeiro",
+                  id: "financeiro-alert",
                   title: "Financeiro",
                   icon: CreditCard,
                   ...financeiroSummary,
+                  tone: normalizeAttentionTone(financeiroSummary.tone),
+                  onClick: () => navigate(`/aluno/${aluno.id}?tab=financeiro`),
+                  duplicatedByFlag:
+                    flagReasons.has("pagamento_pendente") ||
+                    flagReasons.has("plano_vencendo") ||
+                    flagReasons.has("plano_vencido"),
+                },
+              ];
+              const summaryAttentionItems: IndicatorItem[] = summaryAttentionCandidates
+                .filter(
+                  (item) => shouldShowSummaryAttention(item) && !item.duplicatedByFlag
+                )
+                .map(({ duplicatedByFlag, ...item }) => item);
+              const complianceIndicatorItems: IndicatorItem[] = [
+                {
+                  id: "treino-ok",
+                  title: "Treino",
+                  icon: Dumbbell,
+                  tone: "ok",
+                  label: "Treino ativo",
+                  detail: summary.treino.tone === "ok" ? summary.treino.detail : "Semana atual",
+                  onClick: () => navigate(`/aluno/${aluno.id}?tab=treinos`),
+                },
+                {
+                  id: "planilha-ok",
+                  title: "Planilha",
+                  icon: Calendar,
+                  tone: "ok",
+                  label: "Planilha valida",
+                  detail: summary.planilha.tone === "ok" ? summary.planilha.detail : undefined,
+                  onClick: () => navigate(`/aluno/${aluno.id}?tab=treinos`),
+                },
+                {
+                  id: "financeiro-ok",
+                  title: "Financeiro",
+                  icon: CreditCard,
+                  tone: "ok",
+                  label: "Pagamento em dia",
+                  detail:
+                    financeiroSummary.tone === "ok" ? financeiroSummary.detail : undefined,
                   onClick: () => navigate(`/aluno/${aluno.id}?tab=financeiro`),
                 },
+              ];
+              const activeNotificationItems = [
+                ...priorityIndicatorItems,
+                ...summaryAttentionItems,
               ].sort((a, b) => {
                 const weight: Record<IndicatorTone, number> = {
                   alert: 0,
@@ -1436,6 +1565,10 @@ export default function AlunosManager() {
                 };
                 return weight[a.tone] - weight[b.tone];
               });
+              const indicatorItems =
+                activeNotificationItems.length > 0
+                  ? activeNotificationItems.slice(0, 4)
+                  : complianceIndicatorItems;
 
               return (
                 <Card
@@ -1548,7 +1681,7 @@ export default function AlunosManager() {
                       </div>
 
                       <div
-                        className="grid grid-cols-2 gap-2"
+                        className={`grid gap-2 ${indicatorItems.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}
                         onClick={(event) => event.stopPropagation()}
                       >
                         {indicatorItems.map((item) => {

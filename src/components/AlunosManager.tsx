@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, type CSSProperties } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { differenceInCalendarDays, formatDistanceToNow, parseISO, startOfDay } from "date-fns";
@@ -104,6 +104,51 @@ interface Aluno {
 
 type IndicatorTone = "alert" | "warn" | "ok" | "neutral";
 
+const COR_LABELS: Record<string, string> = {
+  "#ef4444": "Vermelho",
+  "#f59e0b": "Laranja",
+  "#eab308": "Amarelo",
+  "#22c55e": "Verde",
+  "#06b6d4": "Ciano",
+  "#3b82f6": "Azul",
+  "#a855f7": "Roxo",
+  "#ec4899": "Rosa",
+};
+
+const COR_PALETTE = [
+  "#ef4444",
+  "#f59e0b",
+  "#eab308",
+  "#22c55e",
+  "#06b6d4",
+  "#3b82f6",
+  "#a855f7",
+  "#ec4899",
+];
+
+const normalizeHexColor = (color: string | null) => color?.toLowerCase() || null;
+
+const getCorLabel = (color: string) => COR_LABELS[color] || color.toUpperCase();
+
+const hexToRgba = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const r = parseInt(normalized.slice(0, 2), 16);
+  const g = parseInt(normalized.slice(2, 4), 16);
+  const b = parseInt(normalized.slice(4, 6), 16);
+
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const getAlunoCardColorStyle = (color: string | null): CSSProperties | undefined => {
+  if (!color) return undefined;
+
+  return {
+    background: `linear-gradient(0deg, ${hexToRgba(color, 0.18)}, ${hexToRgba(color, 0.18)}), hsl(var(--card))`,
+    borderColor: color,
+    boxShadow: `0 14px 30px ${hexToRgba(color, 0.14)}`,
+  };
+};
+
 interface StudentCardSummary {
   chat: {
     tone: IndicatorTone;
@@ -143,7 +188,7 @@ export default function AlunosManager() {
       const raw = sessionStorage.getItem(FILTERS_KEY);
       if (raw) return JSON.parse(raw);
     } catch {}
-    return { searchTerm: "", filtroStatus: "todos", ordenacao: "nome" };
+    return { searchTerm: "", filtroStatus: "todos", filtroCor: "todas", ordenacao: "nome" };
   })();
 
   const [loading, setLoading] = useState(false);
@@ -152,6 +197,9 @@ export default function AlunosManager() {
   const [filtroStatus, setFiltroStatus] = useState<
     "todos" | "ativos" | "inativos" | "arquivados"
   >(initialFilters.filtroStatus);
+  const [filtroCor, setFiltroCor] = useState<string>(
+    initialFilters.filtroCor || "todas"
+  );
   const [ordenacao, setOrdenacao] = useState<"nome" | "recente" | "antigo">(
     initialFilters.ordenacao
   );
@@ -169,18 +217,6 @@ export default function AlunosManager() {
   const { settings: personalSettings } = usePersonalSettings(user?.id);
   const { flagsByStudent } = usePriorityStudents(user?.id);
   const { statusByAluno } = useAlunosQuickStatus(user?.id);
-
-  // Cor de identidade do aluno, separada do indicador de status.
-  const corPalette = [
-    "#ef4444",
-    "#f59e0b",
-    "#eab308",
-    "#22c55e",
-    "#06b6d4",
-    "#3b82f6",
-    "#a855f7",
-    "#ec4899",
-  ];
 
   const setCorAluno = async (id: string, cor: string | null) => {
     if (!user?.id) return;
@@ -423,10 +459,10 @@ export default function AlunosManager() {
     try {
       sessionStorage.setItem(
         FILTERS_KEY,
-        JSON.stringify({ searchTerm, filtroStatus, ordenacao })
+        JSON.stringify({ searchTerm, filtroStatus, filtroCor, ordenacao })
       );
     } catch {}
-  }, [searchTerm, filtroStatus, ordenacao]);
+  }, [searchTerm, filtroStatus, filtroCor, ordenacao]);
 
   // 🔧 React Query: cache compartilhado, sem refetch desnecessário entre navegações
   const { data: alunos = [] } = useQuery<Aluno[]>({
@@ -453,6 +489,25 @@ export default function AlunosManager() {
     () => alunos.filter((aluno) => Boolean(aluno.archived_at)),
     [alunos]
   );
+  const coresDisponiveis = useMemo(() => {
+    const colors = new Set<string>();
+
+    alunos.forEach((aluno) => {
+      const color = normalizeHexColor(aluno.aluno_card_color);
+      if (color) colors.add(color);
+    });
+
+    return Array.from(colors).sort((a, b) => {
+      const paletteA = COR_PALETTE.indexOf(a);
+      const paletteB = COR_PALETTE.indexOf(b);
+
+      if (paletteA !== -1 && paletteB !== -1) return paletteA - paletteB;
+      if (paletteA !== -1) return -1;
+      if (paletteB !== -1) return 1;
+
+      return a.localeCompare(b);
+    });
+  }, [alunos]);
   const alunosParaDadosDoCard =
     filtroStatus === "arquivados" ? alunosArquivadosLista : alunosNaoArquivados;
 
@@ -796,6 +851,16 @@ export default function AlunosManager() {
       resultado = resultado.filter((aluno) => resolveAccessAllowed(aluno) === false);
     }
 
+    if (filtroCor === "com-cor") {
+      resultado = resultado.filter((aluno) => Boolean(aluno.aluno_card_color));
+    } else if (filtroCor === "sem-cor") {
+      resultado = resultado.filter((aluno) => !aluno.aluno_card_color);
+    } else if (filtroCor !== "todas") {
+      resultado = resultado.filter(
+        (aluno) => normalizeHexColor(aluno.aluno_card_color) === filtroCor
+      );
+    }
+
     resultado.sort((a, b) => {
       if (ordenacao === "nome") {
         return a.nome.localeCompare(b.nome);
@@ -816,6 +881,7 @@ export default function AlunosManager() {
     alunosNaoArquivados,
     searchTerm,
     filtroStatus,
+    filtroCor,
     ordenacao,
     resolveAccessAllowed,
   ]);
@@ -949,7 +1015,8 @@ export default function AlunosManager() {
     (a) => resolveAccessAllowed(a) === false
   ).length;
   const alunosArquivados = alunosArquivadosLista.length;
-  const hasAlunoFilters = searchTerm.trim().length > 0 || filtroStatus !== "todos";
+  const hasAlunoFilters =
+    searchTerm.trim().length > 0 || filtroStatus !== "todos" || filtroCor !== "todas";
   const alunoCorAtual = alunoCorDialog
     ? alunos.find((aluno) => aluno.id === alunoCorDialog.id) || alunoCorDialog
     : null;
@@ -1165,7 +1232,7 @@ export default function AlunosManager() {
 
         <Card className="mb-6 border-2">
           <CardContent className="p-4 sm:pt-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -1189,6 +1256,32 @@ export default function AlunosManager() {
                   <SelectItem value="ativos">Apenas Ativos</SelectItem>
                   <SelectItem value="inativos">Apenas Bloqueados</SelectItem>
                   <SelectItem value="arquivados">Arquivados</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={filtroCor}
+                onValueChange={setFiltroCor}
+              >
+                <SelectTrigger>
+                  <Palette className="h-4 w-4 mr-2" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas as cores</SelectItem>
+                  <SelectItem value="com-cor">Com cor</SelectItem>
+                  <SelectItem value="sem-cor">Sem cor</SelectItem>
+                  {coresDisponiveis.map((cor) => (
+                    <SelectItem key={cor} value={cor}>
+                      <span className="inline-flex items-center gap-2">
+                        <span
+                          className="h-3 w-3 shrink-0 rounded-full border border-border"
+                          style={{ backgroundColor: cor }}
+                        />
+                        {getCorLabel(cor)}
+                      </span>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
@@ -1225,6 +1318,7 @@ export default function AlunosManager() {
               const isAccessUnknown = resolvedAccessAllowed === null;
               const isAccessAllowed = resolvedAccessAllowed !== false;
               const corCustom = aluno.aluno_card_color;
+              const cardColorStyle = getAlunoCardColorStyle(corCustom);
               const isArchived = Boolean(aluno.archived_at);
 
               const prioridade: "arquivado" | "sincronizando" | "bloqueado" | "urgente" | "atencao" | "importante" | "ativo" = isArchived
@@ -1349,10 +1443,12 @@ export default function AlunosManager() {
                   className={`group hover:shadow-xl transition-all duration-300 border-2 cursor-pointer relative overflow-hidden touch-target ${prioridadeStyles.ring} ${
                     isArchived ? "opacity-80" : ""
                   }`}
+                  style={cardColorStyle}
                   onClick={() => navigate(`/aluno/${aluno.id}`)}
                 >
                   <div
-                    className={`absolute left-0 top-0 bottom-0 w-1 ${prioridadeStyles.bar}`}
+                    className={`absolute left-0 top-0 bottom-0 w-1 ${corCustom ? "" : prioridadeStyles.bar}`}
+                    style={corCustom ? { backgroundColor: corCustom } : undefined}
                   />
 
                   <CardContent className="pt-4 pl-4 sm:pl-5 pr-3 pb-4">
@@ -1360,13 +1456,6 @@ export default function AlunosManager() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex min-w-0 items-center gap-2 pr-1">
-                            {corCustom && (
-                              <span
-                                className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-background"
-                                style={{ backgroundColor: corCustom }}
-                                title="Cor personalizada do aluno"
-                              />
-                            )}
                             <h3 className="min-w-0 truncate text-base font-bold leading-tight transition-colors group-hover:text-primary">
                               {aluno.nome}
                             </h3>
@@ -1645,13 +1734,13 @@ export default function AlunosManager() {
                 Nenhum aluno encontrado
               </h3>
               <p className="text-sm text-muted-foreground mb-6">
-                {filtroStatus === "arquivados" && !searchTerm
+                {filtroStatus === "arquivados" && !searchTerm && filtroCor === "todas"
                   ? "Nenhum aluno arquivado"
-                  : searchTerm || filtroStatus !== "todos"
+                  : hasAlunoFilters
                   ? "Tente ajustar os filtros de busca"
                   : "Comece cadastrando seu primeiro aluno"}
               </p>
-              {!searchTerm && filtroStatus === "todos" && (
+              {!hasAlunoFilters && (
                 <Button
                   onClick={() => setOpenDialog(true)}
                   style={{
@@ -1716,7 +1805,7 @@ export default function AlunosManager() {
             {alunoCorAtual && (
               <div className="space-y-4">
                 <div className="grid grid-cols-4 gap-2">
-                  {corPalette.map((cor) => (
+                  {COR_PALETTE.map((cor) => (
                     <button
                       key={cor}
                       onClick={() => setCorAluno(alunoCorAtual.id, cor)}

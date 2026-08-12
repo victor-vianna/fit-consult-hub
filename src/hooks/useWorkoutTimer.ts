@@ -917,7 +917,7 @@ export function useWorkoutTimer({
       setShowCompletionScreen(true);
       toast.success("Treino concluído!");
 
-      await Promise.all([
+      const resetResults = await Promise.allSettled([
         supabase
           .from("exercicios")
           .update({ concluido: false, series_concluidas: 0 } as any)
@@ -929,6 +929,16 @@ export function useWorkoutTimer({
       ]);
 
       // 🔧 FIX: Dispatch centralized events for cross-component sync
+      const resetErrors = resetResults.filter(
+        (result) =>
+          result.status === "rejected" ||
+          (result.status === "fulfilled" && result.value.error)
+      );
+      if (resetErrors.length > 0) {
+        console.error("[useWorkoutTimer] Erro ao resetar progresso apos finalizacao:", resetErrors);
+        toast.warning("Treino salvo, mas alguns itens podem precisar recarregar para resetar.");
+      }
+
       dispatchWorkoutEvent(WORKOUT_EVENTS.COMPLETED, { treinoId, profileId, personalId });
       dispatchWorkoutEvent(WORKOUT_EVENTS.DASHBOARD_REFRESH, { personalId });
 

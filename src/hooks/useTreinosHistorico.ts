@@ -72,25 +72,29 @@ export function useTreinosHistorico(profileId: string, mes?: Date) {
       if (error) throw error;
 
       // Buscar duração das sessões para treinos concluídos
-      const treinoIds = (data || []).filter(t => t.concluido).map(t => t.id);
-      let sessoesDuracao: Record<string, number> = {};
+      const treinoIds = (data || []).map(t => t.id);
+      const sessoesConcluidas: Record<string, number | null> = {};
       
       if (treinoIds.length > 0) {
         const { data: sessoes } = await supabase
           .from("treino_sessoes")
-          .select("treino_semanal_id, duracao_segundos")
+          .select("treino_semanal_id, duracao_segundos, fim, created_at")
           .in("treino_semanal_id", treinoIds)
           .eq("status", "concluido")
-          .not("duracao_segundos", "is", null);
+          .order("fim", { ascending: false, nullsFirst: false })
+          .order("created_at", { ascending: false });
         
         (sessoes || []).forEach((s: any) => {
-          sessoesDuracao[s.treino_semanal_id] = s.duracao_segundos;
+          if (sessoesConcluidas[s.treino_semanal_id] === undefined) {
+            sessoesConcluidas[s.treino_semanal_id] = s.duracao_segundos ?? null;
+          }
         });
       }
 
       const treinosComDuracao = (data || []).map(t => ({
         ...t,
-        duracao_segundos: sessoesDuracao[t.id] || null,
+        concluido: Boolean(t.concluido || sessoesConcluidas[t.id] !== undefined),
+        duracao_segundos: sessoesConcluidas[t.id] ?? null,
       }));
 
       const treinosDoMes = treinosComDuracao.filter((treino) => {

@@ -440,7 +440,7 @@ export function useExerciseProgress(profileId: string) {
       
       return exercicios.map(ex => {
         const local = progress[ex.id];
-        if (local) {
+        if (local && !local.synced) {
           // Progresso local não sincronizado tem prioridade
           return {
             ...ex,
@@ -469,7 +469,7 @@ export function useExerciseProgress(profileId: string) {
       
       return blocos.map(bloco => {
         const local = progress[bloco.id];
-        if (local) {
+        if (local && !local.synced) {
           // Progresso local não sincronizado tem prioridade
           return { ...bloco, concluido: local.concluido };
         }

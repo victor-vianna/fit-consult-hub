@@ -185,7 +185,7 @@ export function TreinosManager({
     profileId,
     personalId,
     followActiveWeek: isAluno,
-    preferActiveWeek: isPersonal && !readOnly,
+    preferActiveWeek: false,
   });
 
   // Buscar nome do aluno

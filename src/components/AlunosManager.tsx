@@ -60,6 +60,8 @@ import {
   Settings as SettingsIcon,
   CreditCard,
   MessageSquare,
+  MessageSquareText,
+  Check,
   MoreVertical,
   Edit,
   Lock,
@@ -88,7 +90,7 @@ import { useAlunosQuickStatus } from "@/hooks/useAlunosQuickStatus";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileAccountMenu } from "@/components/mobile/MobileAccountMenu";
 import type { StudentAccessState } from "@/hooks/useStudentAccess";
-import { CHAT_CONVERSATION_SEPARATOR, getAlunoIdFromConversationKey } from "@/utils/chat";
+import { buildChatConversationKey, CHAT_CONVERSATION_SEPARATOR, getAlunoIdFromConversationKey } from "@/utils/chat";
 import { formatDisplayDate } from "@/utils/dateFormat";
 
 interface Aluno {
@@ -138,6 +140,30 @@ type IndicatorItem = {
   tone: IndicatorTone;
   icon: ComponentType<{ className?: string }>;
   onClick: () => void;
+  onMarkAsRead?: () => void | Promise<void>;
+};
+
+const DISMISSED_CARD_FEEDBACKS_KEY = "alunos-card-dismissed-feedbacks";
+
+const getDismissedCardFeedbacks = () => {
+  if (typeof window === "undefined") return new Set<string>();
+  try {
+    const raw = window.localStorage.getItem(DISMISSED_CARD_FEEDBACKS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return new Set<string>(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return new Set<string>();
+  }
+};
+
+const addDismissedCardFeedback = (key: string) => {
+  if (typeof window === "undefined") return;
+  const dismissed = getDismissedCardFeedbacks();
+  dismissed.add(key);
+  window.localStorage.setItem(
+    DISMISSED_CARD_FEEDBACKS_KEY,
+    JSON.stringify(Array.from(dismissed))
+  );
 };
 
 const FLAG_INDICATOR_CONFIG: Record<
@@ -188,6 +214,12 @@ const FLAG_INDICATOR_CONFIG: Record<
 const getFlagTone = (flag: PriorityFlag): IndicatorTone =>
   flag.severity === "alta" ? "alert" : "warn";
 
+const normalizeRating = (value: unknown) => {
+  const rating = Number(value);
+  if (!Number.isFinite(rating) || rating <= 0) return null;
+  return Math.min(5, Math.max(1, Math.round(rating)));
+};
+
 const normalizeAttentionTone = (tone: IndicatorTone): IndicatorTone =>
   tone === "ok" ? "ok" : tone === "alert" ? "alert" : "warn";
 
@@ -236,6 +268,20 @@ interface StudentCardSummary {
     label: string;
     detail?: string;
   };
+  feedbackSemanal: {
+    tone: IndicatorTone;
+    label: string;
+    detail?: string;
+    unreadNotificationIds: string[];
+    dismissKey?: string;
+  };
+  feedbackTreino: {
+    tone: IndicatorTone;
+    label: string;
+    detail?: string;
+    unread: number;
+    unreadNotificationIds: string[];
+  };
 }
 
 export default function AlunosManager() {
@@ -244,6 +290,7 @@ export default function AlunosManager() {
   const isMobile = useIsMobile();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [dismissedFeedbackVersion, setDismissedFeedbackVersion] = useState(0);
 
   // 🔧 Filtros persistidos em sessionStorage para preservar estado entre navegações
   const FILTERS_KEY = "alunos-filters";
@@ -277,10 +324,95 @@ export default function AlunosManager() {
   const [editandoAluno, setEditandoAluno] = useState<Aluno | null>(null);
   const [editAlunoForm, setEditAlunoForm] = useState({ nome: "", telefone: "" });
   const [alunoCorDialog, setAlunoCorDialog] = useState<Aluno | null>(null);
+  const [indicatorActionDialog, setIndicatorActionDialog] = useState<IndicatorItem | null>(null);
+  const [markingIndicatorAsRead, setMarkingIndicatorAsRead] = useState(false);
 
   const { settings: personalSettings } = usePersonalSettings(user?.id);
   const { flagsByStudent } = usePriorityStudents(user?.id);
   const { statusByAluno } = useAlunosQuickStatus(user?.id);
+
+  const refreshCardNotifications = useCallback(() => {
+    if (!user?.id) return;
+    queryClient.invalidateQueries({ queryKey: ["alunos-card-summaries", user.id] });
+    queryClient.invalidateQueries({ queryKey: ["priority-students", user.id] });
+  }, [queryClient, user?.id]);
+
+  const handleMarkChatAsRead = useCallback(
+    async (alunoId: string) => {
+      if (!user?.id) return;
+
+      const { error } = await supabase
+        .from("mensagens_chat")
+        .update({ lida: true })
+        .eq("conversa_key", buildChatConversationKey(user.id, alunoId))
+        .eq("remetente_id", alunoId)
+        .eq("destinatario_id", user.id)
+        .eq("lida", false);
+
+      if (error) {
+        toast({
+          title: "Nao foi possivel marcar como lido",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      refreshCardNotifications();
+    },
+    [refreshCardNotifications, toast, user?.id]
+  );
+
+  const handleMarkCardNotificationAsRead = useCallback(
+    async (notificationIds: string[], dismissKey?: string) => {
+      if (!user?.id) return;
+
+      if (notificationIds.length > 0) {
+        const { error } = await supabase
+          .from("notificacoes")
+          .update({ lida: true })
+          .in("id", notificationIds)
+          .eq("destinatario_id", user.id);
+
+        if (error) {
+          toast({
+            title: "Nao foi possivel marcar como lido",
+            description: error.message,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      if (dismissKey) {
+        addDismissedCardFeedback(dismissKey);
+        setDismissedFeedbackVersion((version) => version + 1);
+      }
+
+      refreshCardNotifications();
+    },
+    [refreshCardNotifications, toast, user?.id]
+  );
+
+  const handleOpenIndicatorSection = useCallback(() => {
+    const action = indicatorActionDialog;
+    if (!action) return;
+    setIndicatorActionDialog(null);
+    action.onClick();
+  }, [indicatorActionDialog]);
+
+  const handleMarkIndicatorAsRead = useCallback(async () => {
+    const action = indicatorActionDialog;
+    if (!action?.onMarkAsRead || markingIndicatorAsRead) return;
+
+    setMarkingIndicatorAsRead(true);
+    try {
+      await action.onMarkAsRead();
+      setIndicatorActionDialog(null);
+    } finally {
+      setMarkingIndicatorAsRead(false);
+    }
+  }, [indicatorActionDialog, markingIndicatorAsRead]);
 
   const setCorAluno = async (id: string, cor: string | null) => {
     if (!user?.id) return;
@@ -704,6 +836,7 @@ export default function AlunosManager() {
       "alunos-card-summaries",
       user?.id,
       alunosParaDadosDoCard.map((aluno) => aluno.id).join("|"),
+      dismissedFeedbackVersion,
     ],
     queryFn: async () => {
       if (!user?.id || alunosParaDadosDoCard.length === 0) return {};
@@ -712,12 +845,17 @@ export default function AlunosManager() {
       const today = startOfDay(new Date());
       const currentWeekStart = new Date(today);
       currentWeekStart.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+      const recentFeedbackStart = new Date();
+      recentFeedbackStart.setDate(recentFeedbackStart.getDate() - 14);
 
       const [
         { data: mensagens },
         { data: treinos },
         { data: planilhas },
         { data: subscriptions },
+        { data: checkins },
+        { data: treinoFeedbacks },
+        { data: feedbackSemanalNotifications },
       ] = await Promise.all([
         supabase
           .from("mensagens_chat")
@@ -743,6 +881,31 @@ export default function AlunosManager() {
           .eq("personal_id", user.id)
           .in("student_id", studentIds)
           .order("data_expiracao", { ascending: false }),
+        supabase
+          .from("checkins_semanais")
+          .select("id, profile_id, preenchido_em, duvidas, dores_corpo, mudanca_rotina, comentario_saude")
+          .eq("personal_id", user.id)
+          .in("profile_id", studentIds)
+          .gte("preenchido_em", recentFeedbackStart.toISOString())
+          .order("preenchido_em", { ascending: false }),
+        supabase
+          .from("notificacoes")
+          .select("id, created_at, lida, dados")
+          .eq("destinatario_id", user.id)
+          .eq("tipo", "feedback_treino")
+          .eq("lida", false)
+          .gte("created_at", recentFeedbackStart.toISOString())
+          .order("created_at", { ascending: false })
+          .limit(300),
+        supabase
+          .from("notificacoes")
+          .select("id, created_at, lida, dados")
+          .eq("destinatario_id", user.id)
+          .in("tipo", ["feedback_semanal", "checkin_semanal"])
+          .eq("lida", false)
+          .gte("created_at", recentFeedbackStart.toISOString())
+          .order("created_at", { ascending: false })
+          .limit(300),
       ]);
 
       const chatByStudent = new Map<string, StudentCardSummary["chat"]>();
@@ -857,6 +1020,110 @@ export default function AlunosManager() {
         }
       });
 
+      const feedbackSemanalByStudent = new Map<string, StudentCardSummary["feedbackSemanal"]>();
+      (feedbackSemanalNotifications || []).forEach((notification: any) => {
+        const alunoId = notification.dados?.aluno_id || notification.dados?.profile_id;
+        if (!alunoId || !studentIds.includes(alunoId)) return;
+
+        const current = feedbackSemanalByStudent.get(alunoId);
+        if (current) {
+          current.unreadNotificationIds.push(notification.id);
+          return;
+        }
+
+        feedbackSemanalByStudent.set(alunoId, {
+          tone: "warn",
+          label: "Feedback semanal",
+          detail: formatDistanceToNow(new Date(notification.created_at), {
+            addSuffix: true,
+            locale: ptBR,
+          }),
+          unreadNotificationIds: [notification.id],
+        });
+      });
+
+      const dismissedCardFeedbacks = getDismissedCardFeedbacks();
+      (checkins || []).forEach((checkin: any) => {
+        if (feedbackSemanalByStudent.has(checkin.profile_id)) return;
+        const dismissKey = `checkin:${checkin.id}`;
+        if (dismissedCardFeedbacks.has(dismissKey)) return;
+
+        const hasText = Boolean(
+          checkin.duvidas ||
+            checkin.dores_corpo ||
+            checkin.mudanca_rotina ||
+            checkin.comentario_saude
+        );
+        if (!hasText) return;
+
+        feedbackSemanalByStudent.set(checkin.profile_id, {
+          tone: "warn",
+          label: "Feedback semanal",
+          detail: formatDistanceToNow(new Date(checkin.preenchido_em), {
+            addSuffix: true,
+            locale: ptBR,
+          }),
+          unreadNotificationIds: [],
+          dismissKey,
+        });
+      });
+
+      const treinoFeedbackAccumulator = new Map<
+        string,
+        {
+          count: number;
+          unread: number;
+          latestAt: string;
+          latestRating: number | null;
+          hasLowRating: boolean;
+          unreadNotificationIds: string[];
+        }
+      >();
+
+      (treinoFeedbacks || []).forEach((feedback: any) => {
+        const alunoId = feedback.dados?.aluno_id;
+        if (!alunoId || !studentIds.includes(alunoId)) return;
+
+        const rating = normalizeRating(feedback.dados?.rating);
+        const current = treinoFeedbackAccumulator.get(alunoId);
+        if (!current) {
+          treinoFeedbackAccumulator.set(alunoId, {
+            count: 1,
+            unread: feedback.lida ? 0 : 1,
+            latestAt: feedback.created_at,
+            latestRating: rating,
+            hasLowRating: rating !== null && rating <= 2,
+            unreadNotificationIds: [feedback.id],
+          });
+          return;
+        }
+
+        current.count += 1;
+        if (!feedback.lida) current.unread += 1;
+        if (rating !== null && rating <= 2) current.hasLowRating = true;
+        current.unreadNotificationIds.push(feedback.id);
+      });
+
+      const feedbackTreinoByStudent = new Map<string, StudentCardSummary["feedbackTreino"]>();
+      treinoFeedbackAccumulator.forEach((feedback, alunoId) => {
+        const countToShow = feedback.unread > 0 ? feedback.unread : feedback.count;
+        const label =
+          countToShow === 1 ? "Feedback de treino" : `${countToShow} feedbacks de treino`;
+        const ratingDetail = feedback.latestRating ? `${feedback.latestRating}/5` : null;
+        const timeDetail = formatDistanceToNow(new Date(feedback.latestAt), {
+          addSuffix: true,
+          locale: ptBR,
+        });
+
+        feedbackTreinoByStudent.set(alunoId, {
+          tone: feedback.hasLowRating ? "alert" : "warn",
+          label,
+          detail: [ratingDetail, timeDetail].filter(Boolean).join(" - "),
+          unread: feedback.unread,
+          unreadNotificationIds: feedback.unreadNotificationIds,
+        });
+      });
+
       const result: Record<string, StudentCardSummary> = {};
       studentIds.forEach((studentId) => {
         result[studentId] = {
@@ -876,6 +1143,17 @@ export default function AlunosManager() {
           financeiro: financeiroByStudent.get(studentId) || {
             tone: "neutral",
             label: "Sem financeiro",
+          },
+          feedbackSemanal: feedbackSemanalByStudent.get(studentId) || {
+            tone: "ok",
+            label: "Sem feedback semanal",
+            unreadNotificationIds: [],
+          },
+          feedbackTreino: feedbackTreinoByStudent.get(studentId) || {
+            tone: "ok",
+            label: "Sem feedback de treino",
+            unread: 0,
+            unreadNotificationIds: [],
           },
         };
       });
@@ -1084,6 +1362,7 @@ export default function AlunosManager() {
   const alunoCorAtual = alunoCorDialog
     ? alunos.find((aluno) => aluno.id === alunoCorDialog.id) || alunoCorDialog
     : null;
+  const IndicatorActionIcon = indicatorActionDialog?.icon;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
@@ -1371,11 +1650,33 @@ export default function AlunosManager() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {alunosFiltrados.map((aluno) => {
               const flags = flagsByStudent[aluno.id] || [];
-              const hasHighPriority = flags.some((f) => f.severity === "alta");
+              const summary = cardSummaries[aluno.id] || {
+                chat: { tone: "neutral" as IndicatorTone, label: "Sem mensagens", unread: 0 },
+                treino: { tone: "alert" as IndicatorTone, label: "Sem treino cadastrado" },
+                planilha: { tone: "neutral" as IndicatorTone, label: "Sem planilha" },
+                financeiro: { tone: "neutral" as IndicatorTone, label: "Sem financeiro" },
+                feedbackSemanal: {
+                  tone: "ok" as IndicatorTone,
+                  label: "Sem feedback semanal",
+                  unreadNotificationIds: [],
+                },
+                feedbackTreino: {
+                  tone: "ok" as IndicatorTone,
+                  label: "Sem feedback de treino",
+                  unread: 0,
+                  unreadNotificationIds: [],
+                },
+              };
+              const hasFeedbackNotification =
+                summary.feedbackSemanal.tone !== "ok" ||
+                summary.feedbackTreino.tone !== "ok";
+              const hasHighPriority =
+                flags.some((f) => f.severity === "alta") ||
+                summary.feedbackTreino.tone === "alert";
               const hasPlanilha = flags.some(
                 (f) => f.reason === "planilha_vencendo" || f.reason === "planilha_vencida"
               );
-              const hasPriority = flags.length > 0;
+              const hasPriority = flags.length > 0 || hasFeedbackNotification;
               const status = statusByAluno[aluno.id];
               const accessState = accessByStudent[aluno.id];
               const resolvedAccessAllowed = resolveAccessAllowed(aluno);
@@ -1433,12 +1734,6 @@ export default function AlunosManager() {
                     className: "bg-muted text-muted-foreground",
                   };
               const StatusIcon = statusBadge.icon;
-              const summary = cardSummaries[aluno.id] || {
-                chat: { tone: "neutral", label: "Sem mensagens", unread: 0 },
-                treino: { tone: "alert", label: "Sem treino cadastrado" },
-                planilha: { tone: "neutral", label: "Sem planilha" },
-                financeiro: { tone: "neutral", label: "Sem financeiro" },
-              };
               const financeiroSummary =
                 accessState &&
                 accessState.allowed === false &&
@@ -1463,19 +1758,59 @@ export default function AlunosManager() {
                   "border-border bg-muted/20 text-muted-foreground",
               };
               const flagReasons = new Set(flags.map((flag) => flag.reason));
-              const priorityIndicatorItems: IndicatorItem[] = flags.map((flag, index) => {
-                const config = FLAG_INDICATOR_CONFIG[flag.reason];
-                return {
-                  id: `flag-${flag.reason}-${index}`,
-                  title: config.title,
-                  icon: config.icon,
-                  label: flag.label,
-                  detail: flag.detail,
-                  tone: getFlagTone(flag),
-                  onClick: () => navigate(config.path(aluno.id)),
-                };
-              });
+              const priorityIndicatorItems: IndicatorItem[] = flags
+                .filter((flag) => {
+                  if (
+                    flag.reason === "feedback_nao_respondido" &&
+                    summary.feedbackSemanal.tone !== "ok"
+                  ) {
+                    return false;
+                  }
+                  if (flag.reason === "mensagem_nao_lida" && summary.chat.unread > 0) {
+                    return false;
+                  }
+                  return true;
+                })
+                .map((flag, index) => {
+                  const config = FLAG_INDICATOR_CONFIG[flag.reason];
+                  return {
+                    id: `flag-${flag.reason}-${index}`,
+                    title: config.title,
+                    icon: config.icon,
+                    label: flag.label,
+                    detail: flag.detail,
+                    tone: getFlagTone(flag),
+                    onClick: () => navigate(config.path(aluno.id)),
+                  };
+                });
               const summaryAttentionCandidates: (IndicatorItem & { duplicatedByFlag: boolean })[] = [
+                {
+                  id: "feedback-semanal-alert",
+                  title: "Feedback semanal",
+                  icon: MessageSquare,
+                  ...summary.feedbackSemanal,
+                  tone: normalizeAttentionTone(summary.feedbackSemanal.tone),
+                  onClick: () => navigate(`/aluno/${aluno.id}?tab=checkins`),
+                  onMarkAsRead: () =>
+                    handleMarkCardNotificationAsRead(
+                      summary.feedbackSemanal.unreadNotificationIds,
+                      summary.feedbackSemanal.dismissKey
+                    ),
+                  duplicatedByFlag: false,
+                },
+                {
+                  id: "feedback-treino-alert",
+                  title: "Feedback treino",
+                  icon: MessageSquareText,
+                  ...summary.feedbackTreino,
+                  tone: normalizeAttentionTone(summary.feedbackTreino.tone),
+                  onClick: () => navigate(`/aluno/${aluno.id}?tab=feedbacks-treino`),
+                  onMarkAsRead: () =>
+                    handleMarkCardNotificationAsRead(
+                      summary.feedbackTreino.unreadNotificationIds
+                    ),
+                  duplicatedByFlag: false,
+                },
                 {
                   id: "chat-alert",
                   title: "Chat",
@@ -1483,7 +1818,11 @@ export default function AlunosManager() {
                   ...summary.chat,
                   tone: normalizeAttentionTone(summary.chat.tone),
                   onClick: () => navigate(`/chat?aluno=${aluno.id}`),
-                  duplicatedByFlag: flagReasons.has("mensagem_nao_lida"),
+                  onMarkAsRead:
+                    summary.chat.unread > 0
+                      ? () => handleMarkChatAsRead(aluno.id)
+                      : undefined,
+                  duplicatedByFlag: false,
                 },
                 {
                   id: "treino-alert",
@@ -1523,6 +1862,12 @@ export default function AlunosManager() {
                   (item) => shouldShowSummaryAttention(item) && !item.duplicatedByFlag
                 )
                 .map(({ duplicatedByFlag, ...item }) => item);
+              const feedbackSummaryItems = summaryAttentionItems.filter((item) =>
+                item.id.startsWith("feedback-")
+              );
+              const otherSummaryItems = summaryAttentionItems.filter(
+                (item) => !item.id.startsWith("feedback-")
+              );
               const complianceIndicatorItems: IndicatorItem[] = [
                 {
                   id: "treino-ok",
@@ -1554,8 +1899,9 @@ export default function AlunosManager() {
                 },
               ];
               const activeNotificationItems = [
+                ...feedbackSummaryItems,
                 ...priorityIndicatorItems,
-                ...summaryAttentionItems,
+                ...otherSummaryItems,
               ].sort((a, b) => {
                 const weight: Record<IndicatorTone, number> = {
                   alert: 0,
@@ -1688,10 +2034,17 @@ export default function AlunosManager() {
                           const Icon = item.icon;
                           const isUrgent = item.tone === "alert";
                           return (
-                            <button
+                            <div
                               key={item.id}
-                              type="button"
-                              onClick={item.onClick}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => setIndicatorActionDialog(item)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault();
+                                  setIndicatorActionDialog(item);
+                                }
+                              }}
                               className={`min-h-[86px] rounded-lg border p-2.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[74px] ${
                                 indicatorToneStyles[item.tone]
                               } ${isUrgent ? "animate-pulse" : ""}`}
@@ -1712,7 +2065,7 @@ export default function AlunosManager() {
                                   )}
                                 </div>
                               </div>
-                            </button>
+                            </div>
                           );
                         })}
                       </div>
@@ -1887,6 +2240,72 @@ export default function AlunosManager() {
             </CardContent>
           </Card>
         )}
+
+        <Dialog
+          open={!!indicatorActionDialog}
+          onOpenChange={(open) => {
+            if (!open) setIndicatorActionDialog(null);
+          }}
+        >
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3">
+                {IndicatorActionIcon && (
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-muted">
+                    <IndicatorActionIcon className="h-5 w-5" />
+                  </span>
+                )}
+                <span>{indicatorActionDialog?.title}</span>
+              </DialogTitle>
+              <DialogDescription>
+                Escolha como deseja tratar esta notificacao do card.
+              </DialogDescription>
+            </DialogHeader>
+
+            {indicatorActionDialog && (
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <p className="text-sm font-semibold">{indicatorActionDialog.label}</p>
+                {indicatorActionDialog.detail && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {indicatorActionDialog.detail}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <DialogFooter className="gap-2 sm:flex-col sm:space-x-0">
+              <Button
+                type="button"
+                className="w-full"
+                onClick={handleOpenIndicatorSection}
+              >
+                Abrir
+              </Button>
+              {indicatorActionDialog?.onMarkAsRead && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleMarkIndicatorAsRead}
+                  disabled={markingIndicatorAsRead}
+                >
+                  <Check className="mr-2 h-4 w-4" />
+                  {markingIndicatorAsRead
+                    ? "Marcando..."
+                    : "Marcar como visualizada"}
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={() => setIndicatorActionDialog(null)}
+              >
+                Cancelar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={!!editandoAluno} onOpenChange={(open) => !open && setEditandoAluno(null)}>
           <DialogContent className="sm:max-w-md">

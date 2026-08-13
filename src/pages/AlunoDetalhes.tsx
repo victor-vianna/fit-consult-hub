@@ -55,6 +55,7 @@ import {
   ClipboardList,
   ClipboardCheck,
   MessageSquare,
+  MessageSquareText,
   Pencil,
   Check,
   X,
@@ -74,6 +75,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { AvaliacaoHub } from "@/components/avaliacao/AvaliacaoHub";
 import { AnamneseVisualizacao } from "@/components/AnamneseVisualizacao";
 import { CheckinsDashboard } from "@/components/CheckinsDashboard";
+import { TreinoFeedbacksHistory } from "@/components/TreinoFeedbacksHistory";
 import { PlanilhaStatusCard } from "@/components/PlanilhaStatusCard";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { BroadcastMessageDialog } from "@/components/chat/BroadcastMessageDialog";
@@ -833,6 +835,17 @@ export default function AlunoDetalhes() {
                   <TabNotificationBadge count={tabNotificationCounts.checkins} />
                 </TabsTrigger>
                 <TabsTrigger
+                  value="feedbacks-treino"
+                  className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
+                    isMobile ? "flex-shrink-0 px-6 py-3" : "flex-shrink-0 px-3 py-3 text-xs lg:text-sm"
+                  }`}
+                >
+                  <MessageSquareText
+                    className={`${isMobile ? "h-5 w-5" : "h-4 w-4 mr-2"}`}
+                  />
+                  {!isMobile && "Feedbacks de Treino"}
+                </TabsTrigger>
+                <TabsTrigger
                   value="chat"
                   className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
                     isMobile ? "flex-shrink-0 px-6 py-3" : "flex-shrink-0 px-3 py-3 text-xs lg:text-sm"
@@ -1372,6 +1385,18 @@ export default function AlunoDetalhes() {
             <TabsContent value="checkins" className="space-y-6">
               {user && aluno && (
                 <CheckinsDashboard
+                  profileId={id!}
+                  personalId={user.id}
+                  themeColor={personalSettings?.theme_color}
+                  studentName={aluno.nome}
+                />
+              )}
+            </TabsContent>
+
+            {/* Aba Feedbacks de Treino */}
+            <TabsContent value="feedbacks-treino" className="space-y-6">
+              {user && aluno && (
+                <TreinoFeedbacksHistory
                   profileId={id!}
                   personalId={user.id}
                   themeColor={personalSettings?.theme_color}

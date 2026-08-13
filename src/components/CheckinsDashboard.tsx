@@ -27,7 +27,6 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { FeedbackReply } from "@/components/chat/FeedbackReply";
 import { FeedbackEvolucaoChart } from "@/components/FeedbackEvolucaoChart";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -717,15 +716,6 @@ export function CheckinsDashboard({
                   </CardContent>
                 </Card>
               )}
-              {/* Reply to feedback */}
-              <FeedbackReply
-                checkinId={selectedCheckin.id}
-                alunoId={profileId}
-                personalId={personalId}
-                alunoNome={studentName}
-                themeColor={themeColor}
-                checkin={selectedCheckin}
-              />
             </>
           )}
         </div>

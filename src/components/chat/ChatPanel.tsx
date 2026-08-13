@@ -271,17 +271,31 @@ export function ChatPanel({
   const handleSend = async () => {
     if (!texto.trim() || sending) return;
     const conteudo = texto;
+    const replyToId = replyTo?.id ?? null;
+    const editingMessageId = editingId;
 
-    if (editingId) {
-      const ok = await editarMensagem(editingId, conteudo);
-      if (!ok) return;
-      setTexto("");
+    setTexto("");
+
+    if (editingMessageId) {
+      setEditingId(null);
+      const ok = await editarMensagem(editingMessageId, conteudo);
+      if (!ok) {
+        setTexto((current) => (current ? current : conteudo));
+        setEditingId(editingMessageId);
+        return;
+      }
       setEditingId(null);
     } else {
-      const ok = await enviarMensagem(conteudo, replyTo?.id ?? null);
-      if (!ok) return;
-      setTexto("");
       setReplyTo(null);
+      const ok = await enviarMensagem(conteudo, replyToId);
+      if (!ok) {
+        setTexto((current) => (current ? current : conteudo));
+        if (replyToId) {
+          const originalReply = mensagens.find((msg) => msg.id === replyToId);
+          if (originalReply) setReplyTo(originalReply);
+        }
+        return;
+      }
     }
 
     inputRef.current?.focus();

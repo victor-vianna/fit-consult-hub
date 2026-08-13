@@ -99,20 +99,7 @@ export default function Chat() {
     [],
     { storage: "local" }
   );
-  const selectedAlunoStorageKey = useMemo(
-    () => (user?.id ? `pf:chat-selected-aluno:${user.id}:v1` : null),
-    [user?.id]
-  );
   const alunoIdFromUrl = searchParams.get("aluno");
-
-  const readStoredSelectedAlunoId = () => {
-    if (!selectedAlunoStorageKey || typeof window === "undefined") return null;
-    try {
-      return window.localStorage.getItem(selectedAlunoStorageKey);
-    } catch {
-      return null;
-    }
-  };
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -122,16 +109,11 @@ export default function Chat() {
   }, []);
 
   useEffect(() => {
-    if (!selectedAlunoStorageKey || !selectedAlunoId || typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(selectedAlunoStorageKey, selectedAlunoId);
-    } catch {
-      // cache best-effort
+    if (!alunoIdFromUrl) {
+      setSelectedAlunoId(null);
+      return;
     }
-  }, [selectedAlunoStorageKey, selectedAlunoId]);
 
-  useEffect(() => {
-    if (!alunoIdFromUrl) return;
     if (students.some((student) => student.id === alunoIdFromUrl)) {
       setSelectedAlunoId(alunoIdFromUrl);
       setManualUnreadIds((prev) => prev.filter((id) => id !== alunoIdFromUrl));
@@ -173,24 +155,11 @@ export default function Chat() {
     ]);
 
     const fetchedStudents = (studentData || []) as Student[];
-    const storedAlunoId = readStoredSelectedAlunoId();
-    const nextSelectedAlunoId =
-      (alunoIdFromUrl && fetchedStudents.some((student) => student.id === alunoIdFromUrl)
-        ? alunoIdFromUrl
-        : null) ||
-      (selectedAlunoId && fetchedStudents.some((student) => student.id === selectedAlunoId)
-        ? selectedAlunoId
-        : null) ||
-      (storedAlunoId && fetchedStudents.some((student) => student.id === storedAlunoId)
-        ? storedAlunoId
-        : null) ||
-      fetchedStudents[0]?.id ||
-      null;
 
     setProfile(profileData);
     setStudents(fetchedStudents);
-    if (nextSelectedAlunoId && nextSelectedAlunoId !== selectedAlunoId) {
-      setSelectedAlunoId(nextSelectedAlunoId);
+    if (!alunoIdFromUrl) {
+      setSelectedAlunoId(null);
     }
     await fetchMessages();
   };

@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
     const origin = req.headers.get("origin") ?? "";
     const portalParams = {
       customer: sub.stripe_customer_id,
-      return_url: `${origin}/aluno?tab=plano`,
+      return_url: `${origin}/aluno?section=plano`,
     };
     const portal = sub.stripe_account_id
       ? await stripe.billingPortal.sessions.create(portalParams, { stripeAccount: sub.stripe_account_id })

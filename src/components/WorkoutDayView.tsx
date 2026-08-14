@@ -19,6 +19,7 @@ import { useWorkoutSession } from "@/hooks/useWorkoutSession";
 import { useExerciseProgress } from "@/hooks/useExerciseProgress";
 import { usePersistedState } from "@/hooks/usePersistedState";
 import { formatDisplayMonthDay } from "@/utils/dateFormat";
+import { WORKOUT_EVENTS, dispatchWorkoutEvent } from "@/constants/workoutStatus";
 import {
   getIsolatedExercises,
   normalizeExerciseGroups,
@@ -165,9 +166,6 @@ export function WorkoutDayView({
   personalId,
   gruposPorTreino = {},
   blocosPorTreino = {},
-  onToggleConcluido,
-  onToggleGrupoConcluido,
-  onToggleBlocoConcluido,
   onWorkoutFinished,
 }: WorkoutDayViewProps) {
   // Estado local para updates otimistas
@@ -376,21 +374,13 @@ export function WorkoutDayView({
     const sincronizado = await persistirExercicioAgora(id, concluido);
     if (!sincronizado) return;
 
-    try {
-      await onToggleConcluido(id, concluido);
-      // 🔧 Marcar como sincronizado após sucesso
-      marcarSincronizado(id);
-    } catch (error) {
-      console.error("[WorkoutDayView] Erro ao marcar exercício, tentando retry:", error);
-      // 🔧 Retry 1x
-      try {
-        await onToggleConcluido(id, concluido);
-        marcarSincronizado(id);
-      } catch (retryError) {
-        console.error("[WorkoutDayView] Retry falhou, mantido no localStorage:", retryError);
-        // Progresso local permanece e será sincronizado depois
-      }
-    }
+    marcarSincronizado(id);
+    dispatchWorkoutEvent(WORKOUT_EVENTS.PROGRESS_CHANGED, {
+      profileId,
+      personalId,
+      exercicioId: id,
+      concluido,
+    });
   };
 
   // ✅ Handler para registro de séries
@@ -429,13 +419,22 @@ export function WorkoutDayView({
       return updated;
     });
 
-    return persistirSeriesAgora(id, safeSeries, safeTotal);
+    const sincronizado = await persistirSeriesAgora(id, safeSeries, safeTotal);
+    if (sincronizado) {
+      dispatchWorkoutEvent(WORKOUT_EVENTS.PROGRESS_CHANGED, {
+        profileId,
+        personalId,
+        exercicioId: id,
+        seriesConcluidas: safeSeries,
+        concluido,
+      });
+    }
+
+    return sincronizado;
   };
 
   // ✅ Handler para toggle de grupo
   const handleToggleGrupo = async (grupoId: string, concluido: boolean) => {
-    if (!onToggleGrupoConcluido) return;
-
     const grupoAtual = Object.values(localGrupos)
       .flat()
       .find((grupo) => grupo.grupo_id === grupoId);
@@ -483,17 +482,16 @@ export function WorkoutDayView({
     );
     if (resultadosSync.some((sincronizado) => !sincronizado)) return;
 
-    try {
-      await onToggleGrupoConcluido(grupoId, concluido);
-    } catch (error) {
-      console.error("[WorkoutDayView] Erro ao marcar grupo:", error);
-    }
+    dispatchWorkoutEvent(WORKOUT_EVENTS.PROGRESS_CHANGED, {
+      profileId,
+      personalId,
+      grupoId,
+      concluido,
+    });
   };
 
   // ✅ Handler para toggle de bloco - salva localmente primeiro
   const handleToggleBloco = async (blocoId: string, concluido: boolean) => {
-    if (!onToggleBlocoConcluido) return;
-
     // 🔧 Salvar no localStorage imediatamente (PWA)
     salvarBlocoProgressoLocal(blocoId, concluido);
 
@@ -518,14 +516,13 @@ export function WorkoutDayView({
     const blocoSincronizado = await persistirBlocoAgora(blocoId, concluido);
     if (!blocoSincronizado) return;
 
-    try {
-      await onToggleBlocoConcluido(blocoId, concluido);
-      // 🔧 Marcar como sincronizado após sucesso
-      marcarBlocoSincronizado(blocoId);
-    } catch (error) {
-      console.error("[WorkoutDayView] Erro ao marcar bloco:", error);
-      // Não reverter - o progresso local permanece e será sincronizado depois
-    }
+    marcarBlocoSincronizado(blocoId);
+    dispatchWorkoutEvent(WORKOUT_EVENTS.PROGRESS_CHANGED, {
+      profileId,
+      personalId,
+      blocoId,
+      concluido,
+    });
   };
 
   const resetLocalProgressForTreino = useCallback((treinoId: string) => {

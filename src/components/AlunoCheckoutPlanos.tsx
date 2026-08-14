@@ -5,12 +5,19 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CreditCard, Info, Loader2, Repeat, ShieldCheck, Sparkles } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 interface Props {
   personalId: string;
 }
+
+type PlanPrice = {
+  id: string;
+  plano: string;
+  valor: number | string;
+};
 
 const LABELS: Record<string, string> = {
   mensal: "Mensal",
@@ -35,7 +42,9 @@ const RECORRENCIA: Record<string, string> = {
 
 export function AlunoCheckoutPlanos({ personalId }: Props) {
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const [loadingPlano, setLoadingPlano] = useState<string | null>(null);
+  const selectedPlan = searchParams.get("plan");
 
   const { data: prices, isLoading } = useQuery({
     queryKey: ["aluno_planos", personalId],
@@ -89,6 +98,13 @@ export function AlunoCheckoutPlanos({ personalId }: Props) {
     return null;
   }
 
+  const planPrices = prices as PlanPrice[];
+  const orderedPrices = selectedPlan
+    ? [...planPrices].sort((a, b) =>
+        a.plano === selectedPlan ? -1 : b.plano === selectedPlan ? 1 : 0
+      )
+    : planPrices;
+
   return (
     <Card>
       <CardHeader>
@@ -113,11 +129,16 @@ export function AlunoCheckoutPlanos({ personalId }: Props) {
         </Alert>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {prices.map((p: any) => (
-            <div
-              key={p.id}
-              className="border rounded-lg p-4 flex flex-col gap-3 bg-card hover:border-primary transition-colors"
-            >
+          {orderedPrices.map((p) => {
+            const isSelected = p.plano === selectedPlan;
+
+            return (
+              <div
+                key={p.id}
+                className={`border rounded-lg p-4 flex flex-col gap-3 bg-card hover:border-primary transition-colors ${
+                  isSelected ? "border-primary ring-2 ring-primary/20" : ""
+                }`}
+              >
               <div className="flex items-start justify-between">
                 <div>
                   <h4 className="font-semibold">{LABELS[p.plano] ?? p.plano}</h4>
@@ -129,9 +150,12 @@ export function AlunoCheckoutPlanos({ personalId }: Props) {
                     {RECORRENCIA[p.plano] ?? "Renovacao automatica"}
                   </p>
                 </div>
-                {ECONOMIA[p.plano] && (
-                  <Badge variant="secondary">{ECONOMIA[p.plano]}</Badge>
-                )}
+                <div className="flex flex-col items-end gap-1">
+                  {isSelected && <Badge>Selecionado</Badge>}
+                  {ECONOMIA[p.plano] && (
+                    <Badge variant="secondary">{ECONOMIA[p.plano]}</Badge>
+                  )}
+                </div>
               </div>
               <Button
                 className="w-full"
@@ -141,10 +165,11 @@ export function AlunoCheckoutPlanos({ personalId }: Props) {
                 {loadingPlano === p.plano && (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 )}
-                Assinar com renovacao automatica
+                {isSelected ? "Assinar plano selecionado" : "Assinar com renovacao automatica"}
               </Button>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
 
         <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">

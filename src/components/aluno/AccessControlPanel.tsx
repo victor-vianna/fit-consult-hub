@@ -124,7 +124,8 @@ function getBannerClasses(tone: "ok" | "pending" | "danger") {
 }
 
 export function AccessControlPanel({ studentId, personalId, studentName }: Props) {
-  const { status, logs, loading, mutate, isMutating, refresh } = useStudentAccess(studentId);
+  const { status, logs, loading, mutate, isMutating, refresh, error: accessError } =
+    useStudentAccess(studentId);
   const { subscriptions, loading: subscriptionsLoading } = useSubscriptions(studentId, personalId);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [openCreateSignal, setOpenCreateSignal] = useState(0);
@@ -165,6 +166,22 @@ export function AccessControlPanel({ studentId, personalId, studentName }: Props
           </Badge>
         </div>
       </div>
+
+      {accessError && (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-2">
+              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                Nao foi possivel verificar o acesso deste aluno. Confira a conexao e tente novamente.
+              </p>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={refresh}>
+              Tentar novamente
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Button
@@ -219,8 +236,16 @@ export function AccessControlPanel({ studentId, personalId, studentName }: Props
 }
 
 export function AccessStatusBadge({ studentId }: { studentId: string }) {
-  const { status, loading } = useStudentAccess(studentId);
+  const { status, loading, error } = useStudentAccess(studentId);
   if (loading) return null;
+  if (error) {
+    return (
+      <Badge variant="outline" className="gap-1 rounded-full border-destructive/40 bg-destructive/10 text-destructive">
+        <ShieldAlert className="h-3 w-3" />
+        Erro ao verificar
+      </Badge>
+    );
+  }
   const meta = ACCESS_META[status] ?? ACCESS_META.suspenso;
   const StatusIcon = meta.icon;
 

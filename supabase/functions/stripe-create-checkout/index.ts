@@ -127,8 +127,8 @@ Deno.serve(async (req) => {
       ...(existingSub?.stripe_customer_id
         ? { customer: existingSub.stripe_customer_id }
         : { customer_email: userEmail || profile.email || undefined }),
-      success_url: successUrl || `${origin}/aluno/perfil?checkout=success`,
-      cancel_url: cancelUrl || `${origin}/aluno/perfil?checkout=cancel`,
+      success_url: successUrl || `${origin}/aluno?section=plano&checkout=success`,
+      cancel_url: cancelUrl || `${origin}/aluno?section=plano&checkout=cancel`,
       client_reference_id: userId,
       metadata: {
         student_id: userId,

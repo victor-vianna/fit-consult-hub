@@ -15,17 +15,19 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
+      includeAssets: ['favicon.ico', 'icons/apple-touch-icon.png'],
       manifest: {
         name: 'FitConsult Hub',
         short_name: 'FitConsult',
-        description: 'Plataforma de consultoria fitness online',
+        description: 'Plataforma completa de consultoria fitness online',
         theme_color: '#1a1f2e',
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
         scope: '/',
+        lang: 'pt-BR',
+        categories: ['health', 'fitness', 'lifestyle'],
         icons: [
           {
             src: '/icons/icon-192x192.png',
@@ -38,26 +40,27 @@ export default defineConfig(({ mode }) => ({
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable'
+          },
+          {
+            src: '/icons/apple-touch-icon.png',
+            sizes: '180x180',
+            type: 'image/png'
+          }
+        ],
+        shortcuts: [
+          {
+            name: 'Meus Treinos',
+            short_name: 'Treinos',
+            description: 'Acesse seus treinos rapidamente',
+            url: '/aluno',
+            icons: [{ src: '/icons/icon-192x192.png', sizes: '192x192' }]
           }
         ]
       },
       workbox: {
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-        importScripts: ['/push-sw.js'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/jqpxlqggkstytgrkyhyb\.supabase\.co\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'supabase-api-cache',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 // 24 horas
-              }
-            }
-          }
-        ]
+        importScripts: ['/push-sw.js']
       }
     })
   ].filter(Boolean),

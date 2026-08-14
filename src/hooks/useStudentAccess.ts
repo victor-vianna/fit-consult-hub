@@ -288,7 +288,8 @@ export function useStudentAccess(studentId: string | undefined) {
     },
   });
 
-  const state = stateQuery.data ?? (studentId ? DEFAULT_STATE(studentId) : null);
+  const accessError = stateQuery.error || eventsQuery.error;
+  const state = stateQuery.data ?? (studentId && !accessError ? DEFAULT_STATE(studentId) : null);
   const logs = eventsQuery.data ?? [];
   const lastLog = logs[0] ?? null;
 
@@ -301,9 +302,10 @@ export function useStudentAccess(studentId: string | undefined) {
           personal_id: state.personal_id,
         }
       : null,
-    isActive: state?.allowed ?? true,
-    status: (state?.status ?? "ativo") as AccessStatus,
-    allowed: state?.allowed ?? true,
+    isActive: state?.allowed ?? false,
+    status: (state?.status ?? "suspenso") as AccessStatus,
+    allowed: state?.allowed ?? false,
+    error: accessError,
     lastLog,
     logs,
     loading: stateQuery.isLoading || eventsQuery.isLoading,

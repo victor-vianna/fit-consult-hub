@@ -106,7 +106,7 @@ export default function Auth() {
                   .eq('id', session.user.id);
               }
             }
-            navigate(selectedPlan ? `/aluno?tab=plano&plan=${selectedPlan}` : '/aluno?tab=plano');
+            navigate(selectedPlan ? `/aluno?section=plano&plan=${selectedPlan}` : '/aluno?section=plano');
           }
         }
       }
@@ -154,7 +154,7 @@ export default function Auth() {
     else if (data?.role === 'personal') navigate('/personal');
     else if (data?.role === 'aluno') {
       const linked = await linkStudentToPublicPersonal(userId);
-      if (linked) navigate(selectedPlan ? `/aluno?tab=plano&plan=${selectedPlan}` : '/aluno?tab=plano');
+      if (linked) navigate(selectedPlan ? `/aluno?section=plano&plan=${selectedPlan}` : '/aluno?section=plano');
     }
   };
 
@@ -247,7 +247,7 @@ export default function Auth() {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/aluno?tab=plano`,
+            emailRedirectTo: `${window.location.origin}/aluno?section=plano`,
             data: {
               nome,
               telefone,
@@ -271,7 +271,7 @@ export default function Auth() {
               : 'Voce ja pode fazer login.',
           });
           if (data.session) {
-            navigate(selectedPlan ? `/aluno?tab=plano&plan=${selectedPlan}` : '/aluno?tab=plano');
+            navigate(selectedPlan ? `/aluno?section=plano&plan=${selectedPlan}` : '/aluno?section=plano');
           }
         }
       }

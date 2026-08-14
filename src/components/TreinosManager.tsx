@@ -341,6 +341,9 @@ export function TreinosManager({
   const [limparTreinoDialogOpen, setLimparTreinoDialogOpen] = useState(false);
   const [treinoParaLimpar, setTreinoParaLimpar] = useState<{ treinoId: string; diaNome: string } | null>(null);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [novoTreinoDialogOpen, setNovoTreinoDialogOpen] = useState(false);
+  const [novoTreinoDia, setNovoTreinoDia] = useState<number | null>(null);
+  const [novoTreinoNome, setNovoTreinoNome] = useState("");
 
   // DnD sensors
   const sensors = useSensors(
@@ -974,6 +977,36 @@ export function TreinosManager({
         }
       }
     );
+  };
+
+  const openNovoTreinoDialog = (dia: number) => {
+    setNovoTreinoDia(dia);
+    setNovoTreinoNome("");
+    setNovoTreinoDialogOpen(true);
+  };
+
+  const handleCriarTreinoNomeado = async () => {
+    if (novoTreinoDia === null) return;
+
+    const nome = novoTreinoNome.trim();
+    if (!nome) {
+      toast.error("Informe o nome do treino");
+      return;
+    }
+
+    try {
+      setLoadingStates((prev) => ({ ...prev, adicionando: true }));
+      const novoTreino = await criarTreinoNoDia(novoTreinoDia, nome);
+      setSelectedDia(novoTreinoDia);
+      setSelectedTreinoId(novoTreino?.id || null);
+      setNovoTreinoDialogOpen(false);
+      setNovoTreinoDia(null);
+      setNovoTreinoNome("");
+    } catch (error) {
+      console.error("[TreinosManager] Erro ao criar treino nomeado:", error);
+    } finally {
+      setLoadingStates((prev) => ({ ...prev, adicionando: false }));
+    }
   };
 
   if (loading || loadingGrupos || loadingBlocos) {
@@ -1698,15 +1731,18 @@ export function TreinosManager({
                                       const msg = totalItens > 0
                                         ? `Excluir "${t.nome_treino || 'Treino Principal'}" com ${totalItens} item(ns)? Esta ação não pode ser desfeita.`
                                         : `Excluir "${t.nome_treino || 'Treino Principal'}" (vazio)?`;
-                                      if (confirm(msg)) {
-                                        deletarTreino(t.treinoId).then(() => {
-                                          // Selecionar outro treino se disponível
+                                      const treinoId = t.treinoId;
+                                      askConfirm(
+                                        "Excluir treino?",
+                                        msg,
+                                        async () => {
+                                          await deletarTreino(treinoId);
                                           const outros = treinosDoDiaArr.filter(
-                                            (ot) => ot.treinoId !== t.treinoId
+                                            (ot) => ot.treinoId !== treinoId
                                           );
                                           setSelectedTreinoId(outros[0]?.treinoId || null);
-                                        });
-                                      }
+                                        }
+                                      );
                                     }
                                   }}
                                 >
@@ -1720,12 +1756,7 @@ export function TreinosManager({
                             variant="ghost"
                             size="sm"
                             className="text-xs"
-                            onClick={() => {
-                              const nome = prompt("Nome do novo treino (ex: Cardio Tarde):");
-                              if (nome?.trim()) {
-                                criarTreinoNoDia(selectedDia!, nome.trim());
-                              }
-                            }}
+                            onClick={() => openNovoTreinoDialog(selectedDia!)}
                           >
                             <Plus className="h-3 w-3 mr-1" />
                             Adicionar Treino
@@ -2000,6 +2031,61 @@ export function TreinosManager({
                   <Trash2 className="h-4 w-4 mr-2" />
                 )}
                 Limpar Tudo
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        <Dialog
+          open={novoTreinoDialogOpen}
+          onOpenChange={(open) => {
+            setNovoTreinoDialogOpen(open);
+            if (!open) {
+              setNovoTreinoDia(null);
+              setNovoTreinoNome("");
+            }
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Novo treino no dia</DialogTitle>
+              <DialogDescription>
+                Defina um nome para diferenciar este treino dos demais no mesmo dia.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="novo-treino-nome">Nome do treino</Label>
+              <Input
+                id="novo-treino-nome"
+                value={novoTreinoNome}
+                onChange={(event) => setNovoTreinoNome(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleCriarTreinoNomeado();
+                  }
+                }}
+                placeholder="Ex: Cardio tarde"
+                autoFocus
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setNovoTreinoDialogOpen(false)}
+                disabled={loadingStates.adicionando}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={handleCriarTreinoNomeado}
+                disabled={loadingStates.adicionando || !novoTreinoNome.trim()}
+              >
+                {loadingStates.adicionando && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Criar treino
               </Button>
             </DialogFooter>
           </DialogContent>

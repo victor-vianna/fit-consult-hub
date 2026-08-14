@@ -74,7 +74,7 @@ interface Material {
 }
 
 const WORKOUT_STATE_KEY = "pwa_workout_state";
-const ALWAYS_ALLOWED_ALUNO_SECTIONS = ["inicio", "treinos", "chat", "dados"] as const;
+const ALWAYS_ALLOWED_ALUNO_SECTIONS = ["inicio", "treinos", "chat", "dados", "plano"] as const;
 
 function getAllowedAlunoSections(cardsVisiveis: string[]) {
   return Array.from(new Set([...ALWAYS_ALLOWED_ALUNO_SECTIONS, ...cardsVisiveis]));
@@ -374,7 +374,7 @@ export default function AreaAluno() {
   }, [activeSection, cardsVisiveis.join("|"), handleSectionChange]);
 
   useEffect(() => {
-    const sectionFromUrl = searchParams.get("section");
+    const sectionFromUrl = searchParams.get("section") || searchParams.get("tab");
     const secoesPermitidas = getAllowedAlunoSections(cardsVisiveis);
     if (sectionFromUrl && secoesPermitidas.includes(sectionFromUrl)) {
       handleSectionChange(sectionFromUrl);

@@ -193,31 +193,34 @@ export function AnamneseVisualizacao({
             Anamnese não preenchida
           </h3>
           <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-            {studentName} ainda não preencheu a anamnese inicial. A anamnese é
-            obrigatória e será solicitada no primeiro acesso do aluno.
+            {canEdit
+              ? `${studentName} ainda não preencheu a anamnese inicial. A anamnese é obrigatória e será solicitada no primeiro acesso do aluno.`
+              : "Você ainda não preencheu a anamnese inicial. Ela será solicitada automaticamente para liberar seus treinos com segurança."}
           </p>
-          <Dialog open={editMode} onOpenChange={setEditMode}>
-            <DialogTrigger asChild>
-              <Button style={{ backgroundColor: themeColor }}>
-                <Edit className="mr-2 h-4 w-4" />
-                Preencher para o Aluno
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Preencher Anamnese - {studentName}</DialogTitle>
-              </DialogHeader>
-              <AnamneseInicialForm
-                profileId={profileId}
-                personalId={personalId}
-                themeColor={themeColor}
-                onComplete={() => {
-                  setEditMode(false);
-                  fetchAnamnese();
-                }}
-              />
-            </DialogContent>
-          </Dialog>
+          {canEdit && (
+            <Dialog open={editMode} onOpenChange={setEditMode}>
+              <DialogTrigger asChild>
+                <Button style={{ backgroundColor: themeColor }}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Preencher para o Aluno
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Preencher Anamnese - {studentName}</DialogTitle>
+                </DialogHeader>
+                <AnamneseInicialForm
+                  profileId={profileId}
+                  personalId={personalId}
+                  themeColor={themeColor}
+                  onComplete={() => {
+                    setEditMode(false);
+                    fetchAnamnese();
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
+          )}
         </CardContent>
       </Card>
     );

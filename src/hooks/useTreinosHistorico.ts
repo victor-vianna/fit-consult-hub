@@ -35,13 +35,15 @@ export function useTreinosHistorico(profileId: string, mes?: Date) {
     percentual: 0,
   });
 
-  const mesAtual = mes || new Date();
+  const [fallbackMes] = useState(() => new Date());
+  const mesAtual = mes || fallbackMes;
+  const mesKey = format(mesAtual, "yyyy-MM");
   const inicioMes = startOfMonth(mesAtual);
   const fimMes = endOfMonth(mesAtual);
 
   useEffect(() => {
     fetchTreinos();
-  }, [profileId, mesAtual]);
+  }, [profileId, mesKey]);
 
   // ✅ Listen for centralized workout events
   useEffect(() => {
@@ -54,7 +56,7 @@ export function useTreinosHistorico(profileId: string, mes?: Date) {
       window.removeEventListener(WORKOUT_EVENTS.COMPLETED, handleWorkoutCompleted);
       window.removeEventListener(WORKOUT_EVENTS.PROGRESS_CHANGED, handleWorkoutCompleted);
     };
-  }, [profileId]);
+  }, [profileId, mesKey]);
 
   const fetchTreinos = async () => {
     try {

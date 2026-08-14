@@ -19,7 +19,7 @@ import {
 } from "@/utils/weekUtils";
 import { useExerciseProgress } from "@/hooks/useExerciseProgress";
 import { hidratarBlocoComTemplate } from "@/types/workoutBlocks";
-import { WORKOUT_EVENTS, dispatchWorkoutEvent } from "@/constants/workoutStatus";
+import { WORKOUT_EVENTS } from "@/constants/workoutStatus";
 import {
   normalizeExerciseGroups,
   normalizeExercises,
@@ -296,6 +296,8 @@ export function useTreinos({
 
   // 🔧 FIX: Improved sync ordering - wait for localStorage sync THEN refetch
   useEffect(() => {
+    let progressRefetchTimer: number | null = null;
+
     const handleVisibilityChange = async () => {
       if (document.visibilityState === "visible" && profileId && personalId) {
         // Wait for useExerciseProgress sync to complete
@@ -314,15 +316,28 @@ export function useTreinos({
       });
     };
 
+    const handleProgressChanged = () => {
+      if (progressRefetchTimer != null) {
+        window.clearTimeout(progressRefetchTimer);
+      }
+
+      progressRefetchTimer = window.setTimeout(() => {
+        refetch();
+        progressRefetchTimer = null;
+      }, 300);
+    };
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener(WORKOUT_EVENTS.COMPLETED, handleWorkoutCompleted);
-    window.addEventListener(WORKOUT_EVENTS.PROGRESS_CHANGED, () => {
-      // Debounced refetch for exercise progress changes
-      setTimeout(() => refetch(), 300);
-    });
+    window.addEventListener(WORKOUT_EVENTS.PROGRESS_CHANGED, handleProgressChanged);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener(WORKOUT_EVENTS.COMPLETED, handleWorkoutCompleted);
+      window.removeEventListener(WORKOUT_EVENTS.PROGRESS_CHANGED, handleProgressChanged);
+
+      if (progressRefetchTimer != null) {
+        window.clearTimeout(progressRefetchTimer);
+      }
     };
   }, [profileId, personalId, refetch, queryClient, semanaParaBuscar]);
 

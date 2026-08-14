@@ -35,6 +35,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
+import { updateStudentBasicInfo } from "@/integrations/supabase/studentProfileManagement";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -203,6 +204,51 @@ export default function AlunoDetalhes() {
   }, {});
   const chatBadgeCount =
     chatNaoLidas > 0 ? chatNaoLidas : tabNotificationCounts.chat || 0;
+  const [treinoFeedbackBadgeCount, setTreinoFeedbackBadgeCount] = useState(0);
+
+  useEffect(() => {
+    if (!user?.id || !id) {
+      setTreinoFeedbackBadgeCount(0);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchTreinoFeedbackBadge = async () => {
+      const { count, error } = await supabase
+        .from("notificacoes")
+        .select("id", { count: "exact", head: true })
+        .eq("destinatario_id", user.id)
+        .eq("tipo", "feedback_treino")
+        .eq("lida", false)
+        .filter("dados->>aluno_id", "eq", id);
+
+      if (!cancelled && !error) {
+        setTreinoFeedbackBadgeCount(count || 0);
+      }
+    };
+
+    fetchTreinoFeedbackBadge();
+
+    const channel = supabase
+      .channel(`student-training-feedback-badge:${user.id}:${id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "notificacoes",
+          filter: `destinatario_id=eq.${user.id}`,
+        },
+        fetchTreinoFeedbackBadge
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [id, user?.id]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -254,6 +300,7 @@ export default function AlunoDetalhes() {
         .from("profiles")
         .select("*")
         .eq("id", id)
+        .eq("personal_id", user.id)
         .single();
 
       if (alunoError) {
@@ -286,6 +333,7 @@ export default function AlunoDetalhes() {
         .from("materiais")
         .select("*")
         .eq("profile_id", id)
+        .eq("personal_id", user.id)
         .order("created_at", { ascending: false });
 
       if (materiaisError) {
@@ -436,6 +484,8 @@ export default function AlunoDetalhes() {
     materialId: string,
     arquivoUrl: string
   ) => {
+    if (!user?.id) return;
+
     try {
       const filePath = extractMaterialPath(arquivoUrl);
 
@@ -444,7 +494,8 @@ export default function AlunoDetalhes() {
       const { error } = await supabase
         .from("materiais")
         .delete()
-        .eq("id", materialId);
+        .eq("id", materialId)
+        .eq("personal_id", user.id);
 
       if (error) throw error;
 
@@ -505,14 +556,11 @@ export default function AlunoDetalhes() {
     }
     setSalvandoPerfil(true);
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          nome: nomeTrim,
-          telefone: editTelefone.trim() || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", aluno.id);
+      const { error } = await updateStudentBasicInfo(
+        aluno.id,
+        nomeTrim,
+        editTelefone.trim() || null
+      );
 
       if (error) throw error;
 
@@ -838,12 +886,13 @@ export default function AlunoDetalhes() {
                   value="feedbacks-treino"
                   className={`data-[state=active]:bg-background data-[state=active]:shadow-sm ${
                     isMobile ? "flex-shrink-0 px-6 py-3" : "flex-shrink-0 px-3 py-3 text-xs lg:text-sm"
-                  }`}
+                  } relative`}
                 >
                   <MessageSquareText
                     className={`${isMobile ? "h-5 w-5" : "h-4 w-4 mr-2"}`}
                   />
                   {!isMobile && "Feedbacks de Treino"}
+                  <TabNotificationBadge count={treinoFeedbackBadgeCount} />
                 </TabsTrigger>
                 <TabsTrigger
                   value="chat"

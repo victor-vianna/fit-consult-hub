@@ -36,6 +36,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  setStudentCardColor,
+  updateStudentBasicInfo,
+} from "@/integrations/supabase/studentProfileManagement";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -434,11 +438,7 @@ export default function AlunosManager() {
       )
     );
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({ aluno_card_color: cor })
-      .eq("id", id)
-      .eq("personal_id", user.id);
+    const { error } = await setStudentCardColor(id, cor);
 
     if (error) {
       queryClient.setQueryData(queryKey, previous);
@@ -483,11 +483,11 @@ export default function AlunosManager() {
       )
     );
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({ nome, telefone })
-      .eq("id", editandoAluno.id)
-      .eq("personal_id", user.id);
+    const { error } = await updateStudentBasicInfo(
+      editandoAluno.id,
+      nome,
+      telefone
+    );
 
     if (error) {
       queryClient.setQueryData(queryKey, previous);

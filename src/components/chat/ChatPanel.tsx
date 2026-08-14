@@ -59,6 +59,9 @@ type DeleteTarget = { id: string; isMine: boolean } | null;
 type ProfileSummary = { nome: string | null; telefone?: string | null };
 const CHAT_DRAFT_PREFIX = "fit-consult-hub:chat-draft";
 const QUICK_EMOJIS = ["👍", "💪", "🔥", "👏", "✅"];
+const QUICK_EMOJIS_RENDERED = QUICK_EMOJIS.map(
+  (_, index) => ["\u{1F44D}", "\u{1F4AA}", "\u{1F525}", "\u{1F44F}", "\u2705"][index]
+);
 
 export function ChatPanel({
   personalId,
@@ -83,6 +86,7 @@ export function ChatPanel({
   const lastMessageCountRef = useRef(0);
   const nearBottomRef = useRef(true);
   const skipNextDraftSaveRef = useRef(false);
+  const textoRef = useRef("");
   const { toast } = useToast();
 
   const {
@@ -133,39 +137,75 @@ export function ChatPanel({
     try {
       const raw = window.localStorage.getItem(draftStorageKey);
       if (!raw) {
+        textoRef.current = "";
         setTexto("");
         return;
       }
 
       const parsed = JSON.parse(raw) as { texto?: string };
-      setTexto(typeof parsed.texto === "string" ? parsed.texto : "");
+      const restoredText = typeof parsed.texto === "string" ? parsed.texto : "";
+      textoRef.current = restoredText;
+      setTexto(restoredText);
     } catch {
+      textoRef.current = "";
       setTexto("");
     }
   }, [draftStorageKey]);
 
+  const persistDraft = useCallback(
+    (value = textoRef.current) => {
+      try {
+        if (value.trim()) {
+          window.localStorage.setItem(
+            draftStorageKey,
+            JSON.stringify({
+              texto: value,
+              updatedAt: new Date().toISOString(),
+            })
+          );
+        } else {
+          window.localStorage.removeItem(draftStorageKey);
+        }
+      } catch {
+        // Cache best-effort para preservar rascunhos entre refresh/troca de app.
+      }
+    },
+    [draftStorageKey]
+  );
+
   useEffect(() => {
+    textoRef.current = texto;
+
     if (skipNextDraftSaveRef.current) {
       skipNextDraftSaveRef.current = false;
       return;
     }
 
-    try {
-      if (texto.trim()) {
-        window.localStorage.setItem(
-          draftStorageKey,
-          JSON.stringify({
-            texto,
-            updatedAt: new Date().toISOString(),
-          })
-        );
-      } else {
-        window.localStorage.removeItem(draftStorageKey);
-      }
-    } catch {
-      // Cache best-effort para preservar rascunhos entre refresh/troca de app.
-    }
-  }, [draftStorageKey, texto]);
+    persistDraft(texto);
+  }, [persistDraft, texto]);
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    input.style.height = "auto";
+    input.style.height = `${Math.min(input.scrollHeight, 120)}px`;
+  }, [texto]);
+
+  useEffect(() => {
+    const handlePageHide = () => persistDraft();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") persistDraft();
+    };
+
+    window.addEventListener("pagehide", handlePageHide);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [persistDraft]);
 
   useEffect(() => {
     const handler = () => {
@@ -325,6 +365,7 @@ export function ChatPanel({
     const replyToId = replyTo?.id ?? null;
     const editingMessageId = editingId;
 
+    textoRef.current = "";
     setTexto("");
     try {
       window.localStorage.removeItem(draftStorageKey);
@@ -336,6 +377,7 @@ export function ChatPanel({
       setEditingId(null);
       const ok = await editarMensagem(editingMessageId, conteudo);
       if (!ok) {
+        textoRef.current = textoRef.current || conteudo;
         setTexto((current) => (current ? current : conteudo));
         setEditingId(editingMessageId);
         return;
@@ -345,6 +387,7 @@ export function ChatPanel({
       setReplyTo(null);
       const ok = await enviarMensagem(conteudo, replyToId);
       if (!ok) {
+        textoRef.current = textoRef.current || conteudo;
         setTexto((current) => (current ? current : conteudo));
         if (replyToId) {
           const originalReply = mensagens.find((msg) => msg.id === replyToId);
@@ -370,6 +413,7 @@ export function ChatPanel({
   const clearComposer = () => {
     setEditingId(null);
     setReplyTo(null);
+    textoRef.current = "";
     setTexto("");
     try {
       window.localStorage.removeItem(draftStorageKey);
@@ -381,6 +425,7 @@ export function ChatPanel({
   const startEdit = (msg: ChatMessage) => {
     setEditingId(msg.id);
     setReplyTo(null);
+    textoRef.current = msg.conteudo;
     setTexto(msg.conteudo);
     inputRef.current?.focus();
   };
@@ -397,7 +442,12 @@ export function ChatPanel({
   };
 
   const appendEmoji = (emoji: string) => {
-    setTexto((prev) => `${prev}${emoji}`);
+    const value = emoji.charCodeAt(0) === 0x00f0 ? "\u{1F4CC} " : emoji;
+    setTexto((prev) => {
+      const next = `${prev}${value}`;
+      textoRef.current = next;
+      return next;
+    });
     inputRef.current?.focus();
   };
 
@@ -639,7 +689,7 @@ export function ChatPanel({
         )}
 
         <div className="mb-2 flex items-center gap-1 overflow-x-auto pb-1">
-          {QUICK_EMOJIS.map((emoji) => (
+          {QUICK_EMOJIS_RENDERED.map((emoji) => (
             <Button
               key={emoji}
               type="button"
@@ -680,11 +730,15 @@ export function ChatPanel({
             <textarea
               ref={inputRef}
               value={texto}
-              onChange={(e) => setTexto(e.target.value)}
+              onChange={(e) => {
+                textoRef.current = e.target.value;
+                setTexto(e.target.value);
+              }}
+              onBlur={() => persistDraft()}
               onKeyDown={handleKeyDown}
               placeholder={editingId ? "Editar mensagem..." : "Mensagem"}
               rows={1}
-              className="max-h-[120px] min-h-10 w-full resize-none rounded-2xl border border-input bg-background px-4 py-2.5 pr-10 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="max-h-[120px] min-h-10 w-full resize-none overflow-y-auto rounded-2xl border border-input bg-background px-4 py-2.5 pr-10 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
             <Smile className="pointer-events-none absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
           </div>
@@ -794,7 +848,8 @@ function MessageActions({
             type="button"
             variant="ghost"
             size="icon"
-            className="h-7 w-7 shrink-0 rounded-full opacity-0 transition-opacity group-hover:opacity-100 data-[state=open]:opacity-100"
+            className="h-7 w-7 shrink-0 rounded-full opacity-70 transition-opacity md:opacity-0 md:group-hover:opacity-100 data-[state=open]:opacity-100"
+            aria-label="Acoes da mensagem"
           >
             <MoreVertical className="h-4 w-4" />
           </Button>

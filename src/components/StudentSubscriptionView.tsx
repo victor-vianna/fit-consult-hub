@@ -127,6 +127,8 @@ export function StudentSubscriptionView({
     : null;
   const mostrarAlertaVencimento =
     diasParaExpirar !== null && diasParaExpirar >= 1 && diasParaExpirar <= 3;
+  const canOpenStripePortal = Boolean((activeSubscription as any)?.stripe_customer_id);
+  const canCancelStripeSubscription = Boolean((activeSubscription as any)?.stripe_subscription_id);
 
   if (loading) {
     return (
@@ -256,20 +258,22 @@ export function StudentSubscriptionView({
             )}
 
             <div className="flex flex-wrap gap-2 pt-3 border-t">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleOpenPortal}
-                disabled={openingPortal}
-              >
-                {openingPortal ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                )}
-                Gerenciar pagamento
-              </Button>
-              {!(activeSubscription as any).cancela_no_fim_do_ciclo && (
+              {canOpenStripePortal && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleOpenPortal}
+                  disabled={openingPortal}
+                >
+                  {openingPortal ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                  )}
+                  Gerenciar pagamento
+                </Button>
+              )}
+              {canCancelStripeSubscription && !(activeSubscription as any).cancela_no_fim_do_ciclo && (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -279,6 +283,11 @@ export function StudentSubscriptionView({
                   <Ban className="h-4 w-4 mr-2" />
                   Cancelar assinatura
                 </Button>
+              )}
+              {!canOpenStripePortal && !canCancelStripeSubscription && (
+                <p className="text-sm text-muted-foreground">
+                  Este plano foi registrado pelo personal. Para alterações ou cancelamento, fale diretamente com ele.
+                </p>
               )}
             </div>
           </CardContent>

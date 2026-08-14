@@ -135,6 +135,47 @@ Deno.serve(async (req) => {
       );
     }
 
+    const requestedPersonalId = personal_id || null;
+    const targetPersonalId = isAdmin ? requestedPersonalId : user.id;
+
+    if (!isAdmin && requestedPersonalId && requestedPersonalId !== user.id) {
+      console.error("Personal tentou criar aluno para outro personal:", {
+        actor: user.id,
+        requestedPersonalId,
+      });
+      return new Response(
+        JSON.stringify({
+          error: "Personal trainers so podem criar alunos vinculados a propria conta",
+        }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    if (targetPersonalId) {
+      const { data: targetIsPersonal, error: targetRoleError } =
+        await supabaseAdmin.rpc("check_user_has_role", {
+          _user_id: targetPersonalId,
+          required_role: "personal",
+        });
+
+      if (targetRoleError || !targetIsPersonal) {
+        console.error("personal_id invalido ao criar aluno:", {
+          targetPersonalId,
+          targetRoleError,
+        });
+        return new Response(
+          JSON.stringify({ error: "Personal informado invalido" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+
     console.log("🔄 Criando usuário no Auth...");
 
     // Cria o usuário no Auth
@@ -192,7 +233,7 @@ Deno.serve(async (req) => {
       .update({
         nome,
         telefone: telefone || null,
-        personal_id: personal_id || null,
+        personal_id: targetPersonalId,
       })
       .eq("id", authData.user.id);
 

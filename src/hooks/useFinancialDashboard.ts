@@ -13,6 +13,7 @@ type FinancialSubscriptionRow = {
   parcelas?: number | null;
   status_pagamento?: string | null;
   data_expiracao?: string | null;
+  created_at?: string | null;
   stripe_account_id?: string | null;
   stripe_checkout_session_id?: string | null;
   stripe_subscription_id?: string | null;
@@ -95,6 +96,33 @@ const normalizePaymentText = (value: unknown) =>
     .trim();
 
 const roundCurrency = (value: number) => Math.round(Number(value || 0) * 100) / 100;
+
+const getSubscriptionTimestamp = (subscription: FinancialSubscriptionRow) => {
+  const expirationTime = subscription.data_expiracao
+    ? new Date(subscription.data_expiracao).getTime()
+    : NaN;
+  if (Number.isFinite(expirationTime)) return expirationTime;
+
+  const createdTime = subscription.created_at
+    ? new Date(subscription.created_at).getTime()
+    : NaN;
+  return Number.isFinite(createdTime) ? createdTime : 0;
+};
+
+function getLatestSubscriptionsByStudent(subscriptions: FinancialSubscriptionRow[]) {
+  const latestByStudent = new Map<string, FinancialSubscriptionRow>();
+
+  for (const subscription of subscriptions) {
+    if (!subscription.student_id) continue;
+
+    const current = latestByStudent.get(subscription.student_id);
+    if (!current || getSubscriptionTimestamp(subscription) > getSubscriptionTimestamp(current)) {
+      latestByStudent.set(subscription.student_id, subscription);
+    }
+  }
+
+  return Array.from(latestByStudent.values());
+}
 
 const getPaymentDateKey = (date: string) => {
   const parsed = new Date(date);
@@ -272,6 +300,7 @@ export function useFinancialDashboard(personalId: string) {
       if (paymentsError) throw paymentsError;
 
       const subscriptionRows = (subscriptions || []) as unknown as FinancialSubscriptionRow[];
+      const latestSubscriptions = getLatestSubscriptionsByStudent(subscriptionRows);
       const revenuePayments = getCanonicalRevenuePayments(
         (payments || []) as unknown as FinancialPaymentRow[],
         subscriptionRows
@@ -356,19 +385,16 @@ export function useFinancialDashboard(personalId: string) {
           : 0;
 
       // Assinaturas ativas e inadimplentes
-      const assinaturasAtivas = subscriptions?.filter(
-        (s) => s.status_pagamento === "pago" && new Date(s.data_expiracao) > now
-      ) || [];
-
       // Previsão mensal = receita já recebida no mês + valor esperado das
       // assinaturas (ativas ou pendentes) que renovam dentro do mês atual e
       // ainda não foram pagas neste mês.
       const inicioMes = new Date(currentYear, currentMonth, 1);
       const fimMes = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
       const subsIdsPagasNoMes = new Set(currentMonthPayments.map((p) => p.subscription_id));
-      const aReceberNoMes = (subscriptions ?? [])
+      const aReceberNoMes = latestSubscriptions
         .filter((s) => {
           if (s.status_pagamento === "atrasado") return true;
+          if (!s.data_expiracao) return false;
           const exp = new Date(s.data_expiracao);
           const venceNoMes = exp >= inicioMes && exp <= fimMes;
           return venceNoMes && !subsIdsPagasNoMes.has(s.id);
@@ -376,13 +402,19 @@ export function useFinancialDashboard(personalId: string) {
         .reduce((sum, s) => sum + (s.valor || 0), 0);
       const previsaoReceita = receitaMesAtual + aReceberNoMes;
 
-      const inadimplentes = subscriptions?.filter(
+      const assinaturasAtivas = latestSubscriptions.filter(
+        (s) => s.status_pagamento === "pago" && !!s.data_expiracao && new Date(s.data_expiracao) > now
+      );
+
+      const inadimplentes = latestSubscriptions.filter(
         (s) =>
           s.status_pagamento === "atrasado" ||
-          (s.status_pagamento === "pendente" && new Date(s.data_expiracao) < now)
-      ) || [];
+          (s.status_pagamento === "pendente" &&
+            !!s.data_expiracao &&
+            new Date(s.data_expiracao) < now)
+      );
 
-      const totalAlunos = subscriptions?.length || 0;
+      const totalAlunos = latestSubscriptions.length;
       const taxaInadimplencia = totalAlunos > 0 ? (inadimplentes.length / totalAlunos) * 100 : 0;
 
       const inadimplentesMapped: StudentPaymentStatus[] = inadimplentes.map((sub) => {
@@ -450,13 +482,13 @@ export function useFinancialDashboard(personalId: string) {
       });
 
       // Add pending subscriptions as upcoming payments
-      const pendingSubs = ((subscriptions || []) as unknown as FinancialSubscriptionRow[]).filter(
+      const pendingSubs = latestSubscriptions.filter(
         (s) =>
           s.status_pagamento === "pendente" &&
           !!s.data_expiracao &&
           new Date(s.data_expiracao) >= now &&
           !!(s.stripe_checkout_session_id || s.stripe_subscription_id || s.stripe_account_id)
-      ) || [];
+      );
 
       for (const sub of pendingSubs) {
         const profile = profiles?.find((pr) => pr.id === sub.student_id);

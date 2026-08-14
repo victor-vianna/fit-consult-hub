@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import {
-  ArrowLeft,
   CheckCheck,
   Mail,
   MailOpen,
@@ -319,29 +318,45 @@ export default function Chat() {
     { id: "favorites", label: "Favoritos", count: filterCounts.favorites },
     { id: "pinned", label: "Fixadas", count: filterCounts.pinned },
   ];
+  const chatOpenOnMobile = isMobile && !!selectedStudent;
 
   const content = (
-    <div className="container mx-auto max-w-7xl px-4 py-4 md:py-6">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-bold md:text-2xl">Chat</h1>
-          <p className="text-sm text-muted-foreground">
-            Todas as conversas com alunos em um unico lugar.
-          </p>
+    <div
+      className={cn(
+        chatOpenOnMobile
+          ? "h-full w-full"
+          : "container mx-auto max-w-7xl px-4 py-4 md:py-6"
+      )}
+    >
+      {!chatOpenOnMobile && (
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-xl font-bold md:text-2xl">Chat</h1>
+            <p className="text-sm text-muted-foreground">
+              Todas as conversas com alunos em um unico lugar.
+            </p>
+          </div>
+          {user?.id && (
+            <BroadcastMessageDialog
+              personalId={user.id}
+              themeColor={personalSettings?.theme_color}
+            />
+          )}
         </div>
-        {user?.id && (
-          <BroadcastMessageDialog
-            personalId={user.id}
-            themeColor={personalSettings?.theme_color}
-          />
-        )}
-      </div>
+      )}
 
-      <div className="grid min-h-[620px] overflow-hidden rounded-lg border bg-background md:grid-cols-[340px_minmax(0,1fr)]">
+      <div
+        className={cn(
+          "grid overflow-hidden bg-background",
+          chatOpenOnMobile
+            ? "h-full border-0"
+            : "min-h-[620px] rounded-lg border md:h-[calc(100vh-11rem)] md:grid-cols-[340px_minmax(0,1fr)]"
+        )}
+      >
         <aside
           className={cn(
-            "border-r bg-card",
-            isMobile && selectedStudent ? "hidden" : "block"
+            "min-h-0 flex-col border-r bg-card",
+            isMobile && selectedStudent ? "hidden" : "flex"
           )}
         >
           <div className="border-b p-3">
@@ -387,7 +402,7 @@ export default function Chat() {
             </div>
           </div>
 
-          <div className="max-h-[620px] overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto">
             {conversations.length === 0 ? (
               <div className="p-6 text-center text-sm text-muted-foreground">
                 Nenhuma conversa encontrada.
@@ -545,26 +560,16 @@ export default function Chat() {
           </div>
         </aside>
 
-        <section className={cn("min-w-0", isMobile && !selectedStudent ? "hidden" : "block")}>
+        <section className={cn("min-h-0 min-w-0", isMobile && !selectedStudent ? "hidden" : "block")}>
           {selectedStudent && user?.id ? (
-            <div className="flex h-full flex-col">
-              {isMobile && (
-                <div className="border-b p-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedAlunoId(null)}
-                  >
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Conversas
-                  </Button>
-                </div>
-              )}
+            <div className="flex h-full min-h-0 flex-col">
               <ChatPanel
                 personalId={user.id}
                 alunoId={selectedStudent.id}
                 currentUserId={user.id}
                 themeColor={personalSettings?.theme_color}
+                fullHeight
+                onBack={isMobile ? () => setSelectedAlunoId(null) : undefined}
               />
             </div>
           ) : (
@@ -582,15 +587,31 @@ export default function Chat() {
   if (isMobile) {
     return (
       <AppLayout>
-        <div className="flex min-h-screen flex-col bg-background">
-          <MobileHeaderPersonal
-            personalId={user?.id}
-            personalSettings={personalSettings}
-            profileName={profile?.nome}
-            userId={user?.id}
-          />
-          <main className="flex-1 overflow-auto pb-20">{content}</main>
-          <BottomNavigationPersonal themeColor={personalSettings?.theme_color} />
+        <div
+          className={cn(
+            "flex min-h-screen flex-col bg-background",
+            chatOpenOnMobile && "h-[100dvh] min-h-[100dvh] overflow-hidden"
+          )}
+        >
+          {!chatOpenOnMobile && (
+            <MobileHeaderPersonal
+              personalId={user?.id}
+              personalSettings={personalSettings}
+              profileName={profile?.nome}
+              userId={user?.id}
+            />
+          )}
+          <main
+            className={cn(
+              "flex-1",
+              chatOpenOnMobile ? "min-h-0 overflow-hidden" : "overflow-auto pb-20"
+            )}
+          >
+            {content}
+          </main>
+          {!chatOpenOnMobile && (
+            <BottomNavigationPersonal themeColor={personalSettings?.theme_color} />
+          )}
         </div>
       </AppLayout>
     );

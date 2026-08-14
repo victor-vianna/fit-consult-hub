@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
+  ArrowLeft,
   Check,
   CheckCheck,
   Clock,
@@ -51,6 +52,7 @@ interface ChatPanelProps {
   currentUserId: string;
   themeColor?: string;
   fullHeight?: boolean;
+  onBack?: () => void;
 }
 
 type DeleteTarget = { id: string; isMine: boolean } | null;
@@ -63,6 +65,7 @@ export function ChatPanel({
   currentUserId,
   themeColor,
   fullHeight = false,
+  onBack,
 }: ChatPanelProps) {
   const [texto, setTexto] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -347,7 +350,7 @@ export function ChatPanel({
           "flex items-center justify-center bg-background",
           fullHeight
             ? "h-full min-h-0 rounded-none border-0"
-            : "h-[580px] rounded-lg border"
+            : "h-[calc(100vh-10rem)] min-h-[560px] rounded-lg border"
         )}
       >
         <div className="text-center">
@@ -364,13 +367,30 @@ export function ChatPanel({
         "flex flex-col overflow-hidden bg-background",
         fullHeight
           ? "h-full min-h-0 rounded-none border-0 shadow-none"
-          : "h-[min(76vh,720px)] min-h-[540px] rounded-lg border shadow-sm"
+          : "h-[calc(100vh-10rem)] min-h-[560px] rounded-lg border shadow-sm"
       )}
     >
-      <div className="border-b bg-card">
-        <div className="flex items-center gap-3 px-3 py-3 sm:px-4">
+      <div className="sticky top-0 z-20 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+        <div
+          className={cn(
+            "flex items-center gap-2 px-2 sm:gap-3 sm:px-4",
+            onBack ? "header-safe-top-compact pb-2" : "py-3"
+          )}
+        >
+          {onBack && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 shrink-0 rounded-full"
+              onClick={onBack}
+              title="Voltar para conversas"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          )}
           <div
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white sm:h-11 sm:w-11"
             style={{ backgroundColor: accent }}
           >
             {initials || <UserCircle className="h-6 w-6" />}
@@ -381,7 +401,7 @@ export function ChatPanel({
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
             </div>
             <p className="truncate text-xs text-muted-foreground">
-              Conversa centralizada na plataforma
+              Online na plataforma
             </p>
           </div>
           <Button
@@ -455,11 +475,11 @@ export function ChatPanel({
         )}
       </div>
 
-      <div className="relative flex-1 overflow-hidden bg-muted/20">
+      <div className="relative min-h-0 flex-1 overflow-hidden bg-muted/20">
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="h-full overflow-y-auto px-3 py-4 sm:px-4"
+          className="h-full overflow-y-auto px-2 py-3 sm:px-4 sm:py-4"
         >
           {mensagens.length === 0 ? (
             <EmptyChat otherName={otherName} />
@@ -541,9 +561,9 @@ export function ChatPanel({
         )}
       </div>
 
-      {(editingId || replyTo) && (
-        <div className="border-t bg-card px-3 py-2 sm:px-4">
-          <div className="flex items-start gap-2 rounded-lg border-l-4 bg-muted/50 px-3 py-2" style={{ borderLeftColor: accent }}>
+      <div className="sticky bottom-0 z-20 border-t bg-card/95 px-2 pb-[calc(env(safe-area-inset-bottom,0px)+0.5rem)] pt-2 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:px-4 sm:py-3">
+        {(editingId || replyTo) && (
+          <div className="mb-2 flex items-start gap-2 rounded-lg border-l-4 bg-muted/50 px-3 py-2" style={{ borderLeftColor: accent }}>
             <div className="min-w-0 flex-1">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {editingId
@@ -558,11 +578,9 @@ export function ChatPanel({
               <X className="h-4 w-4" />
             </Button>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="border-t bg-card px-3 py-3 sm:px-4">
-        <div className="mb-2 flex items-center gap-1">
+        <div className="mb-2 flex items-center gap-1 overflow-x-auto pb-1">
           {QUICK_EMOJIS.map((emoji) => (
             <Button
               key={emoji}
@@ -576,7 +594,7 @@ export function ChatPanel({
             </Button>
           ))}
         </div>
-        <div className="flex items-end gap-2">
+        <div className="flex items-end gap-1.5 sm:gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button type="button" variant="ghost" size="icon" className="h-10 w-10 shrink-0 rounded-full">
@@ -608,7 +626,7 @@ export function ChatPanel({
               onKeyDown={handleKeyDown}
               placeholder={editingId ? "Editar mensagem..." : "Mensagem"}
               rows={1}
-              className="max-h-[140px] min-h-10 w-full resize-none rounded-2xl border border-input bg-background px-4 py-2.5 pr-10 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="max-h-[120px] min-h-10 w-full resize-none rounded-2xl border border-input bg-background px-4 py-2.5 pr-10 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
             <Smile className="pointer-events-none absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
           </div>
@@ -711,7 +729,7 @@ function MessageActions({
   isPinned: boolean;
 }) {
   return (
-    <div className={cn("group flex max-w-[86%] items-center gap-1", isMe && "flex-row-reverse")}>
+    <div className={cn("group flex max-w-[92%] items-center gap-1 sm:max-w-[86%]", isMe && "flex-row-reverse")}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button

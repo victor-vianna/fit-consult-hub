@@ -32,8 +32,11 @@ import {
   Lock,
 } from "lucide-react";
 import { AvaliacaoAlunoSection } from "@/components/avaliacao/AvaliacaoAlunoSection";
+import { AnamneseVisualizacao } from "@/components/AnamneseVisualizacao";
+import { CheckinsDashboard } from "@/components/CheckinsDashboard";
 import { StudentSubscriptionView } from "@/components/StudentSubscriptionView";
 import { DocumentViewer } from "@/components/DocumentViewer";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CalendarioSemanal } from "@/components/CalendarioSemanal";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
@@ -71,7 +74,7 @@ interface Material {
 }
 
 const WORKOUT_STATE_KEY = "pwa_workout_state";
-const ALWAYS_ALLOWED_ALUNO_SECTIONS = ["inicio", "treinos", "chat"] as const;
+const ALWAYS_ALLOWED_ALUNO_SECTIONS = ["inicio", "treinos", "chat", "dados"] as const;
 
 function getAllowedAlunoSections(cardsVisiveis: string[]) {
   return Array.from(new Set([...ALWAYS_ALLOWED_ALUNO_SECTIONS, ...cardsVisiveis]));
@@ -424,7 +427,7 @@ export default function AreaAluno() {
   const cardConfig: Record<string, { title: string; icon: any; section: string; badge?: number }> = {
     treinos: { title: ALUNO_CARD_LABELS.treinos, icon: Dumbbell, section: "treinos" },
     chat: { title: ALUNO_CARD_LABELS.chat, icon: MessageSquare, section: "chat", badge: chatNaoLidas },
-    avaliacao: { title: ALUNO_CARD_LABELS.avaliacao, icon: Activity, section: "avaliacao" },
+    avaliacao: { title: ALUNO_CARD_LABELS.avaliacao, icon: Activity, section: "dados" },
     historico: { title: ALUNO_CARD_LABELS.historico, icon: Calendar, section: "historico" },
     materiais: { title: ALUNO_CARD_LABELS.materiais, icon: FileText, section: "materiais" },
     plano: { title: ALUNO_CARD_LABELS.plano, icon: CreditCard, section: "plano" },
@@ -593,6 +596,74 @@ export default function AreaAluno() {
     </div>
   );
 
+  const renderDadosAcompanhamento = () => {
+    if (!profile?.personal_id || !user?.id) return null;
+
+    const studentName = profile?.nome || "Aluno";
+
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <Card>
+          <CardHeader>
+            <CardTitle
+              className="flex items-center gap-2 text-2xl"
+              style={{
+                color: personalSettings?.theme_color || undefined,
+              }}
+            >
+              <ListChecks className="h-6 w-6" />
+              Meus dados
+            </CardTitle>
+            <CardDescription>
+              Consulte em um unico lugar sua avaliacao, anamnese e feedbacks semanais.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+
+        <Tabs defaultValue="avaliacao" className="w-full">
+          <TabsList className="mb-4 grid h-auto w-full grid-cols-3 gap-1 p-1">
+            <TabsTrigger className="px-2 py-2 text-xs sm:text-sm" value="avaliacao">
+              Avaliacao
+            </TabsTrigger>
+            <TabsTrigger className="px-2 py-2 text-xs sm:text-sm" value="anamnese">
+              Anamnese
+            </TabsTrigger>
+            <TabsTrigger className="px-2 py-2 text-xs sm:text-sm" value="feedbacks">
+              Feedbacks
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="avaliacao" className="mt-0">
+            <AvaliacaoAlunoSection
+              profileId={user.id}
+              personalId={profile.personal_id}
+              themeColor={personalSettings?.theme_color}
+            />
+          </TabsContent>
+
+          <TabsContent value="anamnese" className="mt-0">
+            <AnamneseVisualizacao
+              profileId={user.id}
+              personalId={profile.personal_id}
+              studentName={studentName}
+              themeColor={personalSettings?.theme_color}
+              canEdit={false}
+            />
+          </TabsContent>
+
+          <TabsContent value="feedbacks" className="mt-0">
+            <CheckinsDashboard
+              profileId={user.id}
+              personalId={profile.personal_id}
+              studentName={studentName}
+              themeColor={personalSettings?.theme_color}
+            />
+          </TabsContent>
+        </Tabs>
+      </div>
+    );
+  };
+
   const renderContent = () => {
     // Bloqueio de seções de treino se planilha expirada > 7 dias
     if (isBloqueado && secoesBloqueadas.includes(activeSection)) {
@@ -730,6 +801,9 @@ export default function AreaAluno() {
             )}
           </div>
         );
+
+      case "dados":
+        return renderDadosAcompanhamento();
 
       case "materiais":
         return (
@@ -896,17 +970,7 @@ export default function AreaAluno() {
         );
 
       case "avaliacao":
-        return (
-          <div className="space-y-6 animate-fade-in">
-            {profile?.personal_id && (
-              <AvaliacaoAlunoSection
-                profileId={user!.id}
-                personalId={profile.personal_id}
-                themeColor={personalSettings?.theme_color}
-              />
-            )}
-          </div>
-        );
+        return renderDadosAcompanhamento();
 
       case "chat":
         return (

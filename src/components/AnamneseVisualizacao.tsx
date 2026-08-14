@@ -29,6 +29,7 @@ interface Props {
   personalId: string;
   themeColor?: string;
   studentName: string;
+  canEdit?: boolean;
 }
 
 interface AnamneseData {
@@ -79,6 +80,7 @@ export function AnamneseVisualizacao({
   personalId,
   themeColor,
   studentName,
+  canEdit = true,
 }: Props) {
   const { toast } = useToast();
   const [anamnese, setAnamnese] = useState<AnamneseData | null>(null);
@@ -278,28 +280,30 @@ export function AnamneseVisualizacao({
                 </div>
               </div>
             </div>
-            <Dialog open={editMode} onOpenChange={setEditMode}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Edit className="mr-2 h-4 w-4" />
-                  Editar
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Editar Anamnese - {studentName}</DialogTitle>
-                </DialogHeader>
-                <AnamneseInicialForm
-                  profileId={profileId}
-                  personalId={personalId}
-                  themeColor={themeColor}
-                  onComplete={() => {
-                    setEditMode(false);
-                    fetchAnamnese();
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
+            {canEdit && (
+              <Dialog open={editMode} onOpenChange={setEditMode}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Edit className="mr-2 h-4 w-4" />
+                    Editar
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Editar Anamnese - {studentName}</DialogTitle>
+                  </DialogHeader>
+                  <AnamneseInicialForm
+                    profileId={profileId}
+                    personalId={personalId}
+                    themeColor={themeColor}
+                    onComplete={() => {
+                      setEditMode(false);
+                      fetchAnamnese();
+                    }}
+                  />
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
         </CardHeader>
       </Card>

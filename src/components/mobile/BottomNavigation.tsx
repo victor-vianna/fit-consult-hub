@@ -6,6 +6,7 @@ import {
   FileText,
   Home,
   Library,
+  ListChecks,
   LogOut,
   Menu,
   MessageCircle,
@@ -37,6 +38,7 @@ interface BottomNavigationProps {
 }
 
 const navConfig: Record<string, { section: string; label: string; icon: any }> = {
+  dados: { section: "dados", label: "Meus dados", icon: ListChecks },
   treinos: { section: "treinos", label: ALUNO_CARD_LABELS.treinos, icon: Dumbbell },
   chat: { section: "chat", label: ALUNO_CARD_LABELS.chat, icon: MessageCircle },
   avaliacao: { section: "avaliacao", label: ALUNO_CARD_LABELS.avaliacao, icon: Activity },
@@ -70,9 +72,12 @@ export function BottomNavigation({
     navConfig.treinos,
     navConfig.chat,
   ];
-  const drawerItems = configuredItems.filter(
-    (item) => !["treinos", "chat"].includes(item.section)
-  );
+  const drawerItems = [
+    navConfig.dados,
+    ...configuredItems.filter(
+      (item) => !["treinos", "chat", "avaliacao"].includes(item.section)
+    ),
+  ];
   const isDrawerActive = drawerItems.some((item) => item.section === activeSection);
 
   const handleDrawerNavigate = (section: string) => {

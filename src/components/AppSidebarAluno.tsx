@@ -6,6 +6,7 @@ import {
   FileText,
   Home,
   Library,
+  ListChecks,
   MessageSquare,
 } from "lucide-react";
 import {
@@ -55,10 +56,12 @@ export function AppSidebarAluno({
   const menuItemIds = configuredItemIds.includes("chat")
     ? configuredItemIds
     : ["chat", ...configuredItemIds];
+  const configurableMenuItemIds = menuItemIds.filter((id) => id !== "avaliacao");
 
   const items = [
     { title: "Inicio", icon: Home, value: "inicio" },
-    ...menuItemIds.map((id) => itemConfig[id]).filter(Boolean),
+    { title: "Meus dados", icon: ListChecks, value: "dados" },
+    ...configurableMenuItemIds.map((id) => itemConfig[id]).filter(Boolean),
   ];
 
   return (

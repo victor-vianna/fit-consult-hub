@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ClipboardList, FileText, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp, ClipboardList, FileText, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { usePersistedState } from "@/hooks/usePersistedState";
 import { getFilledAnamneseFields } from "@/utils/anamneseHighlights";
 import { toast } from "sonner";
 
@@ -46,6 +47,11 @@ export function AnamneseWorkoutNotes({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
+  const [isMinimized, setIsMinimized] = usePersistedState(
+    `anamnese-workout-notes-minimized:${personalId}:${profileId}`,
+    false,
+    { storage: "local" }
+  );
 
   const filledFields = useMemo(() => getFilledAnamneseFields(anamnese), [anamnese]);
   const suggestedFields = useMemo(
@@ -173,7 +179,7 @@ export function AnamneseWorkoutNotes({
               style={{ backgroundColor: themeColor || "hsl(var(--primary))" }}
             />
             <div className="min-w-0 flex-1 p-4">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0 space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <div
@@ -202,69 +208,88 @@ export function AnamneseWorkoutNotes({
                     )}
                   </div>
 
-                  {!anamnese ? (
-                    <p className="text-sm text-muted-foreground">
-                      A anamnese ainda nao foi preenchida para este aluno.
-                    </p>
-                  ) : selectedItems.length > 0 || note ? (
-                    <div className="space-y-3">
-                      {note && (
-                        <div className="rounded-md border bg-muted/30 p-3">
-                          <p className="text-xs font-semibold uppercase text-muted-foreground">
-                            Observacao do personal
-                          </p>
-                          <p className="mt-1 whitespace-pre-wrap break-words text-sm text-foreground">
-                            {note}
-                          </p>
-                        </div>
-                      )}
-                      {selectedItems.length > 0 && (
-                        <div className="grid gap-2 md:grid-cols-2">
-                          {selectedItems.map((item) => (
-                            <div
-                              key={item.key}
-                              className={cn(
-                                "rounded-md border bg-background p-3",
-                                item.important && "border-destructive/30 bg-destructive/5"
-                              )}
-                            >
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-xs font-semibold uppercase text-muted-foreground">
-                                  {item.label}
-                                </p>
-                                {item.important && (
-                                  <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">
-                                    atencao
-                                  </Badge>
-                                )}
-                              </div>
-                              <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
-                                {item.value}
+                  {!isMinimized && (
+                    <>
+                      {!anamnese ? (
+                        <p className="text-sm text-muted-foreground">
+                          A anamnese ainda nao foi preenchida para este aluno.
+                        </p>
+                      ) : selectedItems.length > 0 || note ? (
+                        <div className="space-y-3">
+                          {note && (
+                            <div className="rounded-md border bg-muted/30 p-3">
+                              <p className="text-xs font-semibold uppercase text-muted-foreground">
+                                Observacao do personal
+                              </p>
+                              <p className="mt-1 whitespace-pre-wrap break-words text-sm text-foreground">
+                                {note}
                               </p>
                             </div>
-                          ))}
+                          )}
+                          {selectedItems.length > 0 && (
+                            <div className="grid gap-2 md:grid-cols-2">
+                              {selectedItems.map((item) => (
+                                <div
+                                  key={item.key}
+                                  className={cn(
+                                    "rounded-md border bg-background p-3",
+                                    item.important && "border-destructive/30 bg-destructive/5"
+                                  )}
+                                >
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="text-xs font-semibold uppercase text-muted-foreground">
+                                      {item.label}
+                                    </p>
+                                    {item.important && (
+                                      <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">
+                                        atencao
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
+                                    {item.value}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          Nenhum destaque salvo. Selecione dores, restricoes,
+                          disponibilidade e preferencias relevantes.
+                        </p>
                       )}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Nenhum destaque salvo. Selecione dores, restricoes,
-                      disponibilidade e preferencias relevantes.
-                    </p>
+                    </>
                   )}
                 </div>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0"
-                  onClick={openEditor}
-                  disabled={!anamnese || filledFields.length === 0}
-                >
-                  <FileText className="mr-2 h-4 w-4" />
-                  Ver detalhes
-                </Button>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsMinimized((prev) => !prev)}
+                    aria-expanded={!isMinimized}
+                  >
+                    {isMinimized ? (
+                      <ChevronDown className="mr-2 h-4 w-4" />
+                    ) : (
+                      <ChevronUp className="mr-2 h-4 w-4" />
+                    )}
+                    {isMinimized ? "Expandir" : "Minimizar"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={openEditor}
+                    disabled={!anamnese || filledFields.length === 0}
+                  >
+                    <FileText className="mr-2 h-4 w-4" />
+                    Ver detalhes
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

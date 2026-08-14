@@ -1301,6 +1301,7 @@ export function TreinosManager({
 
       {isPersonal && (
         <AnamneseWorkoutNotes
+          key={`anamnese-workout-notes-${personalId}-${profileId}`}
           profileId={profileId}
           personalId={personalId}
           studentName={alunoProfile?.nome}

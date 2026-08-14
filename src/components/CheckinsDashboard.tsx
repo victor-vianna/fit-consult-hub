@@ -66,6 +66,11 @@ interface CheckinData {
   preenchido_em: string;
 }
 
+const hasValidWeight = (value?: number | null) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0;
+};
+
 export function CheckinsDashboard({
   profileId,
   personalId,
@@ -495,7 +500,7 @@ export function CheckinsDashboard({
                 </CardHeader>
               </Card>
 
-              {selectedCheckin.peso_atual && (
+              {hasValidWeight(selectedCheckin.peso_atual) && (
                 <InfoCard
                   icon={<Activity className="h-4 w-4 text-blue-600" />}
                   label="Peso Atual"

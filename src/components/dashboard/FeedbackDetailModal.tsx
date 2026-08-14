@@ -59,6 +59,11 @@ interface FullCheckin {
   preenchido_em: string;
 }
 
+const hasValidWeight = (value?: number | null) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0;
+};
+
 const getNotaColor = (nota: number) => {
   if (nota <= 4) {
     return "border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-200 dark:bg-red-500/15";
@@ -210,7 +215,7 @@ export function FeedbackDetailModal({
 
                 {/* Métricas secundárias */}
                 <div className="grid grid-cols-2 gap-3">
-                  {checkin.peso_atual && (
+                  {hasValidWeight(checkin.peso_atual) && (
                     <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
                       <Activity className="h-4 w-4 text-blue-500" />
                       <div>

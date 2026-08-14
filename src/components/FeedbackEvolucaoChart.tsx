@@ -51,6 +51,11 @@ const FEEDBACK_METRICS: {
 
 const SCORE_METRICS = FEEDBACK_METRICS.filter((m) => m.key !== "peso_atual");
 
+const normalizeWeight = (value: unknown) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
 export function FeedbackEvolucaoChart({
   profileId,
   personalId,
@@ -99,7 +104,7 @@ export function FeedbackEvolucaoChart({
       label: `S${c.numero_semana}/${c.ano}`,
       data_inicio: c.data_inicio,
       ...FEEDBACK_METRICS.reduce((acc, m) => {
-        acc[m.key] = c[m.key] ?? null;
+        acc[m.key] = m.key === "peso_atual" ? normalizeWeight(c[m.key]) : c[m.key] ?? null;
         return acc;
       }, {} as Record<string, any>),
     }));
@@ -116,7 +121,7 @@ export function FeedbackEvolucaoChart({
   const weightDomain = useMemo(() => {
     const values = chartData
       .map((item) => Number(item.peso_atual))
-      .filter((value) => Number.isFinite(value));
+      .filter((value) => Number.isFinite(value) && value > 0);
 
     if (values.length === 0) return ["auto", "auto"] as const;
 
@@ -164,10 +169,10 @@ export function FeedbackEvolucaoChart({
       ? previousScores.reduce((sum, value) => sum + value, 0) / previousScores.length
       : null;
 
-    const weightNow = Number(last.peso_atual);
-    const weightPrev = Number(prev.peso_atual);
+    const weightNow = normalizeWeight(last.peso_atual);
+    const weightPrev = normalizeWeight(prev.peso_atual);
     const weightDiff =
-      Number.isFinite(weightNow) && Number.isFinite(weightPrev)
+      weightNow !== null && weightPrev !== null
         ? weightNow - weightPrev
         : null;
 
@@ -191,7 +196,7 @@ export function FeedbackEvolucaoChart({
         currentAverage != null && previousAverage != null
           ? currentAverage - previousAverage
           : null,
-      weightNow: Number.isFinite(weightNow) ? weightNow : null,
+      weightNow,
       weightDiff,
       attention,
     };

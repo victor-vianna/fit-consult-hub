@@ -168,7 +168,7 @@ export function CheckinSemanalForm({
         setQualidadeVida([data.qualidade_vida]);
         setNivelDificuldade([data.nivel_dificuldade]);
         setFormData({
-          peso_atual: data.peso_atual?.toString() || "",
+          peso_atual: Number(data.peso_atual) > 0 ? data.peso_atual.toString() : "",
           justificativa_empenho: data.justificativa_empenho || "",
           justificativa_alimentacao: data.justificativa_alimentacao || "",
           justificativa_sono: data.justificativa_sono || "",
@@ -188,34 +188,99 @@ export function CheckinSemanalForm({
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const parsePesoAtual = () => {
+    const normalized = formData.peso_atual.trim().replace(",", ".");
+    if (!normalized) return null;
+
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  };
+
+  const fetchUltimoPesoValido = async () => {
+    const pesoExistente = Number(checkinExistente?.peso_atual);
+    if (Number.isFinite(pesoExistente) && pesoExistente > 0) {
+      return pesoExistente;
+    }
+
+    const { data, error } = await supabase
+      .from("checkins_semanais")
+      .select("id, peso_atual")
+      .eq("profile_id", profileId)
+      .eq("personal_id", personalId)
+      .not("peso_atual", "is", null)
+      .order("ano", { ascending: false })
+      .order("numero_semana", { ascending: false })
+      .limit(12);
+
+    if (error) throw error;
+
+    const ultimo = (data || []).find((item) => {
+      if (item.id === checkinExistente?.id) return false;
+      const peso = Number(item.peso_atual);
+      return Number.isFinite(peso) && peso > 0;
+    });
+
+    if (ultimo) return Number(ultimo.peso_atual);
+
+    const { data: avaliacaoData, error: avaliacaoError } = await supabase
+      .from("avaliacoes_fisicas")
+      .select("peso")
+      .eq("profile_id", profileId)
+      .order("data_avaliacao", { ascending: false })
+      .limit(12);
+
+    if (avaliacaoError) throw avaliacaoError;
+
+    const ultimaAvaliacao = (avaliacaoData || []).find((item) => {
+      const peso = Number(item.peso);
+      return Number.isFinite(peso) && peso > 0;
+    });
+
+    if (ultimaAvaliacao) return Number(ultimaAvaliacao.peso);
+
+    const { data: anamneseData, error: anamneseError } = await supabase
+      .from("anamnese_inicial")
+      .select("peso_atual")
+      .eq("profile_id", profileId)
+      .eq("personal_id", personalId)
+      .maybeSingle();
+
+    if (anamneseError) throw anamneseError;
+
+    const pesoAnamnese = Number(anamneseData?.peso_atual);
+    return Number.isFinite(pesoAnamnese) && pesoAnamnese > 0 ? pesoAnamnese : null;
+  };
+
   const handleSubmit = async () => {
     setLoading(true);
-
-    const checkinData = {
-      profile_id: profileId,
-      personal_id: personalId,
-      ano: anoAtual,
-      numero_semana: semanaAtual,
-      data_inicio: checkinWeek.startIso,
-      data_fim: checkinWeek.endIso,
-      peso_atual: formData.peso_atual ? Number(formData.peso_atual) : null,
-      nota_empenho: notaEmpenho[0],
-      justificativa_empenho: formData.justificativa_empenho,
-      nota_alimentacao: notaAlimentacao[0],
-      justificativa_alimentacao: formData.justificativa_alimentacao,
-      nota_sono: notaSono[0],
-      justificativa_sono: formData.justificativa_sono,
-      dores_corpo: formData.dores_corpo,
-      estado_emocional: formData.estado_emocional,
-      saude_geral: saudeGeral[0],
-      comentario_saude: formData.comentario_saude,
-      qualidade_vida: qualidadeVida[0],
-      nivel_dificuldade: nivelDificuldade[0],
-      mudanca_rotina: formData.mudanca_rotina,
-      duvidas: formData.duvidas,
-    };
-
     try {
+      const pesoInformado = parsePesoAtual();
+      const pesoAtual = pesoInformado ?? (await fetchUltimoPesoValido());
+
+      const checkinData = {
+        profile_id: profileId,
+        personal_id: personalId,
+        ano: anoAtual,
+        numero_semana: semanaAtual,
+        data_inicio: checkinWeek.startIso,
+        data_fim: checkinWeek.endIso,
+        peso_atual: pesoAtual,
+        nota_empenho: notaEmpenho[0],
+        justificativa_empenho: formData.justificativa_empenho,
+        nota_alimentacao: notaAlimentacao[0],
+        justificativa_alimentacao: formData.justificativa_alimentacao,
+        nota_sono: notaSono[0],
+        justificativa_sono: formData.justificativa_sono,
+        dores_corpo: formData.dores_corpo,
+        estado_emocional: formData.estado_emocional,
+        saude_geral: saudeGeral[0],
+        comentario_saude: formData.comentario_saude,
+        qualidade_vida: qualidadeVida[0],
+        nivel_dificuldade: nivelDificuldade[0],
+        mudanca_rotina: formData.mudanca_rotina,
+        duvidas: formData.duvidas,
+      };
+
       if (checkinExistente) {
         const { error } = await supabase
           .from("checkins_semanais")
@@ -370,6 +435,9 @@ export function CheckinSemanalForm({
               value={formData.peso_atual}
               onChange={(e) => handleInputChange("peso_atual", e.target.value)}
             />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Se deixar em branco ou informar 0, sera mantido o ultimo peso registrado.
+            </p>
           </div>
 
           <div className="space-y-3">

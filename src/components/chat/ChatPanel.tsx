@@ -57,6 +57,7 @@ interface ChatPanelProps {
 
 type DeleteTarget = { id: string; isMine: boolean } | null;
 type ProfileSummary = { nome: string | null; telefone?: string | null };
+const CHAT_DRAFT_PREFIX = "fit-consult-hub:chat-draft";
 const QUICK_EMOJIS = ["👍", "💪", "🔥", "👏", "✅"];
 
 export function ChatPanel({
@@ -81,6 +82,7 @@ export function ChatPanel({
   const openedConversationKeyRef = useRef<string | null>(null);
   const lastMessageCountRef = useRef(0);
   const nearBottomRef = useRef(true);
+  const skipNextDraftSaveRef = useRef(false);
   const { toast } = useToast();
 
   const {
@@ -107,6 +109,10 @@ export function ChatPanel({
     () => `${currentUserId}:${personalId}:${alunoId}`,
     [currentUserId, personalId, alunoId]
   );
+  const draftStorageKey = useMemo(
+    () => `${CHAT_DRAFT_PREFIX}:${conversationScrollKey}`,
+    [conversationScrollKey]
+  );
 
   useEffect(() => {
     marcarComoLidas();
@@ -118,6 +124,48 @@ export function ChatPanel({
     nearBottomRef.current = true;
     setShowScrollButton(false);
   }, [conversationScrollKey]);
+
+  useEffect(() => {
+    skipNextDraftSaveRef.current = true;
+    setEditingId(null);
+    setReplyTo(null);
+
+    try {
+      const raw = window.localStorage.getItem(draftStorageKey);
+      if (!raw) {
+        setTexto("");
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as { texto?: string };
+      setTexto(typeof parsed.texto === "string" ? parsed.texto : "");
+    } catch {
+      setTexto("");
+    }
+  }, [draftStorageKey]);
+
+  useEffect(() => {
+    if (skipNextDraftSaveRef.current) {
+      skipNextDraftSaveRef.current = false;
+      return;
+    }
+
+    try {
+      if (texto.trim()) {
+        window.localStorage.setItem(
+          draftStorageKey,
+          JSON.stringify({
+            texto,
+            updatedAt: new Date().toISOString(),
+          })
+        );
+      } else {
+        window.localStorage.removeItem(draftStorageKey);
+      }
+    } catch {
+      // Cache best-effort para preservar rascunhos entre refresh/troca de app.
+    }
+  }, [draftStorageKey, texto]);
 
   useEffect(() => {
     const handler = () => {
@@ -278,6 +326,11 @@ export function ChatPanel({
     const editingMessageId = editingId;
 
     setTexto("");
+    try {
+      window.localStorage.removeItem(draftStorageKey);
+    } catch {
+      // best-effort
+    }
 
     if (editingMessageId) {
       setEditingId(null);
@@ -318,6 +371,11 @@ export function ChatPanel({
     setEditingId(null);
     setReplyTo(null);
     setTexto("");
+    try {
+      window.localStorage.removeItem(draftStorageKey);
+    } catch {
+      // best-effort
+    }
   };
 
   const startEdit = (msg: ChatMessage) => {

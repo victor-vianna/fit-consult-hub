@@ -982,6 +982,7 @@ export default function AreaAluno() {
                 currentUserId={user.id}
                 themeColor={personalSettings?.theme_color}
                 fullHeight={isMobile}
+                onBack={isMobile ? () => handleSectionChange("inicio") : undefined}
               />
             )}
           </div>
@@ -1014,8 +1015,13 @@ export default function AreaAluno() {
     const isChatSection = activeSection === "chat";
     return (
       <AppLayout>
-        <div className="min-h-screen flex flex-col w-full bg-background">
-          <MobileHeader userName={profile?.nome} />
+        <div
+          className={cn(
+            "min-h-screen flex flex-col w-full bg-background",
+            isChatSection && "h-[100dvh] min-h-[100dvh] overflow-hidden"
+          )}
+        >
+          {!isChatSection && <MobileHeader userName={profile?.nome} />}
 
           <main
             ref={mainScrollRef}
@@ -1023,7 +1029,7 @@ export default function AreaAluno() {
             className={cn(
               "flex-1",
               isChatSection
-                ? "overflow-hidden pb-[calc(4rem+env(safe-area-inset-bottom,0px))]"
+                ? "min-h-0 overflow-hidden"
                 : "overflow-auto mobile-content-spacing"
             )}
           >
@@ -1036,14 +1042,16 @@ export default function AreaAluno() {
             )}
           </main>
 
-          <BottomNavigation
-            activeSection={activeSection}
-            onSectionChange={handleSectionChange}
-            onSignOut={signOut}
-            personalWhatsApp={personalProfile?.telefone}
-            chatNaoLidas={chatNaoLidas}
-            cardsVisiveis={cardsVisiveis}
-          />
+          {!isChatSection && (
+            <BottomNavigation
+              activeSection={activeSection}
+              onSectionChange={handleSectionChange}
+              onSignOut={signOut}
+              personalWhatsApp={personalProfile?.telefone}
+              chatNaoLidas={chatNaoLidas}
+              cardsVisiveis={cardsVisiveis}
+            />
+          )}
 
           {selectedFile && (
             <DocumentViewer

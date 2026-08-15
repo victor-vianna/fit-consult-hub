@@ -73,7 +73,6 @@ interface Material {
   created_at: string;
 }
 
-const WORKOUT_STATE_KEY = "pwa_workout_state";
 const ALWAYS_ALLOWED_ALUNO_SECTIONS = ["inicio", "treinos", "chat", "dados", "plano"] as const;
 
 function getAllowedAlunoSections(cardsVisiveis: string[]) {
@@ -86,27 +85,6 @@ function getAlunoActiveSectionKey(userId: string) {
 
 function getAlunoSectionScrollKey(userId: string, section: string) {
   return `pf:aluno-section-scroll:${userId}:${section}:v1`;
-}
-
-function readAlunoActiveSection(userId: string): string | null {
-  try {
-    const raw = window.localStorage.getItem(getAlunoActiveSectionKey(userId));
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function hasWorkoutInProgress() {
-  try {
-    const raw = window.localStorage.getItem(WORKOUT_STATE_KEY);
-    if (!raw) return false;
-
-    const states = JSON.parse(raw) as Record<string, { iniciado?: boolean }>;
-    return Object.values(states).some((state) => state?.iniciado);
-  } catch {
-    return false;
-  }
 }
 
 function readAlunoSectionScroll(userId: string, section: string) {
@@ -231,11 +209,11 @@ export default function AreaAluno() {
     activeSectionHydratedUserRef.current = user.id;
     skipNextSectionPersistRef.current = true;
 
-    const persistedSection = readAlunoActiveSection(user.id);
-    const nextSection = persistedSection ?? (hasWorkoutInProgress() ? "treinos" : "inicio");
+    const sectionFromUrl = searchParams.get("section") || searchParams.get("tab");
+    const nextSection = sectionFromUrl || "inicio";
 
     setActiveSection(nextSection);
-  }, [user?.id]);
+  }, [searchParams, user?.id]);
 
   useEffect(() => {
     if (!user?.id || activeSectionHydratedUserRef.current !== user.id) return;

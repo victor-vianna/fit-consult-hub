@@ -45,6 +45,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useChatMessages, type ChatMessage } from "@/hooks/useChatMessages";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { getNameInitials } from "@/utils/nameInitial";
 
 interface ChatPanelProps {
   personalId: string;
@@ -107,7 +108,7 @@ export function ChatPanel({
   const currentName = profiles[currentUserId]?.nome || "Voce";
   const otherName =
     profiles[otherUserId]?.nome || (currentUserId === personalId ? "Aluno" : "Personal");
-  const initials = getInitials(otherName);
+  const initials = getNameInitials(otherName);
   const accent = themeColor || "hsl(var(--primary))";
   const conversationScrollKey = useMemo(
     () => `${currentUserId}:${personalId}:${alunoId}`,
@@ -1109,14 +1110,4 @@ function highlightText(text: string, searchTerm: string) {
       part
     )
   );
-}
-
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
 }

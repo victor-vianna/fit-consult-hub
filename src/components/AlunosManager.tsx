@@ -42,6 +42,7 @@ import {
 } from "@/integrations/supabase/studentProfileManagement";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { getNameInitials } from "@/utils/nameInitial";
 import {
   UserPlus,
   Trash2,
@@ -248,6 +249,28 @@ const getAlunoCardColorStyle = (color: string | null): CSSProperties | undefined
     boxShadow: `0 14px 30px ${hexToRgba(color, 0.14)}`,
   };
 };
+
+const getStatusFilterLabel = (value: string) =>
+  ({
+    todos: "Status",
+    ativos: "Ativos",
+    inativos: "Bloq.",
+    arquivados: "Arquiv.",
+  }[value] || "Status");
+
+const getColorFilterLabel = (value: string) => {
+  if (value === "todas") return "Cor";
+  if (value === "com-cor") return "Com cor";
+  if (value === "sem-cor") return "Sem cor";
+  return getCorLabel(value);
+};
+
+const getOrderFilterLabel = (value: string) =>
+  ({
+    nome: "A-Z",
+    recente: "Novos",
+    antigo: "Antigos",
+  }[value] || "A-Z");
 
 interface StudentCardSummary {
   chat: {
@@ -1141,7 +1164,7 @@ export default function AlunosManager() {
             label: "Sem planilha",
           },
           financeiro: financeiroByStudent.get(studentId) || {
-            tone: "neutral",
+            tone: "alert",
             label: "Sem financeiro",
           },
           feedbackSemanal: feedbackSemanalByStudent.get(studentId) || {
@@ -1363,6 +1386,12 @@ export default function AlunosManager() {
     ? alunos.find((aluno) => aluno.id === alunoCorDialog.id) || alunoCorDialog
     : null;
   const IndicatorActionIcon = indicatorActionDialog?.icon;
+  const statsCards = [
+    { label: "Total", value: totalAlunosGerenciados, className: "text-foreground" },
+    { label: "Ativos", value: alunosAtivos, className: "text-emerald-500" },
+    { label: "Bloq.", value: alunosInativos, className: "text-red-500" },
+    { label: "Arquiv.", value: alunosArquivados, className: "text-slate-400" },
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
@@ -1512,7 +1541,24 @@ export default function AlunosManager() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <main className="container mx-auto px-4 py-3 sm:px-6 sm:py-5">
+        <div className="mb-3 grid grid-cols-4 gap-2">
+          {statsCards.map((stat) => (
+            <div
+              key={stat.label}
+              className="min-w-0 rounded-lg border bg-card/70 px-2 py-2 text-center shadow-sm"
+            >
+              <p className={`text-[15px] font-medium leading-none ${stat.className}`}>
+                {stat.value}
+              </p>
+              <p className="mt-1 truncate text-[10px] leading-none text-muted-foreground">
+                {stat.label}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {false && (<>
         <div className="mb-4 rounded-xl border bg-card/70 px-3 py-2 shadow-sm sm:mb-5 sm:px-4">
           <div className="grid grid-cols-2 gap-y-3 sm:grid-cols-4 sm:divide-x sm:divide-border/70">
             <div className="flex min-w-0 items-center gap-2 pr-2">
@@ -1645,16 +1691,93 @@ export default function AlunosManager() {
             </div>
           </CardContent>
         </Card>
+        </>)}
+
+        <div className="mb-3 space-y-2">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome ou email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-11 pl-10 text-sm"
+            />
+          </div>
+
+          <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+            <div className="flex min-w-max items-center gap-2">
+              <Select
+                value={filtroStatus}
+                onValueChange={(value: any) => setFiltroStatus(value)}
+              >
+                <SelectTrigger className="h-11 w-auto min-w-[92px] gap-2 rounded-lg px-3 text-xs font-semibold">
+                  <Filter className="h-4 w-4 shrink-0" />
+                  <span>{getStatusFilterLabel(filtroStatus)}</span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os Alunos</SelectItem>
+                  <SelectItem value="ativos">Apenas Ativos</SelectItem>
+                  <SelectItem value="inativos">Apenas Bloqueados</SelectItem>
+                  <SelectItem value="arquivados">Arquivados</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={filtroCor} onValueChange={setFiltroCor}>
+                <SelectTrigger className="h-11 w-auto min-w-[82px] gap-2 rounded-lg px-3 text-xs font-semibold">
+                  <Palette className="h-4 w-4 shrink-0" />
+                  <span className="max-w-[86px] truncate">
+                    {getColorFilterLabel(filtroCor)}
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas as cores</SelectItem>
+                  <SelectItem value="com-cor">Com cor</SelectItem>
+                  <SelectItem value="sem-cor">Sem cor</SelectItem>
+                  {coresDisponiveis.map((cor) => (
+                    <SelectItem key={cor} value={cor}>
+                      <span className="inline-flex items-center gap-2">
+                        <span
+                          className="h-3 w-3 shrink-0 rounded-full border border-border"
+                          style={{ backgroundColor: cor }}
+                        />
+                        {getCorLabel(cor)}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={ordenacao}
+                onValueChange={(value: any) => setOrdenacao(value)}
+              >
+                <SelectTrigger className="h-11 w-auto min-w-[80px] gap-2 rounded-lg px-3 text-xs font-semibold">
+                  <ArrowUpDown className="h-4 w-4 shrink-0" />
+                  <span>{getOrderFilterLabel(ordenacao)}</span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nome">A-Z</SelectItem>
+                  <SelectItem value="recente">Mais recentes</SelectItem>
+                  <SelectItem value="antigo">Mais antigos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <p className="text-[11px] leading-none text-muted-foreground">
+            {alunosFiltrados.length} aluno{alunosFiltrados.length === 1 ? "" : "s"}
+          </p>
+        </div>
 
         {alunosFiltrados.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {alunosFiltrados.map((aluno) => {
               const flags = flagsByStudent[aluno.id] || [];
               const summary = cardSummaries[aluno.id] || {
                 chat: { tone: "neutral" as IndicatorTone, label: "Sem mensagens", unread: 0 },
                 treino: { tone: "alert" as IndicatorTone, label: "Sem treino cadastrado" },
                 planilha: { tone: "neutral" as IndicatorTone, label: "Sem planilha" },
-                financeiro: { tone: "neutral" as IndicatorTone, label: "Sem financeiro" },
+                financeiro: { tone: "alert" as IndicatorTone, label: "Sem financeiro" },
                 feedbackSemanal: {
                   tone: "ok" as IndicatorTone,
                   label: "Sem feedback semanal",
@@ -1670,13 +1793,6 @@ export default function AlunosManager() {
               const hasFeedbackNotification =
                 summary.feedbackSemanal.tone !== "ok" ||
                 summary.feedbackTreino.tone !== "ok";
-              const hasHighPriority =
-                flags.some((f) => f.severity === "alta") ||
-                summary.feedbackTreino.tone === "alert";
-              const hasPlanilha = flags.some(
-                (f) => f.reason === "planilha_vencendo" || f.reason === "planilha_vencida"
-              );
-              const hasPriority = flags.length > 0 || hasFeedbackNotification;
               const status = statusByAluno[aluno.id];
               const accessState = accessByStudent[aluno.id];
               const resolvedAccessAllowed = resolveAccessAllowed(aluno);
@@ -1686,25 +1802,7 @@ export default function AlunosManager() {
               const cardColorStyle = getAlunoCardColorStyle(corCustom);
               const isArchived = Boolean(aluno.archived_at);
 
-              const prioridade: "arquivado" | "sincronizando" | "bloqueado" | "urgente" | "atencao" | "importante" | "ativo" = isArchived
-                ? "arquivado"
-                : isAccessUnknown
-                ? "sincronizando"
-                : !isAccessAllowed
-                ? "bloqueado"
-                : hasHighPriority
-                ? "urgente"
-                : hasPlanilha
-                ? "atencao"
-                : hasPriority
-                ? "importante"
-                : "ativo";
-
-              const prioridadeStyles = {
-                arquivado: { ring: "border-muted bg-muted/30", bar: "bg-muted-foreground/50", chip: "bg-muted text-muted-foreground", icon: Archive, label: "Arquivado" },
-                sincronizando: { ring: "border-muted", bar: "bg-muted-foreground/50", chip: "bg-muted text-muted-foreground", icon: Clock, label: "Sincronizando" },
-                bloqueado: { ring: "border-muted", bar: "bg-muted-foreground", chip: "bg-muted text-muted-foreground", icon: UserX, label: "Bloqueado" },
-                urgente:   { ring: "border-destructive/50 ring-1 ring-destructive/20", bar: "bg-destructive", chip: "bg-destructive text-destructive-foreground", icon: Flame, label: "Urgente" },
+              /*
                 atencao:   { ring: "border-yellow-500/60 ring-1 ring-yellow-500/20", bar: "bg-yellow-500", chip: "bg-yellow-500 text-black", icon: FileWarning, label: "Atenção" },
                 importante:{ ring: "border-orange-500/50", bar: "bg-orange-500", chip: "bg-orange-500 text-white", icon: AlertTriangle, label: "Importante" },
                 ativo:     { ring: "", bar: "bg-green-500", chip: "bg-green-600 text-white", icon: UserCheck, label: "Ativo" },
@@ -1734,6 +1832,7 @@ export default function AlunosManager() {
                     className: "bg-muted text-muted-foreground",
                   };
               const StatusIcon = statusBadge.icon;
+              */
               const financeiroSummary =
                 accessState &&
                 accessState.allowed === false &&
@@ -1749,14 +1848,58 @@ export default function AlunosManager() {
                   : summary.financeiro;
               const indicatorToneStyles: Record<IndicatorTone, string> = {
                 alert:
-                  "border-red-500/80 bg-red-500/15 text-red-700 ring-1 ring-red-500/35 shadow-sm dark:bg-red-950/50 dark:text-red-100",
+                  "border-red-500/35 bg-red-500/10 text-red-600 dark:text-red-300",
                 warn:
-                  "border-orange-500/45 bg-orange-500/10 text-orange-700 dark:text-orange-300",
+                  "border-orange-500/35 bg-orange-500/10 text-orange-600 dark:text-orange-300",
                 ok:
-                  "border-emerald-500/25 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400",
+                  "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300",
                 neutral:
                   "border-border bg-muted/20 text-muted-foreground",
               };
+              const hasCriticalCardIssue =
+                (!isAccessUnknown && !isAccessAllowed) ||
+                flags.some((flag) => flag.severity === "alta") ||
+                summary.feedbackTreino.tone === "alert" ||
+                summary.treino.tone === "alert" ||
+                summary.planilha.tone === "alert" ||
+                financeiroSummary.tone === "alert";
+              const hasWarningCardIssue =
+                isAccessUnknown ||
+                flags.some((flag) => flag.severity === "media") ||
+                hasFeedbackNotification ||
+                summary.chat.tone === "warn" ||
+                summary.treino.tone === "warn" ||
+                summary.planilha.tone === "warn" ||
+                financeiroSummary.tone === "warn";
+              const cardSeverity: "ok" | "warn" | "alert" | "neutral" = isArchived
+                ? "neutral"
+                : hasCriticalCardIssue
+                ? "alert"
+                : hasWarningCardIssue
+                ? "warn"
+                : "ok";
+              const cardSeverityStyles = {
+                ok: {
+                  ring: "border-border/70",
+                  bar: "bg-emerald-500",
+                  avatar: "bg-emerald-500/15 text-emerald-500",
+                },
+                warn: {
+                  ring: "border-orange-500/25",
+                  bar: "bg-orange-500",
+                  avatar: "bg-orange-500/15 text-orange-500",
+                },
+                alert: {
+                  ring: "border-red-500/30",
+                  bar: "bg-red-500",
+                  avatar: "bg-red-500/15 text-red-500",
+                },
+                neutral: {
+                  ring: "border-border/70 opacity-80",
+                  bar: "bg-muted-foreground/50",
+                  avatar: "bg-muted text-muted-foreground",
+                },
+              }[cardSeverity];
               const flagReasons = new Set(flags.map((flag) => flag.reason));
               const priorityIndicatorItems: IndicatorItem[] = flags
                 .filter((flag) => {
@@ -1919,43 +2062,42 @@ export default function AlunosManager() {
               return (
                 <Card
                   key={aluno.id}
-                  className={`group hover:shadow-xl transition-all duration-300 border-2 cursor-pointer relative overflow-hidden touch-target ${prioridadeStyles.ring} ${
+                  className={`group relative cursor-pointer overflow-hidden rounded-lg border bg-card transition-all duration-200 hover:border-primary/40 hover:shadow-md ${cardSeverityStyles.ring} ${
                     isArchived ? "opacity-80" : ""
                   }`}
                   style={cardColorStyle}
                   onClick={() => navigate(`/aluno/${aluno.id}`)}
                 >
                   <div
-                    className={`absolute left-0 top-0 bottom-0 w-1 ${corCustom ? "" : prioridadeStyles.bar}`}
-                    style={corCustom ? { backgroundColor: corCustom } : undefined}
+                    className={`absolute bottom-0 left-0 top-0 w-[3px] ${cardSeverityStyles.bar}`}
                   />
 
-                  <CardContent className="pt-4 pl-4 sm:pl-5 pr-3 pb-4">
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex min-w-0 items-center gap-2 pr-1">
-                            <h3 className="min-w-0 truncate text-base font-bold leading-tight transition-colors group-hover:text-primary">
+                  <CardContent className="py-3 pl-4 pr-2">
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${cardSeverityStyles.avatar}`}
+                          >
+                            {getNameInitials(aluno.nome, "A")}
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="truncate text-sm font-bold leading-tight transition-colors group-hover:text-primary">
                               {aluno.nome}
                             </h3>
-                          </div>
-                          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <Mail className="h-3 w-3 flex-shrink-0" />
-                            <span className="truncate">{aluno.email}</span>
+                            <p className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">
+                              {aluno.email}
+                            </p>
                           </div>
                         </div>
 
-                        <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                          <Badge className={`${statusBadge.className} gap-1 text-[10px] py-0.5 px-2`}>
-                            <StatusIcon className="h-3 w-3" />
-                            {statusBadge.label}
-                          </Badge>
+                        <div className="flex shrink-0 items-center" onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8"
+                                className="h-11 w-11"
                                 aria-label={`Acoes de ${aluno.nome}`}
                               >
                                 <MoreVertical className="h-4 w-4" />
@@ -2026,18 +2168,13 @@ export default function AlunosManager() {
                         </div>
                       </div>
 
-                      <div
-                        className={`grid gap-2 ${indicatorItems.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}
-                        onClick={(event) => event.stopPropagation()}
-                      >
+                      <div className="flex flex-wrap gap-1.5" onClick={(event) => event.stopPropagation()}>
                         {indicatorItems.map((item) => {
                           const Icon = item.icon;
-                          const isUrgent = item.tone === "alert";
                           return (
-                            <div
+                            <button
+                              type="button"
                               key={item.id}
-                              role="button"
-                              tabIndex={0}
                               onClick={() => setIndicatorActionDialog(item)}
                               onKeyDown={(event) => {
                                 if (event.key === "Enter" || event.key === " ") {
@@ -2045,27 +2182,18 @@ export default function AlunosManager() {
                                   setIndicatorActionDialog(item);
                                 }
                               }}
-                              className={`min-h-[86px] rounded-lg border p-2.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[74px] ${
+                              className={`inline-flex min-h-7 max-w-full items-center gap-1 rounded-md border px-2 py-1 text-left text-[10px] font-semibold leading-none transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                                 indicatorToneStyles[item.tone]
-                              } ${isUrgent ? "animate-pulse" : ""}`}
+                              }`}
                             >
-                              <div className="flex items-start gap-2.5">
-                                <Icon className={`${isUrgent ? "h-5 w-5 text-red-500 dark:text-red-300" : "h-4 w-4"} mt-0.5 shrink-0`} />
-                                <div className="min-w-0 flex-1">
-                                  <p className="break-words text-[11px] font-bold uppercase leading-tight tracking-wide opacity-90">
-                                    {item.title}
-                                  </p>
-                                  <p className="mt-1 break-words text-[13px] font-bold leading-snug sm:text-xs">
-                                    {item.label}
-                                  </p>
-                                  {item.detail && (
-                                    <p className="mt-1 break-words text-[11px] leading-snug opacity-85">
-                                      {item.detail}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
+                              <Icon className="h-3 w-3 shrink-0" />
+                              <span className="truncate">{item.label}</span>
+                              {item.detail && (
+                                <span className="max-w-[96px] truncate opacity-80">
+                                  {item.detail}
+                                </span>
+                              )}
+                            </button>
                           );
                         })}
                       </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { usePersistedState } from "@/hooks/usePersistedState";
 import { extractMaterialPath, getMaterialSignedUrl, openMaterialInNewTab } from "@/utils/materiais";
+import { getNameInitials } from "@/utils/nameInitial";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -701,7 +702,7 @@ export default function AlunoDetalhes() {
                         : "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.8))",
                     }}
                   >
-                    {aluno.nome.charAt(0).toUpperCase()}
+                    {getNameInitials(aluno.nome, "A")}
                   </div>
 
                   <div className="flex-1">

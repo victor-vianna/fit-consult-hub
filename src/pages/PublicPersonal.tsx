@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, ShieldCheck, Sparkles } from "lucide-react";
+import { getNameInitials } from "@/utils/nameInitial";
 
 type PublicPlan = {
   id: string;
@@ -135,7 +136,7 @@ export default function PublicPersonal() {
                   className="h-full w-full object-cover"
                 />
               ) : (
-                displayName.slice(0, 2).toUpperCase()
+                getNameInitials(displayName, "P")
               )}
             </div>
             <Badge variant="secondary" className="mb-4">

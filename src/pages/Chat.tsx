@@ -42,6 +42,7 @@ import {
   buildChatConversationKey,
   getAlunoIdFromConversationKey,
 } from "@/utils/chat";
+import { getNameInitials } from "@/utils/nameInitial";
 
 interface Student {
   id: string;
@@ -429,7 +430,7 @@ export default function Chat() {
                             personalSettings?.theme_color || "hsl(var(--primary))",
                         }}
                       >
-                        {getInitials(conversation.nome)}
+                        {getNameInitials(conversation.nome, "A")}
                       </div>
                       {conversation.isFavorite && (
                         <span className="absolute -bottom-1 -right-1 rounded-full border bg-background p-0.5 text-amber-500">
@@ -663,14 +664,4 @@ export default function Chat() {
       </SidebarProvider>
     </AppLayout>
   );
-}
-
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
 }

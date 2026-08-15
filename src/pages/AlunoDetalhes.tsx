@@ -938,6 +938,7 @@ export default function AlunoDetalhes() {
                   profileId={id!}
                   personalId={user.id}
                   themeColor={personalSettings?.theme_color}
+                  readOnly
                   onVerHistoricoCompleto={() => handleActiveTabChange("historico")}
                   onTreinoAtualizado={handleTreinoAtualizado}
                 />
@@ -964,6 +965,7 @@ export default function AlunoDetalhes() {
                   profileId={id!}
                   personalId={user.id}
                   themeColor={personalSettings?.theme_color}
+                  readOnly
                   refreshKey={refreshKey}
                 />
               )}

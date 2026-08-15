@@ -178,7 +178,6 @@ export function TreinosManager({
     criarTreinoNoDia,
     renomearTreino,
     deletarTreino,
-    marcarConcluidoTreino,
     treinosPorDia,
     workoutWeekReady,
   } = useTreinos({
@@ -1693,29 +1692,14 @@ export function TreinosManager({
                               >
                                 {t.nome_treino || `Treino Principal`}
                               </Button>
-                              {/* Toggle de check (concluído) — personal escolhe qual treino fica marcado */}
-                              {!readOnly && isPersonal && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  title={t.concluido ? "Desmarcar como concluído" : "Marcar como concluído"}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (t.treinoId) {
-                                      marcarConcluidoTreino(t.treinoId, !t.concluido);
-                                    }
-                                  }}
+                              {/* Indicador de treino concluido pelo aluno */}
+                              {t.concluido && (
+                                <span
+                                  className="flex h-6 w-6 items-center justify-center"
+                                  title="Treino concluido pelo aluno"
                                 >
-                                  <CheckCircle2
-                                    className={cn(
-                                      "h-4 w-4 transition-colors",
-                                      t.concluido
-                                        ? "text-green-500"
-                                        : "text-muted-foreground/40 hover:text-green-500"
-                                    )}
-                                  />
-                                </Button>
+                                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                </span>
                               )}
                               {/* Botão de excluir treino individual */}
                               {!readOnly && isPersonal && (

@@ -90,6 +90,7 @@ export function HistoricoAlunoPersonal({
             profileId={alunoSelecionado}
             personalId={personalId}
             themeColor={themeColor}
+            readOnly
           />
 
           {/* Estatísticas adicionais */}

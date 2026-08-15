@@ -22,6 +22,7 @@ interface CalendarioSemanalProps {
   profileId: string;
   personalId: string;
   themeColor?: string;
+  readOnly?: boolean;
   onVerHistoricoCompleto?: () => void;
   onTreinoAtualizado?: () => void;
 }
@@ -31,6 +32,7 @@ const diasSemana = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"];
 export function CalendarioSemanal({
   profileId,
   themeColor,
+  readOnly = false,
   onTreinoAtualizado,
 }: CalendarioSemanalProps) {
   const [treinos, setTreinos] = useState<TreinoSemanal[]>([]);
@@ -208,15 +210,16 @@ export function CalendarioSemanal({
                 </div>
 
                 {treino ? (
-                  <button
-                    type="button"
-                    onClick={() => toggleTreino(treino.id, treino.concluido)}
-                    aria-label={
-                      treino.concluido
-                        ? `Desmarcar treino de ${dia}`
-                        : `Marcar treino de ${dia} como concluido`
-                    }
-                    className="flex h-6 w-6 items-center justify-center rounded-full border transition-transform active:scale-95"
+                  <span
+                    role="img"
+                    onClick={() => {
+                      if (!readOnly) toggleTreino(treino.id, treino.concluido);
+                    }}
+                    aria-label={treino.concluido ? `Treino de ${dia} concluido` : `Treino de ${dia} pendente`}
+                    className={cn(
+                      "flex h-6 w-6 items-center justify-center rounded-full border",
+                      !readOnly && "cursor-pointer transition-transform active:scale-95"
+                    )}
                     style={{
                       borderColor: treino.concluido ? accentColor : `${accentColor}66`,
                       backgroundColor: treino.concluido ? accentColor : "transparent",
@@ -228,7 +231,7 @@ export function CalendarioSemanal({
                     ) : (
                       <span className="h-1.5 w-1.5 rounded-full bg-current opacity-60" />
                     )}
-                  </button>
+                  </span>
                 ) : (
                   <span className="h-6 w-6 rounded-full border border-dashed opacity-30" />
                 )}

@@ -24,6 +24,7 @@ interface DetalhesDiaTreinoProps {
   profileId: string;
   personalId: string;
   themeColor?: string;
+  readOnly?: boolean;
   onTreinoAtualizado?: () => void;
 }
 
@@ -35,6 +36,7 @@ export function DetalhesDiaTreino({
   profileId,
   personalId,
   themeColor,
+  readOnly = false,
   onTreinoAtualizado,
 }: DetalhesDiaTreinoProps) {
   const { marcarConcluido, adicionarObservacao } = useTreinosHistorico(
@@ -156,6 +158,7 @@ export function DetalhesDiaTreino({
                 )}
               </div>
 
+              {!readOnly && (
               <Button
                 variant={treino.concluido ? "default" : "outline"}
                 size="sm"
@@ -181,6 +184,7 @@ export function DetalhesDiaTreino({
                   </>
                 )}
               </Button>
+              )}
             </div>
 
             {/* Observações anteriores */}

@@ -23,6 +23,7 @@ interface CalendarioTreinosMensalProps {
   profileId: string;
   personalId: string;
   themeColor?: string;
+  readOnly?: boolean;
   refreshKey?: number; // ✅ PROP PARA SINCRONIZAÇÃO
 }
 
@@ -30,6 +31,7 @@ export function CalendarioTreinosMensal({
   profileId,
   personalId,
   themeColor,
+  readOnly = false,
   refreshKey, // ✅ RECEBER refreshKey
 }: CalendarioTreinosMensalProps) {
   const [mesAtual, setMesAtual] = useState(new Date());
@@ -272,6 +274,7 @@ export function CalendarioTreinosMensal({
           profileId={profileId}
           personalId={personalId}
           themeColor={themeColor}
+          readOnly={readOnly}
           onTreinoAtualizado={handleTreinoAtualizado} // ✅ PASSAR CALLBACK
         />
       )}

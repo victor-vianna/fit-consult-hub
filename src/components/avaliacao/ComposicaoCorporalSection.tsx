@@ -62,6 +62,7 @@ import {
   type MetricClassification,
 } from "@/utils/avaliacaoMetrics";
 import { formatDateTimeForInput, formatDisplayDate } from "@/utils/dateFormat";
+import { createStudentNotification } from "@/utils/studentNotifications";
 
 interface Props {
   profileId: string;
@@ -206,6 +207,17 @@ export function ComposicaoCorporalSection({
         ? await table.update(payload).eq("id", editing.id)
         : await table.insert(payload);
       if (error) throw error;
+
+      void createStudentNotification({
+        studentId: profileId,
+        personalId,
+        tipo: "composicao_atualizada",
+        titulo: "Composicao corporal atualizada",
+        mensagem: editing
+          ? "Sua avaliacao de composicao corporal foi atualizada."
+          : "Uma nova avaliacao de composicao corporal esta disponivel.",
+        dados: { avaliacao_id: editing?.id || null },
+      });
 
       toast({
         title: pending.length > 0 ? "Avaliacao salva com pendencias" : "Avaliacao salva",

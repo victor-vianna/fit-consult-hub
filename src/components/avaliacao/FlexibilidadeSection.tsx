@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMetricValue, toNumber } from "@/utils/avaliacaoMetrics";
 import { formatDateTimeForInput, formatDisplayDate } from "@/utils/dateFormat";
+import { createStudentNotification } from "@/utils/studentNotifications";
 import {
   clearInterfaceMemory,
   hasMeaningfulValues,
@@ -129,6 +130,17 @@ export function FlexibilidadeSection({ profileId, personalId, themeColor, onRefr
         ? await table.update(payload).eq("id", editing.id)
         : await table.insert(payload);
       if (error) throw error;
+
+      void createStudentNotification({
+        studentId: profileId,
+        personalId,
+        tipo: "avaliacao_atualizada",
+        titulo: "Avaliacao atualizada",
+        mensagem: editing
+          ? "Sua avaliacao de flexibilidade foi atualizada."
+          : "Uma nova avaliacao de flexibilidade esta disponivel.",
+        dados: { avaliacao_id: editing?.id || null, area: "flexibilidade" },
+      });
 
       toast({ title: "Flexibilidade salva" });
       if (!editing) {

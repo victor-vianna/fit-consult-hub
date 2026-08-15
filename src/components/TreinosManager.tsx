@@ -80,6 +80,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { exportTreinoWord } from "@/utils/exportTreinoWord";
 import { exportTreinoPDF } from "@/utils/exportTreinoPDF";
+import { createStudentNotification } from "@/utils/studentNotifications";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
 import { ExportTreinoDialog } from "@/components/ExportTreinoDialog";
 import { usePersistedState } from "@/hooks/usePersistedState";
@@ -334,6 +335,18 @@ export function TreinosManager({
   const [blocoEditando, setBlocoEditando] = useState<BlocoTreino | null>(null);
   const getBlockDraftKey = (dia: number | null) =>
     `${personalId}:${profileId}:${semanaSelecionada}:${dia ?? "x"}`;
+  const notifyWorkoutChanged = useCallback((mensagem = "Seu treino foi atualizado pelo personal.") => {
+    if (readOnly) return;
+    void createStudentNotification({
+      studentId: profileId,
+      personalId,
+      tipo: "treino_atualizado",
+      titulo: "Treino atualizado",
+      mensagem,
+      dados: { semana: semanaSelecionada },
+    });
+  }, [personalId, profileId, readOnly, semanaSelecionada]);
+
   const [salvarModeloOpen, setSalvarModeloOpen] = useState(false);
   const [aplicarModeloOpen, setAplicarModeloOpen] = useState(false);
   const [modeloParaAplicar, setModeloParaAplicar] = useState<any>(null);
@@ -702,10 +715,12 @@ export function TreinosManager({
 
       if (isEditing) {
         await editarExercicio(exercicioEditando.id!, payload);
+        notifyWorkoutChanged("Um exercicio do seu treino foi atualizado.");
         setExercicioEditando(null);
       } else if (selectedDia !== null) {
         const treinoIdAlvo = await criarTreinoSeNecessario(selectedDia);
         await adicionarExercicio(selectedDia, payload, treinoIdAlvo);
+        notifyWorkoutChanged("Seu treino recebeu um novo exercicio.");
       }
 
       await new Promise((resolve) => setTimeout(resolve, 300));
@@ -729,6 +744,7 @@ export function TreinosManager({
     try {
       setLoadingStates((prev) => ({ ...prev, editando: true }));
       await editarDescricao(selectedDia, descricaoEditando || null);
+      notifyWorkoutChanged("As orientacoes do seu treino foram atualizadas.");
       setEditDescricaoOpen(false);
     } catch (error) {
       console.error("[TreinosManager] Erro ao salvar descrição:", error);
@@ -745,6 +761,7 @@ export function TreinosManager({
         try {
           setLoadingStates((prev) => ({ ...prev, removendo: true }));
           await removerExercicio(id);
+          notifyWorkoutChanged("Um exercicio foi removido do seu treino.");
         } catch (error) {
           console.error("[TreinosManager] Erro ao remover:", error);
         } finally {
@@ -856,6 +873,7 @@ export function TreinosManager({
 
       // 🚀 React Query automaticamente atualiza o cache e a UI
       await criarGrupo(treinoId, grupoData);
+      notifyWorkoutChanged("Seu treino recebeu um novo grupo de exercicios.");
 
       setGroupDialogOpen(false);
     } catch (error) {
@@ -887,6 +905,7 @@ export function TreinosManager({
         try {
           setLoadingStates((prev) => ({ ...prev, removendo: true }));
           await deletarGrupo(grupoId);
+          notifyWorkoutChanged("Um grupo de exercicios foi removido do seu treino.");
         } catch (err) {
           console.error("[TreinosManager] Erro ao deletar grupo:", err);
         } finally {
@@ -968,8 +987,10 @@ export function TreinosManager({
       // 🚀 React Query automaticamente atualiza o cache e a UI
       if (blocoEditando) {
         await atualizarBloco(blocoEditando.id, blocoData);
+        notifyWorkoutChanged("Um bloco do seu treino foi atualizado.");
       } else {
         await criarBloco(treinoId, blocoData);
+        notifyWorkoutChanged("Seu treino recebeu um novo bloco.");
       }
 
       setBlockDialogOpen(false);
@@ -995,6 +1016,7 @@ export function TreinosManager({
         try {
           setLoadingStates((prev) => ({ ...prev, removendo: true }));
           await deletarBloco(blocoId);
+          notifyWorkoutChanged("Um bloco foi removido do seu treino.");
         } catch (err) {
           console.error("[TreinosManager] Erro ao deletar bloco:", err);
         } finally {
@@ -1022,6 +1044,7 @@ export function TreinosManager({
     try {
       setLoadingStates((prev) => ({ ...prev, adicionando: true }));
       const novoTreino = await criarTreinoNoDia(novoTreinoDia, nome);
+      notifyWorkoutChanged("Um novo treino foi adicionado para voce.");
       setSelectedDia(novoTreinoDia);
       setSelectedTreinoId(novoTreino?.id || null);
       setNovoTreinoDialogOpen(false);
@@ -1747,6 +1770,7 @@ export function TreinosManager({
                                         msg,
                                         async () => {
                                           await deletarTreino(treinoId);
+                                          notifyWorkoutChanged("Um treino foi removido.");
                                           const outros = treinosDoDiaArr.filter(
                                             (ot) => ot.treinoId !== treinoId
                                           );
@@ -1877,6 +1901,7 @@ export function TreinosManager({
                 })),
                 descanso_entre_grupos: result.descansoEntreGrupos,
               });
+              notifyWorkoutChanged("Um grupo de exercicios do seu treino foi atualizado.");
               setExercicioDialogOpen(false);
               setGrupoEditando(null);
             } catch (error) {
@@ -1903,6 +1928,7 @@ export function TreinosManager({
                 })),
                 descanso_entre_grupos: result.descansoEntreGrupos,
               });
+              notifyWorkoutChanged("Seu treino recebeu um novo grupo de exercicios.");
               setExercicioDialogOpen(false);
             } catch (error) {
               console.error("[TreinosManager] Erro ao criar grupo:", error);

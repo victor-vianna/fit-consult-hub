@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateTimeForInput, formatDisplayDate } from "@/utils/dateFormat";
+import { createStudentNotification } from "@/utils/studentNotifications";
 import {
   clearInterfaceMemory,
   hasMeaningfulValues,
@@ -129,6 +130,17 @@ export function PosturalSection({ profileId, personalId, themeColor, onRefresh }
         ? await table.update(payload).eq("id", editing.id)
         : await table.insert(payload);
       if (error) throw error;
+
+      void createStudentNotification({
+        studentId: profileId,
+        personalId,
+        tipo: "avaliacao_atualizada",
+        titulo: "Avaliacao atualizada",
+        mensagem: editing
+          ? "Sua avaliacao postural foi atualizada."
+          : "Uma nova avaliacao postural esta disponivel.",
+        dados: { avaliacao_id: editing?.id || null, area: "postural" },
+      });
 
       toast({ title: "Avaliacao postural salva" });
       if (!editing) {

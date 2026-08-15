@@ -87,6 +87,7 @@ import { WeightProgressionPanel } from "@/components/WeightProgressionPanel";
 import { MaterialFileExplorer } from "@/components/materials/MaterialFileExplorer";
 import { MobileAccountMenu } from "@/components/mobile/MobileAccountMenu";
 import { formatDisplayDate } from "@/utils/dateFormat";
+import { createStudentNotification } from "@/utils/studentNotifications";
 
 interface Material {
   id: string;
@@ -450,17 +451,30 @@ export default function AlunoDetalhes() {
       if (uploadError) throw uploadError;
 
       // Bucket é privado: armazenamos apenas o path; URLs assinadas são geradas no acesso
-      const { error: dbError } = await supabase.from("materiais").insert({
-        profile_id: id,
-        personal_id: user.id,
-        titulo,
-        descricao,
-        tipo,
-        arquivo_url: fileName,
-        arquivo_nome: arquivo.name,
-      });
+      const { data: materialCriado, error: dbError } = await supabase
+        .from("materiais")
+        .insert({
+          profile_id: id,
+          personal_id: user.id,
+          titulo,
+          descricao,
+          tipo,
+          arquivo_url: fileName,
+          arquivo_nome: arquivo.name,
+        })
+        .select("id")
+        .single();
 
       if (dbError) throw dbError;
+
+      void createStudentNotification({
+        studentId: id,
+        personalId: user.id,
+        tipo: "material_adicionado",
+        titulo: "Novo material disponivel",
+        mensagem: titulo,
+        dados: { material_id: materialCriado?.id, material_tipo: tipo },
+      });
 
       toast({
         title: "Material enviado!",

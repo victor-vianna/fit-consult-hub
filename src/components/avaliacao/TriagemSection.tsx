@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Edit, ShieldCheck, CheckCircle, XCircle } from "lucide-react";
 import { formatDateTimeForInput, formatDisplayDate } from "@/utils/dateFormat";
+import { createStudentNotification } from "@/utils/studentNotifications";
 import {
   clearInterfaceMemory,
   hasMeaningfulValues,
@@ -162,6 +163,16 @@ export function TriagemSection({ profileId, personalId, themeColor }: Props) {
         const { error } = await supabase.from("avaliacoes_fisicas").insert(data);
         if (error) throw error;
       }
+      void createStudentNotification({
+        studentId: profileId,
+        personalId,
+        tipo: "avaliacao_atualizada",
+        titulo: "Avaliacao atualizada",
+        mensagem: editing
+          ? "Sua triagem foi atualizada."
+          : "Uma nova triagem esta disponivel.",
+        dados: { avaliacao_id: editing?.id || null, area: "triagem" },
+      });
       toast({ title: "Salvo!" });
       if (!editing) {
         clearTriagemDraft(draftScope);

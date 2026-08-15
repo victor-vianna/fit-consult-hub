@@ -35,6 +35,14 @@ function buildTargetUrl(tipo: string, dados: Record<string, any>, recipientRole?
     return alunoId ? `/chat?aluno=${alunoId}` : "/chat";
   }
 
+  if (recipientRole === "aluno") {
+    if (tipo.includes("pagamento") || tipo.includes("plano")) return "/aluno?section=plano";
+    if (tipo.includes("material")) return "/aluno?section=materiais";
+    if (tipo.includes("avaliacao") || tipo.includes("composicao")) return "/aluno?section=dados";
+    if (tipo.includes("treino") || tipo.startsWith("planilha_")) return "/aluno?section=treinos";
+    return "/aluno";
+  }
+
   if (tipo === "treino_concluido" && alunoId) {
     return `/aluno/${alunoId}?tab=historico`;
   }
@@ -296,8 +304,24 @@ Deno.serve(async (req) => {
       .eq("user_id", notification.destinatario_id)
       .maybeSingle();
 
+    const allowedStudentTypes = [
+      "nova_mensagem",
+      "mensagem",
+      "planilha_aluno_lembrete",
+      "planilha_aluno_fim",
+      "treino_atualizado",
+      "composicao_atualizada",
+      "avaliacao_atualizada",
+      "material_adicionado",
+      "pagamento_pendente",
+      "pagamento_atrasado",
+      "pagamento_registrado",
+      "plano_expirando",
+      "plano_expirado",
+    ];
+
     const allowed =
-      (roleRow?.role === "aluno" && notification.tipo === "nova_mensagem") ||
+      (roleRow?.role === "aluno" && allowedStudentTypes.includes(notification.tipo)) ||
       (roleRow?.role === "personal" &&
         [
           "nova_mensagem",

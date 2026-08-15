@@ -43,6 +43,7 @@ import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { TreinosManager } from "@/components/TreinosManager";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
+import { AlunoNotificacoesDropdown } from "@/components/AlunoNotificacoesDropdown";
 import { BottomNavigation } from "@/components/mobile/BottomNavigation";
 import { ActionCard } from "@/components/mobile/ActionCard";
 import { CalendarioTreinosMensal } from "@/components/CalendarioTreinosMensal";
@@ -999,7 +1000,19 @@ export default function AreaAluno() {
             isChatSection && "h-[100dvh] min-h-[100dvh] overflow-hidden"
           )}
         >
-          {!isChatSection && <MobileHeader userName={profile?.nome} />}
+          {!isChatSection && (
+            <MobileHeader
+              userName={profile?.nome}
+              notificationSlot={
+                user?.id ? (
+                  <AlunoNotificacoesDropdown
+                    userId={user.id}
+                    onNavigateSection={handleSectionChange}
+                  />
+                ) : null
+              }
+            />
+          )}
 
           <main
             ref={mainScrollRef}
@@ -1107,6 +1120,12 @@ export default function AreaAluno() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {user?.id && (
+                    <AlunoNotificacoesDropdown
+                      userId={user.id}
+                      onNavigateSection={handleSectionChange}
+                    />
+                  )}
                   <ThemeToggle />
                   {profile?.personal_id && personalProfile?.telefone && (
                     <>

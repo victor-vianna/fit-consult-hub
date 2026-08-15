@@ -20,6 +20,11 @@ import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { FeedbackDetailModal } from "@/components/dashboard/FeedbackDetailModal";
 import { TreinoFeedbackModal } from "@/components/dashboard/TreinoFeedbackModal";
+import { NotificationCategoryIcon } from "@/components/notifications/NotificationCategoryIcon";
+import {
+  getNotificationCategoryMeta,
+  getNotificationSummary,
+} from "@/components/notifications/NotificationCategoryMeta";
 
 interface NotificacoesDropdownProps {
   userId: string;
@@ -47,6 +52,7 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
   } = usePushNotifications(userId);
 
   const [grupoExpandido, setGrupoExpandido] = useState<string | null>(null);
+  const [tipoGrupoExpandido, setTipoGrupoExpandido] = useState<string | null>(null);
   const [nomesResolvidos, setNomesResolvidos] = useState<Record<string, string>>({});
   const [feedbackModal, setFeedbackModal] = useState<{
     open: boolean;
@@ -228,6 +234,114 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
     grupo.itens.filter((i) => !i.lida).forEach((i) => marcarComoLida(i.id));
   };
 
+  const getTipoGrupoKey = (tipo?: string | null) => {
+    if (tipo === "nova_mensagem" || tipo === "mensagem") return "chat";
+    if (tipo?.startsWith("planilha_")) return "planilha";
+    if (tipo === "treino_concluido" || tipo === "treino_iniciado") return "treino";
+    if (tipo === "feedback_treino") return "feedback_treino";
+    if (FEEDBACK_TYPES.includes(String(tipo))) return "avaliacao";
+    if (tipo === "novo_aluno") return "aluno";
+    return tipo || "sistema";
+  };
+
+  const getTipoGrupoTitulo = (key: string) => {
+    switch (key) {
+      case "chat":
+        return "Mensagens de chat";
+      case "planilha":
+        return "Planilhas";
+      case "treino":
+        return "Treinos";
+      case "feedback_treino":
+        return "Feedbacks de treino";
+      case "avaliacao":
+        return "Avaliacoes e check-ins";
+      case "aluno":
+        return "Aluno";
+      default:
+        return "Outras notificacoes";
+    }
+  };
+
+  const agruparPorTipo = (itens: any[]) => {
+    const map = new Map<
+      string,
+      { key: string; titulo: string; tipo: string; itens: any[]; naoLidas: number }
+    >();
+
+    for (const item of itens) {
+      const key = getTipoGrupoKey(item.tipo);
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          titulo: getTipoGrupoTitulo(key),
+          tipo: item.tipo,
+          itens: [],
+          naoLidas: 0,
+        });
+      }
+      const grupoTipo = map.get(key)!;
+      grupoTipo.itens.push(item);
+      if (!item.lida) grupoTipo.naoLidas += 1;
+    }
+
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.naoLidas !== b.naoLidas) return b.naoLidas - a.naoLidas;
+      const aTime = new Date(a.itens[0].created_at).getTime();
+      const bTime = new Date(b.itens[0].created_at).getTime();
+      return bTime - aTime;
+    });
+  };
+
+  const marcarTipoComoLido = (itens: any[]) => {
+    itens.filter((i) => !i.lida).forEach((i) => marcarComoLida(i.id));
+  };
+
+  const renderNotificacaoItem = (n: any) => (
+    <div
+      key={n.id}
+      className={`p-2.5 rounded-md border text-sm cursor-pointer transition-colors hover:bg-accent/50 ${
+        !n.lida
+          ? "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-800/60"
+          : "bg-card border-border"
+      }`}
+      onClick={() => handleNotificacaoClick(n)}
+    >
+      <div className="flex items-start gap-2">
+        <NotificationCategoryIcon tipo={n.tipo} unread={!n.lida} className="h-8 w-8 rounded-md" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <h4 className="font-medium text-sm leading-tight">
+              {n.titulo}
+            </h4>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5 flex-shrink-0 -mt-0.5 -mr-0.5"
+              onClick={(e) => {
+                e.stopPropagation();
+                deletarNotificacao(n.id);
+              }}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+          {n.mensagem && (
+            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+              {n.mensagem}
+            </p>
+          )}
+          <p className="text-[10px] text-muted-foreground mt-1">
+            {formatDistanceToNow(new Date(n.created_at), {
+              addSuffix: true,
+              locale: ptBR,
+            })}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <>
       <DropdownMenu>
@@ -295,15 +409,28 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
             <ScrollArea className="h-[450px] p-1">
               {grupos.map((grupo) => {
                 const expandido = grupoExpandido === grupo.key;
+                const empilhado = grupo.itens.length > 1;
+                const tiposDoGrupo = agruparPorTipo(grupo.itens);
                 return (
-                  <div key={grupo.key} className="mx-2 my-1.5">
+                  <div
+                    key={grupo.key}
+                    className={`relative mx-2 my-2 transition-all ${
+                      empilhado && !expandido ? "pb-3" : ""
+                    }`}
+                  >
                     {/* Cabeçalho do grupo */}
+                    {empilhado && !expandido && (
+                      <>
+                        <div className="absolute inset-x-3 bottom-1 h-[46px] rounded-lg border bg-card/55 shadow-sm" />
+                        <div className="absolute inset-x-1.5 bottom-2 h-[46px] rounded-lg border bg-card/80 shadow-sm" />
+                      </>
+                    )}
                     <button
                       type="button"
                       onClick={() =>
                         setGrupoExpandido(expandido ? null : grupo.key)
                       }
-                      className={`w-full flex items-center justify-between p-2.5 rounded-lg border transition-colors ${
+                      className={`relative z-10 w-full flex items-center justify-between p-2.5 rounded-lg border transition-colors ${
                         grupo.naoLidas > 0
                           ? "bg-blue-50/80 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800"
                           : "bg-card border-border hover:bg-accent/50"
@@ -326,9 +453,9 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
                             {grupo.naoLidas}
                           </Badge>
                         )}
-                        <span className="text-xs text-muted-foreground">
+                        <Badge variant="secondary" className="h-5 text-xs px-1.5">
                           {grupo.itens.length}
-                        </span>
+                        </Badge>
                       </div>
                     </button>
 
@@ -346,52 +473,94 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
                             Marcar grupo como lido
                           </Button>
                         )}
-                        {grupo.itens.map((n) => (
-                          <div
-                            key={n.id}
-                            className={`p-2.5 rounded-md border text-sm cursor-pointer transition-colors hover:bg-accent/50 ${
-                              !n.lida
-                                ? "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-800/60"
-                                : "bg-card border-border"
-                            }`}
-                            onClick={() => handleNotificacaoClick(n)}
-                          >
-                            <div className="flex items-start gap-2">
-                              <div className="text-lg flex-shrink-0 leading-none mt-0.5">
-                                {getIcone(n.tipo)}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-start justify-between gap-2">
-                                  <h4 className="font-medium text-sm leading-tight">
-                                    {n.titulo}
-                                  </h4>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-5 w-5 flex-shrink-0 -mt-0.5 -mr-0.5"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      deletarNotificacao(n.id);
-                                    }}
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
+                        {tiposDoGrupo.map((tipoGrupo) => {
+                          const tipoKey = `${grupo.key}:${tipoGrupo.key}`;
+                          const tipoExpandido = tipoGrupoExpandido === tipoKey;
+                          const tipoEmpilhado = tipoGrupo.itens.length > 1;
+                          const maisRecente = tipoGrupo.itens[0];
+                          const tipoCategory = getNotificationCategoryMeta(tipoGrupo.tipo).key;
+
+                          if (!tipoEmpilhado) return renderNotificacaoItem(maisRecente);
+
+                          return (
+                            <div
+                              key={tipoKey}
+                              className={`relative transition-all ${
+                                !tipoExpandido ? "pb-3" : ""
+                              }`}
+                            >
+                              {!tipoExpandido && (
+                                <>
+                                  <div className="absolute inset-x-3 bottom-1 h-[58px] rounded-md border bg-card/55 shadow-sm" />
+                                  <div className="absolute inset-x-1.5 bottom-2 h-[58px] rounded-md border bg-card/80 shadow-sm" />
+                                </>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setTipoGrupoExpandido(tipoExpandido ? null : tipoKey)
+                                }
+                                className={`relative z-10 w-full rounded-md border p-2.5 text-left text-sm transition-colors hover:bg-accent/50 ${
+                                  tipoGrupo.naoLidas > 0
+                                    ? "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-800/60"
+                                    : "bg-card border-border"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    {tipoExpandido ? (
+                                      <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    ) : (
+                                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    )}
+                                    <NotificationCategoryIcon
+                                      tipo={tipoGrupo.tipo}
+                                      unread={tipoGrupo.naoLidas > 0}
+                                    />
+                                    <span className="truncate font-medium">
+                                      {tipoGrupo.titulo}
+                                    </span>
+                                  </div>
+                                  <div className="flex shrink-0 items-center gap-1.5">
+                                    {tipoGrupo.naoLidas > 0 && (
+                                      <Badge variant="destructive" className="h-5 px-1.5 text-xs">
+                                        {tipoGrupo.naoLidas}
+                                      </Badge>
+                                    )}
+                                    <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                                      {tipoGrupo.itens.length}
+                                    </Badge>
+                                  </div>
                                 </div>
-                                {n.mensagem && (
-                                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                                    {n.mensagem}
-                                  </p>
-                                )}
-                                <p className="text-[10px] text-muted-foreground mt-1">
-                                  {formatDistanceToNow(new Date(n.created_at), {
-                                    addSuffix: true,
-                                    locale: ptBR,
-                                  })}
+                                <p className="mt-1.5 line-clamp-1 pl-10 text-xs text-muted-foreground">
+                                  {getNotificationSummary(
+                                    tipoGrupo.itens.length,
+                                    tipoCategory,
+                                    tipoGrupo.naoLidas
+                                  )}
                                 </p>
-                              </div>
+                              </button>
+
+                              {tipoExpandido && (
+                                <div className="ml-3 mt-1 space-y-1 border-l border-border pl-2">
+                                  {tipoGrupo.naoLidas > 0 && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => marcarTipoComoLido(tipoGrupo.itens)}
+                                      className="h-auto w-full justify-start p-1 text-xs"
+                                    >
+                                      <CheckCheck className="h-3 w-3 mr-1" />
+                                      Marcar tipo como lido
+                                    </Button>
+                                  )}
+                                  {tipoGrupo.itens.map((n) => renderNotificacaoItem(n))}
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>

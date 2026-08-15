@@ -42,7 +42,6 @@ serve(async (req: Request) => {
     console.log(`[verificar-planilhas] Encontradas ${planilhas?.length || 0} planilhas ativas`);
 
     const notificacoesParaCriar: any[] = [];
-    const mensagensParaCriar: any[] = [];
     const planilhasParaAtualizar: { id: string; updates: any }[] = [];
 
     for (const planilha of planilhas || []) {
@@ -56,18 +55,6 @@ serve(async (req: Request) => {
         .single();
 
       const nomeAluno = aluno?.nome || "Aluno";
-
-      // Helper to create a chat message from personal to student
-      const criarMensagemChat = (conteudo: string) => {
-        const conversaKey = `${planilha.personal_id}::${planilha.profile_id}`;
-        mensagensParaCriar.push({
-          remetente_id: planilha.personal_id,
-          destinatario_id: planilha.profile_id,
-          conversa_key: conversaKey,
-          conteudo,
-          tipo: "texto",
-        });
-      };
 
       // Verificar se expirou
       if (dataFim <= hojeStr && !planilha.lembrete_enviado_expirou) {
@@ -89,11 +76,6 @@ serve(async (req: Request) => {
           dados: { planilha_id: planilha.id },
         });
 
-        // Enviar mensagem de chat para o aluno
-        criarMensagemChat(
-          `📋 Sua planilha "${planilha.nome}" chegou ao fim! Em breve prepararei sua próxima fase de treinos. Fique atento(a)! 💪`
-        );
-
         planilhasParaAtualizar.push({
           id: planilha.id,
           updates: { lembrete_enviado_expirou: true },
@@ -111,10 +93,14 @@ serve(async (req: Request) => {
           dados: { planilha_id: planilha.id, aluno_id: planilha.profile_id },
         });
 
-        // Mensagem de renovação para o aluno
-        criarMensagemChat(
-          `⏰ Faltam apenas 3 dias para o fim da sua planilha "${planilha.nome}". Aproveite ao máximo esses últimos treinos! Em breve vou preparar sua próxima fase. 🔥`
-        );
+        notificacoesParaCriar.push({
+          destinatario_id: planilha.profile_id,
+          tipo: "planilha_aluno_lembrete",
+          titulo: "Sua planilha termina em 3 dias",
+          mensagem: `Faltam 3 dias para o fim da planilha "${planilha.nome}". Aproveite os ultimos treinos!`,
+          dados: { planilha_id: planilha.id },
+        });
+
 
         planilhasParaAtualizar.push({
           id: planilha.id,
@@ -141,10 +127,7 @@ serve(async (req: Request) => {
           dados: { planilha_id: planilha.id },
         });
 
-        // Mensagem de renovação para o aluno
-        criarMensagemChat(
-          `📅 Sua planilha "${planilha.nome}" termina em 1 semana! Continue firme nos treinos, e em breve vou preparar sua próxima fase. 💪`
-        );
+
 
         planilhasParaAtualizar.push({
           id: planilha.id,
@@ -164,18 +147,6 @@ serve(async (req: Request) => {
       }
     }
 
-    // Criar mensagens de chat
-    if (mensagensParaCriar.length > 0) {
-      console.log(`[verificar-planilhas] Enviando ${mensagensParaCriar.length} mensagens de chat`);
-      const { error: errorMensagens } = await supabase
-        .from("mensagens_chat")
-        .insert(mensagensParaCriar);
-
-      if (errorMensagens) {
-        console.error(`[verificar-planilhas] Erro ao criar mensagens:`, errorMensagens);
-      }
-    }
-
     // Atualizar flags das planilhas
     for (const { id, updates } of planilhasParaAtualizar) {
       const { error } = await supabase
@@ -188,13 +159,11 @@ serve(async (req: Request) => {
       }
     }
 
-    console.log(`[verificar-planilhas] Concluído. Notificações: ${notificacoesParaCriar.length}, Mensagens: ${mensagensParaCriar.length}`);
 
     return new Response(
       JSON.stringify({
         success: true,
         notificacoes_criadas: notificacoesParaCriar.length,
-        mensagens_enviadas: mensagensParaCriar.length,
         planilhas_atualizadas: planilhasParaAtualizar.length,
       }),
       {

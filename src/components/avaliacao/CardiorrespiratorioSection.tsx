@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { calculateCardio, formatMetricValue, toNumber } from "@/utils/avaliacaoMetrics";
 import { formatDateTimeForInput, formatDisplayDate } from "@/utils/dateFormat";
+import { createStudentNotification } from "@/utils/studentNotifications";
 import {
   clearInterfaceMemory,
   hasMeaningfulValues,
@@ -109,6 +110,17 @@ export function CardiorrespiratorioSection({ profileId, personalId, themeColor, 
         ? await table.update(payload).eq("id", editing.id)
         : await table.insert(payload);
       if (error) throw error;
+
+      void createStudentNotification({
+        studentId: profileId,
+        personalId,
+        tipo: "avaliacao_atualizada",
+        titulo: "Avaliacao atualizada",
+        mensagem: editing
+          ? "Seu teste cardiorrespiratorio foi atualizado."
+          : "Um novo teste cardiorrespiratorio esta disponivel.",
+        dados: { avaliacao_id: editing?.id || null, area: "cardiorrespiratorio" },
+      });
 
       toast({ title: "Teste cardiorrespiratorio salvo" });
       if (!editing) {

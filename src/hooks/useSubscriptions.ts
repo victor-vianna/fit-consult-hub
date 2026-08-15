@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { dateInputToIsoString, parseDateInputValue } from "@/utils/dateFormat";
+import { createStudentNotification } from "@/utils/studentNotifications";
 
 export interface Subscription {
   id: string;
@@ -98,6 +99,60 @@ const calculateExpirationDate = (plano: Subscription["plano"], paymentDate: stri
   return expiration;
 };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const formatDatePtBr = (value: string) =>
+  new Date(value).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+
+const notifySubscriptionLifecycleAlerts = (
+  studentId: string | undefined,
+  personalId: string | undefined,
+  subscriptions: Subscription[]
+) => {
+  if (!studentId || !personalId) return;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  subscriptions.forEach((subscription) => {
+    if (subscription.status_pagamento !== "pago" || !subscription.data_expiracao) return;
+
+    const expiration = new Date(subscription.data_expiracao);
+    if (!Number.isFinite(expiration.getTime())) return;
+    expiration.setHours(0, 0, 0, 0);
+
+    const daysUntilExpiration = Math.ceil((expiration.getTime() - today.getTime()) / DAY_MS);
+
+    if (daysUntilExpiration < 0) {
+      void createStudentNotification({
+        studentId,
+        personalId,
+        tipo: "plano_expirado",
+        titulo: "Plano expirado",
+        mensagem: "Seu plano expirou. Regularize para manter o acesso.",
+        dados: { subscription_id: subscription.id, data_expiracao: subscription.data_expiracao },
+        dedupeKey: `${subscription.id}:plano_expirado`,
+      });
+      return;
+    }
+
+    if (daysUntilExpiration <= 7) {
+      void createStudentNotification({
+        studentId,
+        personalId,
+        tipo: "plano_expirando",
+        titulo: "Plano expirando",
+        mensagem:
+          daysUntilExpiration === 0
+            ? "Seu plano expira hoje."
+            : `Seu plano expira em ${daysUntilExpiration} dia${daysUntilExpiration === 1 ? "" : "s"} (${formatDatePtBr(subscription.data_expiracao)}).`,
+        dados: { subscription_id: subscription.id, data_expiracao: subscription.data_expiracao },
+        dedupeKey: `${subscription.id}:plano_expirando:${subscription.data_expiracao}`,
+      });
+    }
+  });
+};
+
 export function useSubscriptions(studentId?: string, personalId?: string) {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,7 +182,9 @@ export function useSubscriptions(studentId?: string, personalId?: string) {
       const { data, error } = await query;
 
       if (error) throw error;
-      setSubscriptions((data || []) as Subscription[]);
+      const fetchedSubscriptions = (data || []) as Subscription[];
+      setSubscriptions(fetchedSubscriptions);
+      notifySubscriptionLifecycleAlerts(studentId, personalId, fetchedSubscriptions);
     } catch (error: any) {
       console.error("Erro ao buscar assinaturas:", error);
       toast({
@@ -244,6 +301,16 @@ export function useSubscriptions(studentId?: string, personalId?: string) {
             : "Pagamento manual registrado como recebido.",
       });
 
+      void createStudentNotification({
+        studentId,
+        personalId,
+        tipo: "pagamento_registrado",
+        titulo: "Pagamento registrado",
+        mensagem: "Seu pagamento foi registrado e seu plano esta ativo.",
+        dados: { subscription_id: subscription.id, plano: paymentData.plano },
+        dedupeKey: `${subscription.id}:pagamento_registrado`,
+      });
+
       await fetchSubscriptions();
       return subscription as Subscription;
     } catch (error: any) {
@@ -273,6 +340,36 @@ export function useSubscriptions(studentId?: string, personalId?: string) {
         title: "Sucesso",
         description: "Assinatura atualizada com sucesso",
       });
+
+      if (studentId && personalId && updates.status_pagamento) {
+        const notificationByStatus = {
+          pendente: {
+            tipo: "pagamento_pendente",
+            titulo: "Pagamento pendente",
+            mensagem: "Existe um pagamento pendente no seu plano.",
+          },
+          atrasado: {
+            tipo: "pagamento_atrasado",
+            titulo: "Pagamento atrasado",
+            mensagem: "Seu pagamento esta atrasado. Regularize para manter o acesso.",
+          },
+          pago: {
+            tipo: "pagamento_registrado",
+            titulo: "Pagamento registrado",
+            mensagem: "Seu pagamento foi registrado e seu plano esta ativo.",
+          },
+        }[updates.status_pagamento];
+
+        if (notificationByStatus) {
+          void createStudentNotification({
+            studentId,
+            personalId,
+            ...notificationByStatus,
+            dados: { subscription_id: id },
+            dedupeKey: `${id}:${notificationByStatus.tipo}`,
+          });
+        }
+      }
 
       await fetchSubscriptions();
     } catch (error: any) {

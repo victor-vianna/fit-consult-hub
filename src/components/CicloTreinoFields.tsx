@@ -14,7 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Layers, Save } from "lucide-react";
-import { useModeloPastas } from "@/hooks/useModeloPastas";
 
 interface CicloTreinoFieldsProps {
   planilhaId: string;
@@ -34,7 +33,6 @@ const NIVEIS = ["Iniciante", "Intermediário", "Avançado"];
 
 export function CicloTreinoFields({
   planilhaId,
-  personalId,
   initialValues,
   themeColor,
   onSaved,
@@ -62,14 +60,6 @@ export function CicloTreinoFields({
     initialValues?.ciclo_numero,
   ]);
 
-  const { pastas, loading: loadingPastas } = useModeloPastas({
-    personalId,
-    enabled: !!personalId,
-  });
-
-  // Get only root-level folders as workout type options
-  const pastaRaiz = pastas.filter((p) => !p.parent_id);
-
   const cicloLabel = [genero, modalidade, nivel, numero ? `Ciclo ${numero}` : ""]
     .filter(Boolean)
     .join(" > ");
@@ -85,7 +75,7 @@ export function CicloTreinoFields({
         .from("planilhas_treino")
         .update({
           ciclo_genero: genero || null,
-          ciclo_modalidade: modalidade || null,
+          ciclo_modalidade: modalidade.trim() || null,
           ciclo_nivel: nivel || null,
           ciclo_numero: numero ? parseInt(numero) : null,
         })
@@ -156,19 +146,12 @@ export function CicloTreinoFields({
           </div>
           <div className="space-y-2 rounded-lg border border-muted-foreground/30 bg-background/80 p-3">
             <Label className="text-xs text-foreground/80">Tipo de Treino</Label>
-            <Select value={modalidade} onValueChange={setModalidade}>
-              <SelectTrigger className="h-9 border-muted-foreground/55 bg-background text-foreground hover:border-muted-foreground/80">
-                <SelectValue placeholder={loadingPastas ? "Carregando..." : "Selecionar"} />
-              </SelectTrigger>
-              <SelectContent>
-                {pastaRaiz.map((p) => (
-                  <SelectItem key={p.id} value={p.nome}>{p.nome}</SelectItem>
-                ))}
-                {pastaRaiz.length === 0 && !loadingPastas && (
-                  <SelectItem value="_empty" disabled>Nenhuma pasta criada</SelectItem>
-                )}
-              </SelectContent>
-            </Select>
+            <Input
+              value={modalidade}
+              onChange={(e) => setModalidade(e.target.value)}
+              placeholder="Digite o tipo"
+              className="h-9 border-muted-foreground/55 bg-background text-foreground hover:border-muted-foreground/80"
+            />
           </div>
           <div className="space-y-2 rounded-lg border border-muted-foreground/30 bg-background/80 p-3">
             <Label className="text-xs text-foreground/80">Nível</Label>

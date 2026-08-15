@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { TreinosHojeModal } from "./TreinosHojeModal";
 import { AlertasModal } from "./AlertasModal";
 import { FeedbackDetailModal } from "./FeedbackDetailModal";
+import { TreinosSemanaModal, type AlunoTreinoSemana } from "./TreinosSemanaModal";
 import { useChatNaoLidas } from "@/hooks/useChatMessages";
 import { getAlunoIdFromConversationKey } from "@/utils/chat";
 import {
@@ -105,6 +106,7 @@ export function PersonalDashboardCards({
   const [feedbacksPendentes, setFeedbacksPendentes] = useState<FeedbackPendente[]>([]);
   const [alunosTreinaramHoje, setAlunosTreinaramHoje] = useState<AlunoTreinoHoje[]>([]);
   const [alunosNaoTreinaramHoje, setAlunosNaoTreinaramHoje] = useState<AlunoTreinoHoje[]>([]);
+  const [alunosTreinosSemana, setAlunosTreinosSemana] = useState<AlunoTreinoSemana[]>([]);
   const [stats, setStats] = useState({
     totalAlunos: 0,
     alunosAtivos: 0,
@@ -116,6 +118,7 @@ export function PersonalDashboardCards({
   
   // Modal states
   const [treinosHojeModalOpen, setTreinosHojeModalOpen] = useState(false);
+  const [treinosSemanaModalOpen, setTreinosSemanaModalOpen] = useState(false);
   const [alertasModalOpen, setAlertasModalOpen] = useState(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
@@ -254,6 +257,7 @@ export function PersonalDashboardCards({
         fetchPlanilhasExpirando(),
         fetchFeedbacksPendentes(),
         fetchTreinosHoje(),
+        fetchTreinosSemana(),
         fetchStats(),
       ]);
     } catch (error) {
@@ -530,6 +534,61 @@ export function PersonalDashboardCards({
     setAlunosNaoTreinaramHoje(alunosComStatus.filter((a) => !a.treinou));
   };
 
+  const getInicioSemanaAtual = () => {
+    const inicioSemana = startOfDay(new Date());
+    inicioSemana.setDate(inicioSemana.getDate() - ((inicioSemana.getDay() + 6) % 7));
+    return inicioSemana;
+  };
+
+  const fetchTreinosSemana = async () => {
+    const inicioSemana = getInicioSemanaAtual();
+
+    const { data: sessoes } = await supabase
+      .from("treino_sessoes")
+      .select(`
+        id,
+        profile_id,
+        fim,
+        inicio,
+        duracao_segundos,
+        profiles:profile_id (nome)
+      `)
+      .eq("personal_id", personalId)
+      .eq("status", "concluido")
+      .gte("fim", inicioSemana.toISOString())
+      .order("fim", { ascending: false });
+
+    const porAluno = new Map<string, AlunoTreinoSemana>();
+
+    (sessoes || []).forEach((sessao: any) => {
+      if (!sessao.profile_id || !sessao.fim) return;
+
+      const current = porAluno.get(sessao.profile_id) || {
+        id: sessao.profile_id,
+        nome: sessao.profiles?.nome || "Aluno",
+        total_treinos: 0,
+        ultimo_treino: sessao.fim,
+        duracao_total_minutos: 0,
+      };
+
+      current.total_treinos += 1;
+      current.duracao_total_minutos += Math.round((sessao.duracao_segundos || 0) / 60);
+
+      if (parseISO(sessao.fim) > parseISO(current.ultimo_treino)) {
+        current.ultimo_treino = sessao.fim;
+      }
+
+      porAluno.set(sessao.profile_id, current);
+    });
+
+    setAlunosTreinosSemana(
+      Array.from(porAluno.values()).sort((a, b) => {
+        if (b.total_treinos !== a.total_treinos) return b.total_treinos - a.total_treinos;
+        return parseISO(b.ultimo_treino).getTime() - parseISO(a.ultimo_treino).getTime();
+      })
+    );
+  };
+
   const fetchStats = async () => {
     // Total de alunos
     const { count: totalAlunos } = await supabase
@@ -554,9 +613,7 @@ export function PersonalDashboardCards({
       .gte("fim", hoje.toISOString());
 
     // Treinos finalizados na semana
-    const inicioSemana = new Date();
-    inicioSemana.setDate(inicioSemana.getDate() - inicioSemana.getDay() + 1);
-    inicioSemana.setHours(0, 0, 0, 0);
+    const inicioSemana = getInicioSemanaAtual();
     const { count: treinosSemana } = await supabase
       .from("treino_sessoes")
       .select("*", { count: "exact", head: true })
@@ -659,7 +716,10 @@ export function PersonalDashboardCards({
             <p className="text-xs text-muted-foreground">alunos já treinaram hoje</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card
+          className="cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => setTreinosSemanaModalOpen(true)}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Treinos na Semana</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -872,6 +932,16 @@ export function PersonalDashboardCards({
         onOpenChange={setTreinosHojeModalOpen}
         alunosTreinaram={alunosTreinaramHoje}
         alunosNaoTreinaram={alunosNaoTreinaramHoje}
+        themeColor={themeColor}
+      />
+
+      <TreinosSemanaModal
+        open={treinosSemanaModalOpen}
+        onOpenChange={setTreinosSemanaModalOpen}
+        alunos={alunosTreinosSemana}
+        inicioSemana={getInicioSemanaAtual()}
+        fimSemana={new Date()}
+        totalTreinos={stats.treinosSemana}
         themeColor={themeColor}
       />
 

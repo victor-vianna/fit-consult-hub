@@ -2,7 +2,6 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { TreinoDia } from "@/types/treino";
 import type { PersonalSettings } from "@/hooks/usePersonalSettings";
-import { formatDisplayDate } from "@/utils/dateFormat";
 import { organizeForExport } from "./exportOrganizer";
 import {
   getIsolatedExercises,
@@ -40,7 +39,7 @@ export interface ExportTreinoPDFParams {
 }
 
 export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
-  const { treinos, gruposPorTreino, blocosPorTreino, alunoNome, semanaLabel, personalSettings, useLetterhead } = params;
+  const { treinos, gruposPorTreino, blocosPorTreino, alunoNome, personalSettings, useLetterhead } = params;
   const themeColor = personalSettings.theme_color || "#3b82f6";
   const personalName = personalSettings.display_name || "Personal Trainer";
   const rgb = hexToRgb(themeColor);
@@ -119,12 +118,6 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
   doc.text("Aluno: ", 14, y);
   doc.setFont("helvetica", "normal");
   doc.text(alunoNome, 14 + doc.getTextWidth("Aluno: "), y);
-  y += 6;
-
-  doc.setFont("helvetica", "bold");
-  doc.text("Semana: ", 14, y);
-  doc.setFont("helvetica", "normal");
-  doc.text(semanaLabel, 14 + doc.getTextWidth("Semana: "), y);
   y += 10;
 
   // Top margin for new pages (avoid letterhead header art)
@@ -271,7 +264,7 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
 
   // Footer (skip when letterhead is used to avoid overlapping)
   if (!letterheadDataUrl) {
-    const footerText = `Gerado por ${personalName} - ${formatDisplayDate(new Date())}`;
+    const footerText = `Gerado por ${personalName}`;
     doc.setFontSize(8);
     doc.setTextColor(150, 150, 150);
     doc.setFont("helvetica", "normal");
@@ -283,7 +276,7 @@ export async function exportTreinoPDF(params: ExportTreinoPDFParams) {
     }
   }
 
-  doc.save(`Treino_${alunoNome.replace(/\s+/g, "_")}_${semanaLabel.replace(/\//g, "-")}.pdf`);
+  doc.save(`Treino_${alunoNome.replace(/\s+/g, "_")}.pdf`);
 }
 
 function loadImage(url: string): Promise<string> {

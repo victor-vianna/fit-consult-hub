@@ -89,6 +89,7 @@ export function ComposicaoCorporalSection({
   const [studentName, setStudentName] = useState("Aluno");
   const [openDialog, setOpenDialog] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
+  const [selectedAssessmentId, setSelectedAssessmentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -105,9 +106,22 @@ export function ComposicaoCorporalSection({
       supabase.from("profiles").select("nome").eq("id", profileId).maybeSingle(),
     ]);
 
+    const compositionRecords = (registros || []).filter(hasCompositionData);
     setStudentName(profile?.nome || "Aluno");
-    setAvaliacoes((registros || []).filter(hasCompositionData));
+    setAvaliacoes(compositionRecords);
+    return compositionRecords;
   };
+
+  useEffect(() => {
+    if (avaliacoes.length === 0) {
+      setSelectedAssessmentId(null);
+      return;
+    }
+
+    if (!selectedAssessmentId || !avaliacoes.some((avaliacao) => avaliacao.id === selectedAssessmentId)) {
+      setSelectedAssessmentId(avaliacoes[0].id);
+    }
+  }, [avaliacoes, selectedAssessmentId]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -170,7 +184,8 @@ export function ComposicaoCorporalSection({
       });
       setOpenDialog(false);
       setEditing(null);
-      fetchData();
+      const updatedAssessments = await fetchData();
+      setSelectedAssessmentId(editing ? editing.id : updatedAssessments[0]?.id ?? null);
       onRefresh();
     } catch (error: any) {
       toast({ title: "Erro", description: error.message, variant: "destructive" });
@@ -186,12 +201,18 @@ export function ComposicaoCorporalSection({
       return;
     }
     toast({ title: "Avaliacao removida" });
-    fetchData();
+    const nextSelection = avaliacoes.find((avaliacao) => avaliacao.id !== id)?.id ?? null;
+    await fetchData();
+    setSelectedAssessmentId(nextSelection);
     onRefresh();
   };
 
-  const latest = avaliacoes[0];
-  const previous = avaliacoes[1];
+  const selectedIndex = useMemo(
+    () => avaliacoes.findIndex((avaliacao) => avaliacao.id === selectedAssessmentId),
+    [avaliacoes, selectedAssessmentId]
+  );
+  const selectedAssessment = selectedIndex >= 0 ? avaliacoes[selectedIndex] : avaliacoes[0];
+  const previous = selectedIndex >= 0 ? avaliacoes[selectedIndex + 1] : avaliacoes[1];
 
   return (
     <Card className="border-2 shadow-md">
@@ -213,18 +234,26 @@ export function ComposicaoCorporalSection({
         </div>
       </CardHeader>
       <CardContent className="pt-4">
-        {latest ? (
-          <CompositionDashboard
-            avaliacao={latest}
-            previous={previous}
-            studentName={studentName}
-            totalAssessments={avaliacoes.length}
-            onEdit={() => {
-              setEditing(latest);
-              setOpenDialog(true);
-            }}
-            onDelete={() => handleDelete(latest.id)}
-          />
+        {selectedAssessment ? (
+          <div className="grid gap-4 xl:grid-cols-[280px_1fr]">
+            <AssessmentHistoryPanel
+              avaliacoes={avaliacoes}
+              selectedAssessmentId={selectedAssessment.id}
+              onSelect={setSelectedAssessmentId}
+            />
+            <CompositionDashboard
+              avaliacao={selectedAssessment}
+              previous={previous}
+              studentName={studentName}
+              totalAssessments={avaliacoes.length}
+              selectedPosition={selectedIndex >= 0 ? selectedIndex + 1 : 1}
+              onEdit={() => {
+                setEditing(selectedAssessment);
+                setOpenDialog(true);
+              }}
+              onDelete={() => handleDelete(selectedAssessment.id)}
+            />
+          </div>
         ) : (
           <div className="py-12 text-center">
             <Ruler className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
@@ -254,11 +283,69 @@ export function ComposicaoCorporalSection({
   );
 }
 
+function AssessmentHistoryPanel({
+  avaliacoes,
+  selectedAssessmentId,
+  onSelect,
+}: {
+  avaliacoes: any[];
+  selectedAssessmentId: string;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <aside className="rounded-xl border bg-muted/20 p-3">
+      <div className="mb-3">
+        <p className="text-sm font-semibold">Historico de avaliacoes</p>
+        <p className="text-xs text-muted-foreground">Selecione um registro para navegar pelos dados salvos.</p>
+      </div>
+      <div className="max-h-[620px] space-y-2 overflow-y-auto pr-1">
+        {avaliacoes.map((avaliacao, index) => {
+          const active = avaliacao.id === selectedAssessmentId;
+          const pending = Array.isArray(avaliacao.campos_pendentes) ? avaliacao.campos_pendentes : [];
+          const bodyFat = formatMetricValue(avaliacao.percentual_gordura, "%");
+          const weight = formatMetricValue(avaliacao.peso, "kg");
+
+          return (
+            <button
+              key={avaliacao.id}
+              type="button"
+              onClick={() => onSelect(avaliacao.id)}
+              className={cn(
+                "w-full rounded-lg border p-3 text-left transition hover:border-primary/60 hover:bg-background",
+                active ? "border-primary bg-background shadow-sm" : "bg-card"
+              )}
+            >
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">{formatDisplayDate(avaliacao.data_avaliacao)}</p>
+                  <p className="text-xs text-muted-foreground">Avaliacao #{avaliacoes.length - index}</p>
+                </div>
+                {index === 0 && <Badge variant="outline">Atual</Badge>}
+              </div>
+              <div className="flex flex-wrap gap-1 text-xs text-muted-foreground">
+                <span>{weight}</span>
+                <span>-</span>
+                <span>{bodyFat}</span>
+              </div>
+              {pending.length > 0 && (
+                <Badge variant="outline" className="mt-2 border-amber-400 text-[10px] text-amber-600 dark:text-amber-300">
+                  Incompleta
+                </Badge>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}
+
 function CompositionDashboard({
   avaliacao,
   previous,
   studentName,
   totalAssessments,
+  selectedPosition,
   onEdit,
   onDelete,
 }: {
@@ -266,6 +353,7 @@ function CompositionDashboard({
   previous?: any;
   studentName: string;
   totalAssessments: number;
+  selectedPosition: number;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -299,6 +387,9 @@ function CompositionDashboard({
             <UserRound className="h-4 w-4 text-muted-foreground" />
             <h3 className="text-xl font-semibold leading-tight">{studentName}</h3>
             <Badge variant="outline">{formatDisplayDate(avaliacao.data_avaliacao)}</Badge>
+            <Badge variant="outline">
+              {selectedPosition} de {totalAssessments}
+            </Badge>
             {pending.length > 0 ? (
               <Badge variant="outline" className="border-amber-400 text-amber-600 dark:text-amber-300">
                 <AlertTriangle className="mr-1 h-3 w-3" /> Incompleta

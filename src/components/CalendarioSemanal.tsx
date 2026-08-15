@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getWeekStart } from "@/utils/weekUtils";
 import { cn } from "@/lib/utils";
 import { formatDisplayDateRange } from "@/utils/dateFormat";
+import { filterWorkoutsWithContent } from "@/utils/workoutContent";
 
 interface TreinoSemanal {
   id: string;
@@ -68,7 +69,8 @@ export function CalendarioSemanal({
         .eq("semana", semanaFormatada);
 
       if (error) throw error;
-      setTreinos(data || []);
+      const treinosComConteudo = await filterWorkoutsWithContent(data || []);
+      setTreinos(treinosComConteudo);
     } catch (err) {
       console.error("[CalendarioSemanal] Erro ao carregar treinos:", err);
       toast({

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { differenceInDays, parseISO, format, addWeeks } from "date-fns";
 import { getPreviousWeekStart, getWeekStart } from "@/utils/weekUtils";
 import { PLANILHA_UI_STATUS, type PlanilhaUIStatus } from "@/constants/workoutStatus";
+import { filterWorkoutsWithContent } from "@/utils/workoutContent";
 
 interface Planilha {
   id: string;
@@ -206,11 +207,18 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
       return;
     }
 
-    console.log(`[usePlanilhaAtiva] Encontrados ${treinosBase.length} treinos para replicar`);
+    const treinosBaseComConteudo = await filterWorkoutsWithContent(treinosBase);
+
+    if (treinosBaseComConteudo.length === 0) {
+      console.log("[usePlanilhaAtiva] Nenhum treino com conteudo na semana base para replicar");
+      return;
+    }
+
+    console.log(`[usePlanilhaAtiva] Encontrados ${treinosBaseComConteudo.length} treinos para replicar`);
 
     // Agrupar treinos base por dia
-    const treinosBasePorDia = new Map<number, typeof treinosBase>();
-    for (const treino of treinosBase) {
+    const treinosBasePorDia = new Map<number, typeof treinosBaseComConteudo>();
+    for (const treino of treinosBaseComConteudo) {
       const dia = treino.dia_semana;
       if (!treinosBasePorDia.has(dia)) treinosBasePorDia.set(dia, []);
       treinosBasePorDia.get(dia)!.push(treino);
@@ -442,11 +450,18 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
       return;
     }
 
-    console.log(`[usePlanilhaAtiva] Encontrados ${treinosOrigem.length} treinos para copiar`);
+    const treinosOrigemComConteudo = await filterWorkoutsWithContent(treinosOrigem);
+
+    if (treinosOrigemComConteudo.length === 0) {
+      console.log("[usePlanilhaAtiva] Nenhum treino com conteudo na semana origem para copiar");
+      return;
+    }
+
+    console.log(`[usePlanilhaAtiva] Encontrados ${treinosOrigemComConteudo.length} treinos para copiar`);
 
     // Agrupar treinos por dia
-    const treinosPorDia = new Map<number, typeof treinosOrigem>();
-    for (const treino of treinosOrigem) {
+    const treinosPorDia = new Map<number, typeof treinosOrigemComConteudo>();
+    for (const treino of treinosOrigemComConteudo) {
       const dia = treino.dia_semana;
       if (!treinosPorDia.has(dia)) treinosPorDia.set(dia, []);
       treinosPorDia.get(dia)!.push(treino);

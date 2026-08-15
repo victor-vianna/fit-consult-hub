@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { differenceInCalendarDays, startOfDay } from "date-fns";
+import { filterWorkoutsWithContent } from "@/utils/workoutContent";
 
 export interface AlunoQuickStatus {
   treinouHoje: boolean;
@@ -25,12 +26,14 @@ export function useAlunosQuickStatus(personalId?: string) {
 
       const { data: treinos } = await supabase
         .from("treinos_semanais")
-        .select("profile_id, concluido, updated_at, dia_semana")
+        .select("id, profile_id, concluido, updated_at, dia_semana")
         .eq("personal_id", personalId)
         .gte("updated_at", inicioSemana.toISOString());
 
       const map: Record<string, AlunoQuickStatus> = {};
-      (treinos || []).forEach((t: any) => {
+      const treinosComConteudo = await filterWorkoutsWithContent(treinos || []);
+
+      treinosComConteudo.forEach((t: any) => {
         const id = t.profile_id;
         if (!map[id]) {
           map[id] = {

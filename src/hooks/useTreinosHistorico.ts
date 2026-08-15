@@ -11,6 +11,7 @@ import {
   subDays,
 } from "date-fns";
 import { WORKOUT_EVENTS } from "@/constants/workoutStatus";
+import { filterWorkoutsWithContent } from "@/utils/workoutContent";
 
 interface TreinoSemanal {
   id: string;
@@ -74,7 +75,8 @@ export function useTreinosHistorico(profileId: string, mes?: Date) {
       if (error) throw error;
 
       // Buscar duração das sessões para treinos concluídos
-      const treinoIds = (data || []).map(t => t.id);
+      const treinosComConteudo = await filterWorkoutsWithContent(data || []);
+      const treinoIds = treinosComConteudo.map(t => t.id);
       const sessoesConcluidas: Record<string, number | null> = {};
       
       if (treinoIds.length > 0) {
@@ -93,7 +95,7 @@ export function useTreinosHistorico(profileId: string, mes?: Date) {
         });
       }
 
-      const treinosComDuracao = (data || []).map(t => ({
+      const treinosComDuracao = treinosComConteudo.map(t => ({
         ...t,
         concluido: Boolean(t.concluido || sessoesConcluidas[t.id] !== undefined),
         duracao_segundos: sessoesConcluidas[t.id] ?? null,

@@ -116,8 +116,11 @@ export function ComposicaoCorporalSection({
 
     const dobrasMedidas: Record<string, Array<number | null>> = {};
     const dobrasMedias: Record<string, number> = {};
+    const dobrasMeasureCount = Math.max(1, Number(form.get("dobras_measure_count")) || 3);
     SKINFOLD_FIELDS.forEach(({ key }) => {
-      const values = [1, 2, 3].map((index) => toNumber(form.get(`${key}_${index}`)));
+      const values = Array.from({ length: dobrasMeasureCount }, (_, index) =>
+        toNumber(form.get(`${key}_${index + 1}`))
+      );
       const media = average(values);
       dobrasMedidas[key] = values;
       if (media !== null) dobrasMedias[key] = media;
@@ -405,6 +408,8 @@ function CompositionDashboard({
         <ComparisonPanel avaliacao={avaliacao} previous={previous} />
       </div>
 
+      <SkinfoldMeasurementsPanel avaliacao={avaliacao} />
+
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
         <span>{totalAssessments} avaliacao{totalAssessments === 1 ? "" : "es"} no historico de composicao.</span>
         {avaliacao.observacoes && <span className="italic">Obs.: {avaliacao.observacoes}</span>}
@@ -592,6 +597,65 @@ function ComparisonPanel({ avaliacao, previous }: { avaliacao: any; previous?: a
   );
 }
 
+function SkinfoldMeasurementsPanel({ avaliacao }: { avaliacao: any }) {
+  const rows = SKINFOLD_FIELDS.map(({ key, label }) => {
+    const values = getSkinfoldValues(avaliacao, key);
+    const media = toFiniteNumber(avaliacao?.dobras_medias?.[key]) ?? average(values);
+    return { key, label, values, media };
+  }).filter((row) => row.values.some((value) => value !== null) || row.media !== null);
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const maxMeasures = Math.max(1, ...rows.map((row) => row.values.length));
+
+  return (
+    <div className="rounded-xl border bg-card p-4">
+      <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold">Dobras cutaneas registradas</p>
+          <p className="text-xs text-muted-foreground">
+            Medicoes informadas no registro e media usada nos calculos.
+          </p>
+        </div>
+        <Badge variant="outline">{rows.length} dobras</Badge>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[560px] text-sm">
+          <thead>
+            <tr className="border-b text-left text-xs text-muted-foreground">
+              <th className="py-2 pr-3 font-medium">Dobra</th>
+              {Array.from({ length: maxMeasures }, (_, index) => (
+                <th key={index} className="px-3 py-2 font-medium">
+                  {index + 1}a medicao
+                </th>
+              ))}
+              <th className="py-2 pl-3 text-right font-medium">Media</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.key} className="border-b last:border-0">
+                <td className="py-2 pr-3 font-medium">{row.label}</td>
+                {Array.from({ length: maxMeasures }, (_, index) => (
+                  <td key={index} className="px-3 py-2 text-muted-foreground">
+                    {formatMetricValue(row.values[index], "mm")}
+                  </td>
+                ))}
+                <td className="py-2 pl-3 text-right font-semibold">
+                  {formatMetricValue(row.media, "mm")}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function CompositionForm({
   editing,
   loading,
@@ -604,9 +668,15 @@ function CompositionForm({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   const medidas = editing?.dobras_medidas || {};
+  const [dobrasMeasureCount, setDobrasMeasureCount] = useState(() => getSkinfoldMeasureCount(editing));
+
+  useEffect(() => {
+    setDobrasMeasureCount(getSkinfoldMeasureCount(editing));
+  }, [editing?.id]);
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
+      <input type="hidden" name="dobras_measure_count" value={dobrasMeasureCount} />
       <section className="space-y-3 rounded-lg border bg-muted/20 p-3">
         <h3 className="text-sm font-semibold">Dados gerais</h3>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -667,24 +737,55 @@ function CompositionForm({
       </section>
 
       <section className="space-y-3 rounded-lg border bg-muted/20 p-3">
-        <h3 className="text-sm font-semibold">Dobras cutaneas</h3>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h3 className="text-sm font-semibold">Dobras cutaneas</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Use mais colunas quando fizer mais de uma medicao da mesma dobra; a media sera calculada automaticamente.
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setDobrasMeasureCount((count) => Math.max(1, count - 1))}
+              disabled={dobrasMeasureCount <= 1}
+            >
+              <Trash2 className="mr-1 h-4 w-4" /> Remover coluna
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setDobrasMeasureCount((count) => count + 1)}
+            >
+              <Plus className="mr-1 h-4 w-4" /> Adicionar coluna
+            </Button>
+          </div>
+        </div>
         <div className="space-y-2">
           {SKINFOLD_FIELDS.map(({ key, label }) => (
-            <div
-              key={key}
-              className="grid gap-2 rounded-md border bg-background/60 p-2 sm:grid-cols-[1fr_repeat(3,minmax(0,110px))]"
-            >
-              <Label className="self-center text-sm">{label}</Label>
-              {[1, 2, 3].map((index) => (
-                <Input
-                  key={index}
-                  name={`${key}_${index}`}
-                  type="number"
-                  step="0.1"
-                  placeholder={`${index}a medida`}
-                  defaultValue={medidas?.[key]?.[index - 1] ?? ""}
-                />
-              ))}
+            <div key={key} className="overflow-x-auto rounded-md border bg-background/60 p-2">
+              <div
+                className="grid gap-2"
+                style={{
+                  gridTemplateColumns: `minmax(140px, 1fr) repeat(${dobrasMeasureCount}, minmax(0, 110px))`,
+                  minWidth: `${160 + dobrasMeasureCount * 118}px`,
+                }}
+              >
+                <Label className="self-center text-sm">{label}</Label>
+                {Array.from({ length: dobrasMeasureCount }, (_, index) => (
+                  <Input
+                    key={index}
+                    name={`${key}_${index + 1}`}
+                    type="number"
+                    step="0.1"
+                    placeholder={`${index + 1}a medicao`}
+                    defaultValue={medidas?.[key]?.[index] ?? ""}
+                  />
+                ))}
+              </div>
             </div>
           ))}
         </div>
@@ -825,6 +926,22 @@ function toFiniteNumber(value: unknown) {
   if (value === null || value === undefined || value === "") return null;
   const numeric = typeof value === "number" ? value : Number(value);
   return Number.isFinite(numeric) ? numeric : null;
+}
+
+function getSkinfoldValues(record: any, key: string) {
+  const values = Array.isArray(record?.dobras_medidas?.[key])
+    ? record.dobras_medidas[key]
+    : [];
+
+  return values.map((value: unknown) => toFiniteNumber(value));
+}
+
+function getSkinfoldMeasureCount(record: any) {
+  if (!record) return 3;
+  const counts = SKINFOLD_FIELDS
+    .map(({ key }) => getSkinfoldValues(record, key).length)
+    .filter((count) => count > 0);
+  return counts.length > 0 ? Math.max(1, ...counts) : 3;
 }
 
 function clamp(value: number, min: number, max: number) {

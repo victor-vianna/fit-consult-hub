@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { addDays, parseISO } from "date-fns";
 import {
   ClipboardList,
   Calendar,
@@ -38,7 +39,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { usePlanilhaAtiva } from "@/hooks/usePlanilhaAtiva";
 import { CicloTreinoFields } from "@/components/CicloTreinoFields";
 import { cn } from "@/lib/utils";
-import { formatDisplayDate } from "@/utils/dateFormat";
+import { formatDisplayDate, formatDisplayDateRange } from "@/utils/dateFormat";
 
 interface PlanilhaStatusCardProps {
   profileId: string;
@@ -46,6 +47,11 @@ interface PlanilhaStatusCardProps {
   variant?: "aluno" | "personal";
   compact?: boolean;
 }
+
+type PeriodoImportacaoTreino = {
+  semana: string;
+  quantidadeTreinos: number;
+};
 
 export function PlanilhaStatusCard({
   profileId,
@@ -65,22 +71,38 @@ export function PlanilhaStatusCard({
     renovarPlanilha,
     encerrarPlanilha,
     sincronizarTreinos,
-    importarTreinosUltimaSemana,
+    importarTreinosDePeriodo,
+    periodosImportacao,
     isCriando,
     isRenovando,
     isEncerrando,
     isSincronizando,
-    isImportandoUltimaSemana,
+    isImportandoPeriodo,
+    loadingPeriodosImportacao,
   } = usePlanilhaAtiva({ profileId, personalId });
 
   const [showNovaDialog, setShowNovaDialog] = useState(false);
   const [showRenovarDialog, setShowRenovarDialog] = useState(false);
   const [showHistoricoDialog, setShowHistoricoDialog] = useState(false);
+  const [showImportPeriodoDialog, setShowImportPeriodoDialog] = useState(false);
+  const [semanaImportacao, setSemanaImportacao] = useState("");
   const [formData, setFormData] = useState({
     nome: "",
     duracaoSemanas: "4",
     observacoes: "",
   });
+
+  useEffect(() => {
+    if (!showImportPeriodoDialog) return;
+
+    const selectedStillExists = periodosImportacao.some(
+      (periodo) => periodo.semana === semanaImportacao
+    );
+
+    if (!selectedStillExists) {
+      setSemanaImportacao(periodosImportacao[0]?.semana || "");
+    }
+  }, [periodosImportacao, semanaImportacao, showImportPeriodoDialog]);
 
   const handleCriar = () => {
     criarPlanilha({
@@ -170,6 +192,18 @@ export function PlanilhaStatusCard({
       observacoes: planilha.observacoes || "",
     });
     setShowRenovarDialog(true);
+  };
+
+  const openImportPeriodoDialog = () => {
+    setSemanaImportacao(periodosImportacao[0]?.semana || "");
+    setShowImportPeriodoDialog(true);
+  };
+
+  const handleImportarPeriodo = () => {
+    if (!semanaImportacao) return;
+
+    importarTreinosDePeriodo({ semanaOrigem: semanaImportacao });
+    setShowImportPeriodoDialog(false);
   };
 
   if (loading) {
@@ -337,10 +371,10 @@ export function PlanilhaStatusCard({
               />
               <ActionCard
                 icon={Copy}
-                title={isImportandoUltimaSemana ? "Importando..." : "Importar ultima semana"}
-                description="Copia treino anterior"
-                onClick={() => importarTreinosUltimaSemana()}
-                disabled={isImportandoUltimaSemana}
+                title={isImportandoPeriodo ? "Importando..." : "Importar por periodo"}
+                description="Escolha a origem"
+                onClick={openImportPeriodoDialog}
+                disabled={isImportandoPeriodo}
               />
               <ActionCard
                 icon={History}
@@ -399,6 +433,17 @@ export function PlanilhaStatusCard({
           onOpenChange={setShowHistoricoDialog}
           historico={historico}
           activeId={planilha.id}
+        />
+
+        <ImportarPeriodoDialog
+          open={showImportPeriodoDialog}
+          onOpenChange={setShowImportPeriodoDialog}
+          periodos={periodosImportacao}
+          selectedSemana={semanaImportacao}
+          onSelectedSemanaChange={setSemanaImportacao}
+          onConfirm={handleImportarPeriodo}
+          isLoading={isImportandoPeriodo}
+          isFetching={loadingPeriodosImportacao}
         />
       </>
     );
@@ -490,21 +535,21 @@ export function PlanilhaStatusCard({
                 Replica a semana atual para as demais semanas
               </p>
 
-              {/* Botão de importar última semana */}
+              {/* Botao de importar periodo especifico */}
               <Button
                 variant="outline"
                 size="sm"
                 className="w-full"
-                onClick={() => importarTreinosUltimaSemana()}
-                disabled={isImportandoUltimaSemana}
+                onClick={openImportPeriodoDialog}
+                disabled={isImportandoPeriodo}
               >
-                <Copy className={cn("h-4 w-4 mr-1", isImportandoUltimaSemana && "animate-pulse")} />
-                {isImportandoUltimaSemana
+                <Copy className={cn("h-4 w-4 mr-1", isImportandoPeriodo && "animate-pulse")} />
+                {isImportandoPeriodo
                   ? "Importando..."
-                  : "Importar treino da última semana"}
+                  : "Importar treino por periodo"}
               </Button>
               <p className="text-xs text-muted-foreground text-center">
-                Copia o treino completo da semana anterior para a semana atual
+                Escolha qual periodo sera copiado para a semana atual
               </p>
 
               <Button
@@ -581,6 +626,17 @@ export function PlanilhaStatusCard({
         onOpenChange={setShowHistoricoDialog}
         historico={historico}
         activeId={planilha.id}
+      />
+
+      <ImportarPeriodoDialog
+        open={showImportPeriodoDialog}
+        onOpenChange={setShowImportPeriodoDialog}
+        periodos={periodosImportacao}
+        selectedSemana={semanaImportacao}
+        onSelectedSemanaChange={setSemanaImportacao}
+        onConfirm={handleImportarPeriodo}
+        isLoading={isImportandoPeriodo}
+        isFetching={loadingPeriodosImportacao}
       />
     </>
   );
@@ -788,6 +844,107 @@ function HistoricoCiclosDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function ImportarPeriodoDialog({
+  open,
+  onOpenChange,
+  periodos,
+  selectedSemana,
+  onSelectedSemanaChange,
+  onConfirm,
+  isLoading,
+  isFetching,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  periodos: PeriodoImportacaoTreino[];
+  selectedSemana: string;
+  onSelectedSemanaChange: (semana: string) => void;
+  onConfirm: () => void;
+  isLoading: boolean;
+  isFetching: boolean;
+}) {
+  const selectedPeriodo = periodos.find((periodo) => periodo.semana === selectedSemana);
+  const hasPeriodos = periodos.length > 0;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Importar treino por periodo</DialogTitle>
+          <DialogDescription>
+            Escolha o periodo de origem que sera copiado para a semana atual.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          {isFetching ? (
+            <div className="flex items-center justify-center rounded-lg border border-dashed py-8 text-sm text-muted-foreground">
+              Carregando periodos com treino...
+            </div>
+          ) : hasPeriodos ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="periodo-importacao">Periodo de origem</Label>
+                <Select
+                  value={selectedSemana}
+                  onValueChange={onSelectedSemanaChange}
+                >
+                  <SelectTrigger id="periodo-importacao">
+                    <SelectValue placeholder="Selecione o periodo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {periodos.map((periodo) => (
+                      <SelectItem key={periodo.semana} value={periodo.semana}>
+                        {formatPeriodoImportacao(periodo.semana)} -{" "}
+                        {periodo.quantidadeTreinos} treino
+                        {periodo.quantidadeTreinos === 1 ? "" : "s"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
+                {selectedPeriodo ? (
+                  <span>
+                    O periodo {formatPeriodoImportacao(selectedPeriodo.semana)} sera copiado para a semana atual.
+                  </span>
+                ) : (
+                  <span>Selecione um periodo para importar.</span>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+              Nenhum periodo anterior com treino foi encontrado para importar.
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={onConfirm}
+            disabled={!selectedSemana || isLoading || isFetching || !hasPeriodos}
+          >
+            {isLoading ? "Importando..." : "Importar periodo"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function formatPeriodoImportacao(semana: string) {
+  try {
+    return formatDisplayDateRange(semana, addDays(parseISO(semana), 6));
+  } catch {
+    return formatPlanilhaDate(semana);
+  }
 }
 
 // Dialog reutilizável

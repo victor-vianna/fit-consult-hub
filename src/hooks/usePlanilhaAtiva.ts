@@ -3,9 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { differenceInDays, parseISO, format, addWeeks } from "date-fns";
-import { getPreviousWeekStart, getWeekStart } from "@/utils/weekUtils";
+import { getWeekStart } from "@/utils/weekUtils";
 import { PLANILHA_UI_STATUS, type PlanilhaUIStatus } from "@/constants/workoutStatus";
-import { filterWorkoutsWithContent } from "@/utils/workoutContent";
 
 interface Planilha {
   id: string;
@@ -30,6 +29,11 @@ interface UsePlanilhaAtivaParams {
   personalId?: string;
 }
 
+interface PeriodoTreinoImportavel {
+  semana: string;
+  quantidadeTreinos: number;
+}
+
 // Função helper para gerar UUID v4
 const generateUUID = (): string => {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
@@ -38,6 +42,37 @@ const generateUUID = (): string => {
     return v.toString(16);
   });
 };
+
+async function filterWorkoutsWithTrainingItems<T extends { id: string }>(workouts: T[]) {
+  const ids = Array.from(new Set(workouts.map((workout) => workout.id).filter(Boolean)));
+  if (ids.length === 0) return [];
+
+  const [exerciciosResult, blocosResult] = await Promise.all([
+    supabase
+      .from("exercicios")
+      .select("treino_semanal_id")
+      .in("treino_semanal_id", ids)
+      .is("deleted_at", null),
+    supabase
+      .from("blocos_treino")
+      .select("treino_semanal_id")
+      .in("treino_semanal_id", ids)
+      .is("deleted_at", null),
+  ]);
+
+  if (exerciciosResult.error) throw exerciciosResult.error;
+  if (blocosResult.error) throw blocosResult.error;
+
+  const idsWithContent = new Set<string>();
+  (exerciciosResult.data || []).forEach((item: any) => {
+    if (item.treino_semanal_id) idsWithContent.add(item.treino_semanal_id);
+  });
+  (blocosResult.data || []).forEach((item: any) => {
+    if (item.treino_semanal_id) idsWithContent.add(item.treino_semanal_id);
+  });
+
+  return workouts.filter((workout) => idsWithContent.has(workout.id));
+}
 
 export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaParams) {
   const queryClient = useQueryClient();
@@ -120,6 +155,45 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
       return data as Planilha[];
     },
     enabled: !!profileId,
+  });
+
+  const { data: periodosImportacao = [], isLoading: loadingPeriodosImportacao } = useQuery({
+    queryKey: ["treino-periodos-importacao", profileId, personalId],
+    queryFn: async () => {
+      if (!profileId || !personalId) return [];
+
+      const semanaAtual = getWeekStart(new Date());
+      const { data: treinos, error } = await supabase
+        .from("treinos_semanais")
+        .select("id, semana")
+        .eq("profile_id", profileId)
+        .eq("personal_id", personalId)
+        .neq("semana", semanaAtual)
+        .order("semana", { ascending: false });
+
+      if (error) throw error;
+      if (!treinos || treinos.length === 0) return [];
+
+      const treinosComConteudo = await filterWorkoutsWithTrainingItems(
+        treinos as Array<{ id: string; semana: string }>
+      );
+
+      const periodos = new Map<string, PeriodoTreinoImportavel>();
+      treinosComConteudo.forEach((treino) => {
+        const atual = periodos.get(treino.semana) || {
+          semana: treino.semana,
+          quantidadeTreinos: 0,
+        };
+        atual.quantidadeTreinos += 1;
+        periodos.set(treino.semana, atual);
+      });
+
+      return Array.from(periodos.values()).sort((a, b) =>
+        b.semana.localeCompare(a.semana)
+      );
+    },
+    enabled: !!profileId && !!personalId,
+    staleTime: 30_000,
   });
 
   // Cálculos derivados
@@ -207,7 +281,7 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
       return;
     }
 
-    const treinosBaseComConteudo = await filterWorkoutsWithContent(treinosBase);
+    const treinosBaseComConteudo = await filterWorkoutsWithTrainingItems(treinosBase);
 
     if (treinosBaseComConteudo.length === 0) {
       console.log("[usePlanilhaAtiva] Nenhum treino com conteudo na semana base para replicar");
@@ -450,7 +524,7 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
       return;
     }
 
-    const treinosOrigemComConteudo = await filterWorkoutsWithContent(treinosOrigem);
+    const treinosOrigemComConteudo = await filterWorkoutsWithTrainingItems(treinosOrigem);
 
     if (treinosOrigemComConteudo.length === 0) {
       console.log("[usePlanilhaAtiva] Nenhum treino com conteudo na semana origem para copiar");
@@ -590,76 +664,55 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
   };
 
   /**
-   * Importa (copia) o treino completo da última semana para a semana atual.
-   * Útil quando a renovação criou uma planilha nova mas a semana atual ficou vazia.
+   * Importa (copia) o treino completo de um periodo semanal escolhido para a semana atual.
+   * Util quando a renovacao criou uma planilha nova mas a semana atual ficou vazia.
    */
-  const importarTreinosDaUltimaSemanaMutation = useMutation({
-    mutationFn: async () => {
+  const importarTreinosDePeriodoMutation = useMutation({
+    mutationFn: async ({ semanaOrigem }: { semanaOrigem: string }) => {
       if (!profileId || !personalId) throw new Error("Dados insuficientes");
+      if (!semanaOrigem) throw new Error("Periodo de origem obrigatorio");
 
       const semanaAtual = getWeekStart(new Date());
+      const semanaOrigemNormalizada = getWeekStart(parseISO(semanaOrigem));
 
-      // ✅ CORREÇÃO: Buscar última semana que REALMENTE tem exercícios ou blocos
-      // Primeiro buscar semanas distintas com treinos
-      const { data: semanasComTreinos, error } = await supabase
+      if (semanaOrigemNormalizada === semanaAtual) {
+        toast.error("Escolha um periodo diferente da semana atual");
+        throw new Error("Periodo de origem igual a semana atual");
+      }
+
+      const { data: treinosOrigem, error } = await supabase
         .from("treinos_semanais")
-        .select("semana, id")
+        .select("id")
         .eq("profile_id", profileId)
         .eq("personal_id", personalId)
-        .neq("semana", semanaAtual)
-        .order("semana", { ascending: false });
+        .eq("semana", semanaOrigemNormalizada);
 
       if (error) throw error;
 
-      if (!semanasComTreinos || semanasComTreinos.length === 0) {
-        toast.error("Nenhuma semana anterior com treinos encontrada");
-        throw new Error("Nenhuma semana anterior encontrada");
+      if (!treinosOrigem || treinosOrigem.length === 0) {
+        toast.error("Nenhum treino encontrado no periodo escolhido");
+        throw new Error("Periodo escolhido sem treinos");
       }
 
-      // Agrupar por semana e verificar qual tem conteúdo real
-      const semanasUnicas = [...new Set(semanasComTreinos.map(t => t.semana))];
-      
-      let semanaOrigem: string | null = null;
-      
-      for (const semana of semanasUnicas) {
-        const treinoIds = semanasComTreinos.filter(t => t.semana === semana).map(t => t.id);
-        
-        // Verificar se tem exercícios
-        const { count: countEx } = await supabase
-          .from("exercicios")
-          .select("id", { count: "exact", head: true })
-          .in("treino_semanal_id", treinoIds)
-          .is("deleted_at", null);
-
-        // Verificar se tem blocos
-        const { count: countBl } = await supabase
-          .from("blocos_treino")
-          .select("id", { count: "exact", head: true })
-          .in("treino_semanal_id", treinoIds)
-          .is("deleted_at", null);
-
-        if ((countEx && countEx > 0) || (countBl && countBl > 0)) {
-          semanaOrigem = semana;
-          break;
-        }
+      const treinosComConteudo = await filterWorkoutsWithTrainingItems(treinosOrigem);
+      if (treinosComConteudo.length === 0) {
+        toast.error("O periodo escolhido nao tem exercicios ou blocos para importar");
+        throw new Error("Periodo escolhido sem conteudo");
       }
 
-      if (!semanaOrigem) {
-        toast.error("Nenhuma semana anterior com exercícios encontrada");
-        throw new Error("Nenhuma semana com conteúdo encontrada");
-      }
-
-      console.log(`[usePlanilhaAtiva] Importando de ${semanaOrigem} para ${semanaAtual}`);
-      await copiarTreinosDeSemana(profileId, personalId, semanaOrigem, semanaAtual);
+      console.log(`[usePlanilhaAtiva] Importando de ${semanaOrigemNormalizada} para ${semanaAtual}`);
+      await copiarTreinosDeSemana(profileId, personalId, semanaOrigemNormalizada, semanaAtual);
+      return { semanaOrigem: semanaOrigemNormalizada, semanaAtual };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["treinos"] });
-      toast.success("Treino importado da última semana com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["treino-periodos-importacao", profileId, personalId] });
+      toast.success("Treino importado do periodo escolhido com sucesso!");
     },
     onError: (error: any) => {
-      console.error("Erro ao importar treino da última semana:", error);
-      if (!error.message?.includes("Nenhuma semana")) {
-        toast.error("Erro ao importar treino da última semana");
+      console.error("Erro ao importar treino do periodo:", error);
+      if (!error.message?.includes("Periodo")) {
+        toast.error("Erro ao importar treino do periodo");
       }
     },
   });
@@ -814,11 +867,13 @@ export function usePlanilhaAtiva({ profileId, personalId }: UsePlanilhaAtivaPara
     renovarPlanilha: renovarPlanilhaMutation.mutate,
     encerrarPlanilha: encerrarPlanilhaMutation.mutate,
     sincronizarTreinos: sincronizarTreinosMutation.mutate,
-    importarTreinosUltimaSemana: importarTreinosDaUltimaSemanaMutation.mutate,
+    importarTreinosDePeriodo: importarTreinosDePeriodoMutation.mutate,
+    periodosImportacao,
     isCriando: criarPlanilhaMutation.isPending,
     isRenovando: renovarPlanilhaMutation.isPending,
     isEncerrando: encerrarPlanilhaMutation.isPending,
     isSincronizando: sincronizarTreinosMutation.isPending,
-    isImportandoUltimaSemana: importarTreinosDaUltimaSemanaMutation.isPending,
+    isImportandoPeriodo: importarTreinosDePeriodoMutation.isPending,
+    loadingPeriodosImportacao,
   };
 }

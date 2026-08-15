@@ -30,6 +30,12 @@ import {
   TIPOS_AGRUPAMENTO,
   TipoAgrupamento,
 } from "@/types/exerciseGroup";
+import {
+  clearInterfaceMemory,
+  hasMeaningfulValues,
+  readInterfaceMemory,
+  writeInterfaceMemory,
+} from "@/utils/interfaceMemory";
 
 interface ExercicioItem {
   id?: string;
@@ -57,6 +63,14 @@ interface ExercicioGroupResult {
 }
 
 export type ExercicioDialogResult = ExercicioSimpleResult | ExercicioGroupResult;
+
+type ExercicioDraft = {
+  modo: "simple" | "group";
+  formData: Omit<ExercicioItem, "id">;
+  grupoExercicios: Omit<ExercicioItem, "id">[];
+  tipoAgrupamento: TipoAgrupamento;
+  descansoEntreGrupos: number;
+};
 
 interface GrupoEditando {
   grupo_id: string;
@@ -95,6 +109,25 @@ const defaultExercicio = (): Omit<ExercicioItem, "id"> => ({
   observacoes: "",
 });
 
+const EXERCISE_DIALOG_DRAFT_VERSION = 2;
+const EXERCISE_DIALOG_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const EXERCISE_DEFAULT_VALUES = defaultExercicio();
+
+export function getExerciseDialogDraftScope(draftKey: string) {
+  return `workout:exercise-dialog:${draftKey}`;
+}
+
+export function hasExerciseDialogDraft(draftKey: string) {
+  return Boolean(
+    readInterfaceMemory<ExercicioDraft>({
+      scope: getExerciseDialogDraftScope(draftKey),
+      version: EXERCISE_DIALOG_DRAFT_VERSION,
+      ttlMs: EXERCISE_DIALOG_DRAFT_TTL_MS,
+      hasContent: hasExerciseDraftContent,
+    })
+  );
+}
+
 export function ExercicioDialog({
   open,
   onOpenChange,
@@ -124,7 +157,7 @@ export function ExercicioDialog({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const isNewSimple = !exercicio && !grupoEditando;
-  const storageKey = draftKey ? `pf:exdlg-draft:${draftKey}:v1` : null;
+  const draftScope = draftKey ? getExerciseDialogDraftScope(draftKey) : null;
 
   // Preenche o form ao abrir
   useEffect(() => {
@@ -159,24 +192,13 @@ export function ExercicioDialog({
           observacoes: exercicio.observacoes || "",
         });
       } else {
-        // Novo: tentar restaurar rascunho da sessionStorage
-        let restored = false;
-        if (storageKey) {
-          try {
-            const raw = sessionStorage.getItem(storageKey);
-            if (raw) {
-              const draft = JSON.parse(raw);
-              setModo(draft.modo || "simple");
-              setFormData(draft.formData || defaultExercicio());
-              setGrupoExercicios(draft.grupoExercicios || []);
-              setTipoAgrupamento(draft.tipoAgrupamento || "bi-set");
-              setDescansoEntreGrupos(draft.descansoEntreGrupos ?? 90);
-              restored = true;
-            }
-          } catch {
-            // ignora
-          }
-        }
+        const restored = restoreExerciseDraft(draftScope, {
+          setModo,
+          setFormData,
+          setGrupoExercicios,
+          setTipoAgrupamento,
+          setDescansoEntreGrupos,
+        });
         if (!restored) {
           setModo("simple");
           setFormData(defaultExercicio());
@@ -187,28 +209,28 @@ export function ExercicioDialog({
       }
       setErrors({});
     }
-  }, [open, exercicio, grupoEditando]);
+  }, [open, exercicio, grupoEditando, draftScope]);
 
   // Auto-save rascunho enquanto o dialog está aberto (apenas em criação)
   useEffect(() => {
-    if (!open || !storageKey || !isNewSimple) return;
-    try {
-      sessionStorage.setItem(
-        storageKey,
-        JSON.stringify({ modo, formData, grupoExercicios, tipoAgrupamento, descansoEntreGrupos })
-      );
-    } catch {
-      // ignora quota
-    }
-  }, [open, storageKey, isNewSimple, modo, formData, grupoExercicios, tipoAgrupamento, descansoEntreGrupos]);
+    if (!open || !draftScope || !isNewSimple) return;
+    persistExerciseDraft(draftScope, {
+      modo,
+      formData,
+      grupoExercicios,
+      tipoAgrupamento,
+      descansoEntreGrupos,
+    });
+  }, [open, draftScope, isNewSimple, modo, formData, grupoExercicios, tipoAgrupamento, descansoEntreGrupos]);
 
   const clearDraft = () => {
-    if (!storageKey) return;
-    try {
-      sessionStorage.removeItem(storageKey);
-    } catch {
-      // ignora
-    }
+    if (!draftScope) return;
+    clearInterfaceMemory({ scope: draftScope, version: EXERCISE_DIALOG_DRAFT_VERSION });
+  };
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && isNewSimple) clearDraft();
+    onOpenChange(nextOpen);
   };
 
   // Validação
@@ -352,7 +374,7 @@ export function ExercicioDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold">
@@ -614,6 +636,65 @@ export function ExercicioDialog({
         onSelect={handleExerciseSelect}
       />
     </>
+  );
+}
+
+function persistExerciseDraft(scope: string, draft: ExercicioDraft) {
+  writeInterfaceMemory({
+    scope,
+    version: EXERCISE_DIALOG_DRAFT_VERSION,
+    data: draft,
+    open: true,
+    hasContent: hasExerciseDraftContent,
+  });
+}
+
+function restoreExerciseDraft(
+  scope: string | null,
+  setters: {
+    setModo: (modo: "simple" | "group") => void;
+    setFormData: (data: Omit<ExercicioItem, "id">) => void;
+    setGrupoExercicios: (items: Omit<ExercicioItem, "id">[]) => void;
+    setTipoAgrupamento: (tipo: TipoAgrupamento) => void;
+    setDescansoEntreGrupos: (seconds: number) => void;
+  }
+) {
+  if (!scope) return false;
+
+  const draft = readInterfaceMemory<ExercicioDraft>({
+    scope,
+    version: EXERCISE_DIALOG_DRAFT_VERSION,
+    ttlMs: EXERCISE_DIALOG_DRAFT_TTL_MS,
+    hasContent: hasExerciseDraftContent,
+  });
+
+  if (!draft) return false;
+
+  setters.setModo(draft.data.modo || "simple");
+  setters.setFormData(draft.data.formData || defaultExercicio());
+  setters.setGrupoExercicios(Array.isArray(draft.data.grupoExercicios) ? draft.data.grupoExercicios : []);
+  setters.setTipoAgrupamento(draft.data.tipoAgrupamento || "bi-set");
+  setters.setDescansoEntreGrupos(draft.data.descansoEntreGrupos ?? 90);
+  return true;
+}
+
+function hasExerciseDraftContent(draft: ExercicioDraft) {
+  if (draft.modo === "group") return true;
+  const groupItems = Array.isArray(draft.grupoExercicios) ? draft.grupoExercicios : [];
+  return hasExerciseItemContent(draft.formData || {}) || groupItems.some(hasExerciseItemContent);
+}
+
+function hasExerciseItemContent(exercise: Partial<ExercicioItem>) {
+  return (
+    hasMeaningfulValues({
+      nome: exercise.nome,
+      link_video: exercise.link_video,
+      carga: exercise.carga,
+      observacoes: exercise.observacoes,
+    }) ||
+    ((exercise.series !== undefined && exercise.series !== EXERCISE_DEFAULT_VALUES.series) ||
+      (exercise.repeticoes !== undefined && exercise.repeticoes !== EXERCISE_DEFAULT_VALUES.repeticoes) ||
+      (exercise.descanso !== undefined && exercise.descanso !== EXERCISE_DEFAULT_VALUES.descanso))
   );
 }
 

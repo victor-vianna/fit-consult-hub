@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { Edit, Eye, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateTimeForInput, formatDisplayDate } from "@/utils/dateFormat";
+import {
+  clearInterfaceMemory,
+  hasMeaningfulValues,
+  readInterfaceMemory,
+  writeInterfaceMemory,
+} from "@/utils/interfaceMemory";
 
 interface Props {
   profileId: string;
@@ -37,16 +43,49 @@ const POSTURAL_GROUPS = [
   },
 ] as const;
 
+const POSTURAL_DRAFT_VERSION = 1;
+const POSTURAL_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const POSTURAL_DRAFT_IGNORED_FIELDS = new Set(["data_avaliacao"]);
+
 export function PosturalSection({ profileId, personalId, themeColor, onRefresh }: Props) {
   const { toast } = useToast();
   const [avaliacoes, setAvaliacoes] = useState<any[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
+  const draftScope = useMemo(() => `assessment:postural:${personalId}:${profileId}`, [personalId, profileId]);
+  const [draft, setDraft] = useState<Record<string, string> | null>(() => readPosturalDraft(draftScope)?.data ?? null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchData();
   }, [profileId]);
+
+  useEffect(() => {
+    const storedDraft = readPosturalDraft(draftScope);
+    setDraft(storedDraft?.data ?? null);
+    if (storedDraft?.open) {
+      setEditing(null);
+      setOpenDialog(true);
+    }
+  }, [draftScope]);
+
+  const openNew = () => {
+    setEditing(null);
+    const storedDraft = readPosturalDraft(draftScope);
+    setDraft(storedDraft?.data ?? null);
+    setOpenDialog(true);
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    setOpenDialog(open);
+    if (!open) {
+      if (!editing) {
+        clearPosturalDraft(draftScope);
+        setDraft(null);
+      }
+      setEditing(null);
+    }
+  };
 
   const fetchData = async () => {
     const { data, error } = await supabase
@@ -92,6 +131,10 @@ export function PosturalSection({ profileId, personalId, themeColor, onRefresh }
       if (error) throw error;
 
       toast({ title: "Avaliacao postural salva" });
+      if (!editing) {
+        clearPosturalDraft(draftScope);
+        setDraft(null);
+      }
       setOpenDialog(false);
       setEditing(null);
       fetchData();
@@ -110,7 +153,7 @@ export function PosturalSection({ profileId, personalId, themeColor, onRefresh }
           <CardTitle className="flex items-center gap-2 text-lg">
             <Eye className="h-5 w-5" /> Avaliacao postural
           </CardTitle>
-          <Button size="sm" style={{ backgroundColor: themeColor }} onClick={() => { setEditing(null); setOpenDialog(true); }}>
+          <Button size="sm" style={{ backgroundColor: themeColor }} onClick={openNew}>
             <Plus className="mr-1 h-4 w-4" /> Nova
           </Button>
         </div>
@@ -136,32 +179,77 @@ export function PosturalSection({ profileId, personalId, themeColor, onRefresh }
         ) : (
           <div className="py-12 text-center">
             <p className="mb-4 text-muted-foreground">Nenhuma avaliacao postural registrada</p>
-            <Button onClick={() => setOpenDialog(true)} style={{ backgroundColor: themeColor }}>
+            <Button onClick={openNew} style={{ backgroundColor: themeColor }}>
               <Plus className="mr-1 h-4 w-4" /> Adicionar
             </Button>
           </div>
         )}
       </CardContent>
 
-      <Dialog open={openDialog} onOpenChange={(open) => { setOpenDialog(open); if (!open) setEditing(null); }}>
+      <Dialog open={openDialog} onOpenChange={handleOpenChange}>
         <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar" : "Nova"} avaliacao postural</DialogTitle>
           </DialogHeader>
-          <PosturalForm editing={editing} loading={loading} themeColor={themeColor} onSubmit={handleSubmit} />
+          <PosturalForm
+            editing={editing}
+            draft={editing ? null : draft}
+            loading={loading}
+            themeColor={themeColor}
+            onDraftChange={(nextDraft) => {
+              setDraft(nextDraft);
+              if (nextDraft) {
+                writeInterfaceMemory({
+                  scope: draftScope,
+                  version: POSTURAL_DRAFT_VERSION,
+                  data: nextDraft,
+                  open: true,
+                  hasContent: hasPosturalDraftContent,
+                });
+              } else {
+                clearPosturalDraft(draftScope);
+              }
+            }}
+            onSubmit={handleSubmit}
+          />
         </DialogContent>
       </Dialog>
     </Card>
   );
 }
 
-function PosturalForm({ editing, loading, themeColor, onSubmit }: { editing: any | null; loading: boolean; themeColor?: string; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+function PosturalForm({
+  editing,
+  draft,
+  loading,
+  themeColor,
+  onDraftChange,
+  onSubmit,
+}: {
+  editing: any | null;
+  draft: Record<string, string> | null;
+  loading: boolean;
+  themeColor?: string;
+  onDraftChange: (draft: Record<string, string> | null) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  const formRef = useRef<HTMLFormElement | null>(null);
   const data = editing?.postural_desvios || {};
 
+  const persistDraft = useCallback(() => {
+    if (editing || !formRef.current) return;
+    const values = getFormValues(formRef.current);
+    if (!hasPosturalDraftContent(values)) {
+      onDraftChange(null);
+      return;
+    }
+    onDraftChange(values);
+  }, [editing, onDraftChange]);
+
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form ref={formRef} onSubmit={onSubmit} onInput={persistDraft} onChange={persistDraft} onBlur={persistDraft} className="space-y-4">
       <Field label="Data *">
-        <Input name="data_avaliacao" type="datetime-local" defaultValue={formatDateTimeForInput(editing?.data_avaliacao || new Date())} required />
+        <Input name="data_avaliacao" type="datetime-local" defaultValue={draftValue(draft, editing, "data_avaliacao", formatDateTimeForInput(editing?.data_avaliacao || new Date()))} required />
       </Field>
 
       {POSTURAL_GROUPS.map((group) => (
@@ -170,7 +258,11 @@ function PosturalForm({ editing, loading, themeColor, onSubmit }: { editing: any
           <div className="grid gap-3 sm:grid-cols-2">
             {group.fields.map((field) => (
               <Field key={field} label={formatLabel(field)}>
-                <Input name={`${group.key}.${field}`} defaultValue={data?.[group.key]?.[field] || ""} placeholder="Ex: simetrico, elevado a direita, rotacao..." />
+                <Input
+                  name={`${group.key}.${field}`}
+                  defaultValue={draftValue(draft, editing, `${group.key}.${field}`, data?.[group.key]?.[field] || "")}
+                  placeholder="Ex: simetrico, elevado a direita, rotacao..."
+                />
               </Field>
             ))}
           </div>
@@ -178,7 +270,7 @@ function PosturalForm({ editing, loading, themeColor, onSubmit }: { editing: any
       ))}
 
       <Field label="Observacoes gerais">
-        <Textarea name="postural_observacoes" rows={4} defaultValue={editing?.postural_observacoes || ""} />
+        <Textarea name="postural_observacoes" rows={4} defaultValue={draftValue(draft, editing, "postural_observacoes", editing?.postural_observacoes || "")} />
       </Field>
       <Button type="submit" className="w-full" disabled={loading} style={{ backgroundColor: themeColor }}>
         {loading ? "Salvando..." : "Salvar avaliacao postural"}
@@ -222,4 +314,34 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 function formatLabel(value: string) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function getFormValues(form: HTMLFormElement) {
+  const values: Record<string, string> = {};
+  new FormData(form).forEach((value, key) => {
+    values[key] = String(value);
+  });
+  return values;
+}
+
+function readPosturalDraft(scope: string) {
+  return readInterfaceMemory<Record<string, string>>({
+    scope,
+    version: POSTURAL_DRAFT_VERSION,
+    ttlMs: POSTURAL_DRAFT_TTL_MS,
+    hasContent: hasPosturalDraftContent,
+  });
+}
+
+function clearPosturalDraft(scope: string) {
+  clearInterfaceMemory({ scope, version: POSTURAL_DRAFT_VERSION });
+}
+
+function hasPosturalDraftContent(values: Record<string, string>) {
+  return hasMeaningfulValues(values, POSTURAL_DRAFT_IGNORED_FIELDS);
+}
+
+function draftValue(draft: Record<string, string> | null, editing: any | null, key: string, fallback: string | number | null | undefined) {
+  if (editing) return fallback ?? "";
+  return draft?.[key] ?? fallback ?? "";
 }

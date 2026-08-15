@@ -11,6 +11,12 @@ import type { Database } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
 import { ClipboardList, CheckCircle2, AlertCircle } from "lucide-react";
 import { getAnamneseReferenceDateValue } from "@/utils/anamneseDate";
+import {
+  clearInterfaceMemory,
+  hasMeaningfulValues,
+  readInterfaceMemory,
+  writeInterfaceMemory,
+} from "@/utils/interfaceMemory";
 
 interface Props {
   profileId: string;
@@ -74,6 +80,7 @@ type CachedAnamneseDraft = {
   cachedAt: string;
   sourceUpdatedAt: string | null;
   values: AnamneseFormValues;
+  step?: number;
 };
 
 type AnamneseValue = string | number | boolean | null | undefined;
@@ -86,7 +93,9 @@ type AnamneseInsert =
 type AnamneseUpdate =
   Database["public"]["Tables"]["anamnese_inicial"]["Update"];
 
-const ANAMNESE_CACHE_PREFIX = "fit-consult-hub:anamnese-draft";
+const ANAMNESE_CACHE_PREFIX = "anamnese:initial";
+const ANAMNESE_DRAFT_VERSION = 2;
+const ANAMNESE_DRAFT_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
 const ANAMNESE_FORM_FIELDS = [
   "data_nascimento",
@@ -156,58 +165,44 @@ function getTimestamp(value?: string | null) {
 }
 
 function readCachedAnamnese(cacheKey: string): CachedAnamneseDraft | null {
-  if (typeof window === "undefined") return null;
+  const record = readInterfaceMemory<Omit<CachedAnamneseDraft, "cachedAt">>({
+    scope: cacheKey,
+    version: ANAMNESE_DRAFT_VERSION,
+    ttlMs: ANAMNESE_DRAFT_TTL_MS,
+    hasContent: hasAnamneseDraftContent,
+  });
+  if (!record) return null;
 
-  try {
-    const cached = window.localStorage.getItem(cacheKey);
-    if (!cached) return null;
-
-    const parsed = JSON.parse(cached) as Partial<CachedAnamneseDraft>;
-    if (
-      !parsed ||
-      typeof parsed !== "object" ||
-      !parsed.values ||
-      typeof parsed.values !== "object"
-    ) {
-      return null;
-    }
-
-    return {
-      cachedAt: typeof parsed.cachedAt === "string" ? parsed.cachedAt : "",
-      sourceUpdatedAt:
-        typeof parsed.sourceUpdatedAt === "string"
-          ? parsed.sourceUpdatedAt
-          : null,
-      values: parsed.values,
-    };
-  } catch (error) {
-    console.warn("Nao foi possivel ler o cache da anamnese:", error);
-    return null;
-  }
+  return {
+    cachedAt: record.updatedAt,
+    sourceUpdatedAt: record.data.sourceUpdatedAt,
+    values: record.data.values,
+    step: record.data.step,
+  };
 }
 
 function writeCachedAnamnese(
   cacheKey: string,
   values: Partial<AnamneseFormValues>,
-  sourceUpdatedAt: string | null
+  sourceUpdatedAt: string | null,
+  step?: number
 ) {
-  if (typeof window === "undefined") return;
-
   const cachedValues = pickAnamneseFormValues(values);
-  if (Object.keys(cachedValues).length === 0) return;
+  writeInterfaceMemory({
+    scope: cacheKey,
+    version: ANAMNESE_DRAFT_VERSION,
+    data: { sourceUpdatedAt, values: cachedValues, step },
+    open: true,
+    hasContent: hasAnamneseDraftContent,
+  });
+}
 
-  try {
-    window.localStorage.setItem(
-      cacheKey,
-      JSON.stringify({
-        cachedAt: new Date().toISOString(),
-        sourceUpdatedAt,
-        values: cachedValues,
-      } satisfies CachedAnamneseDraft)
-    );
-  } catch (error) {
-    console.warn("Nao foi possivel salvar o cache da anamnese:", error);
-  }
+function clearCachedAnamnese(cacheKey: string) {
+  clearInterfaceMemory({ scope: cacheKey, version: ANAMNESE_DRAFT_VERSION });
+}
+
+function hasAnamneseDraftContent(draft: Omit<CachedAnamneseDraft, "cachedAt">) {
+  return hasMeaningfulValues(pickAnamneseFormValues(draft.values));
 }
 
 function getErrorMessage(error: unknown) {
@@ -225,6 +220,7 @@ export function AnamneseInicialForm({
   const [existingAnamnese, setExistingAnamnese] =
     useState<ExistingAnamneseData | null>(null);
   const [cacheHydrated, setCacheHydrated] = useState(false);
+  const [draftDirty, setDraftDirty] = useState(false);
   const [step, setStep] = useState(1);
   const totalSteps = 6;
 
@@ -234,20 +230,22 @@ export function AnamneseInicialForm({
   // --- Effects (fora de qualquer função) ---
   useEffect(() => {
     setCacheHydrated(false);
+    setDraftDirty(false);
     setStep(1);
     checkExistingAnamnese();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, personalId]);
 
   useEffect(() => {
-    if (!cacheHydrated || !profileId || !personalId) return;
+    if (!cacheHydrated || !draftDirty || !profileId || !personalId) return;
 
     writeCachedAnamnese(
       getAnamneseCacheKey(profileId, personalId),
       formValues,
-      getAnamneseReferenceDateValue(existingAnamnese)
+      getAnamneseReferenceDateValue(existingAnamnese),
+      step
     );
-  }, [cacheHydrated, existingAnamnese, formValues, profileId, personalId]);
+  }, [cacheHydrated, draftDirty, existingAnamnese, formValues, profileId, personalId, step]);
 
   // --- Helpers / handlers ---
   const nextStep = () => {
@@ -298,12 +296,16 @@ export function AnamneseInicialForm({
         ...(shouldUseCache ? { ...savedValues, ...cached.values } : savedValues),
         termoAceito: false,
       });
+      setStep(shouldUseCache && cached?.step ? Math.min(Math.max(cached.step, 1), totalSteps) : 1);
+      setDraftDirty(false);
     } catch (error: unknown) {
       console.error("Erro ao verificar anamnese:", error);
       const cached = readCachedAnamnese(cacheKey);
       if (cached) {
         setFormValues({ ...cached.values, termoAceito: false });
+        setStep(cached.step ? Math.min(Math.max(cached.step, 1), totalSteps) : 1);
       }
+      setDraftDirty(false);
     } finally {
       setCacheHydrated(true);
     }
@@ -313,6 +315,7 @@ export function AnamneseInicialForm({
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value, type } = e.target;
+    setDraftDirty(true);
     setFormValues((prev) => ({
       ...prev,
       [name]:
@@ -325,6 +328,7 @@ export function AnamneseInicialForm({
   };
 
   const handleRadioChange = (name: string, value: string) => {
+    setDraftDirty(true);
     setFormValues((prev) => ({
       ...prev,
       [name]: value === "sim",
@@ -437,11 +441,8 @@ export function AnamneseInicialForm({
         });
       }
 
-      writeCachedAnamnese(
-        getAnamneseCacheKey(profileId, personalId),
-        anamneseData,
-        now
-      );
+      clearCachedAnamnese(getAnamneseCacheKey(profileId, personalId));
+      setDraftDirty(false);
 
       if (onComplete) onComplete();
     } catch (error: unknown) {
@@ -1104,9 +1105,10 @@ export function AnamneseInicialForm({
                 <Checkbox
                   id="termoAceito"
                   checked={formValues.termoAceito === true}
-                  onCheckedChange={(checked) =>
-                    setFormValues((prev) => ({ ...prev, termoAceito: checked === true }))
-                  }
+                  onCheckedChange={(checked) => {
+                    setDraftDirty(true);
+                    setFormValues((prev) => ({ ...prev, termoAceito: checked === true }));
+                  }}
                   className="mt-1"
                 />
                 <label

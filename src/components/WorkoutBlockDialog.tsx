@@ -64,7 +64,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useBlockDialogDraft } from "@/hooks/useBlockDialogDraft";
+import { hasBlockDialogDraft, useBlockDialogDraft } from "@/hooks/useBlockDialogDraft";
 
 interface WorkoutBlockDialogProps {
   open: boolean;
@@ -73,6 +73,7 @@ interface WorkoutBlockDialogProps {
   blocoEditando?: Partial<BlocoTreino> | null;
   diaNome?: string;
   personalId?: string;
+  draftKey?: string;
 }
 
 export function WorkoutBlockDialog({
@@ -82,6 +83,7 @@ export function WorkoutBlockDialog({
   blocoEditando,
   diaNome,
   personalId,
+  draftKey,
 }: WorkoutBlockDialogProps) {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = usePersistedState<"manual" | "template">(
@@ -306,12 +308,18 @@ export function WorkoutBlockDialog({
   };
 
   const draft = useBlockDialogDraft({
-    scopeKey: personalId || "anon",
+    scopeKey: draftKey || personalId || "anon",
     open,
     isEditing,
     collect: collectDraft,
     apply: applyDraft,
+    hasContent: hasBlockDraftContent,
   });
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && !isEditing) draft.clear();
+    onOpenChange(nextOpen);
+  };
 
   // 🔧 CRÍTICO: Re-popular o formulário sempre que abrir com um bloco diferente.
   // Sem isso, ao editar um bloco (ex.: cardio Elíptico) o modal aparece vazio
@@ -432,7 +440,7 @@ export function WorkoutBlockDialog({
   const tipoConfig = TIPOS_BLOCO[tipo];
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -1193,7 +1201,7 @@ export function WorkoutBlockDialog({
         <DialogFooter>
           <Button
             variant="outline"
-            onClick={() => onOpenChange(false)}
+            onClick={() => handleOpenChange(false)}
             disabled={loading}
           >
             Cancelar
@@ -1236,4 +1244,39 @@ export function WorkoutBlockDialog({
       </AlertDialog>
     </Dialog>
   );
+}
+
+export function hasWorkoutBlockDialogDraft(draftKey: string) {
+  return hasBlockDialogDraft(draftKey, hasBlockDraftContent);
+}
+
+function hasBlockDraftContent(draft: Record<string, unknown>) {
+  const links = Array.isArray(draft.links) ? draft.links : [];
+  return (
+    isFilledString(draft.nome) ||
+    isFilledString(draft.descricao) ||
+    isFilledString(draft.gruposMusculares) ||
+    isFilledString(draft.atividades) ||
+    links.some(isFilledString) ||
+    draft.tipo !== "cardio" ||
+    draft.posicao !== "fim" ||
+    draft.duracaoMinutos !== 10 ||
+    draft.obrigatorio === true ||
+    draft.modalidade !== "hiit" ||
+    draft.trabalhoSeg !== 30 ||
+    draft.descansoSeg !== 30 ||
+    draft.rounds !== 10 ||
+    draft.velocidade !== 0 ||
+    draft.inclinacao !== 0 ||
+    draft.bpmMin !== 0 ||
+    draft.bpmMax !== 0 ||
+    draft.intensidadeValor !== 80 ||
+    draft.intensidadeUnidade !== "percentual" ||
+    draft.tipoAlongamento !== "estatico" ||
+    draft.tipoAquecimento !== "geral"
+  );
+}
+
+function isFilledString(value: unknown) {
+  return typeof value === "string" && value.trim() !== "";
 }

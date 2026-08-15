@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  clearInterfaceMemory,
+  hasMeaningfulValue,
+  readInterfaceMemory,
+  writeInterfaceMemory,
+} from "@/utils/interfaceMemory";
 
 /**
  * Persistência leve de rascunho para o WorkoutBlockDialog.
- * Guarda em sessionStorage por personalId; ignora edição (apenas novos blocos).
+ * Guarda em localStorage com status em andamento; ignora edição (apenas novos blocos).
  */
 export function useBlockDialogDraft<T extends Record<string, unknown>>(params: {
   scopeKey: string;
@@ -10,63 +16,107 @@ export function useBlockDialogDraft<T extends Record<string, unknown>>(params: {
   isEditing: boolean;
   collect: () => T;
   apply: (draft: T) => void;
+  hasContent?: (draft: T) => boolean;
+  autoRestore?: boolean;
 }) {
-  const { scopeKey, open, isEditing, collect, apply } = params;
-  const storageKey = `pf:block-draft:${scopeKey}:v1`;
+  const {
+    scopeKey,
+    open,
+    isEditing,
+    collect,
+    apply,
+    hasContent = defaultDraftHasContent,
+    autoRestore = true,
+  } = params;
+  const version = BLOCK_DIALOG_DRAFT_VERSION;
   const [draftAvailable, setDraftAvailable] = useState(false);
   const collectRef = useRef(collect);
   const applyRef = useRef(apply);
+  const hasContentRef = useRef(hasContent);
   collectRef.current = collect;
   applyRef.current = apply;
+  hasContentRef.current = hasContent;
 
-  // Detecta rascunho ao abrir (apenas em criação)
+  // Detecta/restaura rascunho ao abrir (apenas em criacao)
   useEffect(() => {
     if (!open || isEditing) {
       setDraftAvailable(false);
       return;
     }
-    try {
-      const raw = sessionStorage.getItem(storageKey);
-      setDraftAvailable(!!raw);
-    } catch {
-      setDraftAvailable(false);
-    }
-  }, [open, isEditing, storageKey]);
 
-  // Auto-save com debounce enquanto o dialog está aberto e não estamos editando
+    const draft = readInterfaceMemory<T>({
+      scope: getBlockDialogDraftScope(scopeKey),
+      version,
+      ttlMs: BLOCK_DIALOG_DRAFT_TTL_MS,
+      hasContent: hasContentRef.current,
+    });
+
+    if (draft && autoRestore) {
+      applyRef.current(draft.data);
+      setDraftAvailable(false);
+      return;
+    }
+
+    setDraftAvailable(Boolean(draft));
+  }, [open, isEditing, scopeKey, version, autoRestore]);
+
+  // Auto-save com debounce enquanto o dialog esta aberto e nao estamos editando
   useEffect(() => {
     if (!open || isEditing) return;
     const interval = setInterval(() => {
-      try {
-        const snapshot = collectRef.current();
-        sessionStorage.setItem(storageKey, JSON.stringify(snapshot));
-      } catch {
-        // quota / serialização — ignora
-      }
+      const snapshot = collectRef.current();
+      writeInterfaceMemory({
+        scope: getBlockDialogDraftScope(scopeKey),
+        version,
+        data: snapshot,
+        open: true,
+        hasContent: hasContentRef.current,
+      });
     }, 800);
     return () => clearInterval(interval);
-  }, [open, isEditing, storageKey]);
+  }, [open, isEditing, scopeKey, version]);
 
   const restore = useCallback(() => {
-    try {
-      const raw = sessionStorage.getItem(storageKey);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as T;
-      applyRef.current(parsed);
-      setDraftAvailable(false);
-    } catch {
-      // ignora
-    }
-  }, [storageKey]);
+    const draft = readInterfaceMemory<T>({
+      scope: getBlockDialogDraftScope(scopeKey),
+      version,
+      ttlMs: BLOCK_DIALOG_DRAFT_TTL_MS,
+      hasContent: hasContentRef.current,
+    });
+    if (!draft) return;
+    applyRef.current(draft.data);
+    setDraftAvailable(false);
+  }, [scopeKey, version]);
 
   const clear = useCallback(() => {
-    try {
-      sessionStorage.removeItem(storageKey);
-    } catch {
-      // ignora
-    }
+    clearInterfaceMemory({ scope: getBlockDialogDraftScope(scopeKey), version });
     setDraftAvailable(false);
-  }, [storageKey]);
+  }, [scopeKey, version]);
 
   return { draftAvailable, restore, clear };
+}
+
+const BLOCK_DIALOG_DRAFT_VERSION = 2;
+const BLOCK_DIALOG_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function getBlockDialogDraftScope(scopeKey: string) {
+  return `workout:block-dialog:${scopeKey}`;
+}
+
+export function hasBlockDialogDraft<T extends Record<string, unknown>>(
+  scopeKey: string,
+  hasContent: (draft: T) => boolean = defaultDraftHasContent
+) {
+  return Boolean(
+    readInterfaceMemory<T>({
+      scope: getBlockDialogDraftScope(scopeKey),
+      version: BLOCK_DIALOG_DRAFT_VERSION,
+      ttlMs: BLOCK_DIALOG_DRAFT_TTL_MS,
+      hasContent,
+    })
+  );
+}
+
+function defaultDraftHasContent<T extends Record<string, unknown>>(draft: T) {
+  return Object.values(draft).some(hasMeaningfulValue);
 }

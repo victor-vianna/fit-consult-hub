@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { Edit, Plus, StretchHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,12 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMetricValue, toNumber } from "@/utils/avaliacaoMetrics";
 import { formatDateTimeForInput, formatDisplayDate } from "@/utils/dateFormat";
+import {
+  clearInterfaceMemory,
+  hasMeaningfulValues,
+  readInterfaceMemory,
+  writeInterfaceMemory,
+} from "@/utils/interfaceMemory";
 
 interface Props {
   profileId: string;
@@ -19,16 +25,68 @@ interface Props {
   onRefresh?: () => void;
 }
 
+const FLEX_DRAFT_VERSION = 1;
+const FLEX_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const FLEX_DRAFT_IGNORED_FIELDS = new Set(["data_avaliacao"]);
+
 export function FlexibilidadeSection({ profileId, personalId, themeColor, onRefresh }: Props) {
   const { toast } = useToast();
   const [avaliacoes, setAvaliacoes] = useState<any[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
+  const draftScope = useMemo(() => `assessment:flexibility:${personalId}:${profileId}`, [personalId, profileId]);
+  const [draft, setDraft] = useState<Record<string, string> | null>(() => readFlexDraft(draftScope)?.data ?? null);
   const [loading, setLoading] = useState(false);
+  const formRef = useRef<HTMLFormElement | null>(null);
 
   useEffect(() => {
     fetchData();
   }, [profileId]);
+
+  useEffect(() => {
+    const storedDraft = readFlexDraft(draftScope);
+    setDraft(storedDraft?.data ?? null);
+    if (storedDraft?.open) {
+      setEditing(null);
+      setOpenDialog(true);
+    }
+  }, [draftScope]);
+
+  const persistDraft = useCallback(() => {
+    if (editing || !formRef.current) return;
+    const values = getFormValues(formRef.current);
+    if (!hasFlexDraftContent(values)) {
+      clearFlexDraft(draftScope);
+      setDraft(null);
+      return;
+    }
+    setDraft(values);
+    writeInterfaceMemory({
+      scope: draftScope,
+      version: FLEX_DRAFT_VERSION,
+      data: values,
+      open: true,
+      hasContent: hasFlexDraftContent,
+    });
+  }, [draftScope, editing]);
+
+  const openNew = () => {
+    setEditing(null);
+    const storedDraft = readFlexDraft(draftScope);
+    setDraft(storedDraft?.data ?? null);
+    setOpenDialog(true);
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    setOpenDialog(open);
+    if (!open) {
+      if (!editing) {
+        clearFlexDraft(draftScope);
+        setDraft(null);
+      }
+      setEditing(null);
+    }
+  };
 
   const fetchData = async () => {
     const { data, error } = await supabase
@@ -73,6 +131,10 @@ export function FlexibilidadeSection({ profileId, personalId, themeColor, onRefr
       if (error) throw error;
 
       toast({ title: "Flexibilidade salva" });
+      if (!editing) {
+        clearFlexDraft(draftScope);
+        setDraft(null);
+      }
       setOpenDialog(false);
       setEditing(null);
       fetchData();
@@ -91,7 +153,7 @@ export function FlexibilidadeSection({ profileId, personalId, themeColor, onRefr
           <CardTitle className="flex items-center gap-2 text-lg">
             <StretchHorizontal className="h-5 w-5" /> Flexibilidade
           </CardTitle>
-          <Button size="sm" style={{ backgroundColor: themeColor }} onClick={() => { setEditing(null); setOpenDialog(true); }}>
+          <Button size="sm" style={{ backgroundColor: themeColor }} onClick={openNew}>
             <Plus className="mr-1 h-4 w-4" /> Nova
           </Button>
         </div>
@@ -122,36 +184,36 @@ export function FlexibilidadeSection({ profileId, personalId, themeColor, onRefr
         ) : (
           <div className="py-12 text-center">
             <p className="mb-4 text-muted-foreground">Nenhum teste de flexibilidade registrado</p>
-            <Button onClick={() => setOpenDialog(true)} style={{ backgroundColor: themeColor }}>
+            <Button onClick={openNew} style={{ backgroundColor: themeColor }}>
               <Plus className="mr-1 h-4 w-4" /> Adicionar
             </Button>
           </div>
         )}
       </CardContent>
 
-      <Dialog open={openDialog} onOpenChange={(open) => { setOpenDialog(open); if (!open) setEditing(null); }}>
+      <Dialog open={openDialog} onOpenChange={handleOpenChange}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar" : "Nova"} avaliacao de flexibilidade</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form ref={formRef} onSubmit={handleSubmit} onInput={persistDraft} onChange={persistDraft} onBlur={persistDraft} className="space-y-4">
             <Field label="Data *">
-              <Input name="data_avaliacao" type="datetime-local" defaultValue={formatDateTimeForInput(editing?.data_avaliacao || new Date())} required />
+              <Input name="data_avaliacao" type="datetime-local" defaultValue={draftValue(draft, editing, "data_avaliacao", formatDateTimeForInput(editing?.data_avaliacao || new Date()))} required />
             </Field>
             <Field label="Sentar e alcancar (cm)">
-              <Input name="sentar_alcancar" type="number" step="0.1" defaultValue={editing?.flexibilidade_sentar_alcancar ?? ""} />
+              <Input name="sentar_alcancar" type="number" step="0.1" defaultValue={draftValue(draft, editing, "sentar_alcancar", editing?.flexibilidade_sentar_alcancar ?? "")} />
             </Field>
             <Field label="Ombro">
-              <Input name="ombro" placeholder="Ex: normal, limitado, hipermovel" defaultValue={editing?.flexibilidade_ombro || ""} />
+              <Input name="ombro" placeholder="Ex: normal, limitado, hipermovel" defaultValue={draftValue(draft, editing, "ombro", editing?.flexibilidade_ombro || "")} />
             </Field>
             <Field label="Quadril">
-              <Input name="quadril" placeholder="Ex: normal, limitado" defaultValue={editing?.flexibilidade_quadril || ""} />
+              <Input name="quadril" placeholder="Ex: normal, limitado" defaultValue={draftValue(draft, editing, "quadril", editing?.flexibilidade_quadril || "")} />
             </Field>
             <Field label="Tornozelo">
-              <Input name="tornozelo" placeholder="Ex: normal, limitado" defaultValue={editing?.flexibilidade_tornozelo || ""} />
+              <Input name="tornozelo" placeholder="Ex: normal, limitado" defaultValue={draftValue(draft, editing, "tornozelo", editing?.flexibilidade_tornozelo || "")} />
             </Field>
             <Field label="Observacoes">
-              <Textarea name="observacoes" rows={3} defaultValue={editing?.observacoes || ""} />
+              <Textarea name="observacoes" rows={3} defaultValue={draftValue(draft, editing, "observacoes", editing?.observacoes || "")} />
             </Field>
             <Button type="submit" className="w-full" disabled={loading} style={{ backgroundColor: themeColor }}>
               {loading ? "Salvando..." : "Salvar"}
@@ -180,4 +242,34 @@ function Metric({ label, value, unit }: { label: string; value: any; unit: strin
       <p className="font-semibold">{formatMetricValue(value, unit)}</p>
     </div>
   );
+}
+
+function getFormValues(form: HTMLFormElement) {
+  const values: Record<string, string> = {};
+  new FormData(form).forEach((value, key) => {
+    values[key] = String(value);
+  });
+  return values;
+}
+
+function readFlexDraft(scope: string) {
+  return readInterfaceMemory<Record<string, string>>({
+    scope,
+    version: FLEX_DRAFT_VERSION,
+    ttlMs: FLEX_DRAFT_TTL_MS,
+    hasContent: hasFlexDraftContent,
+  });
+}
+
+function clearFlexDraft(scope: string) {
+  clearInterfaceMemory({ scope, version: FLEX_DRAFT_VERSION });
+}
+
+function hasFlexDraftContent(values: Record<string, string>) {
+  return hasMeaningfulValues(values, FLEX_DRAFT_IGNORED_FIELDS);
+}
+
+function draftValue(draft: Record<string, string> | null, editing: any | null, key: string, fallback: string | number | null | undefined) {
+  if (editing) return fallback ?? "";
+  return draft?.[key] ?? fallback ?? "";
 }

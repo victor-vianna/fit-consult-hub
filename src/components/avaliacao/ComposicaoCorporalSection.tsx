@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import {
   AlertTriangle,
@@ -37,6 +37,12 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  clearInterfaceMemory,
+  hasMeaningfulValues,
+  readInterfaceMemory,
+  writeInterfaceMemory,
+} from "@/utils/interfaceMemory";
+import {
   GENERAL_FIELDS,
   PERIMETRY_FIELDS,
   SKINFOLD_FIELDS,
@@ -66,6 +72,15 @@ interface Props {
 
 type DirectionPreference = "up" | "down" | "neutral";
 
+type CompositionDraft = {
+  values: Record<string, string>;
+  dobrasMeasureCount: number;
+};
+
+const COMPOSITION_DRAFT_VERSION = 4;
+const COMPOSITION_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const COMPOSITION_DRAFT_IGNORED_FIELDS = new Set(["data_avaliacao", "dobras_measure_count"]);
+
 const CONTEXT_LABELS: Record<string, string> = {
   masculino: "Masculino",
   feminino: "Feminino",
@@ -90,11 +105,25 @@ export function ComposicaoCorporalSection({
   const [openDialog, setOpenDialog] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
   const [selectedAssessmentId, setSelectedAssessmentId] = useState<string | null>(null);
+  const draftScope = useMemo(
+    () => `assessment:composition:${personalId}:${profileId}`,
+    [personalId, profileId]
+  );
+  const [draft, setDraft] = useState<CompositionDraft | null>(() => readCompositionDraft(draftScope)?.data ?? null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchData();
   }, [profileId]);
+
+  useEffect(() => {
+    const storedDraft = readCompositionDraft(draftScope);
+    setDraft(storedDraft?.data ?? null);
+    if (storedDraft?.open) {
+      setEditing(null);
+      setOpenDialog(true);
+    }
+  }, [draftScope]);
 
   const fetchData = async () => {
     const [{ data: registros }, { data: profile }] = await Promise.all([
@@ -182,6 +211,10 @@ export function ComposicaoCorporalSection({
         title: pending.length > 0 ? "Avaliacao salva com pendencias" : "Avaliacao salva",
         description: pending.length > 0 ? `Falta preencher: ${pending.join(", ")}.` : undefined,
       });
+      if (!editing) {
+        clearCompositionDraft(draftScope);
+        setDraft(null);
+      }
       setOpenDialog(false);
       setEditing(null);
       const updatedAssessments = await fetchData();
@@ -226,6 +259,8 @@ export function ComposicaoCorporalSection({
             style={{ backgroundColor: themeColor }}
             onClick={() => {
               setEditing(null);
+              const storedDraft = readCompositionDraft(draftScope);
+              setDraft(storedDraft?.data ?? null);
               setOpenDialog(true);
             }}
           >
@@ -258,7 +293,14 @@ export function ComposicaoCorporalSection({
           <div className="py-12 text-center">
             <Ruler className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
             <p className="mb-4 text-muted-foreground">Nenhuma avaliacao corporal registrada</p>
-            <Button onClick={() => setOpenDialog(true)} style={{ backgroundColor: themeColor }}>
+            <Button
+              onClick={() => {
+                const storedDraft = readCompositionDraft(draftScope);
+                setDraft(storedDraft?.data ?? null);
+                setOpenDialog(true);
+              }}
+              style={{ backgroundColor: themeColor }}
+            >
               <Plus className="mr-1 h-4 w-4" /> Criar primeira avaliacao
             </Button>
           </div>
@@ -269,14 +311,34 @@ export function ComposicaoCorporalSection({
         open={openDialog}
         onOpenChange={(open) => {
           setOpenDialog(open);
-          if (!open) setEditing(null);
+          if (!open) {
+            if (!editing) {
+              clearCompositionDraft(draftScope);
+              setDraft(null);
+            }
+            setEditing(null);
+          }
         }}
       >
         <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar" : "Nova"} avaliacao corporal completa</DialogTitle>
           </DialogHeader>
-          <CompositionForm editing={editing} loading={loading} themeColor={themeColor} onSubmit={handleSubmit} />
+          <CompositionForm
+            editing={editing}
+            draft={editing ? null : draft}
+            loading={loading}
+            themeColor={themeColor}
+            onDraftChange={(nextDraft) => {
+              setDraft(nextDraft);
+              if (nextDraft) {
+                persistCompositionDraft(draftScope, nextDraft);
+              } else {
+                clearCompositionDraft(draftScope);
+              }
+            }}
+            onSubmit={handleSubmit}
+          />
         </DialogContent>
       </Dialog>
     </Card>
@@ -749,24 +811,69 @@ function SkinfoldMeasurementsPanel({ avaliacao }: { avaliacao: any }) {
 
 function CompositionForm({
   editing,
+  draft,
   loading,
   themeColor,
+  onDraftChange,
   onSubmit,
 }: {
   editing: any | null;
+  draft: CompositionDraft | null;
   loading: boolean;
   themeColor?: string;
+  onDraftChange: (draft: CompositionDraft | null) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const didMountRef = useRef(false);
+  const draftValues = editing ? {} : draft?.values ?? {};
   const medidas = editing?.dobras_medidas || {};
-  const [dobrasMeasureCount, setDobrasMeasureCount] = useState(() => getSkinfoldMeasureCount(editing));
+  const [dobrasMeasureCount, setDobrasMeasureCount] = useState(() =>
+    editing ? getSkinfoldMeasureCount(editing) : draft?.dobrasMeasureCount ?? 3
+  );
+
+  const persistDraft = useCallback(() => {
+    if (editing || !formRef.current) return;
+    const values = getFormValues(formRef.current);
+    if (!hasCompositionDraftContent(values)) {
+      onDraftChange(null);
+      return;
+    }
+    onDraftChange({
+      values,
+      dobrasMeasureCount,
+    });
+  }, [dobrasMeasureCount, editing, onDraftChange]);
+  const persistDraftAfterFieldUpdate = useCallback(() => {
+    window.setTimeout(persistDraft, 0);
+  }, [persistDraft]);
 
   useEffect(() => {
-    setDobrasMeasureCount(getSkinfoldMeasureCount(editing));
-  }, [editing?.id]);
+    setDobrasMeasureCount(editing ? getSkinfoldMeasureCount(editing) : draft?.dobrasMeasureCount ?? 3);
+  }, [draft?.dobrasMeasureCount, editing, editing?.id]);
+
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    persistDraft();
+  }, [dobrasMeasureCount, persistDraft]);
+
+  const draftValue = (name: string, fallback: string | number | null | undefined = "") => {
+    if (editing) return fallback ?? "";
+    return draftValues[name] ?? fallback ?? "";
+  };
 
   return (
-    <form onSubmit={onSubmit} className="space-y-5">
+    <form
+      ref={formRef}
+      onSubmit={onSubmit}
+      onInput={persistDraft}
+      onChange={persistDraft}
+      onBlur={persistDraft}
+      className="space-y-5"
+    >
       <input type="hidden" name="dobras_measure_count" value={dobrasMeasureCount} />
       <section className="space-y-3 rounded-lg border bg-muted/20 p-3">
         <h3 className="text-sm font-semibold">Dados gerais</h3>
@@ -775,16 +882,16 @@ function CompositionForm({
             <Input
               name="data_avaliacao"
               type="datetime-local"
-              defaultValue={formatDateTimeForInput(editing?.data_avaliacao || new Date())}
+              defaultValue={draftValue("data_avaliacao", formatDateTimeForInput(editing?.data_avaliacao || new Date()))}
               required
             />
           </Field>
-          <Field label="Objetivo"><Input name="objetivo" defaultValue={editing?.objetivo || ""} /></Field>
-          <Field label="Peso (kg)"><Input name="peso" type="number" step="0.1" defaultValue={editing?.peso ?? ""} /></Field>
-          <Field label="Altura (m)"><Input name="altura" type="number" step="0.01" defaultValue={editing?.altura ?? ""} /></Field>
-          <Field label="Idade"><Input name="idade" type="number" step="1" defaultValue={editing?.idade ?? ""} /></Field>
+          <Field label="Objetivo"><Input name="objetivo" defaultValue={draftValue("objetivo", editing?.objetivo || "")} /></Field>
+          <Field label="Peso (kg)"><Input name="peso" type="number" step="0.1" defaultValue={draftValue("peso", editing?.peso ?? "")} /></Field>
+          <Field label="Altura (m)"><Input name="altura" type="number" step="0.01" defaultValue={draftValue("altura", editing?.altura ?? "")} /></Field>
+          <Field label="Idade"><Input name="idade" type="number" step="1" defaultValue={draftValue("idade", editing?.idade ?? "")} /></Field>
           <Field label="Sexo">
-            <Select name="sexo_avaliacao" defaultValue={editing?.sexo_avaliacao || ""}>
+            <Select name="sexo_avaliacao" defaultValue={String(draftValue("sexo_avaliacao", editing?.sexo_avaliacao || ""))} onValueChange={persistDraftAfterFieldUpdate}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="masculino">Masculino</SelectItem>
@@ -793,7 +900,7 @@ function CompositionForm({
             </Select>
           </Field>
           <Field label="Fase">
-            <Select name="fase" defaultValue={editing?.fase || ""}>
+            <Select name="fase" defaultValue={String(draftValue("fase", editing?.fase || ""))} onValueChange={persistDraftAfterFieldUpdate}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="crianca">Crianca</SelectItem>
@@ -803,7 +910,7 @@ function CompositionForm({
             </Select>
           </Field>
           <Field label="Etnia">
-            <Select name="etnia" defaultValue={editing?.etnia || ""}>
+            <Select name="etnia" defaultValue={String(draftValue("etnia", editing?.etnia || ""))} onValueChange={persistDraftAfterFieldUpdate}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="caucasiano">Caucasiano</SelectItem>
@@ -821,7 +928,7 @@ function CompositionForm({
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {PERIMETRY_FIELDS.map(({ key, label }) => (
             <Field key={key} label={`${label} (cm)`}>
-              <Input name={key} type="number" step="0.1" defaultValue={editing?.[key] ?? ""} />
+              <Input name={key} type="number" step="0.1" defaultValue={draftValue(key, editing?.[key] ?? "")} />
             </Field>
           ))}
         </div>
@@ -873,7 +980,7 @@ function CompositionForm({
                     type="number"
                     step="0.1"
                     placeholder={`${index + 1}a medicao`}
-                    defaultValue={medidas?.[key]?.[index] ?? ""}
+                    defaultValue={draftValue(`${key}_${index + 1}`, medidas?.[key]?.[index] ?? "")}
                   />
                 ))}
               </div>
@@ -883,7 +990,7 @@ function CompositionForm({
       </section>
 
       <Field label="Observacoes">
-        <Textarea name="observacoes" rows={3} defaultValue={editing?.observacoes || ""} />
+        <Textarea name="observacoes" rows={3} defaultValue={draftValue("observacoes", editing?.observacoes || "")} />
       </Field>
 
       <Button type="submit" className="w-full" disabled={loading} style={{ backgroundColor: themeColor }}>
@@ -1017,6 +1124,43 @@ function toFiniteNumber(value: unknown) {
   if (value === null || value === undefined || value === "") return null;
   const numeric = typeof value === "number" ? value : Number(value);
   return Number.isFinite(numeric) ? numeric : null;
+}
+
+function getFormValues(form: HTMLFormElement) {
+  const values: Record<string, string> = {};
+  const formData = new FormData(form);
+  formData.forEach((value, key) => {
+    values[key] = String(value);
+  });
+  return values;
+}
+
+function readCompositionDraft(scope: string) {
+  return readInterfaceMemory<CompositionDraft>({
+    scope,
+    version: COMPOSITION_DRAFT_VERSION,
+    ttlMs: COMPOSITION_DRAFT_TTL_MS,
+    hasContent: hasCompositionDraftContent,
+  });
+}
+
+function persistCompositionDraft(scope: string, draft: CompositionDraft) {
+  writeInterfaceMemory({
+    scope,
+    version: COMPOSITION_DRAFT_VERSION,
+    data: draft,
+    open: true,
+    hasContent: hasCompositionDraftContent,
+  });
+}
+
+function hasCompositionDraftContent(draft: CompositionDraft | Record<string, string>) {
+  const values = "values" in draft ? draft.values : draft;
+  return hasMeaningfulValues(values, COMPOSITION_DRAFT_IGNORED_FIELDS);
+}
+
+function clearCompositionDraft(scope: string) {
+  clearInterfaceMemory({ scope, version: COMPOSITION_DRAFT_VERSION });
 }
 
 function getSkinfoldValues(record: any, key: string) {

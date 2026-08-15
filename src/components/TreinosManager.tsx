@@ -46,7 +46,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ExercicioDialog } from "@/components/ExercicioDialog";
+import { ExercicioDialog, hasExerciseDialogDraft } from "@/components/ExercicioDialog";
 import { SortableExercicioCard } from "@/components/SortableExercicioCard";
 import { SortableGroupCard } from "@/components/SortableGroupCard";
 import { SortableBlockCard } from "@/components/SortableBlockCard";
@@ -54,7 +54,7 @@ import { WorkoutTimer } from "./WorkoutTimer";
 import { WorkoutDayView } from "./WorkoutDayView";
 import ExercisePicker from "@/components/exercises/ExercisePicker";
 import { formatDisplayDate, formatDisplayMonthDay } from "@/utils/dateFormat";
-import { WorkoutBlockDialog } from "./WorkoutBlockDialog";
+import { WorkoutBlockDialog, hasWorkoutBlockDialogDraft } from "./WorkoutBlockDialog";
 import { WorkoutBlockCard } from "./WorkoutBlockCard";
 import type { Exercise } from "@/types/exercise";
 import type { Exercicio as TreinoExercicio, TreinoDia } from "@/types/treino";
@@ -279,11 +279,7 @@ export function TreinosManager({
     enabled: workoutWeekReady,
   });
 
-  const [exercicioDialogOpen, setExercicioDialogOpen] = usePersistedState<boolean>(
-    `tm-exdlg-open:${profileId}`,
-    false,
-    { storage: "session" }
-  );
+  const [exercicioDialogOpen, setExercicioDialogOpen] = useState(false);
   const [editDescricaoOpen, setEditDescricaoOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedDia, setSelectedDia] = usePersistedState<number | null>(
@@ -294,8 +290,10 @@ export function TreinosManager({
   const [exercicioEditando, setExercicioEditando] =
     useState<DialogExercicio | null>(null);
   const [descricaoEditando, setDescricaoEditando] = useState("");
+  const getExerciseDraftKey = (dia: number | null) =>
+    `${personalId}:${profileId}:${semanaSelecionada}:${dia ?? "x"}`;
   const [selectedTreinoId, setSelectedTreinoId] = usePersistedState<string | null>(
-    `tm-selected-treino:${profileId}`,
+    `tm-selected-treino:${personalId}:${profileId}:${semanaSelecionada}`,
     null,
     { storage: "session" }
   );
@@ -334,10 +332,37 @@ export function TreinosManager({
   } | null>(null);
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [blocoEditando, setBlocoEditando] = useState<BlocoTreino | null>(null);
+  const getBlockDraftKey = (dia: number | null) =>
+    `${personalId}:${profileId}:${semanaSelecionada}:${dia ?? "x"}`;
   const [salvarModeloOpen, setSalvarModeloOpen] = useState(false);
   const [aplicarModeloOpen, setAplicarModeloOpen] = useState(false);
   const [modeloParaAplicar, setModeloParaAplicar] = useState<any>(null);
   const [limparTreinoDialogOpen, setLimparTreinoDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (readOnly || exercicioDialogOpen || blockDialogOpen || exercicioEditando || grupoEditando || exercicioTemp) return;
+
+    for (const dia of [1, 2, 3, 4, 5, 6, 7]) {
+      if (hasExerciseDialogDraft(getExerciseDraftKey(dia))) {
+        setSelectedDia(dia);
+        setExercicioDialogOpen(true);
+        return;
+      }
+    }
+  }, [readOnly, profileId, personalId, semanaSelecionada]);
+
+  useEffect(() => {
+    if (readOnly || blockDialogOpen || blocoEditando) return;
+    if ([1, 2, 3, 4, 5, 6, 7].some((dia) => hasExerciseDialogDraft(getExerciseDraftKey(dia)))) return;
+
+    for (const dia of [1, 2, 3, 4, 5, 6, 7]) {
+      if (hasWorkoutBlockDialogDraft(getBlockDraftKey(dia))) {
+        setSelectedDia(dia);
+        setBlockDialogOpen(true);
+        return;
+      }
+    }
+  }, [readOnly, profileId, personalId, semanaSelecionada]);
   const [treinoParaLimpar, setTreinoParaLimpar] = useState<{ treinoId: string; diaNome: string } | null>(null);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [novoTreinoDialogOpen, setNovoTreinoDialogOpen] = useState(false);
@@ -679,7 +704,8 @@ export function TreinosManager({
         await editarExercicio(exercicioEditando.id!, payload);
         setExercicioEditando(null);
       } else if (selectedDia !== null) {
-        await adicionarExercicio(selectedDia, payload, selectedTreinoId);
+        const treinoIdAlvo = await criarTreinoSeNecessario(selectedDia);
+        await adicionarExercicio(selectedDia, payload, treinoIdAlvo);
       }
 
       await new Promise((resolve) => setTimeout(resolve, 300));
@@ -1887,7 +1913,7 @@ export function TreinosManager({
           diaNome={
             selectedDia !== null ? diasSemana[selectedDia - 1].nome : undefined
           }
-          draftKey={`${profileId}:${selectedDia ?? "x"}`}
+          draftKey={getExerciseDraftKey(selectedDia)}
         />
 
         <Dialog open={editDescricaoOpen} onOpenChange={setEditDescricaoOpen}>
@@ -1951,6 +1977,7 @@ export function TreinosManager({
             selectedDia !== null ? diasSemana[selectedDia - 1].nome : undefined
           }
           personalId={personalId}
+          draftKey={getBlockDraftKey(selectedDia)}
         />
 
         {/* 🆕 DIALOG: Salvar como Modelo */}

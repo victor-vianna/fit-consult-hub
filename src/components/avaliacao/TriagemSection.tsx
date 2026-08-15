@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Edit, ShieldCheck, CheckCircle, XCircle } from "lucide-react";
 import { formatDateTimeForInput, formatDisplayDate } from "@/utils/dateFormat";
+import {
+  clearInterfaceMemory,
+  hasMeaningfulValues,
+  readInterfaceMemory,
+  writeInterfaceMemory,
+} from "@/utils/interfaceMemory";
 
 interface Props {
   profileId: string;
@@ -28,16 +34,70 @@ const PARQ_PERGUNTAS = [
   "Você conhece alguma outra razão pela qual não deveria praticar atividade física?",
 ];
 
+type TriagemDraft = {
+  values: Record<string, string>;
+  parqRespostas: boolean[];
+  liberacaoMedica: boolean;
+};
+
+const TRIAGEM_DRAFT_VERSION = 1;
+const TRIAGEM_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const TRIAGEM_DRAFT_IGNORED_FIELDS = new Set(["data_avaliacao"]);
+
 export function TriagemSection({ profileId, personalId, themeColor }: Props) {
   const { toast } = useToast();
   const [avaliacoes, setAvaliacoes] = useState<any[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
+  const draftScope = useMemo(() => `assessment:triagem:${personalId}:${profileId}`, [personalId, profileId]);
+  const [draft, setDraft] = useState<TriagemDraft | null>(() => readTriagemDraft(draftScope)?.data ?? null);
   const [loading, setLoading] = useState(false);
   const [parqRespostas, setParqRespostas] = useState<boolean[]>(new Array(7).fill(false));
   const [liberacaoMedica, setLiberacaoMedica] = useState(false);
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const didMountRef = useRef(false);
 
   useEffect(() => { fetchData(); }, [profileId]);
+
+  useEffect(() => {
+    const storedDraft = readTriagemDraft(draftScope);
+    setDraft(storedDraft?.data ?? null);
+    if (storedDraft?.open) {
+      setEditing(null);
+      applyTriagemDraft(storedDraft.data, setParqRespostas, setLiberacaoMedica);
+      setOpenDialog(true);
+    }
+  }, [draftScope]);
+
+  const persistDraft = useCallback(() => {
+    if (editing || !formRef.current) return;
+    const nextDraft: TriagemDraft = {
+      values: getFormValues(formRef.current),
+      parqRespostas,
+      liberacaoMedica,
+    };
+    if (!hasTriagemDraftContent(nextDraft)) {
+      clearTriagemDraft(draftScope);
+      setDraft(null);
+      return;
+    }
+    setDraft(nextDraft);
+    writeInterfaceMemory({
+      scope: draftScope,
+      version: TRIAGEM_DRAFT_VERSION,
+      data: nextDraft,
+      open: true,
+      hasContent: hasTriagemDraftContent,
+    });
+  }, [draftScope, editing, liberacaoMedica, parqRespostas]);
+
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    persistDraft();
+  }, [liberacaoMedica, parqRespostas, persistDraft]);
 
   const fetchData = async () => {
     const { data } = await supabase
@@ -50,8 +110,14 @@ export function TriagemSection({ profileId, personalId, themeColor }: Props) {
 
   const openNew = () => {
     setEditing(null);
-    setParqRespostas(new Array(7).fill(false));
-    setLiberacaoMedica(false);
+    const storedDraft = readTriagemDraft(draftScope);
+    setDraft(storedDraft?.data ?? null);
+    if (storedDraft) {
+      applyTriagemDraft(storedDraft.data, setParqRespostas, setLiberacaoMedica);
+    } else {
+      setParqRespostas(new Array(7).fill(false));
+      setLiberacaoMedica(false);
+    }
     setOpenDialog(true);
   };
 
@@ -60,6 +126,17 @@ export function TriagemSection({ profileId, personalId, themeColor }: Props) {
     setParqRespostas(Array.isArray(av.triagem_parq) ? av.triagem_parq : new Array(7).fill(false));
     setLiberacaoMedica(av.triagem_liberacao_medica || false);
     setOpenDialog(true);
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    setOpenDialog(open);
+    if (!open) {
+      if (!editing) {
+        clearTriagemDraft(draftScope);
+        setDraft(null);
+      }
+      setEditing(null);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -86,6 +163,10 @@ export function TriagemSection({ profileId, personalId, themeColor }: Props) {
         if (error) throw error;
       }
       toast({ title: "Salvo!" });
+      if (!editing) {
+        clearTriagemDraft(draftScope);
+        setDraft(null);
+      }
       setOpenDialog(false);
       fetchData();
     } catch (error: any) {
@@ -146,11 +227,11 @@ export function TriagemSection({ profileId, personalId, themeColor }: Props) {
         )}
       </CardContent>
 
-      <Dialog open={openDialog} onOpenChange={(o) => setOpenDialog(o)}>
+      <Dialog open={openDialog} onOpenChange={handleOpenChange}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editing ? "Editar" : "Nova"} Triagem</DialogTitle></DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div><Label>Data *</Label><Input name="data_avaliacao" type="datetime-local" defaultValue={formatDateTimeForInput(editing?.data_avaliacao || new Date())} required /></div>
+          <form ref={formRef} onSubmit={handleSubmit} onInput={persistDraft} onChange={persistDraft} onBlur={persistDraft} className="space-y-4">
+            <div><Label>Data *</Label><Input name="data_avaliacao" type="datetime-local" defaultValue={draftValue(draft, editing, "data_avaliacao", formatDateTimeForInput(editing?.data_avaliacao || new Date()))} required /></div>
             
             <div className="space-y-3">
               <Label className="text-base font-semibold">PAR-Q (Questionário de Prontidão)</Label>
@@ -163,18 +244,61 @@ export function TriagemSection({ profileId, personalId, themeColor }: Props) {
               ))}
             </div>
 
-            <div><Label>Histórico de Lesões</Label><Textarea name="historico_lesoes" rows={2} placeholder="Descreva lesões anteriores..." defaultValue={editing?.triagem_historico_lesoes} /></div>
-            <div><Label>Restrições Médicas</Label><Textarea name="restricoes" rows={2} placeholder="Restrições para exercícios..." defaultValue={editing?.triagem_restricoes} /></div>
+            <div><Label>Histórico de Lesões</Label><Textarea name="historico_lesoes" rows={2} placeholder="Descreva lesões anteriores..." defaultValue={draftValue(draft, editing, "historico_lesoes", editing?.triagem_historico_lesoes)} /></div>
+            <div><Label>Restrições Médicas</Label><Textarea name="restricoes" rows={2} placeholder="Restrições para exercícios..." defaultValue={draftValue(draft, editing, "restricoes", editing?.triagem_restricoes)} /></div>
             <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
               <Switch checked={liberacaoMedica} onCheckedChange={setLiberacaoMedica} />
               <Label>Liberação Médica para Exercícios</Label>
               <Badge variant={liberacaoMedica ? "default" : "outline"} className="ml-auto">{liberacaoMedica ? "Liberado" : "Não"}</Badge>
             </div>
-            <div><Label>Observações</Label><Textarea name="observacoes" rows={2} defaultValue={editing?.triagem_observacoes} /></div>
+            <div><Label>Observações</Label><Textarea name="observacoes" rows={2} defaultValue={draftValue(draft, editing, "observacoes", editing?.triagem_observacoes)} /></div>
             <Button type="submit" className="w-full" disabled={loading} style={{ backgroundColor: themeColor }}>{loading ? "Salvando..." : "Salvar"}</Button>
           </form>
         </DialogContent>
       </Dialog>
     </Card>
   );
+}
+
+function getFormValues(form: HTMLFormElement) {
+  const values: Record<string, string> = {};
+  new FormData(form).forEach((value, key) => {
+    values[key] = String(value);
+  });
+  return values;
+}
+
+function readTriagemDraft(scope: string) {
+  return readInterfaceMemory<TriagemDraft>({
+    scope,
+    version: TRIAGEM_DRAFT_VERSION,
+    ttlMs: TRIAGEM_DRAFT_TTL_MS,
+    hasContent: hasTriagemDraftContent,
+  });
+}
+
+function clearTriagemDraft(scope: string) {
+  clearInterfaceMemory({ scope, version: TRIAGEM_DRAFT_VERSION });
+}
+
+function applyTriagemDraft(
+  draft: TriagemDraft,
+  setParqRespostas: (respostas: boolean[]) => void,
+  setLiberacaoMedica: (liberado: boolean) => void
+) {
+  setParqRespostas(Array.isArray(draft.parqRespostas) ? draft.parqRespostas : new Array(7).fill(false));
+  setLiberacaoMedica(Boolean(draft.liberacaoMedica));
+}
+
+function hasTriagemDraftContent(draft: TriagemDraft) {
+  return (
+    hasMeaningfulValues(draft.values, TRIAGEM_DRAFT_IGNORED_FIELDS) ||
+    (Array.isArray(draft.parqRespostas) && draft.parqRespostas.some(Boolean)) ||
+    draft.liberacaoMedica === true
+  );
+}
+
+function draftValue(draft: TriagemDraft | null, editing: any | null, key: string, fallback: string | number | null | undefined) {
+  if (editing) return fallback ?? "";
+  return draft?.values?.[key] ?? fallback ?? "";
 }

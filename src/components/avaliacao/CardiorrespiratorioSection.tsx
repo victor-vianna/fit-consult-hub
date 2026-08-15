@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { Activity, Edit, HeartPulse, Plus, Trash2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -14,6 +14,12 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { calculateCardio, formatMetricValue, toNumber } from "@/utils/avaliacaoMetrics";
 import { formatDateTimeForInput, formatDisplayDate } from "@/utils/dateFormat";
+import {
+  clearInterfaceMemory,
+  hasMeaningfulValues,
+  readInterfaceMemory,
+  writeInterfaceMemory,
+} from "@/utils/interfaceMemory";
 
 interface Props {
   profileId: string;
@@ -22,16 +28,49 @@ interface Props {
   onRefresh: () => void;
 }
 
+const CARDIO_DRAFT_VERSION = 1;
+const CARDIO_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const CARDIO_DRAFT_IGNORED_FIELDS = new Set(["data_avaliacao", "cardio_tipo", "cardio_distancia_m"]);
+
 export function CardiorrespiratorioSection({ profileId, personalId, themeColor, onRefresh }: Props) {
   const { toast } = useToast();
   const [avaliacoes, setAvaliacoes] = useState<any[]>([]);
   const [editing, setEditing] = useState<any | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
+  const draftScope = useMemo(() => `assessment:cardio:${personalId}:${profileId}`, [personalId, profileId]);
+  const [draft, setDraft] = useState<Record<string, string> | null>(() => readCardioDraft(draftScope)?.data ?? null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchData();
   }, [profileId]);
+
+  useEffect(() => {
+    const storedDraft = readCardioDraft(draftScope);
+    setDraft(storedDraft?.data ?? null);
+    if (storedDraft?.open) {
+      setEditing(null);
+      setOpenDialog(true);
+    }
+  }, [draftScope]);
+
+  const openNew = () => {
+    setEditing(null);
+    const storedDraft = readCardioDraft(draftScope);
+    setDraft(storedDraft?.data ?? null);
+    setOpenDialog(true);
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    setOpenDialog(open);
+    if (!open) {
+      if (!editing) {
+        clearCardioDraft(draftScope);
+        setDraft(null);
+      }
+      setEditing(null);
+    }
+  };
 
   const fetchData = async () => {
     const { data } = await supabase
@@ -72,6 +111,10 @@ export function CardiorrespiratorioSection({ profileId, personalId, themeColor, 
       if (error) throw error;
 
       toast({ title: "Teste cardiorrespiratorio salvo" });
+      if (!editing) {
+        clearCardioDraft(draftScope);
+        setDraft(null);
+      }
       setOpenDialog(false);
       setEditing(null);
       fetchData();
@@ -101,7 +144,7 @@ export function CardiorrespiratorioSection({ profileId, personalId, themeColor, 
           <CardTitle className="flex items-center gap-2 text-lg">
             <HeartPulse className="h-5 w-5" /> Teste cardiorrespiratorio
           </CardTitle>
-          <Button size="sm" style={{ backgroundColor: themeColor }} onClick={() => { setEditing(null); setOpenDialog(true); }}>
+          <Button size="sm" style={{ backgroundColor: themeColor }} onClick={openNew}>
             <Plus className="mr-1 h-4 w-4" /> Novo teste
           </Button>
         </div>
@@ -161,43 +204,118 @@ export function CardiorrespiratorioSection({ profileId, personalId, themeColor, 
           <div className="py-12 text-center">
             <Activity className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
             <p className="mb-4 text-muted-foreground">Nenhum teste cardiorrespiratorio registrado</p>
-            <Button onClick={() => setOpenDialog(true)} style={{ backgroundColor: themeColor }}>
+            <Button onClick={openNew} style={{ backgroundColor: themeColor }}>
               <Plus className="mr-1 h-4 w-4" /> Registrar teste
             </Button>
           </div>
         )}
       </CardContent>
 
-      <Dialog open={openDialog} onOpenChange={(open) => { setOpenDialog(open); if (!open) setEditing(null); }}>
+      <Dialog open={openDialog} onOpenChange={handleOpenChange}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar" : "Novo"} teste cardiorrespiratorio</DialogTitle>
           </DialogHeader>
-          <CardioForm editing={editing} loading={loading} themeColor={themeColor} onSubmit={handleSubmit} />
+          <CardioForm
+            editing={editing}
+            draft={editing ? null : draft}
+            loading={loading}
+            themeColor={themeColor}
+            onDraftChange={(nextDraft) => {
+              setDraft(nextDraft);
+              if (nextDraft) {
+                writeInterfaceMemory({
+                  scope: draftScope,
+                  version: CARDIO_DRAFT_VERSION,
+                  data: nextDraft,
+                  open: true,
+                  hasContent: hasCardioDraftContent,
+                });
+              } else {
+                clearCardioDraft(draftScope);
+              }
+            }}
+            onSubmit={handleSubmit}
+          />
         </DialogContent>
       </Dialog>
     </Card>
   );
 }
 
-function CardioForm({ editing, loading, themeColor, onSubmit }: { editing: any | null; loading: boolean; themeColor?: string; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
-  const [distancia, setDistancia] = useState<number | null>(editing?.cardio_distancia_m ?? 1600);
-  const [minutos, setMinutos] = useState<number | null>(editing?.cardio_tempo_segundos ? Math.floor(editing.cardio_tempo_segundos / 60) : null);
-  const [segundos, setSegundos] = useState<number | null>(editing?.cardio_tempo_segundos ? editing.cardio_tempo_segundos % 60 : null);
+function CardioForm({
+  editing,
+  draft,
+  loading,
+  themeColor,
+  onDraftChange,
+  onSubmit,
+}: {
+  editing: any | null;
+  draft: Record<string, string> | null;
+  loading: boolean;
+  themeColor?: string;
+  onDraftChange: (draft: Record<string, string> | null) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const didMountRef = useRef(false);
+  const [distancia, setDistancia] = useState<number | null>(
+    toNumber(draftValue(draft, editing, "cardio_distancia_m", editing?.cardio_distancia_m ?? 1600)) ?? 1600
+  );
+  const [minutos, setMinutos] = useState<number | null>(
+    draft?.tempo_minutos !== undefined
+      ? toNumber(draft.tempo_minutos)
+      : editing?.cardio_tempo_segundos
+      ? Math.floor(editing.cardio_tempo_segundos / 60)
+      : null
+  );
+  const [segundos, setSegundos] = useState<number | null>(
+    draft?.tempo_segundos !== undefined
+      ? toNumber(draft.tempo_segundos)
+      : editing?.cardio_tempo_segundos
+      ? editing.cardio_tempo_segundos % 60
+      : null
+  );
 
   const preview = useMemo(() => calculateCardio({
     distanciaM: distancia,
     tempoSegundos: minutos !== null ? minutos * 60 + (segundos || 0) : null,
   }), [distancia, minutos, segundos]);
 
+  const persistDraft = useCallback(() => {
+    if (editing || !formRef.current) return;
+    const values = getFormValues(formRef.current);
+    values.cardio_distancia_m = distancia !== null ? String(distancia) : "";
+    values.tempo_minutos = minutos !== null ? String(minutos) : "";
+    values.tempo_segundos = segundos !== null ? String(segundos) : "";
+    if (!hasCardioDraftContent(values)) {
+      onDraftChange(null);
+      return;
+    }
+    onDraftChange(values);
+  }, [distancia, editing, minutos, onDraftChange, segundos]);
+
+  const persistDraftAfterFieldUpdate = useCallback(() => {
+    window.setTimeout(persistDraft, 0);
+  }, [persistDraft]);
+
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    persistDraft();
+  }, [distancia, minutos, segundos, persistDraft]);
+
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form ref={formRef} onSubmit={onSubmit} onInput={persistDraft} onChange={persistDraft} onBlur={persistDraft} className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Data *">
-          <Input name="data_avaliacao" type="datetime-local" defaultValue={formatDateTimeForInput(editing?.data_avaliacao || new Date())} required />
+          <Input name="data_avaliacao" type="datetime-local" defaultValue={draftValue(draft, editing, "data_avaliacao", formatDateTimeForInput(editing?.data_avaliacao || new Date()))} required />
         </Field>
         <Field label="Tipo">
-          <Select name="cardio_tipo" defaultValue={editing?.cardio_tipo || "teste_1600m"}>
+          <Select name="cardio_tipo" defaultValue={String(draftValue(draft, editing, "cardio_tipo", editing?.cardio_tipo || "teste_1600m"))} onValueChange={persistDraftAfterFieldUpdate}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="teste_1600m">Teste 1600m</SelectItem>
@@ -225,7 +343,7 @@ function CardioForm({ editing, loading, themeColor, onSubmit }: { editing: any |
       </div>
 
       <Field label="Observacoes">
-        <Textarea name="cardio_observacoes" rows={3} defaultValue={editing?.cardio_observacoes || ""} />
+        <Textarea name="cardio_observacoes" rows={3} defaultValue={draftValue(draft, editing, "cardio_observacoes", editing?.cardio_observacoes || "")} />
       </Field>
       <Button type="submit" className="w-full" disabled={loading} style={{ backgroundColor: themeColor }}>
         {loading ? "Salvando..." : "Salvar teste"}
@@ -257,4 +375,35 @@ function formatTime(seconds?: number | null) {
   const min = Math.floor(seconds / 60);
   const sec = seconds % 60;
   return `${min}min ${String(sec).padStart(2, "0")}s`;
+}
+
+function getFormValues(form: HTMLFormElement) {
+  const values: Record<string, string> = {};
+  new FormData(form).forEach((value, key) => {
+    values[key] = String(value);
+  });
+  return values;
+}
+
+function readCardioDraft(scope: string) {
+  return readInterfaceMemory<Record<string, string>>({
+    scope,
+    version: CARDIO_DRAFT_VERSION,
+    ttlMs: CARDIO_DRAFT_TTL_MS,
+    hasContent: hasCardioDraftContent,
+  });
+}
+
+function clearCardioDraft(scope: string) {
+  clearInterfaceMemory({ scope, version: CARDIO_DRAFT_VERSION });
+}
+
+function hasCardioDraftContent(values: Record<string, string>) {
+  if (hasMeaningfulValues(values, CARDIO_DRAFT_IGNORED_FIELDS)) return true;
+  return values.cardio_distancia_m !== undefined && values.cardio_distancia_m !== "" && values.cardio_distancia_m !== "1600";
+}
+
+function draftValue(draft: Record<string, string> | null, editing: any | null, key: string, fallback: string | number | null | undefined) {
+  if (editing) return fallback ?? "";
+  return draft?.[key] ?? fallback ?? "";
 }

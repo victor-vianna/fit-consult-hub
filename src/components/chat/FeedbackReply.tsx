@@ -1,13 +1,20 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { MessageSquare, Quote, Reply } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Send, MessageSquare, Quote } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { buildChatConversationKey } from "@/utils/chat";
-import { createNotificationId, dispatchPushNotification } from "@/utils/pushNotifications";
-import { compactName, previewNotificationMessage } from "@/utils/notificationText";
+import {
+  normalizeFeedbackReplyPreview,
+  queueFeedbackReplyContext,
+} from "@/utils/feedbackReplyContext";
 
 interface FeedbackReplyProps {
   checkinId: string;
@@ -15,163 +22,138 @@ interface FeedbackReplyProps {
   personalId: string;
   alunoNome: string;
   themeColor?: string;
-  /** Dados do checkin para permitir citar a pergunta/resposta original */
   checkin?: Record<string, any> | null;
+  onStartReply?: () => void;
 }
 
-// Mapeia campos do checkin para rótulos legíveis (a "pergunta" original)
-const CAMPOS_CITAVEIS: Array<{ key: string; label: string; tipo: "texto" | "nota" }> = [
-  { key: "duvidas", label: "❓ Dúvidas", tipo: "texto" },
-  { key: "comentario_saude", label: "💊 Saúde", tipo: "texto" },
-  { key: "dores_corpo", label: "⚠️ Dores no corpo", tipo: "texto" },
-  { key: "estado_emocional", label: "🧠 Estado emocional", tipo: "texto" },
-  { key: "mudanca_rotina", label: "🔄 Mudança na rotina", tipo: "texto" },
-  { key: "justificativa_empenho", label: "💪 Justificativa do empenho", tipo: "texto" },
-  { key: "justificativa_alimentacao", label: "🥗 Justificativa da alimentação", tipo: "texto" },
-  { key: "justificativa_sono", label: "😴 Justificativa do sono", tipo: "texto" },
-  { key: "nota_empenho", label: "💪 Nota de empenho", tipo: "nota" },
-  { key: "nota_alimentacao", label: "🥗 Nota de alimentação", tipo: "nota" },
-  { key: "nota_sono", label: "😴 Nota de sono", tipo: "nota" },
-  { key: "saude_geral", label: "❤️ Saúde geral", tipo: "nota" },
-  { key: "qualidade_vida", label: "✨ Qualidade de vida", tipo: "nota" },
-  { key: "nivel_dificuldade", label: "🏋️ Nível de dificuldade", tipo: "nota" },
+const CITABLE_FIELDS: Array<{ key: string; label: string; type: "text" | "score" }> = [
+  { key: "duvidas", label: "Duvidas", type: "text" },
+  { key: "comentario_saude", label: "Saude", type: "text" },
+  { key: "dores_corpo", label: "Dores no corpo", type: "text" },
+  { key: "estado_emocional", label: "Estado emocional", type: "text" },
+  { key: "mudanca_rotina", label: "Mudanca na rotina", type: "text" },
+  { key: "justificativa_empenho", label: "Justificativa do empenho", type: "text" },
+  { key: "justificativa_alimentacao", label: "Justificativa da alimentacao", type: "text" },
+  { key: "justificativa_sono", label: "Justificativa do sono", type: "text" },
+  { key: "nota_empenho", label: "Nota de empenho", type: "score" },
+  { key: "nota_alimentacao", label: "Nota de alimentacao", type: "score" },
+  { key: "nota_sono", label: "Nota de sono", type: "score" },
+  { key: "saude_geral", label: "Saude geral", type: "score" },
+  { key: "qualidade_vida", label: "Qualidade de vida", type: "score" },
+  { key: "nivel_dificuldade", label: "Nivel de dificuldade", type: "score" },
 ];
 
-const GERAL = "__geral__";
+const GENERAL = "__general__";
 
-export function FeedbackReply({ checkinId, alunoId, personalId, alunoNome, themeColor, checkin }: FeedbackReplyProps) {
-  const [resposta, setResposta] = useState("");
-  const [campoSelecionado, setCampoSelecionado] = useState<string>(GERAL);
-  const [sending, setSending] = useState(false);
+function hasValue(value: unknown) {
+  return value !== null && value !== undefined && value !== "";
+}
+
+function buildWeeklyTitle(checkin?: Record<string, any> | null) {
+  if (checkin?.numero_semana && checkin?.ano) {
+    return `Feedback semanal - Semana ${checkin.numero_semana}/${checkin.ano}`;
+  }
+
+  return "Feedback semanal";
+}
+
+function buildGeneralPreview(checkin?: Record<string, any> | null) {
+  if (!checkin) return "Feedback semanal enviado pelo aluno";
+
+  const textField = CITABLE_FIELDS.find((field) => field.type === "text" && hasValue(checkin[field.key]));
+  if (textField) return `${textField.label}: ${String(checkin[textField.key])}`;
+
+  const scores = [
+    hasValue(checkin.nota_empenho) ? `Empenho ${checkin.nota_empenho}/10` : null,
+    hasValue(checkin.nota_alimentacao) ? `Alimentacao ${checkin.nota_alimentacao}/10` : null,
+    hasValue(checkin.nota_sono) ? `Sono ${checkin.nota_sono}/10` : null,
+  ].filter(Boolean);
+
+  return scores.length ? scores.join(", ") : "Feedback semanal enviado pelo aluno";
+}
+
+export function FeedbackReply({
+  checkinId,
+  alunoId,
+  personalId,
+  alunoNome,
+  themeColor,
+  checkin,
+  onStartReply,
+}: FeedbackReplyProps) {
+  const [selectedField, setSelectedField] = useState<string>(GENERAL);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
-  // Filtra apenas campos preenchidos do checkin
-  const camposDisponiveis = useMemo(() => {
+  const availableFields = useMemo(() => {
     if (!checkin) return [];
-    return CAMPOS_CITAVEIS.filter((c) => {
-      const v = checkin[c.key];
-      return v !== null && v !== undefined && v !== "";
-    });
+    return CITABLE_FIELDS.filter((field) => hasValue(checkin[field.key]));
   }, [checkin]);
 
-  const buildCitacao = (): string | null => {
-    if (campoSelecionado === GERAL || !checkin) return null;
-    const campo = CAMPOS_CITAVEIS.find((c) => c.key === campoSelecionado);
-    if (!campo) return null;
-    const valor = checkin[campo.key];
-    if (valor === null || valor === undefined || valor === "") return null;
-    const valorFmt = campo.tipo === "nota" ? `${valor}/10` : String(valor);
-    return `${campo.label}: ${valorFmt}`;
+  const buildSelectedCitation = () => {
+    if (selectedField === GENERAL || !checkin) return null;
+
+    const field = CITABLE_FIELDS.find((item) => item.key === selectedField);
+    if (!field) return null;
+
+    const value = checkin[field.key];
+    if (!hasValue(value)) return null;
+
+    const formattedValue = field.type === "score" ? `${value}/10` : String(value);
+    return `${field.label}: ${formattedValue}`;
   };
 
-  const handleSend = async () => {
-    if (!resposta.trim() || sending) return;
-    setSending(true);
+  const previewCitation = normalizeFeedbackReplyPreview(
+    buildSelectedCitation() || buildGeneralPreview(checkin),
+    "Feedback semanal enviado pelo aluno"
+  );
 
-    try {
-      const conversaKey = buildChatConversationKey(personalId, alunoId);
-      const semanaInfo =
-        checkin?.numero_semana && checkin?.ano
-          ? ` (Semana ${checkin.numero_semana}/${checkin.ano})`
-          : "";
-      const citacao = buildCitacao();
+  const handleStartReply = () => {
+    queueFeedbackReplyContext({
+      id: `weekly-feedback:${checkinId}:${selectedField}`,
+      personalId,
+      alunoId,
+      senderId: personalId,
+      sourceType: "weekly_feedback",
+      sourceId: checkinId,
+      authorName: alunoNome,
+      title: buildWeeklyTitle(checkin),
+      preview: previewCitation,
+      createdAt: checkin?.preenchido_em || null,
+    });
 
-      // Monta mensagem com bloco de citação (linhas com "> " são renderizadas como quote no ChatPanel)
-      let conteudo = `📝 Resposta ao feedback semanal${semanaInfo}\n`;
-      if (citacao) {
-        conteudo += citacao
-          .split("\n")
-          .map((l) => `> ${l}`)
-          .join("\n");
-        conteudo += "\n\n";
-      } else {
-        conteudo += "\n";
-      }
-      conteudo += resposta.trim();
+    toast({
+      title: "Citacao anexada ao chat",
+      description: `Escreva sua resposta para ${alunoNome}.`,
+    });
 
-      const { error: mensagemError } = await supabase.from("mensagens_chat").insert({
-        conversa_key: conversaKey,
-        remetente_id: personalId,
-        destinatario_id: alunoId,
-        conteudo,
-        tipo: "texto",
-      });
-      if (mensagemError) throw mensagemError;
-
-      // Notificação para o aluno
-      const { data: personalProfile } = await supabase
-        .from("profiles")
-        .select("nome")
-        .eq("id", personalId)
-        .single();
-
-      const notificacaoId = createNotificationId();
-      const { error: notificacaoError } = await supabase.from("notificacoes").insert({
-        id: notificacaoId,
-        destinatario_id: alunoId,
-        tipo: "nova_mensagem",
-        titulo: compactName(personalProfile?.nome || "Personal"),
-        mensagem: previewNotificationMessage(resposta.trim()),
-        dados: {
-          aluno_id: alunoId,
-          aluno_nome: alunoNome,
-          profile_id: personalId,
-          remetente_id: personalId,
-          remetente_nome: personalProfile?.nome || null,
-          remetente_nome_curto: compactName(personalProfile?.nome || "Personal"),
-          conversa_key: conversaKey,
-          checkin_id: checkinId,
-          tipo_acao: "chat",
-        },
-      });
-      if (notificacaoError) throw notificacaoError;
-
-      await dispatchPushNotification(notificacaoId);
-
-      toast({
-        title: "Resposta enviada!",
-        description: `Mensagem enviada para ${alunoNome}`,
-      });
-
-      setResposta("");
-      setCampoSelecionado(GERAL);
-    } catch (error: any) {
-      toast({
-        title: "Erro ao enviar resposta",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setSending(false);
-    }
+    onStartReply?.();
+    navigate(`/chat?aluno=${alunoId}`);
   };
-
-  const previewCitacao = buildCitacao();
 
   return (
     <Card className="border-2 border-dashed">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-base">
           <MessageSquare className="h-4 w-4" style={{ color: themeColor }} />
           Responder feedback
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {/* Seletor de qual item está sendo respondido */}
-        {camposDisponiveis.length > 0 && (
+        {availableFields.length > 0 && (
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">
               Responder sobre:
             </label>
-            <Select value={campoSelecionado} onValueChange={setCampoSelecionado}>
+            <Select value={selectedField} onValueChange={setSelectedField}>
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={GERAL}>Feedback geral (sem citação)</SelectItem>
-                {camposDisponiveis.map((c) => (
-                  <SelectItem key={c.key} value={c.key}>
-                    {c.label}
+                <SelectItem value={GENERAL}>Feedback geral</SelectItem>
+                {availableFields.map((field) => (
+                  <SelectItem key={field.key} value={field.key}>
+                    {field.label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -179,34 +161,27 @@ export function FeedbackReply({ checkinId, alunoId, personalId, alunoNome, theme
           </div>
         )}
 
-        {/* Preview da citação que será enviada */}
-        {previewCitacao && (
-          <div
-            className="rounded-lg border-l-4 bg-muted/40 px-3 py-2 text-xs text-muted-foreground flex gap-2"
-            style={{ borderLeftColor: themeColor || "hsl(var(--primary))" }}
-          >
-            <Quote className="h-3 w-3 mt-0.5 shrink-0 opacity-60" />
-            <span className="whitespace-pre-wrap">{previewCitacao}</span>
+        <div
+          className="flex gap-2 rounded-lg border-l-4 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+          style={{ borderLeftColor: themeColor || "hsl(var(--primary))" }}
+        >
+          <Quote className="mt-0.5 h-3 w-3 shrink-0 opacity-60" />
+          <div className="min-w-0">
+            <p className="font-medium text-foreground/80">{buildWeeklyTitle(checkin)}</p>
+            <p className="truncate">{previewCitation}</p>
           </div>
-        )}
+        </div>
 
-        <textarea
-          value={resposta}
-          onChange={(e) => setResposta(e.target.value)}
-          placeholder={`Escreva sua resposta para ${alunoNome}...`}
-          rows={3}
-          className="w-full resize-none rounded-xl border border-input bg-background px-4 py-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        />
         <div className="flex justify-end">
           <Button
-            onClick={handleSend}
-            disabled={!resposta.trim() || sending}
+            type="button"
             size="sm"
             style={{ backgroundColor: themeColor || undefined }}
             className="gap-2"
+            onClick={handleStartReply}
           >
-            <Send className="h-3 w-3" />
-            {sending ? "Enviando..." : "Enviar resposta"}
+            <Reply className="h-3 w-3" />
+            Responder no chat
           </Button>
         </div>
       </CardContent>

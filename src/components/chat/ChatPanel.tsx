@@ -45,6 +45,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useChatMessages, type ChatMessage } from "@/hooks/useChatMessages";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import {
+  FEEDBACK_REPLY_CONTEXT_EVENT,
+  buildFeedbackReplyMessage,
+  clearFeedbackReplyContext,
+  queueFeedbackReplyContext,
+  readFeedbackReplyContext,
+  type FeedbackReplyContext,
+} from "@/utils/feedbackReplyContext";
 import { getNameInitials } from "@/utils/nameInitial";
 
 interface ChatPanelProps {
@@ -75,6 +83,7 @@ export function ChatPanel({
   const [texto, setTexto] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [feedbackReplyTo, setFeedbackReplyTo] = useState<FeedbackReplyContext | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -134,6 +143,7 @@ export function ChatPanel({
     skipNextDraftSaveRef.current = true;
     setEditingId(null);
     setReplyTo(null);
+    setFeedbackReplyTo(readFeedbackReplyContext(personalId, alunoId, currentUserId));
 
     try {
       const raw = window.localStorage.getItem(draftStorageKey);
@@ -151,7 +161,31 @@ export function ChatPanel({
       textoRef.current = "";
       setTexto("");
     }
-  }, [draftStorageKey]);
+  }, [alunoId, currentUserId, draftStorageKey, personalId]);
+
+  useEffect(() => {
+    const handleFeedbackReplyContext = (event: Event) => {
+      const context = (event as CustomEvent<FeedbackReplyContext>).detail;
+      if (
+        !context ||
+        context.personalId !== personalId ||
+        context.alunoId !== alunoId ||
+        context.senderId !== currentUserId
+      ) {
+        return;
+      }
+
+      setEditingId(null);
+      setReplyTo(null);
+      setFeedbackReplyTo(context);
+      requestAnimationFrame(() => inputRef.current?.focus());
+    };
+
+    window.addEventListener(FEEDBACK_REPLY_CONTEXT_EVENT, handleFeedbackReplyContext);
+    return () => {
+      window.removeEventListener(FEEDBACK_REPLY_CONTEXT_EVENT, handleFeedbackReplyContext);
+    };
+  }, [alunoId, currentUserId, personalId]);
 
   const persistDraft = useCallback(
     (value = textoRef.current) => {
@@ -362,9 +396,13 @@ export function ChatPanel({
 
   const handleSend = async () => {
     if (!texto.trim() || sending) return;
-    const conteudo = texto;
+    const feedbackReplyContext = feedbackReplyTo;
+    const conteudo = feedbackReplyContext
+      ? buildFeedbackReplyMessage(feedbackReplyContext, texto)
+      : texto;
     const replyToId = replyTo?.id ?? null;
     const editingMessageId = editingId;
+    const originalText = texto;
 
     textoRef.current = "";
     setTexto("");
@@ -386,13 +424,26 @@ export function ChatPanel({
       setEditingId(null);
     } else {
       setReplyTo(null);
-      const ok = await enviarMensagem(conteudo, replyToId);
+      setFeedbackReplyTo(null);
+      if (feedbackReplyContext) {
+        clearFeedbackReplyContext(personalId, alunoId, currentUserId);
+      }
+
+      const ok = await enviarMensagem(
+        conteudo,
+        replyToId,
+        feedbackReplyContext ? originalText : undefined
+      );
       if (!ok) {
-        textoRef.current = textoRef.current || conteudo;
-        setTexto((current) => (current ? current : conteudo));
+        textoRef.current = textoRef.current || originalText;
+        setTexto((current) => (current ? current : originalText));
         if (replyToId) {
           const originalReply = mensagens.find((msg) => msg.id === replyToId);
           if (originalReply) setReplyTo(originalReply);
+        }
+        if (feedbackReplyContext) {
+          setFeedbackReplyTo(feedbackReplyContext);
+          queueFeedbackReplyContext(feedbackReplyContext);
         }
         return;
       }
@@ -414,6 +465,7 @@ export function ChatPanel({
   const clearComposer = () => {
     setEditingId(null);
     setReplyTo(null);
+    setFeedbackReplyTo(null);
     textoRef.current = "";
     setTexto("");
     try {
@@ -421,11 +473,14 @@ export function ChatPanel({
     } catch {
       // best-effort
     }
+    clearFeedbackReplyContext(personalId, alunoId, currentUserId);
   };
 
   const startEdit = (msg: ChatMessage) => {
     setEditingId(msg.id);
     setReplyTo(null);
+    setFeedbackReplyTo(null);
+    clearFeedbackReplyContext(personalId, alunoId, currentUserId);
     textoRef.current = msg.conteudo;
     setTexto(msg.conteudo);
     inputRef.current?.focus();
@@ -434,6 +489,8 @@ export function ChatPanel({
   const startReply = (msg: ChatMessage) => {
     setReplyTo(msg);
     setEditingId(null);
+    setFeedbackReplyTo(null);
+    clearFeedbackReplyContext(personalId, alunoId, currentUserId);
     inputRef.current?.focus();
   };
 
@@ -671,16 +728,22 @@ export function ChatPanel({
       </div>
 
       <div className="sticky bottom-0 z-20 border-t bg-card/95 px-2 pb-[calc(env(safe-area-inset-bottom,0px)+0.5rem)] pt-2 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:px-4 sm:py-3">
-        {(editingId || replyTo) && (
+        {(editingId || replyTo || feedbackReplyTo) && (
           <div className="mb-2 flex items-start gap-2 rounded-lg border-l-4 bg-muted/50 px-3 py-2" style={{ borderLeftColor: accent }}>
             <div className="min-w-0 flex-1">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {editingId
                   ? "Editando mensagem"
+                  : feedbackReplyTo
+                  ? `Respondendo feedback de ${feedbackReplyTo.authorName}`
                   : `Respondendo ${replyTo?.remetente_id === currentUserId ? "voce" : otherName}`}
               </div>
               <div className="truncate text-xs text-foreground/80">
-                {editingId ? findMsg(editingId)?.conteudo : replyTo?.conteudo}
+                {editingId
+                  ? findMsg(editingId)?.conteudo
+                  : feedbackReplyTo
+                  ? `${feedbackReplyTo.title}: ${feedbackReplyTo.preview}`
+                  : replyTo?.conteudo}
               </div>
             </div>
             <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={clearComposer}>
@@ -737,7 +800,7 @@ export function ChatPanel({
               }}
               onBlur={() => persistDraft()}
               onKeyDown={handleKeyDown}
-              placeholder={editingId ? "Editar mensagem..." : "Mensagem"}
+              placeholder={editingId ? "Editar mensagem..." : feedbackReplyTo ? "Responder feedback..." : "Mensagem"}
               rows={1}
               className="max-h-[120px] min-h-10 w-full resize-none overflow-y-auto rounded-2xl border border-input bg-background px-4 py-2.5 pr-10 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />

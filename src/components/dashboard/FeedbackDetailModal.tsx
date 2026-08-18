@@ -305,6 +305,7 @@ export function FeedbackDetailModal({
                   alunoNome={alunoNome}
                   themeColor={themeColor}
                   checkin={checkin}
+                  onStartReply={() => onOpenChange(false)}
                 />
               </>
             ) : (

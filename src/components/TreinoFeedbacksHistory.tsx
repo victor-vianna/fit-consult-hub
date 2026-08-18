@@ -7,6 +7,10 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDisplayDateTime } from "@/utils/dateFormat";
 import { Dumbbell, MessageSquareText, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import {
+  normalizeFeedbackReplyPreview,
+  queueFeedbackReplyContext,
+} from "@/utils/feedbackReplyContext";
 
 interface TreinoFeedbacksHistoryProps {
   profileId: string;
@@ -39,6 +43,15 @@ function normalizeRating(value: number | string | null | undefined) {
   const rating = Number(value);
   if (!Number.isFinite(rating) || rating <= 0) return null;
   return Math.min(5, Math.max(1, Math.round(rating)));
+}
+
+function buildWorkoutFeedbackPreview(feedback: TreinoFeedbackItem) {
+  const parts = [
+    feedback.rating ? `Avaliacao: ${feedback.rating}/5` : null,
+    feedback.comentario?.trim() ? feedback.comentario.trim() : null,
+  ].filter(Boolean);
+
+  return parts.length ? parts.join(" - ") : "Feedback de treino enviado pelo aluno";
 }
 
 function RatingStars({ rating }: { rating: number | null }) {
@@ -118,6 +131,23 @@ export function TreinoFeedbacksHistory({
     if (ratings.length === 0) return null;
     return ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length;
   }, [feedbacks]);
+
+  const handleReply = (feedback: TreinoFeedbackItem) => {
+    queueFeedbackReplyContext({
+      id: `workout-feedback:${feedback.id}`,
+      personalId,
+      alunoId: profileId,
+      senderId: personalId,
+      sourceType: "workout_feedback",
+      sourceId: feedback.id,
+      authorName: studentName,
+      title: "Feedback de treino",
+      preview: normalizeFeedbackReplyPreview(buildWorkoutFeedbackPreview(feedback)),
+      createdAt: feedback.createdAt,
+    });
+
+    navigate(`/chat?aluno=${profileId}`);
+  };
 
   if (loading) {
     return (
@@ -235,7 +265,7 @@ export function TreinoFeedbacksHistory({
                   variant="outline"
                   size="sm"
                   className="shrink-0 gap-2"
-                  onClick={() => navigate(`/chat?aluno=${profileId}`)}
+                  onClick={() => handleReply(feedback)}
                 >
                   <MessageSquareText className="h-4 w-4" />
                   Responder no chat

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
@@ -7,12 +7,12 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { MessageSquare, Send, Star } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { MessageSquare, Quote, Reply, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { buildChatConversationKey } from "@/utils/chat";
-import { createNotificationId, dispatchPushNotification } from "@/utils/pushNotifications";
-import { compactName, previewNotificationMessage } from "@/utils/notificationText";
+import {
+  normalizeFeedbackReplyPreview,
+  queueFeedbackReplyContext,
+} from "@/utils/feedbackReplyContext";
 
 interface TreinoFeedbackModalProps {
   open: boolean;
@@ -27,6 +27,15 @@ interface TreinoFeedbackModalProps {
   createdAt?: string;
 }
 
+function buildWorkoutFeedbackPreview(rating?: number | null, comentario?: string | null) {
+  const parts = [
+    rating ? `Avaliacao: ${rating}/5` : null,
+    comentario?.trim() ? comentario.trim() : null,
+  ].filter(Boolean);
+
+  return parts.length ? parts.join(" - ") : "Feedback de treino enviado pelo aluno";
+}
+
 export function TreinoFeedbackModal({
   open,
   onOpenChange,
@@ -37,91 +46,45 @@ export function TreinoFeedbackModal({
   rating,
   comentario,
   treinoId,
+  createdAt,
 }: TreinoFeedbackModalProps) {
-  const [resposta, setResposta] = useState("");
-  const [sending, setSending] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const previewCitation = normalizeFeedbackReplyPreview(
+    buildWorkoutFeedbackPreview(rating, comentario),
+    "Feedback de treino enviado pelo aluno"
+  );
 
-  const handleSend = async () => {
-    if (!resposta.trim() || sending) return;
-    setSending(true);
-    try {
-      const conversaKey = buildChatConversationKey(personalId, alunoId);
-      const citacao = [
-        rating ? `⭐ Avaliação: ${"⭐".repeat(rating)}` : null,
-        comentario ? `💬 "${comentario}"` : null,
-      ]
-        .filter(Boolean)
-        .map((l) => `> ${l}`)
-        .join("\n");
+  const handleStartReply = () => {
+    queueFeedbackReplyContext({
+      id: `workout-feedback:${treinoId || alunoId}:${createdAt || "latest"}`,
+      personalId,
+      alunoId,
+      senderId: personalId,
+      sourceType: "workout_feedback",
+      sourceId: treinoId || `feedback-treino:${alunoId}`,
+      authorName: alunoNome,
+      title: "Feedback de treino",
+      preview: previewCitation,
+      createdAt: createdAt || null,
+    });
 
-      const conteudo =
-        `📝 Resposta ao feedback de treino\n` +
-        (citacao ? `${citacao}\n\n` : "\n") +
-        resposta.trim();
+    toast({
+      title: "Citacao anexada ao chat",
+      description: `Escreva sua resposta para ${alunoNome}.`,
+    });
 
-      const { error: mensagemError } = await supabase.from("mensagens_chat").insert({
-        conversa_key: conversaKey,
-        remetente_id: personalId,
-        destinatario_id: alunoId,
-        conteudo,
-        tipo: "texto",
-      });
-      if (mensagemError) throw mensagemError;
-
-      const { data: personalProfile } = await supabase
-        .from("profiles")
-        .select("nome")
-        .eq("id", personalId)
-        .single();
-
-      const notificacaoId = createNotificationId();
-      const { error: notificacaoError } = await supabase.from("notificacoes").insert({
-        id: notificacaoId,
-        destinatario_id: alunoId,
-        tipo: "nova_mensagem",
-        titulo: compactName(personalProfile?.nome || "Personal"),
-        mensagem: previewNotificationMessage(resposta.trim()),
-        dados: {
-          aluno_id: alunoId,
-          aluno_nome: alunoNome,
-          profile_id: personalId,
-          remetente_id: personalId,
-          remetente_nome: personalProfile?.nome || null,
-          remetente_nome_curto: compactName(personalProfile?.nome || "Personal"),
-          conversa_key: conversaKey,
-          treino_id: treinoId,
-          tipo_acao: "chat",
-        },
-      });
-      if (notificacaoError) throw notificacaoError;
-
-      await dispatchPushNotification(notificacaoId);
-
-      toast({
-        title: "Resposta enviada!",
-        description: `Mensagem enviada para ${alunoNome}`,
-      });
-      setResposta("");
-      onOpenChange(false);
-    } catch (err: any) {
-      toast({
-        title: "Erro ao enviar resposta",
-        description: err.message,
-        variant: "destructive",
-      });
-    } finally {
-      setSending(false);
-    }
+    onOpenChange(false);
+    navigate(`/chat?aluno=${alunoId}`);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <div
-              className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
               style={{ backgroundColor: themeColor || "hsl(var(--primary))" }}
             >
               <MessageSquare className="h-5 w-5 text-white" />
@@ -135,48 +98,49 @@ export function TreinoFeedbackModal({
 
         <div className="space-y-4 pt-2">
           <Card>
-            <CardContent className="pt-4 space-y-3">
+            <CardContent className="space-y-3 pt-4">
               {rating ? (
                 <div className="flex items-center gap-2">
                   <Star className="h-4 w-4 text-yellow-500" />
-                  <span className="text-sm font-medium text-muted-foreground">Avaliação:</span>
-                  <span className="text-lg">{"⭐".repeat(rating)}</span>
+                  <span className="text-sm font-medium text-muted-foreground">Avaliacao:</span>
+                  <span className="text-sm font-semibold">{rating}/5</span>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">Sem avaliação</p>
+                <p className="text-sm text-muted-foreground">Sem avaliacao</p>
               )}
               {comentario ? (
                 <div>
-                  <p className="text-xs font-semibold text-muted-foreground mb-1">Comentário</p>
-                  <p className="text-sm whitespace-pre-wrap">{comentario}</p>
+                  <p className="mb-1 text-xs font-semibold text-muted-foreground">Comentario</p>
+                  <p className="whitespace-pre-wrap text-sm">{comentario}</p>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">Sem comentário</p>
+                <p className="text-sm text-muted-foreground">Sem comentario</p>
               )}
             </CardContent>
           </Card>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Responder para {alunoNome}</label>
-            <textarea
-              value={resposta}
-              onChange={(e) => setResposta(e.target.value)}
-              placeholder="Escreva sua resposta..."
-              rows={4}
-              className="w-full resize-none rounded-xl border border-input bg-background px-4 py-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-            <div className="flex justify-end">
-              <Button
-                onClick={handleSend}
-                disabled={!resposta.trim() || sending}
-                size="sm"
-                style={{ backgroundColor: themeColor || undefined }}
-                className="gap-2"
-              >
-                <Send className="h-3 w-3" />
-                {sending ? "Enviando..." : "Enviar resposta"}
-              </Button>
+          <div
+            className="flex gap-2 rounded-lg border-l-4 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+            style={{ borderLeftColor: themeColor || "hsl(var(--primary))" }}
+          >
+            <Quote className="mt-0.5 h-3 w-3 shrink-0 opacity-60" />
+            <div className="min-w-0">
+              <p className="font-medium text-foreground/80">Feedback de treino</p>
+              <p className="truncate">{previewCitation}</p>
             </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              size="sm"
+              style={{ backgroundColor: themeColor || undefined }}
+              className="gap-2"
+              onClick={handleStartReply}
+            >
+              <Reply className="h-3 w-3" />
+              Responder no chat
+            </Button>
           </div>
         </div>
       </DialogContent>

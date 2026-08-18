@@ -67,7 +67,16 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
     rating: number | null;
     comentario: string | null;
     treinoId: string | null;
-  }>({ open: false, alunoId: "", alunoNome: "", rating: null, comentario: null, treinoId: null });
+    createdAt: string | null;
+  }>({
+    open: false,
+    alunoId: "",
+    alunoNome: "",
+    rating: null,
+    comentario: null,
+    treinoId: null,
+    createdAt: null,
+  });
 
   const getIcone = (tipo: string) => {
     switch (tipo) {
@@ -180,6 +189,7 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
         rating: n.dados?.rating ?? null,
         comentario: n.dados?.comentario ?? null,
         treinoId: n.dados?.treino_id ?? null,
+        createdAt: n.created_at ?? null,
       });
       return;
     }
@@ -596,6 +606,7 @@ export function NotificacoesDropdown({ userId }: NotificacoesDropdownProps) {
         rating={treinoFeedbackModal.rating}
         comentario={treinoFeedbackModal.comentario}
         treinoId={treinoFeedbackModal.treinoId}
+        createdAt={treinoFeedbackModal.createdAt || undefined}
       />
     </>
   );

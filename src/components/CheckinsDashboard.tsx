@@ -26,13 +26,18 @@ import {
   BarChart3,
   ChevronLeft,
   ChevronRight,
+  Reply,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { FeedbackEvolucaoChart } from "@/components/FeedbackEvolucaoChart";
-import { useIsMobile } from "@/hooks/use-mobile";
 import {
   formatDisplayDateRange,
   formatDisplayDateTime,
 } from "@/utils/dateFormat";
+import {
+  normalizeFeedbackReplyPreview,
+  queueFeedbackReplyContext,
+} from "@/utils/feedbackReplyContext";
 
 interface Props {
   profileId: string;
@@ -78,7 +83,7 @@ export function CheckinsDashboard({
   studentName,
 }: Props) {
   const { toast } = useToast();
-  const isMobile = useIsMobile();
+  const navigate = useNavigate();
   const [checkins, setCheckins] = useState<CheckinData[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCheckin, setSelectedCheckin] = useState<CheckinData | null>(
@@ -158,6 +163,48 @@ export function CheckinsDashboard({
 
   const getWeekRange = (checkin: CheckinData) =>
     formatDisplayDateRange(checkin.data_inicio, checkin.data_fim);
+
+  const buildWeeklyFeedbackPreview = (checkin: CheckinData) => {
+    const candidates = [
+      checkin.duvidas ? `Duvidas: ${checkin.duvidas}` : null,
+      checkin.dores_corpo ? `Dores no corpo: ${checkin.dores_corpo}` : null,
+      checkin.estado_emocional ? `Estado emocional: ${checkin.estado_emocional}` : null,
+      checkin.comentario_saude ? `Saude: ${checkin.comentario_saude}` : null,
+      checkin.mudanca_rotina ? `Mudanca na rotina: ${checkin.mudanca_rotina}` : null,
+      checkin.justificativa_empenho
+        ? `Justificativa do empenho: ${checkin.justificativa_empenho}`
+        : null,
+      checkin.justificativa_alimentacao
+        ? `Justificativa da alimentacao: ${checkin.justificativa_alimentacao}`
+        : null,
+      checkin.justificativa_sono
+        ? `Justificativa do sono: ${checkin.justificativa_sono}`
+        : null,
+    ].filter(Boolean);
+
+    return normalizeFeedbackReplyPreview(
+      candidates[0] ||
+        `Empenho ${checkin.nota_empenho}/10, Alimentacao ${checkin.nota_alimentacao}/10, Sono ${checkin.nota_sono}/10`,
+      "Feedback semanal enviado pelo aluno"
+    );
+  };
+
+  const handleReplyToCheckin = (checkin: CheckinData) => {
+    queueFeedbackReplyContext({
+      id: `weekly-feedback:${checkin.id}`,
+      personalId,
+      alunoId: profileId,
+      senderId: personalId,
+      sourceType: "weekly_feedback",
+      sourceId: checkin.id,
+      authorName: studentName,
+      title: getWeekLabel(checkin),
+      preview: buildWeeklyFeedbackPreview(checkin),
+      createdAt: checkin.preenchido_em,
+    });
+
+    navigate(`/chat?aluno=${profileId}`);
+  };
 
   const goToRelativeWeek = (direction: -1 | 1) => {
     if (selectedIndex < 0) return;
@@ -327,8 +374,8 @@ export function CheckinsDashboard({
         </CardHeader>
       </Card>
 
-      {isMobile && selectedCheckin && (
-        <Card className="border-2 shadow-sm sticky top-2 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      {selectedCheckin && (
+        <Card className="sticky top-2 z-20 border-2 bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:static">
           <CardContent className="p-3 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
@@ -388,6 +435,17 @@ export function CheckinsDashboard({
                 <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </div>
+
+            <Button
+              type="button"
+              size="sm"
+              className="w-full justify-center gap-2"
+              style={{ backgroundColor: themeColor || undefined }}
+              onClick={() => handleReplyToCheckin(selectedCheckin)}
+            >
+              <Reply className="h-4 w-4" />
+              Responder no chat
+            </Button>
           </CardContent>
         </Card>
       )}
@@ -484,15 +542,16 @@ export function CheckinsDashboard({
             <>
               <Card className="border-2">
                 <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>
-                      Semana {selectedCheckin.numero_semana} de{" "}
-                      {selectedCheckin.ano}
-                    </span>
-                    <Badge variant="outline">
-                      {getWeekRange(selectedCheckin)}
-                    </Badge>
-                  </CardTitle>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <CardTitle>
+                      Semana {selectedCheckin.numero_semana} de {selectedCheckin.ano}
+                    </CardTitle>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline">
+                        {getWeekRange(selectedCheckin)}
+                      </Badge>
+                    </div>
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     Preenchido em{" "}
                     {formatDisplayDateTime(selectedCheckin.preenchido_em)}

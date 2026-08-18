@@ -133,7 +133,11 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
   );
 
   const enviarMensagem = useCallback(
-    async (conteudo: string, replyToId: string | null = null) => {
+    async (
+      conteudo: string,
+      replyToId: string | null = null,
+      notificationPreview?: string
+    ) => {
       const conteudoFinal = conteudo.trim();
       if (!conteudoFinal || sending) return false;
       if (!isReady || ![personalId, alunoId].includes(currentUserId)) {
@@ -176,7 +180,7 @@ export function useChatMessages({ personalId, alunoId, currentUserId }: UseChatM
           destinatario_id: destinatarioId,
           tipo: "nova_mensagem",
           titulo: compactName(remetenteProfile?.nome || "Usuario"),
-          mensagem: previewNotificationMessage(conteudoFinal),
+          mensagem: previewNotificationMessage(notificationPreview || conteudoFinal),
           dados: {
             aluno_id: alunoId,
             aluno_nome: alunoProfile?.nome || null,

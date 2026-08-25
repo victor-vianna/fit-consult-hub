@@ -219,19 +219,21 @@ export function GroupedExerciseCard({
       )}
     >
       <CardContent className="p-3 sm:p-4">
-        <div className="flex min-h-[56px] items-center justify-between gap-3 sm:min-h-[64px]">
+        <div className="flex min-h-[56px] min-w-0 items-center justify-between gap-2 sm:min-h-[64px] sm:gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="flex shrink-0 flex-col items-center gap-1">
               {!readOnly && (
-                <div
+                <button
+                  type="button"
                   {...dragListeners}
                   {...dragAttributes}
-                  className="-m-1 cursor-grab touch-none p-1 active:cursor-grabbing"
+                  className="inline-flex h-8 w-8 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted active:cursor-grabbing"
                   title="Arrastar para reordenar"
+                  aria-label={`Arrastar grupo ${index + 1} para reordenar`}
                   onClick={(event) => event.stopPropagation()}
                 >
-                  <GripVertical className="h-4 w-4 text-muted-foreground" />
-                </div>
+                  <GripVertical className="h-4 w-4" />
+                </button>
               )}
               <Badge variant="outline" className="text-xs font-mono">
                 {index + 1}
@@ -286,18 +288,20 @@ export function GroupedExerciseCard({
             </div>
           </div>
 
-          {!readOnly && (onEdit || onDelete) && (
-            <div
-              className="flex shrink-0 gap-1"
-              onClick={(event) => event.stopPropagation()}
-            >
+          <div
+            className="flex shrink-0 items-center justify-end gap-1"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {!readOnly && (onEdit || onDelete) && (
+              <>
               {onEdit && (
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-9 w-9 touch-target"
+                  className="h-9 w-9"
                   onClick={onEdit}
                   title="Editar grupo"
+                  aria-label="Editar grupo"
                 >
                   <Edit className="h-4 w-4" />
                 </Button>
@@ -306,22 +310,35 @@ export function GroupedExerciseCard({
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-9 w-9 text-destructive hover:text-destructive touch-target"
+                  className="h-9 w-9 text-destructive hover:text-destructive"
                   onClick={onDelete}
                   title="Deletar grupo"
+                  aria-label="Deletar grupo"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
               )}
-            </div>
-          )}
-
-          <ChevronDown
-            className={cn(
-              "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-              expanded && "rotate-180"
+              </>
             )}
-          />
+
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="h-9 w-9"
+              aria-expanded={expanded}
+              aria-label={expanded ? "Recolher grupo" : "Expandir grupo"}
+              title={expanded ? "Recolher" : "Expandir"}
+              onClick={() => setExpanded((value) => !value)}
+            >
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                  expanded && "rotate-180"
+                )}
+              />
+            </Button>
+          </div>
         </div>
 
         {expanded && (
@@ -462,7 +479,7 @@ export function GroupedExerciseCard({
                         </div>
 
                         {exercicio.observacoes && (
-                          <p className="text-xs text-muted-foreground italic">
+                          <p className="break-words text-xs italic text-muted-foreground">
                             {exercicio.observacoes}
                           </p>
                         )}

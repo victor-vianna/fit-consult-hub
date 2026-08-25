@@ -140,18 +140,21 @@ export function ExercicioCard({
       )}
     >
       <CardContent className="p-3 sm:p-4">
-        <div className="flex min-h-[56px] items-center gap-3 sm:min-h-[64px]">
+        <div className="flex min-h-[56px] min-w-0 items-center gap-2 sm:min-h-[64px] sm:gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
           {!readOnly && (
             <div className="flex shrink-0 flex-col items-center gap-1">
-              <div
+              <button
+                type="button"
                 {...dragListeners}
                 {...dragAttributes}
-                className="-m-1 cursor-grab touch-none p-1 active:cursor-grabbing"
+                className="inline-flex h-8 w-8 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted active:cursor-grabbing"
                 title="Arrastar para reordenar"
+                aria-label={`Arrastar exercicio ${index + 1} para reordenar`}
                 onClick={(event) => event.stopPropagation()}
               >
-                <GripVertical className="h-4 w-4 text-muted-foreground" />
-              </div>
+                <GripVertical className="h-4 w-4" />
+              </button>
               <Badge variant="outline" className="text-xs">
                 {index + 1}
               </Badge>
@@ -191,7 +194,7 @@ export function ExercicioCard({
           ) : null}
 
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2">
               <p
                 className={cn(
                   "min-w-0 flex-1 truncate text-sm font-semibold leading-tight sm:text-base",
@@ -207,29 +210,32 @@ export function ExercicioCard({
               )}
             </div>
             <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1 font-medium">
-                <Dumbbell className="h-3.5 w-3.5" />
-                {treinoResumo}
+              <span className="inline-flex min-w-0 items-center gap-1 font-medium">
+                <Dumbbell className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{treinoResumo}</span>
               </span>
               {exercicio.descanso > 0 && (
                 <span className="hidden items-center gap-1 sm:inline-flex">
-                  <Clock className="h-3.5 w-3.5" />
+                  <Clock className="h-3.5 w-3.5 shrink-0" />
                   {exercicio.descanso}s
                 </span>
               )}
             </div>
           </div>
 
-          {!readOnly && (onEdit || onDelete) && (
-            <div
-              className="flex shrink-0 gap-1"
-              onClick={(event) => event.stopPropagation()}
-            >
+          </div>
+
+          <div
+            className="flex shrink-0 items-center justify-end gap-1"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {!readOnly && (onEdit || onDelete) && (
+              <>
               {onEdit && (
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-9 w-9 touch-target"
+                  className="h-9 w-9"
                   onClick={() => onEdit(exercicio)}
                   title="Editar exercício"
                 >
@@ -240,22 +246,34 @@ export function ExercicioCard({
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-9 w-9 text-destructive hover:text-destructive touch-target"
+                  className="h-9 w-9 text-destructive hover:text-destructive"
                   onClick={() => onDelete(exercicio.id)}
                   title="Excluir exercício"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
               )}
-            </div>
-          )}
-
-          <ChevronDown
-            className={cn(
-              "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-              expanded && "rotate-180"
+              </>
             )}
-          />
+
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="h-9 w-9"
+              aria-expanded={expanded}
+              aria-label={expanded ? "Recolher exercicio" : "Expandir exercicio"}
+              title={expanded ? "Recolher" : "Expandir"}
+              onClick={() => setExpanded((value) => !value)}
+            >
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                  expanded && "rotate-180"
+                )}
+              />
+            </Button>
+          </div>
         </div>
 
         {expanded && (
@@ -320,7 +338,7 @@ export function ExercicioCard({
             </div>
 
             {exercicio.observacoes && (
-              <p className="text-sm text-muted-foreground italic">
+              <p className="break-words text-sm italic text-muted-foreground">
                 {exercicio.observacoes}
               </p>
             )}

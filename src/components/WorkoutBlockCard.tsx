@@ -360,7 +360,7 @@ export function WorkoutBlockCard({
         }
       }}
       className={cn(
-        "group cursor-pointer hover:shadow-md transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "group overflow-hidden cursor-pointer hover:shadow-md transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         corClass,
         bloco.concluido && "opacity-75"
       )}
@@ -387,19 +387,22 @@ export function WorkoutBlockCard({
       ) : (
       <>
       <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3 flex-1">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
             {/* Grip + Checkbox/Index */}
             <div className="flex flex-col items-center gap-1 pt-1">
               {!readOnly && (
-                <div
+                <button
+                  type="button"
                   {...dragListeners}
                   {...dragAttributes}
-                  className="cursor-grab active:cursor-grabbing touch-none p-1 -m-1"
+                  className="touch-target inline-flex cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted active:cursor-grabbing"
                   title="Arrastar para reordenar"
+                  aria-label={`Arrastar bloco ${index + 1} para reordenar`}
+                  onClick={(event) => event.stopPropagation()}
                 >
-                  <GripVertical className="h-4 w-4 text-muted-foreground" />
-                </div>
+                  <GripVertical className="h-4 w-4" />
+                </button>
               )}
 
               {readOnly && onToggleConcluido ? (
@@ -421,14 +424,14 @@ export function WorkoutBlockCard({
             </div>
 
             {/* Conteúdo */}
-            <div className="flex-1 space-y-2">
+            <div className="min-w-0 flex-1 space-y-2">
               {/* Header */}
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex min-w-0 items-start justify-between gap-2">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <span className="text-xl">{tipoConfig.icon}</span>
                   <h4
                     className={cn(
-                      "font-semibold text-lg md:text-base",
+                      "min-w-0 max-w-full break-words text-base font-semibold leading-snug sm:text-lg md:text-base",
                       bloco.concluido && "line-through text-muted-foreground"
                     )}
                   >
@@ -454,7 +457,7 @@ export function WorkoutBlockCard({
               {expanded && (bloco.descricao || 
                 bloco.config_alongamento?.observacoes || 
                 bloco.config_aquecimento?.observacoes) && (
-                <p className="text-base md:text-sm text-muted-foreground">
+                <p className="break-words text-base text-muted-foreground md:text-sm">
                   {bloco.descricao || 
                    bloco.config_alongamento?.observacoes || 
                    bloco.config_aquecimento?.observacoes}
@@ -500,7 +503,7 @@ export function WorkoutBlockCard({
                             Protocolo de Intervalos
                           </span>
                         </div>
-                        <div className="grid grid-cols-3 gap-2 text-sm">
+                        <div className="grid gap-2 text-sm sm:grid-cols-3">
                           <div>
                             <span className="text-muted-foreground">
                               Trabalho:
@@ -698,6 +701,10 @@ export function WorkoutBlockCard({
 
 
           {/* Botão expandir (aluno) */}
+          <div
+            className="flex shrink-0 items-center justify-end gap-1 border-t pt-2 sm:border-t-0 sm:pt-0"
+            onClick={(event) => event.stopPropagation()}
+          >
           {!bloco.concluido && (
             <Button
               size="icon"
@@ -723,7 +730,7 @@ export function WorkoutBlockCard({
           {/* Ações (só para Personal) */}
           {!readOnly && (
             <div
-              className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+              className="flex gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
               onClick={(event) => event.stopPropagation()}
             >
               {onSaveAsTemplate && (
@@ -737,6 +744,7 @@ export function WorkoutBlockCard({
                   }}
                   className="h-10 w-10 md:h-9 md:w-9 touch-target"
                   title="Salvar como template"
+                  aria-label={`Salvar ${bloco.nome} como template`}
                 >
                   <Save className="h-5 w-5 md:h-4 md:w-4" />
                 </Button>
@@ -750,6 +758,8 @@ export function WorkoutBlockCard({
                     onEdit();
                   }}
                   className="h-10 w-10 md:h-9 md:w-9 touch-target"
+                  title="Editar bloco"
+                  aria-label={`Editar ${bloco.nome}`}
                 >
                   <Edit className="h-5 w-5 md:h-4 md:w-4" />
                 </Button>
@@ -759,6 +769,8 @@ export function WorkoutBlockCard({
                   size="icon"
                   variant="ghost"
                   className="h-10 w-10 md:h-9 md:w-9 text-destructive hover:text-destructive touch-target"
+                  title="Excluir bloco"
+                  aria-label={`Excluir ${bloco.nome}`}
                   onClick={(event) => {
                     event.stopPropagation();
                     onDelete();
@@ -769,6 +781,7 @@ export function WorkoutBlockCard({
               )}
             </div>
           )}
+          </div>
         </div>
       </CardHeader>
 

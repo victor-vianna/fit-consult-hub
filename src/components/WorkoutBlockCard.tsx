@@ -26,6 +26,7 @@ import {
   Save,
   ExternalLink,
   ChevronDown,
+  Play,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -37,6 +38,7 @@ import {
   getCorTipoBloco,
 } from "@/types/workoutBlocks";
 import { cn } from "@/lib/utils";
+import { getFirstValidVideoUrl, getVideoThumbnail } from "@/utils/videoLinks";
 
 interface WorkoutBlockCardProps {
   bloco: BlocoTreino;
@@ -181,6 +183,10 @@ export function WorkoutBlockCard({
       bloco.config_alongamento?.observacoes ||
       bloco.config_aquecimento?.observacoes ||
       null;
+    const videoUrl = getFirstValidVideoUrl(
+      Array.isArray(bloco.links) ? bloco.links : []
+    );
+    const videoThumbnail = videoUrl ? getVideoThumbnail(videoUrl) : null;
 
     return (
       <Card
@@ -335,6 +341,30 @@ export function WorkoutBlockCard({
                 ) : null}
               </div>
             </div>
+
+            {videoUrl && videoThumbnail ? (
+              <a
+                href={videoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(event) => event.stopPropagation()}
+                aria-label={`Abrir demonstracao de ${bloco.nome} em nova aba`}
+                title="Abrir demonstracao"
+                className="relative h-12 w-16 shrink-0 overflow-hidden rounded-lg border bg-muted shadow-sm transition-transform active:scale-[0.98] sm:h-14 sm:w-20"
+              >
+                <img
+                  src={videoThumbnail}
+                  alt=""
+                  loading="lazy"
+                  className="h-full w-full object-cover"
+                />
+                <span className="absolute inset-0 flex items-center justify-center bg-black/30">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55">
+                    <Play className="ml-0.5 h-3.5 w-3.5 text-white" />
+                  </span>
+                </span>
+              </a>
+            ) : null}
 
             <ChevronDown
               className={cn(

@@ -15,6 +15,7 @@ import { InlinePesoInput } from "@/components/InlinePesoInput";
 import { supabase } from "@/integrations/supabase/client";
 import { useWeightHistory } from "@/hooks/useWeightHistory";
 import { formatDisplayMonthDay } from "@/utils/dateFormat";
+import { getNormalizedVideoUrl, getVideoThumbnail } from "@/utils/videoLinks";
 
 interface CompactExerciseCardProps {
   exercicio: {
@@ -59,48 +60,6 @@ function getSuggestedWeight(lastWeight: string | null) {
 
   const increment = parsed < 10 ? 1 : parsed < 40 ? 2 : 2.5;
   return formatWeight(parsed + increment);
-}
-
-function getYoutubeId(value?: string | null) {
-  if (!value) return null;
-
-  try {
-    const url = new URL(value);
-    const host = url.hostname.replace(/^www\./, "");
-
-    if (host === "youtu.be") {
-      return url.pathname.split("/").filter(Boolean)[0] || null;
-    }
-
-    if (host.endsWith("youtube.com")) {
-      if (url.pathname === "/watch") return url.searchParams.get("v");
-
-      const [, type, id] = url.pathname.split("/");
-      if (["embed", "shorts"].includes(type) && id) return id;
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
-}
-
-function getVideoThumbnail(videoUrl?: string | null, fallback?: string | null) {
-  if (fallback) return fallback;
-
-  const youtubeId = getYoutubeId(videoUrl);
-  if (youtubeId) return `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
-
-  return "/exercise-thumbnail.svg";
-}
-
-function getExternalVideoUrl(videoUrl?: string | null) {
-  if (!videoUrl) return null;
-
-  const youtubeId = getYoutubeId(videoUrl);
-  if (youtubeId) return `https://www.youtube.com/watch?v=${youtubeId}`;
-
-  return videoUrl;
 }
 
 function formatPrescription(exercicio: CompactExerciseCardProps["exercicio"]) {
@@ -149,7 +108,7 @@ export function CompactExerciseCard({
   const currentSeries = Math.min(completedSeries + 1, totalSeries);
   const weightHistory = useWeightHistory(exercicio.nome, profileId || null);
   const suggestedWeight = getSuggestedWeight(weightHistory.ultimoPeso);
-  const externalVideoUrl = getExternalVideoUrl(exercicio.link_video);
+  const externalVideoUrl = getNormalizedVideoUrl(exercicio.link_video);
   const thumbnail = externalVideoUrl
     ? getVideoThumbnail(exercicio.link_video, exercicio.thumbnail)
     : null;

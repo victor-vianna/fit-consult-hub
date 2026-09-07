@@ -275,7 +275,7 @@ export function WorkoutCompletionScreen({
   })();
 
   const enviarFeedback = async () => {
-    if (!rating && !feedback.trim()) return;
+    if (!rating && !feedback.trim()) return true;
     setIsSubmitting(true);
 
     try {
@@ -321,9 +321,11 @@ export function WorkoutCompletionScreen({
       }
 
       toast.success("Feedback enviado!");
+      return true;
     } catch (err) {
       console.error("Erro ao enviar feedback:", err);
       toast.error("Erro ao enviar feedback");
+      return false;
     } finally {
       setIsSubmitting(false);
     }
@@ -529,7 +531,8 @@ export function WorkoutCompletionScreen({
 
   const handleVoltar = async () => {
     if (rating || feedback.trim()) {
-      await enviarFeedback();
+      const feedbackEnviado = await enviarFeedback();
+      if (!feedbackEnviado) return;
     }
     onClose();
   };

@@ -811,10 +811,12 @@ export function useWorkoutTimer({
       if (error) throw error;
 
       // 🔧 CORREÇÃO: Marcar treinos_semanais.concluido = true
-      await supabase
+      const { error: treinoUpdateError } = await supabase
         .from("treinos_semanais")
         .update({ concluido: true, updated_at: new Date().toISOString() })
         .eq("id", treinoId);
+
+      if (treinoUpdateError) throw treinoUpdateError;
 
       // Buscar nome do aluno
       const { data: alunoData } = await supabase

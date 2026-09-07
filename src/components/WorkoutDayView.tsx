@@ -20,6 +20,7 @@ import { useExerciseProgress } from "@/hooks/useExerciseProgress";
 import { usePersistedState } from "@/hooks/usePersistedState";
 import { formatDisplayMonthDay } from "@/utils/dateFormat";
 import { WORKOUT_EVENTS, dispatchWorkoutEvent } from "@/constants/workoutStatus";
+import { toast } from "sonner";
 import {
   getIsolatedExercises,
   normalizeExerciseGroups,
@@ -1211,7 +1212,14 @@ function TreinoCard({
             onToggleGrupo={handleToggleGrupo}
             onToggleBloco={handleToggleBloco}
             isWorkoutActive={isWorkoutActive}
-            onFinalizarTreino={() => finalizarRef.current?.()}
+            onFinalizarTreino={() => {
+              if (finalizarRef.current) {
+                finalizarRef.current();
+                return;
+              }
+
+              toast.info("Estamos restaurando sua sessão de treino. Aguarde um instante e tente finalizar novamente.");
+            }}
             profileId={profileId}
             treinoId={treinoId}
             resumeItemId={resumeItemId}

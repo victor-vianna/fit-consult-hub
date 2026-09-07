@@ -95,6 +95,7 @@ export function WorkoutTimer({
         treinoId={treinoId}
         onClose={() => {
           fecharTelaConclusao();
+          onWorkoutComplete?.();
         }}
       />
     );
@@ -105,13 +106,17 @@ export function WorkoutTimer({
   }
 
   const handleFinalizar = async () => {
+    if (isFinalizando) return;
+
     setIsFinalizando(true);
-    const concluido = await finalizar();
-    if (concluido) {
-      onWorkoutComplete?.();
+    try {
+      const concluido = await finalizar();
+      if (concluido) {
+        setShowFinalizarDialog(false);
+      }
+    } finally {
+      setIsFinalizando(false);
     }
-    setShowFinalizarDialog(false);
-    setIsFinalizando(false);
   };
 
   const handleCancelar = async () => {
@@ -233,7 +238,10 @@ export function WorkoutTimer({
               Voltar
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleFinalizar}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleFinalizar();
+              }}
               className="w-full sm:w-auto"
               disabled={isFinalizando}
             >

@@ -6,11 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dumbbell, Loader2, CalendarDays } from "lucide-react";
 import { WorkoutTimer } from "./WorkoutTimer";
+import { WorkoutCompletionScreen } from "./WorkoutCompletionScreen";
 import { WorkoutDayHeader } from "./WorkoutDayHeader";
 import { WorkoutExerciseList } from "./WorkoutExerciseList";
 import type { TreinoDia } from "@/types/treino";
 import type { BlocoTreino } from "@/types/workoutBlocks";
 import type { GrupoExercicio } from "@/hooks/useExerciseGroups";
+import type { WorkoutCompletionData } from "@/hooks/useWorkoutTimer";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -32,6 +34,7 @@ interface WorkoutDayViewProps {
   treinos: TreinoDia[];
   profileId: string;
   personalId: string;
+  semana?: string;
   gruposPorTreino?: Record<string, GrupoExercicio[]>;
   blocosPorTreino?: Record<string, BlocoTreino[]>;
   onToggleConcluido: (id: string, concluido: boolean) => Promise<any>;
@@ -74,6 +77,21 @@ function countCompletedItems(
   const blocksDone = normalizeWorkoutBlocks(blocos).filter((bloco) => bloco.concluido).length;
 
   return isolatedDone + groupDone + blocksDone;
+}
+
+function countWorkoutItems(
+  treino: TreinoDia,
+  grupos: GrupoExercicio[],
+  blocos: BlocoTreino[]
+) {
+  const exerciciosIsolados = getIsolatedExercises(treino.exercicios).length;
+  const exerciciosEmGrupos = normalizeExerciseGroups(grupos).reduce(
+    (total, grupo) => total + (grupo.exercicios?.length || 0),
+    0
+  );
+  const totalBlocos = normalizeWorkoutBlocks(blocos).length;
+
+  return exerciciosIsolados + exerciciosEmGrupos + totalBlocos;
 }
 
 function buildWorkoutSubtitle(treino: TreinoDia, hasMultiple: boolean) {
@@ -165,6 +183,7 @@ export function WorkoutDayView({
   treinos,
   profileId,
   personalId,
+  semana,
   gruposPorTreino = {},
   blocosPorTreino = {},
   onWorkoutFinished,
@@ -175,6 +194,10 @@ export function WorkoutDayView({
     useState<Record<string, GrupoExercicio[]>>(gruposPorTreino);
   const [localBlocos, setLocalBlocos] =
     useState<Record<string, BlocoTreino[]>>(blocosPorTreino);
+  const [completionScreen, setCompletionScreen] = useState<{
+    treinoId: string;
+    data: WorkoutCompletionData;
+  } | null>(null);
 
   // 🔧 Hook de persistência de sessão PWA
   const { 
@@ -325,13 +348,7 @@ export function WorkoutDayView({
   // 🔧 Calcular total de itens de treino (exercícios isolados + exercícios em grupos + blocos)
   const calcularTotalItens = useCallback(
     (treino: TreinoDia, grupos: GrupoExercicio[], blocos: BlocoTreino[]): number => {
-      const exerciciosIsolados = getIsolatedExercises(treino.exercicios).length;
-      const exerciciosEmGrupos = normalizeExerciseGroups(grupos).reduce(
-        (total, grupo) => total + (grupo.exercicios?.length || 0),
-        0
-      );
-      const totalBlocos = normalizeWorkoutBlocks(blocos).length;
-      return exerciciosIsolados + exerciciosEmGrupos + totalBlocos;
+      return countWorkoutItems(treino, grupos, blocos);
     },
     []
   );
@@ -617,6 +634,119 @@ export function WorkoutDayView({
     String(primeiroDiaComConteudo),
     { storage: "local" }
   );
+
+  useEffect(() => {
+    const semanaTemConteudo = localTreinos.some((treino) => {
+      const treinoId = getTreinoId(treino);
+      const grupos = treinoId ? normalizeExerciseGroups(localGrupos[treinoId] ?? []) : [];
+      const blocos = treinoId ? normalizeWorkoutBlocks(localBlocos[treinoId] ?? []) : [];
+      return countWorkoutItems(treino, grupos, blocos) > 0;
+    });
+
+    if (!semanaTemConteudo) return;
+
+    const diaNumero = Number(diaAtivo);
+    const diaAtivoTemConteudo =
+      Number.isFinite(diaNumero) &&
+      localTreinos
+        .filter((treino) => treino.dia === diaNumero)
+        .some((treino) => {
+          const treinoId = getTreinoId(treino);
+          const grupos = treinoId ? normalizeExerciseGroups(localGrupos[treinoId] ?? []) : [];
+          const blocos = treinoId ? normalizeWorkoutBlocks(localBlocos[treinoId] ?? []) : [];
+          return countWorkoutItems(treino, grupos, blocos) > 0;
+        });
+
+    if (!diaAtivoTemConteudo && String(primeiroDiaComConteudo) !== diaAtivo) {
+      console.warn("[WorkoutDayView] Dia ativo sem conteudo apos carregar semana:", {
+        profileId,
+        personalId,
+        semana,
+        diaAtivo,
+        primeiroDiaComConteudo,
+      });
+      setDiaAtivo(String(primeiroDiaComConteudo));
+    }
+  }, [
+    diaAtivo,
+    getTreinoId,
+    localBlocos,
+    localGrupos,
+    localTreinos,
+    personalId,
+    primeiroDiaComConteudo,
+    profileId,
+    semana,
+    setDiaAtivo,
+  ]);
+
+  useEffect(() => {
+    const expectedWorkoutIds = treinos
+      .map((treino) => getTreinoId(treino))
+      .filter(Boolean)
+      .join("|");
+    const displayedWorkoutIds = localTreinos
+      .map((treino) => getTreinoId(treino))
+      .filter(Boolean)
+      .join("|");
+
+    if (expectedWorkoutIds !== displayedWorkoutIds) return;
+
+    const expectedByDay = new Map<number, number>();
+    const displayedByDay = new Map<number, number>();
+
+    treinos.forEach((treino) => {
+      const treinoId = getTreinoId(treino);
+      const grupos = treinoId
+        ? normalizeExerciseGroups(gruposPorTreino[treinoId] ?? treino.grupos ?? [])
+        : normalizeExerciseGroups(treino.grupos ?? []);
+      const blocos = treinoId
+        ? normalizeWorkoutBlocks(blocosPorTreino[treinoId] ?? treino.blocos ?? [])
+        : normalizeWorkoutBlocks(treino.blocos ?? []);
+      expectedByDay.set(
+        treino.dia,
+        (expectedByDay.get(treino.dia) ?? 0) + countWorkoutItems(treino, grupos, blocos)
+      );
+    });
+
+    localTreinos.forEach((treino) => {
+      const treinoId = getTreinoId(treino);
+      const grupos = treinoId ? normalizeExerciseGroups(localGrupos[treinoId] ?? []) : [];
+      const blocos = treinoId ? normalizeWorkoutBlocks(localBlocos[treinoId] ?? []) : [];
+      displayedByDay.set(
+        treino.dia,
+        (displayedByDay.get(treino.dia) ?? 0) + countWorkoutItems(treino, grupos, blocos)
+      );
+    });
+
+    const divergencias = Array.from({ length: 7 }, (_, index) => {
+      const dia = index + 1;
+      const esperado = expectedByDay.get(dia) ?? 0;
+      const exibido = displayedByDay.get(dia) ?? 0;
+
+      return esperado === exibido ? null : { dia, esperado, exibido };
+    }).filter(Boolean);
+
+    if (divergencias.length > 0) {
+      console.warn("[WorkoutDayView] Divergencia de contagem no treino exibido:", {
+        profileId,
+        personalId,
+        semana,
+        divergencias,
+      });
+    }
+  }, [
+    blocosPorTreino,
+    getTreinoId,
+    gruposPorTreino,
+    localBlocos,
+    localGrupos,
+    localTreinos,
+    personalId,
+    profileId,
+    semana,
+    treinos,
+  ]);
 
   const [resumeItemId, setResumeItemId] = useState<string | null>(null);
   const restoreKeyRef = useRef<string | null>(null);
@@ -913,6 +1043,7 @@ export function WorkoutDayView({
   ]);
 
   return (
+    <>
     <div className="space-y-3 sm:space-y-4 pb-20">
       {/* Header Compacto */}
       <div className="flex items-center justify-between gap-2">
@@ -1055,7 +1186,11 @@ export function WorkoutDayView({
                     personalId={personalId}
                     marcarTreinoIniciado={handleIniciarTreino}
                     marcarTreinoFinalizado={marcarTreinoFinalizado}
-                    onTreinoConcluido={(finishedTreinoId) => {
+                    onTreinoConcluido={(finishedTreinoId, completionData) => {
+                      setCompletionScreen({
+                        treinoId: finishedTreinoId,
+                        data: completionData,
+                      });
                       resetLocalProgressForTreino(finishedTreinoId);
                       onWorkoutFinished?.();
                     }}
@@ -1075,6 +1210,14 @@ export function WorkoutDayView({
         })}
       </Tabs>
     </div>
+    {completionScreen && (
+      <WorkoutCompletionScreen
+        data={completionScreen.data}
+        treinoId={completionScreen.treinoId}
+        onClose={() => setCompletionScreen(null)}
+      />
+    )}
+    </>
   );
 }
 
@@ -1126,7 +1269,7 @@ function TreinoCard({
   personalId: string;
   marcarTreinoIniciado: (treinoId: string, dia: number) => void;
   marcarTreinoFinalizado: (treinoId: string, dia: number) => void;
-  onTreinoConcluido: (treinoId: string) => void;
+  onTreinoConcluido: (treinoId: string, completionData: WorkoutCompletionData) => void;
   onTreinoCancelado: (treinoId: string) => void;
   handleToggleExercicio: (id: string, concluido: boolean) => Promise<any>;
   handleRegisterSerie: (id: string, seriesConcluidas: number, totalSeries: number) => Promise<any>;
@@ -1173,9 +1316,9 @@ function TreinoCard({
             finalizarRef={finalizarRef}
             iniciarRef={iniciarRef}
             onWorkoutStart={() => marcarTreinoIniciado(treinoId, treino.dia)}
-            onWorkoutComplete={() => {
+            onWorkoutComplete={(completionData) => {
               marcarTreinoFinalizado(treinoId, treino.dia);
-              onTreinoConcluido(treinoId);
+              onTreinoConcluido(treinoId, completionData);
             }}
             onWorkoutCancel={() => {
               marcarTreinoFinalizado(treinoId, treino.dia);

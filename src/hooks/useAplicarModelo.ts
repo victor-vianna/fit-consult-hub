@@ -122,8 +122,8 @@ export function useAplicarModelo() {
 
           if (updateError) throw updateError;
 
-          // Deletar exercícios e blocos antigos
-          await Promise.all([
+          // Deletar exercícios e blocos antigos antes de inserir a nova versão.
+          const [deleteExerciciosResult, deleteBlocosResult] = await Promise.all([
             supabase
               .from("exercicios")
               .delete()
@@ -133,6 +133,18 @@ export function useAplicarModelo() {
               .delete()
               .eq("treino_semanal_id", treinoExistente.id),
           ]);
+
+          if (deleteExerciciosResult.error) {
+            throw new Error(
+              `Falha ao limpar exercícios antigos: ${deleteExerciciosResult.error.message}`
+            );
+          }
+
+          if (deleteBlocosResult.error) {
+            throw new Error(
+              `Falha ao limpar blocos antigos: ${deleteBlocosResult.error.message}`
+            );
+          }
 
           treinoId = treinoExistente.id;
         } else {

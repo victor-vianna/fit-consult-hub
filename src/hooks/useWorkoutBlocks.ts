@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import type { BlocoTreino } from "@/types/workoutBlocks";
 import { hidratarBlocoComTemplate } from "@/types/workoutBlocks";
 import { normalizeWorkoutBlocks } from "@/utils/workoutNormalization";
+import { getWeekStart } from "@/utils/weekUtils";
 
 
 interface UseWorkoutBlocksProps {
@@ -20,15 +21,6 @@ interface UseWorkoutBlocksProps {
   semana?: string;
   enabled?: boolean;
 }
-
-// Utilitário: retorna início da semana (segunda-feira)
-const getWeekStart = (date = new Date()) => {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  const diff = d.getDate() - d.getDay() + 1;
-  const inicio = new Date(d.setDate(diff));
-  return inicio.toISOString().split("T")[0];
-};
 
 const buildQueryKey = (
   profileId: string,
@@ -40,50 +32,27 @@ const garantirTreinoExisteBloco = async (
   treinoSemanalId: string | null,
   profileId: string,
   personalId: string,
-  dia?: number
+  semana: string
 ): Promise<string> => {
-  // Se o ID já existe, verifica se o registro realmente existe no banco
-  if (treinoSemanalId) {
-    const { data, error } = await supabase
-      .from("treinos_semanais")
-      .select("id")
-      .eq("id", treinoSemanalId)
-      .maybeSingle();
-
-    if (!error && data) {
-      return treinoSemanalId;
-    }
+  if (!treinoSemanalId) {
+    throw new Error("Treino de destino não informado. Atualize a lista e tente novamente.");
   }
 
-  // Se não existe ou houve erro, cria um novo
-  console.log(
-    `[useWorkoutBlocks] Criando treino semanal para dia ${
-      dia || "desconhecido"
-    }`
-  );
-
-  const hoje = new Date();
-  const inicioDaSemana = new Date(hoje);
-  inicioDaSemana.setDate(hoje.getDate() - hoje.getDay() + 1);
-
-  const { data: novoTreino, error: createError } = await supabase
+  const { data, error } = await supabase
     .from("treinos_semanais")
-    .insert({
-      profile_id: profileId,
-      personal_id: personalId,
-      semana: inicioDaSemana.toISOString().split("T")[0],
-      dia_semana: dia || 1,
-      concluido: false,
-    })
-    .select()
-    .single();
+    .select("id")
+    .eq("id", treinoSemanalId)
+    .eq("profile_id", profileId)
+    .eq("personal_id", personalId)
+    .eq("semana", semana)
+    .maybeSingle();
 
-  if (createError) {
-    console.error("[useWorkoutBlocks] Erro ao criar treino:", createError);
-    throw createError;
+  if (error) throw error;
+  if (!data) {
+    throw new Error("Treino de destino não encontrado nesta semana. Atualize a lista e tente novamente.");
   }
 
-  return novoTreino.id;
+  return treinoSemanalId;
 };
 
 export function useWorkoutBlocks({
@@ -174,7 +143,8 @@ export function useWorkoutBlocks({
       const treinoIdValido = await garantirTreinoExisteBloco(
         treinoSemanalId,
         profileId,
-        personalId
+        personalId,
+        semana
       );
 
       // 1. Obter próxima ordem
@@ -237,7 +207,9 @@ export function useWorkoutBlocks({
     },
     onError: (error: any) => {
       console.error("[useWorkoutBlocks] Erro ao criar:", error);
-      if (error.code === "42P17") {
+      if (error?.message?.includes("Treino de destino")) {
+        toast.error(error.message);
+      } else if (error.code === "42P17") {
         toast.error("Erro de permissão. Verifique as políticas RLS.");
       } else {
         toast.error("Erro ao adicionar bloco de treino");

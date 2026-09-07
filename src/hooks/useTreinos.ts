@@ -98,15 +98,21 @@ export function useTreinos({
     useState<string | null>(null);
 
   // Query separada para buscar semana ativa do personal
-  const { data: semanaAtivaData, isLoading: loadingSemanaAtiva } = useQuery({
+  const {
+    data: semanaAtivaData,
+    isLoading: loadingSemanaAtiva,
+    error: activeWeekError,
+  } = useQuery({
     queryKey: buildActiveWeekQueryKey(profileId, personalId),
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("treino_semana_ativa")
         .select("semana_inicio")
         .eq("profile_id", profileId)
         .eq("personal_id", personalId)
         .maybeSingle();
+
+      if (error) throw error;
       
       return data?.semana_inicio || null;
     },
@@ -133,7 +139,10 @@ export function useTreinos({
     shouldUseActiveWeek && semanaAtivaData ? semanaAtivaData : semanaSelecionada;
   const waitsForActiveWeek = followActiveWeek || preferActiveWeek;
   const canFetchWorkoutWeek =
-    !!profileId && !!personalId && (!waitsForActiveWeek || !loadingSemanaAtiva);
+    !!profileId &&
+    !!personalId &&
+    !activeWeekError &&
+    (!waitsForActiveWeek || !loadingSemanaAtiva);
 
   const { obterGruposDoTreino } = useExerciseGroups({
     profileId,
@@ -261,12 +270,17 @@ export function useTreinos({
             );
 
             // Buscar blocos do treino
-            const { data: blocos } = await supabase
+            const { data: blocos, error: blocosError } = await supabase
               .from("blocos_treino")
               .select("*")
               .eq("treino_semanal_id", treino.id)
               .is("deleted_at", null)
               .order("ordem", { ascending: true });
+
+            if (blocosError) {
+              console.error("❌ Erro ao buscar blocos:", blocosError);
+              throw blocosError;
+            }
 
             const blocosHidratados = normalizeWorkoutBlocks(
               (blocos ?? []).map((b: any) => hidratarBlocoComTemplate(b))
@@ -926,7 +940,8 @@ export function useTreinos({
   return {
     treinos,
     loading: loadingTreinos || (waitsForActiveWeek && loadingSemanaAtiva),
-    error,
+    error: activeWeekError || error,
+    activeWeekError,
     workoutWeekReady: canFetchWorkoutWeek,
     // Navegação de semanas
     semanaSelecionada: semanaParaBuscar,

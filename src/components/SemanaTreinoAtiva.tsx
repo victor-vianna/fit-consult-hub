@@ -13,6 +13,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatDisplayDate, formatDisplayMonthDay } from "@/utils/dateFormat";
 
@@ -28,6 +38,7 @@ export function SemanaTreinoAtiva({
   alunoNome,
 }: SemanaTreinoAtivaProps) {
   const [open, setOpen] = useState(false);
+  const [semanaPendente, setSemanaPendente] = useState<Date | null>(null);
   const queryClient = useQueryClient();
 
   // Buscar semana ativa atual
@@ -73,6 +84,7 @@ export function SemanaTreinoAtiva({
       queryClient.invalidateQueries({ queryKey: ["semana-ativa-display", profileId, personalId] });
       queryClient.invalidateQueries({ queryKey: ["treinos", profileId, personalId] });
       toast.success(`Semana de ${formatDisplayDate(semana)} ativada`);
+      setSemanaPendente(null);
       setOpen(false);
     },
     onError: (error) => {
@@ -158,10 +170,9 @@ export function SemanaTreinoAtiva({
               return (
                 <Card
                   key={semanaStr}
-                  className={`p-3 cursor-pointer transition-all hover:bg-accent ${
+                  className={`p-3 transition-all ${
                     isAtiva ? "border-primary bg-primary/5" : ""
                   }`}
-                  onClick={() => definirSemanaMutation.mutate(semana)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
@@ -184,8 +195,18 @@ export function SemanaTreinoAtiva({
                         {formatDisplayDate(semana)}
                       </p>
                     </div>
-                    {isAtiva && (
+                    {isAtiva ? (
                       <Check className="h-5 w-5 text-primary" />
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSemanaPendente(semana)}
+                        disabled={definirSemanaMutation.isPending}
+                      >
+                        Ativar
+                      </Button>
                     )}
                   </div>
                 </Card>
@@ -209,6 +230,38 @@ export function SemanaTreinoAtiva({
           </div>
         )}
       </DialogContent>
+
+      <AlertDialog
+        open={!!semanaPendente}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setSemanaPendente(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ativar semana para o aluno?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {semanaPendente
+                ? `Isso fará ${alunoNome} seguir a semana de ${formatDisplayDate(semanaPendente)}.`
+                : "Isso alterara a semana vista pelo aluno."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={definirSemanaMutation.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={definirSemanaMutation.isPending || !semanaPendente}
+              onClick={(event) => {
+                event.preventDefault();
+                if (semanaPendente) definirSemanaMutation.mutate(semanaPendente);
+              }}
+            >
+              Confirmar ativacao
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

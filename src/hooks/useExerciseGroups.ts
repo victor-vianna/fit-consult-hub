@@ -9,6 +9,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { normalizeExerciseGroups } from "@/utils/workoutNormalization";
+import { getWeekStart } from "@/utils/weekUtils";
 
 type TipoAgrupamento =
   | "normal"
@@ -53,15 +54,6 @@ interface UseExerciseGroupsProps {
   enabled?: boolean;
 }
 
-// Utilitário: retorna início da semana (segunda-feira)
-const getWeekStart = (date = new Date()) => {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  const diff = d.getDate() - d.getDay() + 1;
-  const inicio = new Date(d.setDate(diff));
-  return inicio.toISOString().split("T")[0];
-};
-
 const buildQueryKey = (
   profileId: string,
   personalId: string,
@@ -69,61 +61,39 @@ const buildQueryKey = (
 ): QueryKey => ["grupos-exercicios", profileId, personalId, semana];
 
 /**
- * Cria um treino semanal se ele não existir
- * @param treinoSemanalId - ID que queremos verificar/criar
+ * Valida que o treino semanal de destino existe na semana carregada.
+ * Criar um treino aqui mascararia ID/semana inválidos e poderia gravar no dia errado.
+ * @param treinoSemanalId - ID que queremos verificar
  * @param profileId - ID do aluno
  * @param personalId - ID do personal
- * @param dia - Dia da semana (1-7)
- * @returns Promise<string> - ID do treino (existente ou criado)
+ * @param semana - Semana atualmente carregada (YYYY-MM-DD)
+ * @returns Promise<string> - ID do treino existente
  */
 const garantirTreinoExiste = async (
   treinoSemanalId: string | null,
   profileId: string,
   personalId: string,
-  dia?: number
+  semana: string
 ): Promise<string> => {
-  // Se o ID já existe, verifica se o registro realmente existe no banco
-  if (treinoSemanalId) {
-    const { data, error } = await supabase
-      .from("treinos_semanais")
-      .select("id")
-      .eq("id", treinoSemanalId)
-      .maybeSingle();
-
-    if (!error && data) {
-      return treinoSemanalId;
-    }
+  if (!treinoSemanalId) {
+    throw new Error("Treino de destino não informado. Atualize a lista e tente novamente.");
   }
 
-  // Se não existe ou houve erro, cria um novo
-  console.log(
-    `[useExerciseGroups] Criando treino semanal para dia ${
-      dia || "desconhecido"
-    }`
-  );
-
-  const hoje = new Date();
-  const inicioDaSemana = new Date(hoje);
-  inicioDaSemana.setDate(hoje.getDate() - hoje.getDay() + 1);
-
-  const { data: novoTreino, error: createError } = await supabase
+  const { data, error } = await supabase
     .from("treinos_semanais")
-    .insert({
-      profile_id: profileId,
-      personal_id: personalId,
-      semana: inicioDaSemana.toISOString().split("T")[0],
-      dia_semana: dia || 1, // Default para segunda se não especificado
-      concluido: false,
-    })
-    .select()
-    .single();
+    .select("id")
+    .eq("id", treinoSemanalId)
+    .eq("profile_id", profileId)
+    .eq("personal_id", personalId)
+    .eq("semana", semana)
+    .maybeSingle();
 
-  if (createError) {
-    console.error("[useExerciseGroups] Erro ao criar treino:", createError);
-    throw createError;
+  if (error) throw error;
+  if (!data) {
+    throw new Error("Treino de destino não encontrado nesta semana. Atualize a lista e tente novamente.");
   }
 
-  return novoTreino.id;
+  return treinoSemanalId;
 };
 
 // Gera UUID no client
@@ -250,7 +220,8 @@ export function useExerciseGroups({
       const treinoIdValido = await garantirTreinoExiste(
         treinoSemanalId,
         profileId,
-        personalId
+        personalId,
+        semana
       );
 
       const grupoId = genUUID();
@@ -326,7 +297,7 @@ export function useExerciseGroups({
     },
     onError: (error: any) => {
       console.error("[useExerciseGroups] Erro ao criar grupo:", error);
-      toast.error("Erro ao criar grupo de exercícios");
+      toast.error(error?.message || "Erro ao criar grupo de exercícios");
     },
   });
 

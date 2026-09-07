@@ -36,6 +36,8 @@ import {
   Link as LinkIcon,
   Blocks,
   Trash2,
+  AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 import { format, parseISO, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -54,6 +56,7 @@ import { WorkoutTimer } from "./WorkoutTimer";
 import { WorkoutDayView } from "./WorkoutDayView";
 import ExercisePicker from "@/components/exercises/ExercisePicker";
 import { formatDisplayDate, formatDisplayMonthDay } from "@/utils/dateFormat";
+import { getWeekStart } from "@/utils/weekUtils";
 import { WorkoutBlockDialog, hasWorkoutBlockDialogDraft } from "./WorkoutBlockDialog";
 import { WorkoutBlockCard } from "./WorkoutBlockCard";
 import type { Exercise } from "@/types/exercise";
@@ -181,11 +184,14 @@ export function TreinosManager({
     deletarTreino,
     treinosPorDia,
     workoutWeekReady,
+    error: treinosError,
+    refetch: refetchTreinos,
+    semanaAtivaData,
   } = useTreinos({
     profileId,
     personalId,
     followActiveWeek: isAluno,
-    preferActiveWeek: false,
+    preferActiveWeek: isPersonal,
   });
 
   // Buscar nome do aluno
@@ -254,6 +260,8 @@ export function TreinosManager({
     reordenarGrupos,
     isCriando: isCriandoGrupo,
     isDeletando: isDeletandoGrupo,
+    error: gruposError,
+    refetch: refetchGrupos,
   } = useExerciseGroups({
     profileId,
     personalId,
@@ -273,12 +281,87 @@ export function TreinosManager({
     reordenarBlocos,
     isCriando: isCriandoBloco,
     isDeletando: isDeletandoBloco,
+    error: blocosError,
+    refetch: refetchBlocos,
   } = useWorkoutBlocks({
     profileId,
     personalId,
     semana: semanaSelecionada,
     enabled: workoutWeekReady,
   });
+
+  const [isAtivandoSemanaSelecionada, setIsAtivandoSemanaSelecionada] =
+    useState(false);
+
+  const workoutLoadError = treinosError || gruposError || blocosError;
+  const workoutLoadErrorMessage =
+    workoutLoadError instanceof Error
+      ? workoutLoadError.message
+      : "Nao foi possivel carregar o treino completo.";
+
+  const handleRetryWorkoutLoad = useCallback(async () => {
+    await Promise.allSettled([
+      refetchTreinos(),
+      refetchGrupos(),
+      refetchBlocos(),
+      queryClient.refetchQueries({
+        queryKey: ["semana-ativa-inicio", profileId, personalId],
+      }),
+      queryClient.refetchQueries({
+        queryKey: ["semana-ativa-display", profileId, personalId],
+      }),
+      queryClient.refetchQueries({
+        queryKey: ["semana-ativa", profileId, personalId],
+      }),
+    ]);
+  }, [
+    personalId,
+    profileId,
+    queryClient,
+    refetchBlocos,
+    refetchGrupos,
+    refetchTreinos,
+  ]);
+
+  const handleAtivarSemanaSelecionada = useCallback(async () => {
+    setIsAtivandoSemanaSelecionada(true);
+    try {
+      const { error } = await supabase
+        .from("treino_semana_ativa")
+        .upsert(
+          {
+            profile_id: profileId,
+            personal_id: personalId,
+            semana_inicio: semanaSelecionada,
+          },
+          { onConflict: "profile_id,personal_id" }
+        );
+
+      if (error) throw error;
+
+      await Promise.allSettled([
+        queryClient.invalidateQueries({
+          queryKey: ["semana-ativa", profileId, personalId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["semana-ativa-inicio", profileId, personalId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["semana-ativa-display", profileId, personalId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["treinos", profileId, personalId],
+        }),
+      ]);
+
+      toast.success(`Semana de ${formatDisplayDate(semanaSelecionada)} ativada para o aluno`);
+    } catch (error) {
+      console.error("[TreinosManager] Erro ao ativar semana selecionada:", error);
+      toast.error("Nao foi possivel ativar esta semana para o aluno");
+    } finally {
+      setIsAtivandoSemanaSelecionada(false);
+    }
+  }, [personalId, profileId, queryClient, semanaSelecionada]);
 
   const [isResumingWorkoutData, setIsResumingWorkoutData] = useState(false);
   const resumeRefetchInFlightRef = useRef<Promise<void> | null>(null);
@@ -968,6 +1051,27 @@ export function TreinosManager({
     return data.id;
   };
 
+  const registrarTreinoNaoEncontradoParaEdicao = async (
+    contexto: Record<string, unknown>
+  ) => {
+    try {
+      const { error } = await (supabase as any).rpc("log_workout_edit_not_found", {
+        p_treino_id: String(contexto.treinoIdBuscado || ""),
+        p_profile_id: profileId,
+        p_personal_id: personalId,
+        p_semana: semanaSelecionada,
+        p_context: contexto,
+      });
+
+      if (error) throw error;
+    } catch (logError) {
+      console.warn("[TreinosManager] Falha ao registrar log de treino nao encontrado:", {
+        contexto,
+        logError,
+      });
+    }
+  };
+
   const resolverTreinoIdParaEdicaoDeBloco = async (
     bloco: BlocoTreino
   ): Promise<string | null> => {
@@ -997,7 +1101,7 @@ export function TreinosManager({
       .maybeSingle();
 
     if (error || !treinoDb) {
-      console.warn("[TreinosManager] Treino nao encontrado para edicao de bloco:", {
+      const contexto = {
         blocoId: bloco.id,
         treinoIdBuscado: treinoIdDoBloco,
         selectedTreinoId,
@@ -1005,8 +1109,18 @@ export function TreinosManager({
         profileId,
         personalId,
         semanaSelecionada,
-        error,
-      });
+        error: error
+          ? {
+              code: error.code,
+              message: error.message,
+              details: error.details,
+              hint: error.hint,
+            }
+          : null,
+      };
+
+      console.warn("[TreinosManager] Treino nao encontrado para edicao de bloco:", contexto);
+      await registrarTreinoNaoEncontradoParaEdicao(contexto);
       return null;
     }
 
@@ -1220,6 +1334,33 @@ export function TreinosManager({
     );
   }
 
+  if (workoutLoadError) {
+    return (
+      <Card className="border-destructive/40 bg-destructive/5">
+        <CardContent className="flex flex-col items-center justify-center gap-4 py-12 text-center">
+          <div className="rounded-full bg-destructive/10 p-3 text-destructive">
+            <AlertTriangle className="h-7 w-7" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold text-foreground">
+              Erro ao carregar treino
+            </h2>
+            <p className="max-w-md text-sm text-muted-foreground">
+              Nao foi possivel confirmar os dados do treino agora. Tente novamente antes de considerar este dia como descanso.
+            </p>
+            <p className="max-w-md text-xs text-muted-foreground">
+              {workoutLoadErrorMessage}
+            </p>
+          </div>
+          <Button onClick={handleRetryWorkoutLoad} className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Tentar novamente
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   // SE FOR ALUNO, RENDERIZA O NOVO COMPONENTE
   if (isAluno) {
     return (
@@ -1227,6 +1368,7 @@ export function TreinosManager({
         treinos={treinos}
         profileId={profileId}
         personalId={personalId}
+        semana={semanaSelecionada}
         gruposPorTreino={gruposPorTreino} // ✅ Usar do hook
         blocosPorTreino={blocosPorTreino} // ✅ Usar do hook
         onToggleConcluido={marcarExercicioConcluido}
@@ -1418,6 +1560,13 @@ export function TreinosManager({
     return `${formatDisplayMonthDay(inicio)} - ${formatDisplayDate(fim)}`;
   };
 
+  const semanaQueAlunoVe = semanaAtivaData || getWeekStart();
+  const semanaSelecionadaVisivelParaAluno =
+    semanaSelecionada === semanaQueAlunoVe;
+  const semanaSelecionadaTemConteudo = treinos.some(
+    (treino) => calcularTotalItens(treino) > 0
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -1533,6 +1682,48 @@ export function TreinosManager({
       </div>
 
       <Separator />
+
+      {isPersonal && !readOnly && !semanaSelecionadaVisivelParaAluno && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-foreground">
+                  Esta nao e a semana que o aluno esta vendo
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Voce esta editando {formatDisplayDate(semanaSelecionada)}. O aluno ve {formatDisplayDate(semanaQueAlunoVe)}
+                  {semanaAtivaData
+                    ? " porque existe uma semana ativa definida."
+                    : " porque ele segue a semana atual automaticamente."}
+                </p>
+                {!semanaSelecionadaTemConteudo && (
+                  <p className="text-xs text-amber-700">
+                    Adicione exercicios ou blocos antes de ativar esta semana para o aluno.
+                  </p>
+                )}
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="shrink-0 gap-2 border-amber-500/50"
+              onClick={handleAtivarSemanaSelecionada}
+              disabled={
+                isAtivandoSemanaSelecionada || !semanaSelecionadaTemConteudo
+              }
+            >
+              {isAtivandoSemanaSelecionada ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4" />
+              )}
+              Ativar esta semana
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {isPersonal && (
         <AnamneseWorkoutNotes

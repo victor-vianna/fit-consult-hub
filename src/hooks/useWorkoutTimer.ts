@@ -474,25 +474,25 @@ export function useWorkoutTimer({
   }, [treinoId, sessaoId, saveToStorage, persistirTempo, calculateElapsedTime]);
 
   // Iniciar treino
-  const iniciar = async () => {
+  const iniciar = async (): Promise<boolean> => {
     try {
       // Verifica se o usuário está autenticado
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
       if (authError || !user) {
         toast.error("Você precisa estar logado para iniciar o treino");
-        return;
+        return false;
       }
 
       // Verifica se o usuário autenticado é o dono do treino
       if (user.id !== profileId) {
         toast.error("Você não tem permissão para iniciar este treino");
-        return;
+        return false;
       }
 
       if (!treinoId || !profileId || !personalId) {
         toast.error("Dados inválidos para iniciar o treino");
-        return;
+        return false;
       }
 
       const now = Date.now();
@@ -520,7 +520,7 @@ export function useWorkoutTimer({
         } else {
           toast.error("Não foi possível iniciar o treino. Tente novamente.");
         }
-        return;
+        return false;
       }
 
       // 🔧 Configurar timestamps absolutos
@@ -593,9 +593,11 @@ export function useWorkoutTimer({
       }
 
       toast.success("Treino iniciado");
+      return true;
     } catch (err) {
       console.error("Erro ao iniciar treino:", err);
       toast.error("Erro ao iniciar treino. Verifique sua conexão.");
+      return false;
     }
   };
 
@@ -797,7 +799,7 @@ export function useWorkoutTimer({
       const tempoFinal = calculateElapsedTime();
       const pausasTotalSegundos = Math.floor(totalPausedMsRef.current / 1000);
       
-      const { error } = await supabase
+      const { data: sessaoFinalizada, error } = await supabase
         .from("treino_sessoes")
         .update({
           fim: fimDate.toISOString(),
@@ -806,17 +808,31 @@ export function useWorkoutTimer({
           tempo_pausado_total: pausasTotalSegundos,
           status: "concluido",
         })
-        .eq("id", sessaoId);
+        .eq("id", sessaoId)
+        .eq("treino_semanal_id", treinoId)
+        .eq("profile_id", profileId)
+        .in("status", ACTIVE_SESSION_STATUSES as unknown as string[])
+        .select("id")
+        .maybeSingle();
 
       if (error) throw error;
+      if (!sessaoFinalizada) {
+        throw new Error("Sessao ativa nao encontrada para finalizar este treino.");
+      }
 
       // 🔧 CORREÇÃO: Marcar treinos_semanais.concluido = true
-      const { error: treinoUpdateError } = await supabase
+      const { data: treinoConcluido, error: treinoUpdateError } = await supabase
         .from("treinos_semanais")
         .update({ concluido: true, updated_at: new Date().toISOString() })
-        .eq("id", treinoId);
+        .eq("id", treinoId)
+        .eq("profile_id", profileId)
+        .select("id")
+        .maybeSingle();
 
       if (treinoUpdateError) throw treinoUpdateError;
+      if (!treinoConcluido) {
+        throw new Error("Treino semanal nao encontrado para concluir.");
+      }
 
       // Buscar nome do aluno
       const { data: alunoData } = await supabase
@@ -966,7 +982,7 @@ export function useWorkoutTimer({
       return dadosConclusao;
     } catch (err) {
       console.error("Erro ao finalizar treino:", err);
-      toast.error("Erro ao finalizar treino");
+      toast.error("Nao foi possivel finalizar o treino. Verifique sua conexao e tente novamente.");
       return null;
     }
   };

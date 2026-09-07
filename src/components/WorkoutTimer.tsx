@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Play, Pause, Check, X, Timer, Loader2 } from "lucide-react";
 import { useWorkoutTimer } from "@/hooks/useWorkoutTimer";
-import { WorkoutCompletionScreen } from "./WorkoutCompletionScreen";
+import type { WorkoutCompletionData } from "@/hooks/useWorkoutTimer";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,7 +20,7 @@ interface WorkoutTimerProps {
   profileId: string;
   personalId: string;
   readOnly?: boolean;
-  onWorkoutComplete?: () => void;
+  onWorkoutComplete?: (completionData: WorkoutCompletionData) => void;
   onWorkoutCancel?: () => void;
   onWorkoutStart?: () => void;
   progresso?: number;
@@ -49,13 +49,10 @@ export function WorkoutTimer({
     isPaused,
     isLoading,
     formattedTime,
-    showCompletionScreen,
-    completionData,
     iniciar,
     togglePause,
     finalizar,
     cancelar,
-    fecharTelaConclusao,
   } = useWorkoutTimer({ treinoId, profileId, personalId });
 
   // Expose finalizar trigger via ref
@@ -74,8 +71,10 @@ export function WorkoutTimer({
 
     if (!isRunning && !isPaused && !isLoading) {
       iniciarRef.current = () => {
-        iniciar();
-        onWorkoutStart?.();
+        void (async () => {
+          const iniciado = await iniciar();
+          if (iniciado) onWorkoutStart?.();
+        })();
       };
     } else {
       iniciarRef.current = null;
@@ -88,19 +87,6 @@ export function WorkoutTimer({
 
   if (readOnly) return null;
 
-  if (showCompletionScreen && completionData) {
-    return (
-      <WorkoutCompletionScreen
-        data={completionData}
-        treinoId={treinoId}
-        onClose={() => {
-          fecharTelaConclusao();
-          onWorkoutComplete?.();
-        }}
-      />
-    );
-  }
-
   if (isLoading) {
     return null; // Don't show skeleton for the fixed bar — let it appear naturally
   }
@@ -110,9 +96,10 @@ export function WorkoutTimer({
 
     setIsFinalizando(true);
     try {
-      const concluido = await finalizar();
-      if (concluido) {
+      const completionData = await finalizar();
+      if (completionData) {
         setShowFinalizarDialog(false);
+        onWorkoutComplete?.(completionData);
       }
     } finally {
       setIsFinalizando(false);

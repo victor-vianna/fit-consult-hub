@@ -69,6 +69,8 @@ export function SemanaTreinoAtiva({
     },
     onSuccess: (semana) => {
       queryClient.invalidateQueries({ queryKey: ["semana-ativa", profileId, personalId] });
+      queryClient.invalidateQueries({ queryKey: ["semana-ativa-inicio", profileId, personalId] });
+      queryClient.invalidateQueries({ queryKey: ["semana-ativa-display", profileId, personalId] });
       queryClient.invalidateQueries({ queryKey: ["treinos", profileId, personalId] });
       toast.success(`Semana de ${formatDisplayDate(semana)} ativada`);
       setOpen(false);
@@ -92,6 +94,8 @@ export function SemanaTreinoAtiva({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["semana-ativa", profileId, personalId] });
+      queryClient.invalidateQueries({ queryKey: ["semana-ativa-inicio", profileId, personalId] });
+      queryClient.invalidateQueries({ queryKey: ["semana-ativa-display", profileId, personalId] });
       queryClient.invalidateQueries({ queryKey: ["treinos", profileId, personalId] });
       toast.success("Voltando para semana atual automaticamente");
       setOpen(false);

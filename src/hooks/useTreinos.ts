@@ -41,6 +41,11 @@ const buildQueryKey = (
   semana: string
 ): QueryKey => ["treinos", profileId, personalId, semana];
 
+const buildActiveWeekQueryKey = (
+  profileId: string,
+  personalId: string
+): QueryKey => ["semana-ativa-inicio", profileId, personalId];
+
 const cargaFromDb = (c: string | number | null | undefined): string | null =>
   c == null ? null : String(c);
 
@@ -94,7 +99,7 @@ export function useTreinos({
 
   // Query separada para buscar semana ativa do personal
   const { data: semanaAtivaData, isLoading: loadingSemanaAtiva } = useQuery({
-    queryKey: ["semana-ativa", profileId, personalId],
+    queryKey: buildActiveWeekQueryKey(profileId, personalId),
     queryFn: async () => {
       const { data } = await supabase
         .from("treino_semana_ativa")
@@ -312,7 +317,7 @@ export function useTreinos({
         queryKey: buildQueryKey(profileId, personalId, semanaParaBuscar),
       });
       queryClient.invalidateQueries({
-        queryKey: ["semana-ativa", profileId, personalId],
+        queryKey: buildActiveWeekQueryKey(profileId, personalId),
       });
     };
 

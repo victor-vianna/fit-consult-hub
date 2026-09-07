@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTreinos } from "@/hooks/useTreinos";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -279,6 +279,114 @@ export function TreinosManager({
     semana: semanaSelecionada,
     enabled: workoutWeekReady,
   });
+
+  const [isResumingWorkoutData, setIsResumingWorkoutData] = useState(false);
+  const resumeRefetchInFlightRef = useRef<Promise<void> | null>(null);
+  const resumeRefetchTimerRef = useRef<number | null>(null);
+
+  const refetchStudentWorkoutData = useCallback(async () => {
+    if (!isAluno || !profileId || !personalId || !workoutWeekReady) return;
+    if (resumeRefetchInFlightRef.current) return resumeRefetchInFlightRef.current;
+
+    setIsResumingWorkoutData(true);
+
+    const activeWeekQueryKey = ["semana-ativa-inicio", profileId, personalId];
+
+    const run = (async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.user?.id) return;
+
+      await queryClient.refetchQueries({
+        queryKey: activeWeekQueryKey,
+        type: "active",
+      });
+
+      const cachedActiveWeek = queryClient.getQueryData<string | null>(
+        activeWeekQueryKey
+      );
+      const weekToRefresh =
+        typeof cachedActiveWeek === "string" && cachedActiveWeek
+          ? cachedActiveWeek
+          : semanaSelecionada;
+
+      await Promise.all([
+        queryClient.refetchQueries({
+          queryKey: ["treinos", profileId, personalId, weekToRefresh],
+          type: "active",
+        }),
+        queryClient.refetchQueries({
+          queryKey: ["grupos-exercicios", profileId, personalId, weekToRefresh],
+          type: "active",
+        }),
+        queryClient.refetchQueries({
+          queryKey: ["blocos-treino", profileId, personalId, weekToRefresh],
+          type: "active",
+        }),
+        queryClient.refetchQueries({
+          queryKey: ["semana-ativa-display", profileId, personalId],
+          type: "active",
+        }),
+      ]);
+    })();
+
+    resumeRefetchInFlightRef.current = run;
+
+    try {
+      await run;
+    } catch (error) {
+      console.error("[TreinosManager] Erro ao revalidar treinos no resume:", error);
+    } finally {
+      resumeRefetchInFlightRef.current = null;
+      setIsResumingWorkoutData(false);
+    }
+  }, [
+    isAluno,
+    personalId,
+    profileId,
+    queryClient,
+    semanaSelecionada,
+    workoutWeekReady,
+  ]);
+
+  useEffect(() => {
+    if (!isAluno) return;
+
+    const scheduleResumeRefetch = () => {
+      if (document.visibilityState === "hidden") return;
+
+      if (resumeRefetchTimerRef.current != null) {
+        window.clearTimeout(resumeRefetchTimerRef.current);
+      }
+
+      resumeRefetchTimerRef.current = window.setTimeout(() => {
+        resumeRefetchTimerRef.current = null;
+        void refetchStudentWorkoutData();
+      }, 150);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        scheduleResumeRefetch();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", scheduleResumeRefetch);
+    window.addEventListener("pageshow", scheduleResumeRefetch);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", scheduleResumeRefetch);
+      window.removeEventListener("pageshow", scheduleResumeRefetch);
+
+      if (resumeRefetchTimerRef.current != null) {
+        window.clearTimeout(resumeRefetchTimerRef.current);
+      }
+    };
+  }, [isAluno, refetchStudentWorkoutData]);
 
   const [exercicioDialogOpen, setExercicioDialogOpen] = useState(false);
   const [editDescricaoOpen, setEditDescricaoOpen] = useState(false);
@@ -1057,7 +1165,7 @@ export function TreinosManager({
     }
   };
 
-  if (loading || loadingGrupos || loadingBlocos) {
+  if (loading || loadingGrupos || loadingBlocos || isResumingWorkoutData) {
     return (
       <div className="flex flex-col items-center justify-center py-16 space-y-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

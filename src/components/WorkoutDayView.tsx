@@ -199,7 +199,7 @@ export function WorkoutDayView({
 
   // Buscar semana ativa
   const { data: semanaAtiva, refetch: refetchSemanaAtiva } = useQuery({
-    queryKey: ["semana-ativa", profileId, personalId],
+    queryKey: ["semana-ativa-display", profileId, personalId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("treino_semana_ativa")
@@ -217,7 +217,7 @@ export function WorkoutDayView({
     refetchOnWindowFocus: true,
   });
 
-  // 🔧 PWA: Refetch dados ao voltar ao app
+  // Recarrega apenas o indicador visual; os dados do treino são revalidados no TreinosManager.
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {

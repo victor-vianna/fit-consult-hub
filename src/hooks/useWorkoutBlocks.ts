@@ -256,12 +256,19 @@ export function useWorkoutBlocks({
     }) => {
       console.log("[useWorkoutBlocks] Atualizando bloco:", blocoId);
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("blocos_treino")
         .update(updates as any)
-        .eq("id", blocoId);
+        .eq("id", blocoId)
+        .is("deleted_at", null)
+        .select("id, treino_semanal_id")
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) {
+        throw new Error("Bloco de treino não encontrado. Ele pode ter sido removido; atualize a lista e tente novamente.");
+      }
+
       return { blocoId, updates };
     },
     onSuccess: async () => {
@@ -273,7 +280,9 @@ export function useWorkoutBlocks({
     },
     onError: (error: any) => {
       console.error("[useWorkoutBlocks] Erro ao atualizar:", error);
-      if (error.code === "42P17") {
+      if (error?.message?.includes("Bloco de treino não encontrado")) {
+        toast.error(error.message);
+      } else if (error.code === "42P17") {
         toast.error("Erro de permissão ao atualizar.");
       } else {
         toast.error("Erro ao atualizar bloco");

@@ -644,6 +644,7 @@ export function TreinosManager({
             isPersonal
               ? () => {
                   setBlocoEditando(bloco);
+                  setSelectedTreinoId(bloco.treino_semanal_id);
                   setBlockDialogOpen(true);
                 }
               : undefined
@@ -967,6 +968,60 @@ export function TreinosManager({
     return data.id;
   };
 
+  const resolverTreinoIdParaEdicaoDeBloco = async (
+    bloco: BlocoTreino
+  ): Promise<string | null> => {
+    const treinoIdDoBloco = String(bloco.treino_semanal_id || "");
+
+    if (!treinoIdDoBloco) {
+      console.warn("[TreinosManager] Bloco sem treino_semanal_id ao editar:", {
+        blocoId: bloco.id,
+        selectedTreinoId,
+        selectedDia,
+        profileId,
+        personalId,
+        semanaSelecionada,
+      });
+      return null;
+    }
+
+    const treinoEmCache = treinos.find((treino) => treino.treinoId === treinoIdDoBloco);
+    if (treinoEmCache) return treinoIdDoBloco;
+
+    const { data: treinoDb, error } = await supabase
+      .from("treinos_semanais")
+      .select("id, profile_id, personal_id, semana, dia_semana")
+      .eq("id", treinoIdDoBloco)
+      .eq("profile_id", profileId)
+      .eq("personal_id", personalId)
+      .maybeSingle();
+
+    if (error || !treinoDb) {
+      console.warn("[TreinosManager] Treino nao encontrado para edicao de bloco:", {
+        blocoId: bloco.id,
+        treinoIdBuscado: treinoIdDoBloco,
+        selectedTreinoId,
+        selectedDia,
+        profileId,
+        personalId,
+        semanaSelecionada,
+        error,
+      });
+      return null;
+    }
+
+    if (treinoDb.semana !== semanaSelecionada) {
+      console.warn("[TreinosManager] Treino encontrado em semana diferente ao editar bloco:", {
+        blocoId: bloco.id,
+        treinoIdBuscado: treinoIdDoBloco,
+        semanaDoTreino: treinoDb.semana,
+        semanaSelecionada,
+      });
+    }
+
+    return treinoIdDoBloco;
+  };
+
   // 🔧 Função para salvar grupo
   const handleSaveGroup = async (grupoData: GrupoExerciciosInput) => {
     if (selectedDia === null) return;
@@ -1067,27 +1122,18 @@ export function TreinosManager({
 
   // 🆕 Função para salvar bloco
   const handleSaveBlock = async (blocoData: Partial<BlocoTreino>) => {
-    if (selectedDia === null) return;
+    if (selectedDia === null && !blocoEditando) return;
 
     try {
       setLoadingStates((prev) => ({ ...prev, adicionando: true }));
 
-      // ✅ Criar treino se não existir (EXCETO se estiver editando)
-      let treinoId: string;
+      const treinoId = blocoEditando
+        ? await resolverTreinoIdParaEdicaoDeBloco(blocoEditando)
+        : await criarTreinoSeNecessario(selectedDia!);
 
-      if (blocoEditando) {
-        // Se está editando, o treino já deve existir
-        const treino = selectedTreinoId 
-          ? treinos.find((t) => t.treinoId === selectedTreinoId)
-          : treinos.find((t) => t.dia === selectedDia);
-        if (!treino?.treinoId) {
-          toast.error("Treino não encontrado para edição");
-          return;
-        }
-        treinoId = treino.treinoId;
-      } else {
-        // Se está criando novo, cria o treino se necessário (já usa selectedTreinoId internamente)
-        treinoId = await criarTreinoSeNecessario(selectedDia);
+      if (!treinoId) {
+        toast.error("Treino não encontrado para edição. Ele pode ter sido removido ou a lista está desatualizada; atualize os treinos e tente novamente.");
+        return;
       }
 
       console.log("[TreinosManager] Salvando bloco para treino:", treinoId);

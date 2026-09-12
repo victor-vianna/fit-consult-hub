@@ -1,0 +1,13 @@
+{
+    "mcpServers": {
+      "context7-api-key": {
+        "url": "https://mcp.context7.com/mcp",
+        "headers": {
+          "Context7-API-Key": "ctx7sk-97cf8362-6147-4f38-b496-bf435dab4eb8Y"
+        }
+      },
+      "supabase": {
+      "url": "https://mcp.supabase.com/mcp?features=docs%2Caccount%2Cdatabase%2Cdebugging%2Cdevelopment%2Cfunctions%2Cbranching"
+    }
+    }
+  }

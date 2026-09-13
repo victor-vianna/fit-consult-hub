@@ -34,7 +34,12 @@ interface CompactExerciseCardProps {
   };
   index: number;
   onToggleConcluido?: (id: string, concluido: boolean) => Promise<any>;
-  onRegisterSerie?: (id: string, seriesConcluidas: number, totalSeries: number) => Promise<any>;
+  onRegisterSerie?: (
+    id: string,
+    seriesConcluidas: number,
+    totalSeries: number,
+    nextGroupedExerciseId?: string | null
+  ) => Promise<any>;
   isWorkoutActive?: boolean;
   profileId?: string;
   variant?: "list" | "carousel";
@@ -42,6 +47,8 @@ interface CompactExerciseCardProps {
   treinoId?: string | null;
   highlighted?: boolean;
   fitContainer?: boolean;
+  canRegisterSeries?: boolean;
+  allowDirectCompletion?: boolean;
 }
 
 function parseWeight(value: string | number | null | undefined) {
@@ -91,6 +98,8 @@ export function CompactExerciseCard({
   highlighted = false,
   profileId,
   fitContainer = false,
+  canRegisterSeries = true,
+  allowDirectCompletion = true,
 }: CompactExerciseCardProps) {
   const [localConcluido, setLocalConcluido] = useState(
     exercicio.concluido || false
@@ -102,6 +111,7 @@ export function CompactExerciseCard({
   const [completedSeries, setCompletedSeries] = useState(
     getCompletedSeries(exercicio)
   );
+  const [isSavingProgress, setIsSavingProgress] = useState(false);
 
   const isCarousel = variant === "carousel";
   const totalSeries = Math.max(1, exercicio.series || 3);
@@ -137,6 +147,8 @@ export function CompactExerciseCard({
 
   const handleToggle = async (target?: boolean) => {
     const novoValor = target ?? !localConcluido;
+    if (novoValor && (!canRegisterSeries || !allowDirectCompletion)) return;
+
     const nextSeries = novoValor ? totalSeries : 0;
     setLocalConcluido(novoValor);
     setCompletedSeries(nextSeries);
@@ -171,12 +183,22 @@ export function CompactExerciseCard({
   };
 
   const handleRegisterSet = async () => {
-    const nextCount = Math.min(completedSeries + 1, totalSeries);
-    setCompletedSeries(nextCount);
-    await onRegisterSerie?.(exercicio.id, nextCount, totalSeries);
+    if (!canRegisterSeries || isSavingProgress || localConcluido) return;
 
-    if (nextCount >= totalSeries && !localConcluido) {
-      await handleToggle(true);
+    const nextCount = Math.min(completedSeries + 1, totalSeries);
+    const previousCount = completedSeries;
+    setCompletedSeries(nextCount);
+    if (nextCount >= totalSeries) setLocalConcluido(true);
+    setIsSavingProgress(true);
+
+    try {
+      await onRegisterSerie?.(exercicio.id, nextCount, totalSeries);
+    } catch (error) {
+      console.error("Erro ao registrar série:", error);
+      setCompletedSeries(previousCount);
+      setLocalConcluido(previousCount >= totalSeries);
+    } finally {
+      setIsSavingProgress(false);
     }
   };
 
@@ -224,6 +246,10 @@ export function CompactExerciseCard({
           {onToggleConcluido ? (
             <button
               type="button"
+              disabled={
+                !localConcluido &&
+                (!canRegisterSeries || !allowDirectCompletion || isSavingProgress)
+              }
               onClick={(event) => {
                 event.stopPropagation();
                 handleToggle();
@@ -233,7 +259,7 @@ export function CompactExerciseCard({
                   ? `Desmarcar ${exercicio.nome}`
                   : `Marcar ${exercicio.nome} como concluido`
               }
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-transform active:scale-95"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {localConcluido ? (
                 <CheckCircle2 className="h-6 w-6 text-green-600" />
@@ -387,7 +413,10 @@ export function CompactExerciseCard({
               variant={localConcluido ? "outline" : "default"}
               size="lg"
               className="h-12 w-full gap-2 text-base font-semibold"
-              disabled={!onToggleConcluido}
+              disabled={
+                isSavingProgress ||
+                (localConcluido ? !onToggleConcluido : !onRegisterSerie || !canRegisterSeries)
+              }
               onClick={(event) => {
                 event.stopPropagation();
                 if (localConcluido) {
@@ -405,7 +434,9 @@ export function CompactExerciseCard({
               ) : (
                 <>
                   <Circle className="h-4 w-4" />
-                  Registrar série {currentSeries}
+                  {canRegisterSeries
+                    ? `Registrar série ${currentSeries}`
+                    : "Aguarde a sua vez"}
                 </>
               )}
             </Button>

@@ -11,6 +11,10 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CompactExerciseCard } from "./CompactExerciseCard";
+import {
+  getNextConjugatedExerciseStep,
+  usesRoundBasedProgression,
+} from "@/utils/conjugatedExerciseProgress";
 
 const TIPOS_AGRUPAMENTO = {
   normal: { label: "Normal" },
@@ -30,7 +34,12 @@ interface CompactGroupCardProps {
   };
   index: number;
   onToggleConcluido?: (id: string, concluido: boolean) => Promise<any>;
-  onRegisterSerie?: (id: string, seriesConcluidas: number, totalSeries: number) => Promise<any>;
+  onRegisterSerie?: (
+    id: string,
+    seriesConcluidas: number,
+    totalSeries: number,
+    nextGroupedExerciseId?: string | null
+  ) => Promise<any>;
   onToggleGrupoConcluido?: (
     grupoId: string,
     concluido: boolean
@@ -101,6 +110,13 @@ export function CompactGroupCard({
   const exerciseIdsKey = localExercicios.map((exercicio) => exercicio.id).join("|");
   const hasHighlightedExercise = localExercicios.some(
     (exercicio) => exercicio.id === resumeItemId
+  );
+  const hasRoundBasedProgression = usesRoundBasedProgression(
+    grupo.tipo_agrupamento
+  );
+  const nextGroupStep = getNextConjugatedExerciseStep(
+    localExercicios,
+    grupo.tipo_agrupamento
   );
 
   useEffect(() => {
@@ -232,6 +248,26 @@ export function CompactGroupCard({
     [canNavigateCarousel, localExercicios.length]
   );
 
+  useEffect(() => {
+    if (!expanded || !hasRoundBasedProgression) return;
+
+    const highlightedIndex = localExercicios.findIndex(
+      (exercise) => exercise.id === resumeItemId
+    );
+    const targetIndex = highlightedIndex >= 0
+      ? highlightedIndex
+      : nextGroupStep?.exerciseIndex;
+
+    if (targetIndex !== undefined) scrollToExercise(targetIndex);
+  }, [
+    expanded,
+    hasRoundBasedProgression,
+    localExercicios,
+    nextGroupStep?.exerciseIndex,
+    resumeItemId,
+    scrollToExercise,
+  ]);
+
   const handleToggleGrupo = async () => {
     if (!onToggleGrupoConcluido) return;
     const novoStatus = !todosConcluidos;
@@ -276,16 +312,38 @@ export function CompactGroupCard({
     const safeTotal = Math.max(1, totalSeries);
     const safeSeries = Math.min(Math.max(0, Math.floor(seriesConcluidas)), safeTotal);
     const concluido = safeSeries >= safeTotal;
+    const currentStep = getNextConjugatedExerciseStep(
+      localExercicios,
+      grupo.tipo_agrupamento
+    );
 
-    setLocalExercicios((prev) =>
-      prev.map((exercicio) =>
+    if (
+      hasRoundBasedProgression &&
+      safeSeries > 0 &&
+      (currentStep?.exerciseId !== id || currentStep.round !== safeSeries)
+    ) {
+      throw new Error("Esta série ainda não é a próxima etapa do grupo conjugado.");
+    }
+
+    const nextExercises = localExercicios.map((exercicio) =>
         exercicio.id === id
           ? { ...exercicio, series_concluidas: safeSeries, concluido }
           : exercicio
-      )
     );
+    setLocalExercicios(nextExercises);
 
-    return onRegisterSerie?.(id, safeSeries, safeTotal);
+    const nextStep = getNextConjugatedExerciseStep(
+      nextExercises,
+      grupo.tipo_agrupamento
+    );
+    if (nextStep) scrollToExercise(nextStep.exerciseIndex);
+
+    return onRegisterSerie?.(
+      id,
+      safeSeries,
+      safeTotal,
+      hasRoundBasedProgression ? nextStep?.exerciseId ?? null : undefined
+    );
   };
 
   return (
@@ -471,6 +529,11 @@ export function CompactGroupCard({
                       treinoId={treinoId}
                       highlighted={resumeItemId === exercicio.id}
                       fitContainer
+                      canRegisterSeries={
+                        !hasRoundBasedProgression ||
+                        nextGroupStep?.exerciseId === exercicio.id
+                      }
+                      allowDirectCompletion={!hasRoundBasedProgression}
                     />
                   </div>
                 ))}

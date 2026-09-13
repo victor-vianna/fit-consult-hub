@@ -37,7 +37,12 @@ interface WorkoutExerciseListProps {
   blocosMeio: BlocoTreino[];
   blocosFim: BlocoTreino[];
   onToggleExercicio: (id: string, concluido: boolean) => Promise<any>;
-  onRegisterSerie?: (id: string, seriesConcluidas: number, totalSeries: number) => Promise<any>;
+  onRegisterSerie?: (
+    id: string,
+    seriesConcluidas: number,
+    totalSeries: number,
+    nextGroupedExerciseId?: string | null
+  ) => Promise<any>;
   onToggleGrupo?: (grupoId: string, concluido: boolean) => Promise<void>;
   onToggleBloco?: (blocoId: string, concluido: boolean) => Promise<void>;
   isWorkoutActive?: boolean;

@@ -29,6 +29,12 @@ import {
   normalizeExercises,
   normalizeWorkoutBlocks,
 } from "@/utils/workoutNormalization";
+import {
+  getExerciseCompletedSeries,
+  getExerciseTotalSeries,
+  getNextConjugatedExerciseStep,
+  usesRoundBasedProgression,
+} from "@/utils/conjugatedExerciseProgress";
 
 interface WorkoutDayViewProps {
   treinos: TreinoDia[];
@@ -143,7 +149,9 @@ function buildWorkoutResumeItems(
         treinoId,
         dia: treino.dia,
         ordem: ex.ordem ?? index,
-        concluido: !!ex.concluido,
+        concluido:
+          !!ex.concluido ||
+          getExerciseCompletedSeries(ex) >= getExerciseTotalSeries(ex),
       });
     });
 
@@ -160,7 +168,9 @@ function buildWorkoutResumeItems(
         treinoId,
         dia: treino.dia,
         ordem: grupoOrdem + ((ex.ordem_no_grupo ?? index + 1) / 100),
-        concluido: !!ex.concluido,
+        concluido:
+          !!ex.concluido ||
+          getExerciseCompletedSeries(ex) >= getExerciseTotalSeries(ex),
       });
     });
   });
@@ -405,11 +415,35 @@ export function WorkoutDayView({
   const handleRegisterSerie = async (
     id: string,
     seriesConcluidas: number,
-    totalSeries: number
+    totalSeries: number,
+    nextGroupedExerciseIdHint?: string | null
   ) => {
     const safeTotal = Math.max(1, totalSeries);
     const safeSeries = Math.min(Math.max(0, Math.floor(seriesConcluidas)), safeTotal);
     const concluido = safeSeries >= safeTotal;
+    let sequentialGroupTreinoId: string | null = null;
+    let nextGroupedExerciseId: string | null = null;
+
+    for (const [treinoId, grupos] of Object.entries(localGrupos)) {
+      const group = grupos.find((item) =>
+        item.exercicios.some((exercise) => exercise.id === id)
+      );
+      if (!group || !usesRoundBasedProgression(group.tipo_agrupamento)) continue;
+
+      sequentialGroupTreinoId = treinoId;
+      const exercisesAfterRegistration = group.exercicios.map((exercise) =>
+        exercise.id === id
+          ? { ...exercise, series_concluidas: safeSeries, concluido }
+          : exercise
+      );
+      nextGroupedExerciseId = nextGroupedExerciseIdHint !== undefined
+        ? nextGroupedExerciseIdHint
+        : getNextConjugatedExerciseStep(
+            exercisesAfterRegistration,
+            group.tipo_agrupamento
+          )?.exerciseId ?? null;
+      break;
+    }
 
     setLocalTreinos((prev) =>
       prev.map((treino) => ({
@@ -436,6 +470,20 @@ export function WorkoutDayView({
       });
       return updated;
     });
+
+    const resumeTarget = sequentialGroupTreinoId
+      ? nextGroupedExerciseId
+        ? findResumeItemById(nextGroupedExerciseId)
+        : getResumeItemAfterToggle(id, true)
+      : concluido
+        ? getResumeItemAfterToggle(id, true)
+        : findResumeItemById(id);
+
+    if (resumeTarget) {
+      setDiaAtivo(String(resumeTarget.dia));
+      saveResumeTarget(resumeTarget.treinoId, resumeTarget.id, resumeTarget.dia);
+      scrollToResumeItem(resumeTarget.id);
+    }
 
     const sincronizado = await persistirSeriesAgora(id, safeSeries, safeTotal);
     if (sincronizado) {
@@ -862,9 +910,47 @@ export function WorkoutDayView({
       const items = getResumeItemsForTreino(treinoId);
       if (items.length === 0) return null;
 
+      const context = getTreinoContext(treinoId);
+      const resolveConjugatedItem = (item: WorkoutResumeItem | undefined) => {
+        if (!item || item.type !== "exercise" || !context) return item ?? null;
+
+        const group = context.grupos.find((candidate) =>
+          candidate.exercicios.some((exercise) => exercise.id === item.id)
+        );
+        if (!group || !usesRoundBasedProgression(group.tipo_agrupamento)) return item;
+
+        const nextStep = getNextConjugatedExerciseStep(
+          group.exercicios,
+          group.tipo_agrupamento
+        );
+        if (nextStep) {
+          return items.find((candidate) => candidate.id === nextStep.exerciseId) ?? item;
+        }
+
+        const groupIds = new Set(
+          group.exercicios.map((exercise) => exercise.id)
+        );
+        const lastGroupIndex = items.reduce(
+          (lastIndex, candidate, index) =>
+            groupIds.has(candidate.id) ? index : lastIndex,
+          -1
+        );
+        return items
+          .slice(lastGroupIndex + 1)
+          .find((candidate) => !candidate.concluido) ?? item;
+      };
+
       if (preferredItemId) {
         const preferred = items.find((item) => item.id === preferredItemId);
-        if (preferred && !preferred.concluido) return preferred;
+        if (preferred) {
+          const resolvedPreferred = resolveConjugatedItem(preferred);
+          if (
+            resolvedPreferred &&
+            (!preferred.concluido || resolvedPreferred.id !== preferred.id)
+          ) {
+            return resolvedPreferred;
+          }
+        }
 
         const preferredIndex = items.findIndex((item) => item.id === preferredItemId);
         if (preferredIndex >= 0) {
@@ -873,9 +959,9 @@ export function WorkoutDayView({
         }
       }
 
-      return items.find((item) => !item.concluido) ?? items[0];
+      return resolveConjugatedItem(items.find((item) => !item.concluido)) ?? items[0];
     },
-    [getResumeItemsForTreino]
+    [getResumeItemsForTreino, getTreinoContext]
   );
 
   const scrollToResumeItem = useCallback((itemId: string | null, behavior: ScrollBehavior = "smooth") => {
@@ -1272,7 +1358,12 @@ function TreinoCard({
   onTreinoConcluido: (treinoId: string, completionData: WorkoutCompletionData) => void;
   onTreinoCancelado: (treinoId: string) => void;
   handleToggleExercicio: (id: string, concluido: boolean) => Promise<any>;
-  handleRegisterSerie: (id: string, seriesConcluidas: number, totalSeries: number) => Promise<any>;
+  handleRegisterSerie: (
+    id: string,
+    seriesConcluidas: number,
+    totalSeries: number,
+    nextGroupedExerciseId?: string | null
+  ) => Promise<any>;
   handleToggleGrupo: (grupoId: string, concluido: boolean) => Promise<void>;
   handleToggleBloco: (blocoId: string, concluido: boolean) => Promise<void>;
   resumeItemId?: string | null;

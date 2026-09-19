@@ -2,6 +2,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
+import { getStudentAccessFailure } from "../_shared/subscription-access.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -269,6 +270,14 @@ Deno.serve(async (req) => {
     const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(token);
     if (authError || !authData?.user) {
       return jsonResponse({ error: "Token invalido." }, 401);
+    }
+
+    const accessFailure = await getStudentAccessFailure(
+      supabaseAdmin,
+      authData.user.id,
+    );
+    if (accessFailure) {
+      return jsonResponse(accessFailure.body, accessFailure.status);
     }
 
     const { notificationId } = await req.json();

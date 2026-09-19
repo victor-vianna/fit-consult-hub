@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { dateInputToIsoString, parseDateInputValue } from "@/utils/dateFormat";
 import { createStudentNotification } from "@/utils/studentNotifications";
 
 export interface Subscription {
@@ -10,7 +9,7 @@ export interface Subscription {
   personal_id: string;
   plano: "mensal" | "trimestral" | "semestral" | "anual";
   valor: number;
-  status_pagamento: "pago" | "pendente" | "atrasado";
+  status_pagamento: "pago" | "pendente" | "atrasado" | "cancelado" | "canceled";
   data_pagamento: string | null;
   data_expiracao: string;
   observacoes: string | null;
@@ -41,38 +40,7 @@ export type PaymentOrigin = "stripe" | "manual";
 export type ManualPaymentMethod = "pix" | "dinheiro" | "transferencia" | "outro";
 export type RegisterPaymentMethod = "stripe" | ManualPaymentMethod;
 
-type PaymentHistoryDraft = {
-  subscription_id: string;
-  student_id: string;
-  personal_id: string;
-  valor: number;
-  data_pagamento: string;
-  metodo_pagamento?: string;
-  observacoes?: string;
-};
-
-type ExistingPaymentHistory = {
-  id: string;
-  valor: number;
-  data_pagamento: string;
-  metodo_pagamento: string | null;
-  observacoes: string | null;
-};
-
 const roundCurrency = (value: number) => Math.round(Number(value || 0) * 100) / 100;
-
-const PLAN_MONTHS: Record<Subscription["plano"], number> = {
-  mensal: 1,
-  trimestral: 3,
-  semestral: 6,
-  anual: 12,
-};
-
-const getPaymentDayKey = (date: string) => {
-  const parsed = new Date(date);
-  if (!Number.isFinite(parsed.getTime())) return String(date || "");
-  return parsed.toISOString().split("T")[0];
-};
 
 const normalizePaymentText = (value: unknown) =>
   String(value ?? "")
@@ -81,23 +49,8 @@ const normalizePaymentText = (value: unknown) =>
     .toLowerCase()
     .trim();
 
-const isSameFinancialPayment = (
-  existing: ExistingPaymentHistory,
-  draft: PaymentHistoryDraft
-) =>
-  getPaymentDayKey(existing.data_pagamento) === getPaymentDayKey(draft.data_pagamento) &&
-  Math.abs(roundCurrency(existing.valor) - roundCurrency(draft.valor)) <= 0.01 &&
-  normalizePaymentText(existing.metodo_pagamento) === normalizePaymentText(draft.metodo_pagamento) &&
-  normalizePaymentText(existing.observacoes) === normalizePaymentText(draft.observacoes);
-
-const calculateExpirationDate = (plano: Subscription["plano"], paymentDate: string) => {
-  const baseDate = parseDateInputValue(paymentDate);
-  if (!baseDate) return null;
-
-  const expiration = new Date(baseDate);
-  expiration.setMonth(expiration.getMonth() + PLAN_MONTHS[plano]);
-  return expiration;
-};
+const buildManualPaymentKey = (parts: Array<string | number | null | undefined>) =>
+  `manual:v1:${parts.map(normalizePaymentText).join(":")}`;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -248,71 +201,56 @@ export function useSubscriptions(studentId?: string, personalId?: string) {
         throw new Error("Valor do pagamento invalido");
       }
 
-      const dataPagamentoIso =
-        dateInputToIsoString(paymentData.data_pagamento) ?? paymentData.data_pagamento;
-      const dataExpiracao = calculateExpirationDate(
+      const idempotencyKey = buildManualPaymentKey([
+        studentId,
+        "new",
         paymentData.plano,
-        paymentData.data_pagamento
+        normalizedValue.toFixed(2),
+        paymentData.data_pagamento,
+        paymentData.metodo_pagamento,
+      ]);
+      const { data: result, error } = await (supabase as any).rpc(
+        "record_manual_subscription_payment",
+        {
+          _student_id: studentId,
+          _subscription_id: null,
+          _plan: paymentData.plano,
+          _value: normalizedValue,
+          _payment_date: paymentData.data_pagamento,
+          _payment_method: paymentData.metodo_pagamento,
+          _notes: paymentData.observacoes || null,
+          _installments: 1,
+          _idempotency_key: idempotencyKey,
+        }
       );
-      if (!dataExpiracao) throw new Error("Data de pagamento invalida");
 
-      const { data: subscription, error: subscriptionError } = await supabase
-        .from("subscriptions")
-        .insert([
-          {
-            student_id: studentId,
-            personal_id: personalId,
-            plano: paymentData.plano,
-            valor: normalizedValue,
-            status_pagamento: "pago",
-            data_pagamento: dataPagamentoIso,
-            data_expiracao: dataExpiracao.toISOString(),
-            observacoes: paymentData.observacoes || null,
-            parcelas: 1,
-          },
-        ])
-        .select()
-        .single();
-
-      if (subscriptionError) throw subscriptionError;
-
-      const { error: historyError } = await supabase
-        .from("payment_history")
-        .insert({
-          subscription_id: subscription.id,
-          student_id: studentId,
-          personal_id: personalId,
-          valor: normalizedValue,
-          data_pagamento: dataPagamentoIso,
-          metodo_pagamento: paymentData.metodo_pagamento,
-          observacoes: paymentData.observacoes || null,
-        });
-
-      if (historyError) {
-        await supabase.from("subscriptions").delete().eq("id", subscription.id);
-        throw historyError;
-      }
+      if (error) throw error;
+      const subscription = result?.subscription as Subscription | undefined;
+      if (!subscription?.id) throw new Error("Assinatura nao retornada pelo servidor");
 
       toast({
-        title: "Pagamento registrado",
-        description:
-          paymentData.origem_pagamento === "stripe"
+        title: result?.duplicate ? "Pagamento ja registrado" : "Pagamento registrado",
+        description: result?.duplicate
+          ? "Esta baixa ja existe no historico financeiro."
+          : paymentData.origem_pagamento === "stripe"
             ? "Pagamento registrado como recebido pela plataforma."
             : "Pagamento manual registrado como recebido.",
       });
 
-      void createStudentNotification({
-        studentId,
-        personalId,
-        tipo: "pagamento_registrado",
-        titulo: "Pagamento registrado",
-        mensagem: "Seu pagamento foi registrado e seu plano esta ativo.",
-        dados: { subscription_id: subscription.id, plano: paymentData.plano },
-        dedupeKey: `${subscription.id}:pagamento_registrado`,
-      });
+      if (!result?.duplicate) {
+        void createStudentNotification({
+          studentId,
+          personalId,
+          tipo: "pagamento_registrado",
+          titulo: "Pagamento registrado",
+          mensagem: "Seu pagamento foi registrado e seu plano esta ativo.",
+          dados: { subscription_id: subscription.id, plano: paymentData.plano },
+          dedupeKey: `${subscription.id}:pagamento_registrado`,
+        });
+      }
 
       await fetchSubscriptions();
-      return subscription as Subscription;
+      return subscription;
     } catch (error: any) {
       console.error("Erro ao registrar pagamento:", error);
       toast({
@@ -398,71 +336,38 @@ export function useSubscriptions(studentId?: string, personalId?: string) {
       if (!subscription) throw new Error("Assinatura não encontrada");
 
       const parcelas = paymentData.parcelas || 1;
-
-      // Calcular nova data de expiração
-      const dataPagamentoBase = parseDateInputValue(paymentData.data_pagamento);
-      if (!dataPagamentoBase) throw new Error("Data de pagamento invalida");
-
-      const dataPagamentoIso = dateInputToIsoString(paymentData.data_pagamento) ?? paymentData.data_pagamento;
-      const dataExpiracao = new Date(dataPagamentoBase);
-      switch (subscription.plano) {
-        case "mensal":
-          dataExpiracao.setMonth(dataExpiracao.getMonth() + 1);
-          break;
-        case "trimestral":
-          dataExpiracao.setMonth(dataExpiracao.getMonth() + 3);
-          break;
-        case "semestral":
-          dataExpiracao.setMonth(dataExpiracao.getMonth() + 6);
-          break;
-        case "anual":
-          dataExpiracao.setFullYear(dataExpiracao.getFullYear() + 1);
-          break;
+      const normalizedValue = roundCurrency(paymentData.valor);
+      if (!Number.isFinite(normalizedValue) || normalizedValue <= 0) {
+        throw new Error("Valor do pagamento invalido");
       }
 
-      // Atualizar assinatura (incluindo parcelas)
-      await updateSubscription(subscriptionId, {
-        status_pagamento: "pago",
-        data_pagamento: dataPagamentoIso,
-        data_expiracao: dataExpiracao.toISOString(),
-      });
-
-      // Registrar no histórico - com suporte a parcelas
-      const valorParcela = paymentData.valor / parcelas;
-      const paymentRecords: PaymentHistoryDraft[] = [];
-
-      for (let i = 0; i < parcelas; i++) {
-        const dataParcela = new Date(dataPagamentoBase);
-        dataParcela.setMonth(dataParcela.getMonth() + i);
-
-        paymentRecords.push({
-          subscription_id: subscriptionId,
-          student_id: subscription.student_id,
-          personal_id: subscription.personal_id,
-          valor: Math.round(valorParcela * 100) / 100,
-          data_pagamento: dataParcela.toISOString(),
-          metodo_pagamento: paymentData.metodo_pagamento,
-          observacoes: parcelas > 1
-            ? `${paymentData.observacoes || ""} (Parcela ${i + 1}/${parcelas})`.trim()
-            : paymentData.observacoes,
-        });
-      }
-
-      const { data: existingPayments, error: existingPaymentsError } = await supabase
-        .from("payment_history")
-        .select("id, valor, data_pagamento, metodo_pagamento, observacoes")
-        .eq("subscription_id", subscriptionId);
-
-      if (existingPaymentsError) throw existingPaymentsError;
-
-      const newPaymentRecords = paymentRecords.filter(
-        (record) =>
-          !(existingPayments || []).some((existing) =>
-            isSameFinancialPayment(existing, record)
-          )
+      const idempotencyKey = buildManualPaymentKey([
+        subscription.student_id,
+        subscriptionId,
+        subscription.plano,
+        normalizedValue.toFixed(2),
+        paymentData.data_pagamento,
+        paymentData.metodo_pagamento,
+        parcelas,
+      ]);
+      const { data: result, error } = await (supabase as any).rpc(
+        "record_manual_subscription_payment",
+        {
+          _student_id: subscription.student_id,
+          _subscription_id: subscriptionId,
+          _plan: subscription.plano,
+          _value: normalizedValue,
+          _payment_date: paymentData.data_pagamento,
+          _payment_method: paymentData.metodo_pagamento || null,
+          _notes: paymentData.observacoes || null,
+          _installments: parcelas,
+          _idempotency_key: idempotencyKey,
+        }
       );
 
-      if (newPaymentRecords.length === 0) {
+      if (error) throw error;
+
+      if (result?.duplicate) {
         toast({
           title: "Pagamento já registrado",
           description: "Esta baixa já existe no histórico financeiro.",
@@ -470,11 +375,7 @@ export function useSubscriptions(studentId?: string, personalId?: string) {
         return;
       }
 
-      const { error: historyError } = await supabase
-        .from("payment_history")
-        .insert(newPaymentRecords);
-
-      if (historyError) throw historyError;
+      const valorParcela = normalizedValue / parcelas;
 
       toast({
         title: "Sucesso",
@@ -482,6 +383,8 @@ export function useSubscriptions(studentId?: string, personalId?: string) {
           ? `Pagamento registrado em ${parcelas}x de R$ ${valorParcela.toFixed(2)}`
           : "Pagamento registrado com sucesso",
       });
+
+      await fetchSubscriptions();
     } catch (error: any) {
       console.error("Erro ao registrar pagamento:", error);
       toast({

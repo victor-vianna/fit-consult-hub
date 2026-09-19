@@ -242,10 +242,7 @@ BEGIN
     )
   );
 
-  PERFORM public.recalculate_student_access_state(
-    v_subscription.student_id,
-    'manual_payment'
-  );
+  PERFORM public.recalculate_student_access(v_subscription.student_id);
 
   RETURN jsonb_build_object(
     'duplicate', false,

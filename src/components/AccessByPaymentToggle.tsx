@@ -7,7 +7,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-export function AccessByPaymentToggle() {
+interface Props {
+  embedded?: boolean;
+}
+
+export function AccessByPaymentToggle({ embedded = false }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -51,33 +55,68 @@ export function AccessByPaymentToggle() {
     });
   };
 
+  const control = (
+    <div className="rounded-lg border border-primary/20 bg-primary/[0.035] p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <ShieldCheck className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <Label className="text-sm font-semibold">Exigir pagamento ativo para acessar</Label>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              {enabled
+                ? "Ativado agora: os pagamentos controlam o acesso dos alunos."
+                : "Desativado agora: os pagamentos não restringem o acesso dos alunos."}
+            </p>
+          </div>
+        </div>
+        {loading ? (
+          <Loader2 className="mt-1 h-5 w-5 shrink-0 animate-spin text-muted-foreground" />
+        ) : (
+          <Switch
+            checked={enabled}
+            onCheckedChange={handleToggle}
+            disabled={saving}
+            aria-label="Exigir pagamento ativo para acessar"
+          />
+        )}
+      </div>
+      <div className="mt-3 grid gap-2 border-t pt-3 text-xs sm:grid-cols-2">
+        <div className="rounded-md bg-background/70 p-2.5">
+          <p className="font-semibold text-foreground">Ao ativar</p>
+          <p className="mt-1 leading-relaxed text-muted-foreground">
+            Após a carência de 24 horas, alunos sem pagamento entram e são direcionados aos planos.
+            O acesso volta automaticamente após a confirmação.
+          </p>
+        </div>
+        <div className="rounded-md bg-background/70 p-2.5">
+          <p className="font-semibold text-foreground">Ao desativar</p>
+          <p className="mt-1 leading-relaxed text-muted-foreground">
+            A situação financeira continua registrada, mas não impede o acesso à plataforma.
+          </p>
+        </div>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Liberações manuais continuam disponíveis para parcerias, cortesias e acordos.
+      </p>
+    </div>
+  );
+
+  if (embedded) return control;
+
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-lg">
           <ShieldCheck className="h-5 w-5" />
           Controle de acesso por pagamento
         </CardTitle>
         <CardDescription>
-          Quando ativado, apenas alunos com assinatura paga e dentro da validade conseguem entrar.
-          Alunos sem pagamento veem a tela com os planos disponíveis.
+          Defina se os pagamentos devem controlar o acesso dos seus alunos.
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        {loading ? (
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-        ) : (
-          <div className="flex items-center justify-between gap-4 rounded-md border p-4">
-            <div>
-              <Label className="text-base">Exigir pagamento ativo para acessar</Label>
-              <p className="text-xs text-muted-foreground mt-1">
-                Vale para todos os alunos. Você pode definir exceções individualmente em cada aluno.
-              </p>
-            </div>
-            <Switch checked={enabled} onCheckedChange={handleToggle} disabled={saving} />
-          </div>
-        )}
-      </CardContent>
+      <CardContent>{control}</CardContent>
     </Card>
   );
 }

@@ -30,6 +30,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { AccessByPaymentToggle } from "@/components/AccessByPaymentToggle";
 
 const PLANOS: { plano: Plano; label: string; descricao: string }[] = [
   { plano: "mensal", label: "Mensal", descricao: "Cobrado a cada mes" },
@@ -92,10 +93,10 @@ export function PersonalPlanPricingForm() {
 
   return (
     <Card className="overflow-hidden border-border/70 bg-card/80 shadow-sm">
-      <CardHeader>
+      <CardHeader className="pb-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <CreditCard className="h-5 w-5" />
             </div>
             <div>
@@ -111,17 +112,18 @@ export function PersonalPlanPricingForm() {
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4">
+        <AccessByPaymentToggle embedded />
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
+          <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
           <>
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-lg border bg-background/70 p-4">
+            <div className="grid gap-2 md:grid-cols-3">
+              <div className="rounded-lg border bg-background/70 p-3">
                 <p className="text-xs text-muted-foreground">Taxa Stripe</p>
-                <p className="mt-1 text-xl font-semibold">
+                <p className="mt-0.5 text-base font-semibold">
                   {formatPercentBR(platformFeePercent)}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -130,23 +132,23 @@ export function PersonalPlanPricingForm() {
                     : "Nao configurada no secret STRIPE_APPLICATION_FEE_PERCENT."}
                 </p>
               </div>
-              <div className="rounded-lg border bg-background/70 p-4">
+              <div className="rounded-lg border bg-background/70 p-3">
                 <p className="text-xs text-muted-foreground">Desconto dos planos</p>
-                <p className="mt-1 text-xl font-semibold">Vs mensal</p>
+                <p className="mt-0.5 text-base font-semibold">Vs mensal</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Trimestral, semestral e anual usam o mensal como base cheia.
                 </p>
               </div>
-              <div className="rounded-lg border bg-background/70 p-4">
+              <div className="rounded-lg border bg-background/70 p-3">
                 <p className="text-xs text-muted-foreground">Liquido estimado</p>
-                <p className="mt-1 text-xl font-semibold">Apos taxas</p>
+                <p className="mt-0.5 text-base font-semibold">Apos taxas</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Subtrai a taxa Stripe estimada exibida nos planos.
                 </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
               {PLANOS.map(({ plano, label, descricao }) => {
                 const existing = prices?.find((p) => p.plano === plano);
                 const isActive = form[plano].ativo;
@@ -164,7 +166,7 @@ export function PersonalPlanPricingForm() {
                   <div
                     key={plano}
                     className={cn(
-                      "rounded-xl border bg-background/70 p-5 shadow-sm transition-all",
+                      "rounded-lg border bg-background/70 p-4 shadow-sm transition-all",
                       isActive
                         ? "border-primary/35 ring-1 ring-primary/10"
                         : "border-border/70 bg-muted/30 opacity-60"
@@ -205,7 +207,7 @@ export function PersonalPlanPricingForm() {
                       </div>
                     </div>
 
-                    <div className="mt-6">
+                    <div className="mt-4">
                       {isEditing && isActive ? (
                         <div className="flex items-center gap-2 rounded-lg border border-primary/50 bg-background px-3 py-2 shadow-sm ring-2 ring-primary/10">
                           <span className="text-sm font-medium text-muted-foreground">R$</span>
@@ -229,7 +231,7 @@ export function PersonalPlanPricingForm() {
                                 event.currentTarget.blur();
                               }
                             }}
-                            className="h-10 border-0 bg-transparent px-0 text-3xl font-bold shadow-none focus-visible:ring-0"
+                            className="h-9 border-0 bg-transparent px-0 text-2xl font-bold shadow-none focus-visible:ring-0"
                           />
                         </div>
                       ) : (
@@ -238,12 +240,12 @@ export function PersonalPlanPricingForm() {
                           disabled={!isActive}
                           onClick={() => setEditingPlan(plano)}
                           className={cn(
-                            "group flex w-full items-end justify-between gap-3 rounded-lg border border-transparent bg-muted/30 px-4 py-3 text-left transition-colors",
+                            "group flex w-full items-end justify-between gap-3 rounded-md border border-transparent bg-muted/30 px-3 py-2 text-left transition-colors",
                             isActive && "hover:border-primary/40 hover:bg-primary/5",
                             !isActive && "cursor-not-allowed"
                           )}
                         >
-                          <span className="text-3xl font-bold tracking-normal">
+                          <span className="text-2xl font-bold tracking-normal">
                             {formatCurrencyBRL(planValue)}
                           </span>
                           <span className="mb-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
@@ -254,34 +256,26 @@ export function PersonalPlanPricingForm() {
                       )}
                     </div>
 
-                    <div className="mt-4 grid gap-2 text-xs sm:grid-cols-2">
-                      <div className="rounded-md border bg-background/80 p-2">
-                        <p className="text-muted-foreground">Taxa Stripe</p>
-                        <p className="font-semibold">{formatCurrencyBRL(fee.totalFees)}</p>
-                        <p className="text-muted-foreground">
-                          {formatTotalStripeFeeRule(platformFeePercent, fee.stripeFee)}
-                        </p>
+                    <div className="mt-3 space-y-1.5 rounded-md border bg-background/80 p-2.5 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-muted-foreground">Taxa Stripe</span>
+                        <span className="font-semibold">{formatCurrencyBRL(fee.totalFees)}</span>
                       </div>
-                      <div className="rounded-md border bg-background/80 p-2">
-                        <p className="text-muted-foreground">
-                          Liquido final
-                        </p>
-                        <p className="font-semibold">{formatCurrencyBRL(fee.netAfterFees)}</p>
-                        <p className="text-muted-foreground">
-                          Apos taxas
-                        </p>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-muted-foreground">Liquido final</span>
+                        <span className="font-semibold">{formatCurrencyBRL(fee.netAfterFees)}</span>
                       </div>
                       {plano !== "mensal" && (
-                        <div className="rounded-md border bg-background/80 p-2 sm:col-span-2">
-                          <p className="text-muted-foreground">Desconto vs mensal</p>
-                          <p className="font-semibold">
+                        <div className="flex items-center justify-between gap-2 border-t pt-1.5">
+                          <span className="text-muted-foreground">Desconto vs mensal</span>
+                          <span className="font-semibold">
                             {formatCurrencyBRL(discount.discountValue)} ({formatPercentBR(discount.discountPercent)})
-                          </p>
-                          <p className="text-muted-foreground">
-                            Valor cheio: {formatCurrencyBRL(discount.fullValue)}
-                          </p>
+                          </span>
                         </div>
                       )}
+                      <p className="pt-0.5 text-[11px] text-muted-foreground">
+                        {formatTotalStripeFeeRule(platformFeePercent, fee.stripeFee)}
+                      </p>
                     </div>
                   </div>
                 );

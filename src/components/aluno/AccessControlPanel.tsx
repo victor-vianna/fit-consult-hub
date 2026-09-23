@@ -11,12 +11,14 @@ import {
   XCircle,
 } from "lucide-react";
 import {
+  AccessMotivo,
   AccessStatus,
   StudentAccessState,
   useStudentAccess,
 } from "@/hooks/useStudentAccess";
 import { useSubscriptions, Subscription } from "@/hooks/useSubscriptions";
 import { ManageAccessDialog } from "./ManageAccessDialog";
+import { ManualAccessReleaseDialog } from "./ManualAccessReleaseDialog";
 import { AccessHistoryList } from "./AccessHistoryList";
 import { SubscriptionManager } from "@/components/SubscriptionManager";
 import { formatDisplayDateOnly } from "@/utils/dateFormat";
@@ -189,6 +191,7 @@ export function AccessControlPanel({ studentId, personalId, studentName }: Props
     useStudentAccess(studentId);
   const { subscriptions, loading: subscriptionsLoading } = useSubscriptions(studentId, personalId);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [releaseDialogOpen, setReleaseDialogOpen] = useState(false);
   const [openCreateSignal, setOpenCreateSignal] = useState(0);
 
   const accessMeta = ACCESS_META[status] ?? ACCESS_META.suspenso;
@@ -266,11 +269,11 @@ export function AccessControlPanel({ studentId, personalId, studentName }: Props
               ? "gap-2 border-red-500/35 text-red-700 hover:bg-red-500/10 hover:text-red-700 dark:text-red-300"
               : "gap-2 border-green-500/35 text-green-700 hover:bg-green-500/10 hover:text-green-700 dark:text-green-300"
           }
-          onClick={() => setDialogOpen(true)}
+          onClick={() => (canSuspend ? setDialogOpen(true) : setReleaseDialogOpen(true))}
           disabled={loading || isMutating}
         >
           {canSuspend ? <ShieldAlert className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
-          {canSuspend ? "Suspender acesso" : "Liberar sem pagamento por 7 dias"}
+          {canSuspend ? "Pausar ou suspender acesso" : "Liberar acesso sem pagamento"}
         </Button>
       </div>
 
@@ -300,6 +303,21 @@ export function AccessControlPanel({ studentId, personalId, studentName }: Props
         isMutating={isMutating}
         onConfirm={async (p) => {
           await mutate(p);
+        }}
+      />
+
+      <ManualAccessReleaseDialog
+        open={releaseDialogOpen}
+        onOpenChange={setReleaseDialogOpen}
+        studentName={studentName}
+        isSubmitting={isMutating}
+        onConfirm={async ({ reasonCode, observation, manualReleaseUntil }) => {
+          await mutate({
+            acao: "reativar",
+            motivo: reasonCode as AccessMotivo,
+            observacao: observation,
+            manualReleaseUntil,
+          });
         }}
       />
     </section>

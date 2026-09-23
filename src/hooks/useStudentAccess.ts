@@ -27,7 +27,15 @@ export type AccessMotivo =
   | "refund_full"
   | "refund_partial"
   | "chargeback"
-  | "dispute";
+  | "dispute"
+  | "manual_indefinite_partnership"
+  | "manual_indefinite_payment_arrangement"
+  | "manual_indefinite_courtesy"
+  | "manual_indefinite_other"
+  | "manual_temporary_partnership"
+  | "manual_temporary_payment_arrangement"
+  | "manual_temporary_courtesy"
+  | "manual_temporary_other";
 
 export const MOTIVO_LABELS: Record<string, string> = {
   ferias: "Ferias",
@@ -317,7 +325,9 @@ export function useStudentAccess(studentId: string | undefined) {
       const titles: Record<typeof vars.acao, string> = {
         pausar: "Acesso pausado",
         suspender: "Acesso suspenso",
-        reativar: "Acesso liberado por 7 dias",
+        reativar: vars.motivo?.startsWith("manual_indefinite_")
+          ? "Acesso liberado sem prazo"
+          : "Acesso liberado sem pagamento",
       };
       toast({ title: titles[vars.acao] });
     },

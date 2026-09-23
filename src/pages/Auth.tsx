@@ -100,44 +100,47 @@ export default function Auth() {
               }
 
               if (!currentPersonalId) {
-                await supabase
-                  .from('profiles')
-                  .update({ personal_id: publicPersonal.id } as any)
-                  .eq('id', session.user.id);
+                const { error: linkError } = await (supabase as any).rpc(
+                  'link_current_student_to_public_personal',
+                  { _slug: publicPersonal.slug }
+                );
+                if (linkError) {
+                  toast({
+                    title: 'Nao foi possivel vincular a conta',
+                    description: linkError.message,
+                    variant: 'destructive',
+                  });
+                  return;
+                }
               }
             }
-            navigate(selectedPlan ? `/aluno?section=plano&plan=${selectedPlan}` : '/aluno');
+            navigate(
+              publicPersonal
+                ? `/planos/${publicPersonal.slug}${selectedPlan ? `?plan=${selectedPlan}` : ''}`
+                : '/aluno'
+            );
           }
         }
       }
     });
   }, [navigate, publicPersonal, publicPersonalSlug, selectedPlan, toast]);
 
-  const linkStudentToPublicPersonal = async (userId: string) => {
+  const linkStudentToPublicPersonal = async () => {
     if (!publicPersonal?.id) return true;
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('personal_id')
-      .eq('id', userId)
-      .maybeSingle();
-
-    const currentPersonalId = (profile as any)?.personal_id as string | null | undefined;
-    if (currentPersonalId && currentPersonalId !== publicPersonal.id) {
+    const { error } = await (supabase as any).rpc(
+      'link_current_student_to_public_personal',
+      { _slug: publicPersonal.slug }
+    );
+    if (error) {
       toast({
-        title: 'Aluno ja vinculado',
-        description: 'Esta conta ja esta vinculada a outro personal. Entre em contato para trocar o vinculo.',
+        title: error.code === '23505' ? 'Aluno ja vinculado' : 'Erro ao vincular conta',
+        description: error.code === '23505'
+          ? 'Esta conta ja esta vinculada a outro personal. Entre em contato para trocar o vinculo.'
+          : error.message,
         variant: 'destructive',
       });
       return false;
-    }
-
-    if (!currentPersonalId) {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ personal_id: publicPersonal.id } as any)
-        .eq('id', userId);
-      if (error) throw error;
     }
 
     return true;
@@ -153,8 +156,14 @@ export default function Auth() {
     if (data?.role === 'admin') navigate('/admin');
     else if (data?.role === 'personal') navigate('/personal');
     else if (data?.role === 'aluno') {
-      const linked = await linkStudentToPublicPersonal(userId);
-      if (linked) navigate(selectedPlan ? `/aluno?section=plano&plan=${selectedPlan}` : '/aluno');
+      const linked = await linkStudentToPublicPersonal();
+      if (linked) {
+        navigate(
+          publicPersonal
+            ? `/planos/${publicPersonal.slug}${selectedPlan ? `?plan=${selectedPlan}` : ''}`
+            : '/aluno'
+        );
+      }
     }
   };
 
@@ -257,13 +266,6 @@ export default function Auth() {
         });
         if (error) throw error;
         if (data.user) {
-          await supabase
-            .from('profiles')
-            .update({
-              telefone,
-              personal_id: publicPersonal?.id ?? null,
-            } as any)
-            .eq('id', data.user.id);
           toast({
             title: 'Cadastro realizado!',
             description: publicPersonal
@@ -271,7 +273,11 @@ export default function Auth() {
               : 'Voce ja pode fazer login.',
           });
           if (data.session) {
-            navigate(selectedPlan ? `/aluno?section=plano&plan=${selectedPlan}` : '/aluno');
+            navigate(
+              publicPersonal
+                ? `/planos/${publicPersonal.slug}${selectedPlan ? `?plan=${selectedPlan}` : ''}`
+                : '/aluno'
+            );
           }
         }
       }

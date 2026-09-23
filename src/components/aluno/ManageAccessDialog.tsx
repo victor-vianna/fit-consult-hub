@@ -43,7 +43,6 @@ interface Props {
 
 const PAUSAR_MOTIVOS: AccessMotivo[] = ["ferias", "lesao", "viagem", "outro"];
 const SUSPENDER_MOTIVOS: AccessMotivo[] = [
-  "inadimplencia",
   "violacao",
   "outro",
 ];
@@ -63,7 +62,9 @@ export function ManageAccessDialog({
 
   useEffect(() => {
     if (open) {
-      setAcao(status === "ativo" || status === "pagamento_pendente" ? null : "reativar");
+      setAcao(
+        status === "ativo" || status === "carencia" ? null : "reativar"
+      );
       setMotivo("");
       setMensagem("");
       setObservacao("");
@@ -101,7 +102,7 @@ export function ManageAccessDialog({
         <DialogHeader>
           <DialogTitle>Gerenciar acesso · {studentName}</DialogTitle>
           <DialogDescription>
-            {status === "ativo" || status === "pagamento_pendente"
+            {status === "ativo" || status === "carencia"
               ? "Escolha a ação. O aluno verá a mensagem que você escrever na tela de bloqueio."
               : "Reative o acesso do aluno à plataforma."}
           </DialogDescription>
@@ -113,13 +114,13 @@ export function ManageAccessDialog({
             <div className="flex items-start gap-2 p-3 rounded-md bg-amber-500/10 border border-amber-500/30 text-sm">
               <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-amber-600" />
               <span>
-                Este aluno esta bloqueado por pagamento. Voce ainda pode aplicar uma suspensao
-                manual, que passa a ter prioridade sobre o status financeiro.
+                Este aluno ja esta direcionado aos planos pela regra financeira. A liberacao abaixo
+                cria uma excecao de 7 dias sem registrar pagamento.
               </span>
             </div>
           )}
 
-          {(status === "ativo" || status === "pagamento_pendente") && (
+          {(status === "ativo" || status === "carencia") && (
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
@@ -215,7 +216,7 @@ export function ManageAccessDialog({
                 <Unlock className="h-5 w-5 mb-2 text-green-600" />
                 <div className="font-semibold">Reativar acesso</div>
                 <div className="text-sm text-muted-foreground mt-1">
-                  {studentName} voltará a acessar a plataforma normalmente.
+                  {studentName} voltara a acessar a plataforma por 7 dias.
                 </div>
               </div>
               <div className="space-y-2">

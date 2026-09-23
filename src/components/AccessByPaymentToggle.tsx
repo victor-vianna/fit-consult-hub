@@ -44,9 +44,9 @@ export function AccessByPaymentToggle() {
       return;
     }
     toast({
-      title: value ? "Bloqueio por pagamento ativado" : "Bloqueio por pagamento desativado",
+      title: value ? "Controle por pagamento ativado" : "Controle por pagamento desativado",
       description: value
-        ? "Alunos sem assinatura paga serão bloqueados automaticamente."
+        ? "Alunos sem pagamento ativo poderao entrar e serao direcionados aos planos."
         : "Os alunos podem acessar normalmente, mesmo sem assinatura.",
     });
   };
@@ -69,7 +69,7 @@ export function AccessByPaymentToggle() {
         ) : (
           <div className="flex items-center justify-between gap-4 rounded-md border p-4">
             <div>
-              <Label className="text-base">Bloquear alunos sem pagamento ativo</Label>
+              <Label className="text-base">Exigir pagamento ativo para acessar</Label>
               <p className="text-xs text-muted-foreground mt-1">
                 Vale para todos os alunos. Você pode definir exceções individualmente em cada aluno.
               </p>

@@ -30,16 +30,16 @@ export function BroadcastMessageDialog({ personalId, themeColor }: BroadcastMess
     setSending(true);
 
     try {
-      // Fetch all active students
+      // A mensagem pode ser util inclusive para recuperacao de acesso. O campo
+      // legado profiles.is_active nao participa mais da decisao financeira.
       const { data: alunos, error: alunosError } = await supabase
         .from("profiles")
         .select("id, nome")
-        .eq("personal_id", personalId)
-        .eq("is_active", true);
+        .eq("personal_id", personalId);
 
       if (alunosError) throw alunosError;
       if (!alunos || alunos.length === 0) {
-        toast({ title: "Nenhum aluno ativo encontrado", variant: "destructive" });
+        toast({ title: "Nenhum aluno encontrado", variant: "destructive" });
         setSending(false);
         return;
       }

@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useCallback, useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { useAuth, UserRole } from "@/hooks/useAuth";
@@ -11,33 +11,35 @@ interface AuthGuardProps {
   allowedRoles?: UserRole[];
 }
 
+function blockedDestination(state: StudentAccessState) {
+  const paymentBlock = state.source === "payment" || state.source === "settings";
+  if (paymentBlock && state.plans_path?.startsWith("/planos/")) {
+    return state.plans_path;
+  }
+  return "/acesso-suspenso";
+}
+
 export const AuthGuard = ({ children, allowedRoles }: AuthGuardProps) => {
   const { user, role, loading } = useAuth();
   const navigate = useNavigate();
   const [checkingAccess, setCheckingAccess] = useState(true);
-  const [isBlocked, setIsBlocked] = useState(false);
-  const [manualReleaseUntil, setManualReleaseUntil] = useState<string | null>(null);
+  const [isBlocked, setIsBlocked] = useState(true);
+  const [accessState, setAccessState] = useState<StudentAccessState | null>(null);
   const [accessCheckError, setAccessCheckError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!loading) {
-      checkAccess();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, role, loading]);
-
-  const checkAccess = async () => {
+  const checkAccess = useCallback(async () => {
     setCheckingAccess(true);
     setAccessCheckError(null);
 
     if (!user || !role) {
-      setIsBlocked(false);
+      setAccessState(null);
+      setIsBlocked(true);
       setCheckingAccess(false);
       return;
     }
 
-    // Admin nunca é bloqueado, sai cedo
     if (role === "admin") {
+      setAccessState(null);
       setIsBlocked(false);
       setCheckingAccess(false);
       return;
@@ -45,29 +47,26 @@ export const AuthGuard = ({ children, allowedRoles }: AuthGuardProps) => {
 
     try {
       if (role === "aluno") {
-        const { data, error } = await (supabase as any).rpc("get_student_access_state", {
-          _student_id: user.id,
-        });
+        const { data, error } = await (supabase as any).rpc(
+          "get_student_access_state",
+          { _student_id: user.id }
+        );
 
-        if (error) {
-          console.error("get_student_access_state:", error);
-          setAccessCheckError("Nao foi possivel verificar seu acesso. Confira sua conexao e tente novamente.");
-          setCheckingAccess(false);
-          return;
+        if (error) throw error;
+        if (!data || typeof data !== "object") {
+          throw new Error("Resposta de acesso invalida");
         }
 
-        const accessState = data as StudentAccessState | null;
-        setManualReleaseUntil(accessState?.manual_release_until ?? null);
+        const nextState = data as StudentAccessState;
+        setAccessState(nextState);
 
-        if (accessState?.allowed === false) {
+        if (nextState.allowed !== true) {
           setIsBlocked(true);
-          setCheckingAccess(false);
-          navigate("/acesso-suspenso", { replace: true });
+          navigate(blockedDestination(nextState), { replace: true });
           return;
         }
 
         setIsBlocked(false);
-        setCheckingAccess(false);
         return;
       }
 
@@ -75,52 +74,71 @@ export const AuthGuard = ({ children, allowedRoles }: AuthGuardProps) => {
         _user_id: user.id,
       });
 
-      if (error) {
-        console.error("pode_acessar_plataforma:", error);
-        setAccessCheckError("Nao foi possivel verificar seu acesso. Confira sua conexao e tente novamente.");
-        setCheckingAccess(false);
-        return;
-      }
-
-      if (data === false) {
+      if (error) throw error;
+      if (data !== true) {
         setIsBlocked(true);
-        setCheckingAccess(false);
         navigate("/acesso-suspenso", { replace: true });
         return;
       }
 
+      setAccessState(null);
       setIsBlocked(false);
-    } catch (e) {
-      console.error("Erro ao verificar acesso:", e);
-      setAccessCheckError("Nao foi possivel verificar seu acesso. Confira sua conexao e tente novamente.");
-      setIsBlocked(false);
+    } catch (error) {
+      console.error("Erro ao verificar acesso:", error);
+      setIsBlocked(true);
+      setAccessCheckError(
+        "Nao foi possivel verificar seu acesso. Confira sua conexao e tente novamente."
+      );
+    } finally {
+      setCheckingAccess(false);
     }
-
-    setCheckingAccess(false);
-  };
+  }, [navigate, role, user]);
 
   useEffect(() => {
-    if (!manualReleaseUntil || role !== "aluno") return;
+    if (!loading) void checkAccess();
+  }, [checkAccess, loading]);
 
-    const delay = new Date(manualReleaseUntil).getTime() - Date.now() + 1000;
+  useEffect(() => {
+    if (role !== "aluno" || accessState?.allowed !== true) return;
+
+    const expirationTimes = [
+      accessState.expires_at,
+      accessState.manual_release_until,
+    ]
+      .filter(Boolean)
+      .map((value) => new Date(value as string).getTime())
+      .filter(Number.isFinite);
+
+    if (expirationTimes.length === 0) return;
+    const delay = Math.min(...expirationTimes) - Date.now() + 1_000;
+
     if (delay <= 0) {
-      checkAccess();
+      void checkAccess();
       return;
     }
 
-    const timer = window.setTimeout(() => {
-      checkAccess();
-    }, Math.min(delay, 2_147_483_647));
-
+    const timer = window.setTimeout(
+      () => void checkAccess(),
+      Math.min(delay, 2_147_483_647)
+    );
     return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [manualReleaseUntil, role]);
+  }, [accessState, checkAccess, role]);
 
   useEffect(() => {
     if (!user || role !== "aluno") return;
 
+    const recheck = () => void checkAccess();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") recheck();
+    };
+    const interval = window.setInterval(recheck, 60_000);
+
+    window.addEventListener("focus", recheck);
+    window.addEventListener("online", recheck);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     const channel = supabase
-      .channel(`student-access-state:${user.id}`)
+      .channel(`student-access-guard:${user.id}`)
       .on(
         "postgres_changes",
         {
@@ -129,40 +147,31 @@ export const AuthGuard = ({ children, allowedRoles }: AuthGuardProps) => {
           table: "student_access_state",
           filter: `student_id=eq.${user.id}`,
         },
-        (payload: any) => {
-          if (payload.new?.allowed === false) {
-            setAccessCheckError(null);
-            setIsBlocked(true);
-            navigate("/acesso-suspenso", { replace: true });
-          } else if (payload.new?.allowed === true) {
-            setAccessCheckError(null);
-            setIsBlocked(false);
-          }
-        }
+        recheck
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      window.clearInterval(interval);
+      window.removeEventListener("focus", recheck);
+      window.removeEventListener("online", recheck);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      void supabase.removeChannel(channel);
     };
-  }, [navigate, role, user]);
+  }, [checkAccess, role, user]);
 
   if (loading || checkingAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
           <p className="mt-4 text-muted-foreground">Verificando acesso...</p>
         </div>
       </div>
     );
   }
 
-  if (isBlocked) return null;
-
-  if (!user || !role) {
-    return <Navigate to="/auth" replace />;
-  }
+  if (!user || !role) return <Navigate to="/auth" replace />;
 
   if (accessCheckError) {
     return (
@@ -171,9 +180,11 @@ export const AuthGuard = ({ children, allowedRoles }: AuthGuardProps) => {
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
             <AlertTriangle className="h-6 w-6 text-destructive" />
           </div>
-          <h1 className="text-xl font-semibold text-foreground">Verificacao de acesso indisponivel</h1>
+          <h1 className="text-xl font-semibold text-foreground">
+            Verificacao de acesso indisponivel
+          </h1>
           <p className="mt-2 text-sm text-muted-foreground">{accessCheckError}</p>
-          <Button onClick={checkAccess} className="mt-6 w-full gap-2">
+          <Button onClick={() => void checkAccess()} className="mt-6 w-full gap-2">
             <RefreshCw className="h-4 w-4" />
             Tentar novamente
           </Button>
@@ -181,6 +192,8 @@ export const AuthGuard = ({ children, allowedRoles }: AuthGuardProps) => {
       </div>
     );
   }
+
+  if (isBlocked) return null;
 
   if (allowedRoles && !allowedRoles.includes(role)) {
     if (role === "admin") return <Navigate to="/admin" replace />;

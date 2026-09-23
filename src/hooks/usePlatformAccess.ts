@@ -4,7 +4,7 @@ import type { StudentAccessState } from "@/hooks/useStudentAccess";
 
 export function usePlatformAccess(userId?: string) {
   const [loading, setLoading] = useState(true);
-  const [allowed, setAllowed] = useState<boolean>(true);
+  const [allowed, setAllowed] = useState<boolean>(false);
   const [state, setState] = useState<StudentAccessState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -12,7 +12,7 @@ export function usePlatformAccess(userId?: string) {
     let mounted = true;
     if (!userId) {
       setLoading(false);
-      setAllowed(true);
+      setAllowed(false);
       setState(null);
       setError(null);
       return;
@@ -35,7 +35,7 @@ export function usePlatformAccess(userId?: string) {
         } else {
           const accessState = data as StudentAccessState;
           setState(accessState);
-          setAllowed(accessState?.allowed !== false);
+          setAllowed(accessState?.allowed === true);
           setError(null);
         }
       } catch (err) {

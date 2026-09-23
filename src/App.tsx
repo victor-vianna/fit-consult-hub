@@ -90,6 +90,7 @@ const App = () => (
               <Route path="/inicio" element={<Landing />} />
               <Route path="/login" element={<Navigate to="/auth" replace />} />
               <Route path="/p/:slug" element={<PublicPersonal />} />
+              <Route path="/planos/:slug" element={<PublicPersonal />} />
               <Route path="/auth" element={<Auth />} />
               <Route
                 path="/admin"

@@ -314,8 +314,7 @@ export function PersonalDashboardCards({
     const { data: alunos } = await supabase
       .from("profiles")
       .select("id, nome")
-      .eq("personal_id", personalId)
-      .eq("is_active", true);
+      .eq("personal_id", personalId);
 
     if (!alunos) return;
 
@@ -488,8 +487,7 @@ export function PersonalDashboardCards({
     const { data: alunos } = await supabase
       .from("profiles")
       .select("id, nome")
-      .eq("personal_id", personalId)
-      .eq("is_active", true);
+      .eq("personal_id", personalId);
 
     if (!alunos) return;
 
@@ -596,12 +594,14 @@ export function PersonalDashboardCards({
       .select("*", { count: "exact", head: true })
       .eq("personal_id", personalId);
 
-    // Alunos ativos
-    const { count: alunosAtivos } = await supabase
-      .from("profiles")
-      .select("*", { count: "exact", head: true })
-      .eq("personal_id", personalId)
-      .eq("is_active", true);
+    // A decisao central substitui o campo legado profiles.is_active.
+    const { data: accessStates } = await (supabase as any).rpc(
+      "get_students_access_states",
+      { _personal_id: personalId }
+    );
+    const alunosAtivos = ((accessStates || []) as Array<{ allowed?: boolean }>).filter(
+      (state) => state.allowed === true
+    ).length;
 
     // Treinos finalizados hoje
     const hoje = startOfDay(new Date());
@@ -623,7 +623,7 @@ export function PersonalDashboardCards({
 
     setStats({
       totalAlunos: totalAlunos || 0,
-      alunosAtivos: alunosAtivos || 0,
+      alunosAtivos,
       treinosHoje: treinosHoje || 0,
       treinosSemana: treinosSemana || 0,
     });

@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export type AccessStatus =
   | "ativo"
+  | "carencia"
   | "pausado"
   | "suspenso"
   | "pagamento_pendente";
@@ -19,7 +20,14 @@ export type AccessMotivo =
   | "legacy_profile_inactive"
   | "payment_required"
   | "payment_expired"
-  | "payment_pending";
+  | "payment_pending"
+  | "payment_grace"
+  | "payment_control_activation_grace"
+  | "payment_control_disabled"
+  | "refund_full"
+  | "refund_partial"
+  | "chargeback"
+  | "dispute";
 
 export const MOTIVO_LABELS: Record<string, string> = {
   ferias: "Ferias",
@@ -32,10 +40,25 @@ export const MOTIVO_LABELS: Record<string, string> = {
   payment_required: "Pagamento necessario",
   payment_expired: "Pagamento vencido",
   payment_pending: "Pagamento pendente",
+  payment_grace: "Carencia de pagamento",
+  payment_control_activation_grace: "Carencia inicial",
+  payment_control_disabled: "Controle por pagamento desativado",
+  refund_full: "Estorno total",
+  refund_partial: "Estorno parcial",
+  chargeback: "Chargeback",
+  dispute: "Contestacao de pagamento",
   manual_pause: "Pausa manual",
   manual_suspend: "Suspensao manual",
   manual_release: "Liberacao manual",
   manual_temporary_release: "Liberacao temporaria",
+  manual_indefinite_partnership: "Parceria sem prazo",
+  manual_indefinite_payment_arrangement: "Acordo sem prazo",
+  manual_indefinite_courtesy: "Cortesia sem prazo",
+  manual_indefinite_other: "Liberacao sem prazo",
+  manual_temporary_partnership: "Parceria temporaria",
+  manual_temporary_payment_arrangement: "Acordo de pagamento",
+  manual_temporary_courtesy: "Cortesia temporaria",
+  manual_temporary_other: "Liberacao temporaria",
   payment_rule_changed: "Regra de pagamento alterada",
 };
 
@@ -57,6 +80,15 @@ export const MENSAGENS_PADRAO: Record<AccessMotivo, string> = {
     "Seu ultimo pagamento venceu. Regularize seu plano para voltar a acessar.",
   payment_pending:
     "Existe um pagamento pendente ou atrasado. Regularize seu plano para voltar a acessar.",
+  payment_grace:
+    "Seu pagamento venceu e esta no periodo de carencia definido pelo personal. Regularize para evitar o bloqueio.",
+  payment_control_activation_grace:
+    "O controle de pagamento foi ativado e seu acesso esta no periodo de carencia definido pelo personal.",
+  payment_control_disabled: "O controle de acesso por pagamento esta desativado.",
+  refund_full: "O pagamento foi estornado e o acesso foi bloqueado.",
+  refund_partial: "O pagamento teve estorno parcial e o acesso foi bloqueado.",
+  chargeback: "O pagamento recebeu chargeback e o acesso foi bloqueado.",
+  dispute: "O pagamento foi contestado e o acesso foi bloqueado.",
 };
 
 export interface StudentAccessState {
@@ -75,8 +107,14 @@ export interface StudentAccessState {
   has_active_payment: boolean;
   active_subscription_id: string | null;
   manual_release_until: string | null;
-  calculated_at: string;
-  updated_at: string;
+  expires_at: string | null;
+  grace_ends_at: string | null;
+  grace_period_hours: number;
+  plans_path: string | null;
+  in_grace: boolean;
+  checked_at: string;
+  calculated_at?: string | null;
+  updated_at?: string | null;
 }
 
 export interface AccessLogWithAuthor {
@@ -107,11 +145,11 @@ export type AccessLog = AccessLogWithAuthor;
 const DEFAULT_STATE = (studentId: string): StudentAccessState => ({
   student_id: studentId,
   personal_id: null,
-  allowed: true,
-  status: "ativo",
-  status_label: "Ativo",
-  reason_code: "active",
-  reason: "Aluno liberado para acessar a plataforma.",
+  allowed: false,
+  status: "suspenso",
+  status_label: "Verificando acesso",
+  reason_code: "access_not_verified",
+  reason: "O acesso ainda nao foi verificado.",
   message_aluno: null,
   source: "system",
   priority: 0,
@@ -120,20 +158,18 @@ const DEFAULT_STATE = (studentId: string): StudentAccessState => ({
   has_active_payment: false,
   active_subscription_id: null,
   manual_release_until: null,
+  expires_at: null,
+  grace_ends_at: null,
+  grace_period_hours: 24,
+  plans_path: null,
+  in_grace: false,
+  checked_at: new Date().toISOString(),
   calculated_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 });
 
-export function deriveStatus(
-  isActive: boolean | undefined | null,
-  lastLog: AccessLog | null
-): AccessStatus {
-  if (lastLog?.event_type === "manual_pause") return "pausado";
-  if (lastLog?.effect === "block") return "suspenso";
-  return isActive === false ? "suspenso" : "ativo";
-}
-
 export function getAccessStatusLabel(status: AccessStatus) {
+  if (status === "carencia") return "Em carencia";
   if (status === "pagamento_pendente") return "Pagamento pendente";
   if (status === "pausado") return "Pausado";
   if (status === "suspenso") return "Suspenso";
@@ -200,10 +236,16 @@ export function useStudentAccess(studentId: string | undefined) {
         _student_id: studentId,
       });
       if (error) throw error;
-      return (data ?? DEFAULT_STATE(studentId)) as StudentAccessState;
+      if (!data || typeof data !== "object") {
+        throw new Error("Resposta de acesso invalida");
+      }
+      return data as StudentAccessState;
     },
     enabled: !!studentId,
     staleTime: 15_000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchInterval: 60_000,
   });
 
   const eventsQuery = useQuery({
@@ -275,7 +317,7 @@ export function useStudentAccess(studentId: string | undefined) {
       const titles: Record<typeof vars.acao, string> = {
         pausar: "Acesso pausado",
         suspender: "Acesso suspenso",
-        reativar: "Acesso reativado",
+        reativar: "Acesso liberado por 7 dias",
       };
       toast({ title: titles[vars.acao] });
     },
@@ -289,7 +331,7 @@ export function useStudentAccess(studentId: string | undefined) {
   });
 
   const accessError = stateQuery.error || eventsQuery.error;
-  const state = stateQuery.data ?? (studentId && !accessError ? DEFAULT_STATE(studentId) : null);
+  const state = stateQuery.data ?? (studentId && stateQuery.isLoading ? DEFAULT_STATE(studentId) : null);
   const logs = eventsQuery.data ?? [];
   const lastLog = logs[0] ?? null;
 

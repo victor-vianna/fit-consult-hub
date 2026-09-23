@@ -31,6 +31,17 @@ export default function AcessoSuspenso() {
   }, [navigate, role, state?.allowed]);
 
   useEffect(() => {
+    if (
+      role === "aluno" &&
+      state?.allowed === false &&
+      (state.source === "payment" || state.source === "settings") &&
+      state.plans_path?.startsWith("/planos/")
+    ) {
+      navigate(state.plans_path, { replace: true });
+    }
+  }, [navigate, role, state]);
+
+  useEffect(() => {
     if (!studentId || role !== "aluno") return;
 
     const channel = supabase
@@ -59,6 +70,32 @@ export default function AcessoSuspenso() {
       supabase.removeChannel(channel);
     };
   }, [navigate, role, studentId]);
+
+  useEffect(() => {
+    if (!studentId || role !== "aluno") return;
+
+    const refresh = async () => {
+      const { data, error } = await (supabase as any).rpc(
+        "get_student_access_state",
+        { _student_id: studentId }
+      );
+      if (!error && data) setState(data as StudentAccessState);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    const interval = window.setInterval(() => void refresh(), 30_000);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [role, studentId]);
 
   async function fetchData() {
     try {

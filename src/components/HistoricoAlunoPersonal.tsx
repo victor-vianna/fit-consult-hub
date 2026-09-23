@@ -32,7 +32,6 @@ export function HistoricoAlunoPersonal({
         .from("profiles")
         .select("id, nome")
         .eq("personal_id", personalId)
-        .eq("is_active", true)
         .order("nome");
 
       if (error) throw error;

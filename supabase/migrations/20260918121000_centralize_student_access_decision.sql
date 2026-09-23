@@ -68,6 +68,7 @@ BEGIN
         source <> 'manual'
         OR event_type <> 'manual_release'
         OR manual_release_until IS NOT NULL
+        OR reason_code LIKE 'manual_indefinite_%'
       ) NOT VALID;
   END IF;
 END;
@@ -208,7 +209,13 @@ BEGIN
 
   -- An explicit suspension is independent from the financial state and lasts
   -- until a later release command is registered.
-  IF v_has_manual AND v_manual.effect = 'block' THEN
+  -- Legacy suspensions explicitly created for delinquency are financial, not
+  -- human relationship blocks. The payment decision below supersedes them so
+  -- a later successful payment restores access without manual intervention.
+  IF v_has_manual
+    AND v_manual.effect = 'block'
+    AND coalesce(v_manual.reason_code, '') <> 'inadimplencia'
+  THEN
     v_allowed := false;
     v_status := CASE
       WHEN v_manual.event_type = 'manual_pause' THEN 'pausado'
@@ -321,13 +328,25 @@ BEGIN
       v_active_subscription_id := v_revoked.id;
     ELSIF v_has_manual
       AND v_manual.effect = 'allow'
-      AND v_manual.manual_release_until IS NOT NULL
-      AND v_manual.manual_release_until > _at
+      AND (
+        v_manual.manual_release_until IS NULL
+        OR v_manual.manual_release_until > _at
+      )
     THEN
       v_allowed := true;
       v_status := 'ativo';
-      v_reason_code := 'manual_temporary_release';
-      v_reason := 'Acesso liberado temporariamente pelo personal trainer.';
+      v_reason_code := coalesce(
+        v_manual.reason_code,
+        CASE
+          WHEN v_manual.manual_release_until IS NULL THEN 'manual_indefinite_release'
+          ELSE 'manual_temporary_release'
+        END
+      );
+      v_reason := CASE
+        WHEN v_manual.manual_release_until IS NULL
+          THEN 'Acesso liberado manualmente sem prazo pelo personal trainer.'
+        ELSE 'Acesso liberado temporariamente pelo personal trainer.'
+      END;
       v_message := v_manual.message_aluno;
       v_source := 'manual';
       v_priority := 100;
@@ -661,12 +680,18 @@ BEGIN
   END IF;
 
   IF _event_type = 'manual_release' THEN
-    _manual_release_until := coalesce(
-      _manual_release_until,
-      statement_timestamp() + interval '7 days'
-    );
+    IF coalesce(_reason_code, '') LIKE 'manual_indefinite_%' THEN
+      _manual_release_until := NULL;
+    ELSE
+      _manual_release_until := coalesce(
+        _manual_release_until,
+        statement_timestamp() + interval '7 days'
+      );
+    END IF;
 
-    IF _manual_release_until <= statement_timestamp() THEN
+    IF _manual_release_until IS NOT NULL
+      AND _manual_release_until <= statement_timestamp()
+    THEN
       RAISE EXCEPTION 'A data de liberacao temporaria precisa ser futura'
         USING ERRCODE = '22023';
     END IF;
@@ -704,7 +729,11 @@ BEGIN
     _manual_release_until,
     jsonb_build_object(
       'manual_release_until', _manual_release_until,
-      'default_release_days', CASE WHEN _event_type = 'manual_release' THEN 7 ELSE NULL END
+      'indefinite', _event_type = 'manual_release' AND _manual_release_until IS NULL,
+      'default_release_days', CASE
+        WHEN _event_type = 'manual_release' AND _manual_release_until IS NOT NULL THEN 7
+        ELSE NULL
+      END
     )
   );
 

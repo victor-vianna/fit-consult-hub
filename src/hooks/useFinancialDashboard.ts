@@ -13,7 +13,10 @@ type FinancialSubscriptionRow = {
   parcelas?: number | null;
   status_pagamento?: string | null;
   data_expiracao?: string | null;
+  data_pagamento?: string | null;
   created_at?: string | null;
+  updated_at?: string | null;
+  last_provider_event_created_at?: string | null;
   stripe_account_id?: string | null;
   stripe_checkout_session_id?: string | null;
   stripe_subscription_id?: string | null;
@@ -65,9 +68,25 @@ export interface StudentPaymentStatus {
   email: string;
   valor: number;
   status_pagamento: "pago" | "pendente" | "atrasado";
-  data_expiracao: string;
+  data_expiracao: string | null;
   diasAtraso: number;
+  accessAllowed: boolean;
+  accessSource: string;
+  accessReasonCode: string | null;
+  manualReleaseUntil: string | null;
 }
+
+type FinancialAccessState = {
+  student_id: string;
+  allowed: boolean;
+  status: string;
+  reason_code: string | null;
+  source: string;
+  payment_required: boolean;
+  has_active_payment: boolean;
+  active_subscription_id: string | null;
+  manual_release_until: string | null;
+};
 
 export interface PaymentDetail {
   id: string;
@@ -98,15 +117,17 @@ const normalizePaymentText = (value: unknown) =>
 const roundCurrency = (value: number) => Math.round(Number(value || 0) * 100) / 100;
 
 const getSubscriptionTimestamp = (subscription: FinancialSubscriptionRow) => {
-  const expirationTime = subscription.data_expiracao
-    ? new Date(subscription.data_expiracao).getTime()
-    : NaN;
-  if (Number.isFinite(expirationTime)) return expirationTime;
-
-  const createdTime = subscription.created_at
-    ? new Date(subscription.created_at).getTime()
-    : NaN;
-  return Number.isFinite(createdTime) ? createdTime : 0;
+  for (const value of [
+    subscription.last_provider_event_created_at,
+    subscription.updated_at,
+    subscription.data_pagamento,
+    subscription.created_at,
+    subscription.data_expiracao,
+  ]) {
+    const time = value ? new Date(value).getTime() : NaN;
+    if (Number.isFinite(time)) return time;
+  }
+  return 0;
 };
 
 function getLatestSubscriptionsByStudent(subscriptions: FinancialSubscriptionRow[]) {
@@ -278,14 +299,14 @@ export function useFinancialDashboard(personalId: string) {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const fetchFinancialData = useCallback(async () => {
+  const fetchFinancialData = useCallback(async (background = false) => {
     if (!personalId) {
       setLoading(false);
       return;
     }
 
     try {
-      setLoading(true);
+      if (!background) setLoading(true);
 
       const { data: subscriptions, error: subsError } = await supabase
         .from("subscriptions")
@@ -293,14 +314,22 @@ export function useFinancialDashboard(personalId: string) {
         .eq("personal_id", personalId);
       if (subsError) throw subsError;
 
-      const { data: payments, error: paymentsError } = await supabase
-        .from("payment_history")
-        .select("*")
-        .eq("personal_id", personalId);
+      const [{ data: payments, error: paymentsError }, accessResult] = await Promise.all([
+        supabase
+          .from("payment_history")
+          .select("*")
+          .eq("personal_id", personalId),
+        (supabase as any).rpc("get_students_access_states", {
+          _personal_id: personalId,
+        }),
+      ]);
       if (paymentsError) throw paymentsError;
+      if (accessResult.error) throw accessResult.error;
 
       const subscriptionRows = (subscriptions || []) as unknown as FinancialSubscriptionRow[];
       const latestSubscriptions = getLatestSubscriptionsByStudent(subscriptionRows);
+      const accessStates = (accessResult.data || []) as FinancialAccessState[];
+      const accessByStudent = new Map(accessStates.map((state) => [state.student_id, state]));
       const revenuePayments = getCanonicalRevenuePayments(
         (payments || []) as unknown as FinancialPaymentRow[],
         subscriptionRows
@@ -310,6 +339,7 @@ export function useFinancialDashboard(personalId: string) {
         new Set([
           ...((subscriptions || []).map((s) => s.student_id)),
           ...revenuePayments.map((payment) => payment.student_id),
+          ...accessStates.map((state) => state.student_id),
         ])
       );
       let profiles: { id: string; nome: string; email: string }[] = [];
@@ -402,33 +432,44 @@ export function useFinancialDashboard(personalId: string) {
         .reduce((sum, s) => sum + (s.valor || 0), 0);
       const previsaoReceita = receitaMesAtual + aReceberNoMes;
 
-      const assinaturasAtivas = latestSubscriptions.filter(
-        (s) => s.status_pagamento === "pago" && !!s.data_expiracao && new Date(s.data_expiracao) > now
+      const billingStates = accessStates.filter((state) => state.payment_required);
+      const paidStates = billingStates.filter((state) => state.has_active_payment);
+      const studentsWithoutActivePayment = billingStates.filter(
+        (state) => !state.has_active_payment && state.status !== "carencia"
       );
 
-      const inadimplentes = latestSubscriptions.filter(
-        (s) =>
-          s.status_pagamento === "atrasado" ||
-          (s.status_pagamento === "pendente" &&
-            !!s.data_expiracao &&
-            new Date(s.data_expiracao) < now)
+      const totalAlunos = billingStates.length;
+      const taxaInadimplencia = totalAlunos > 0
+        ? (studentsWithoutActivePayment.length / totalAlunos) * 100
+        : 0;
+      const latestByStudent = new Map(
+        latestSubscriptions.map((subscription) => [subscription.student_id, subscription])
       );
+      const subscriptionsById = new Map(subscriptionRows.map((subscription) => [subscription.id, subscription]));
 
-      const totalAlunos = latestSubscriptions.length;
-      const taxaInadimplencia = totalAlunos > 0 ? (inadimplentes.length / totalAlunos) * 100 : 0;
-
-      const inadimplentesMapped: StudentPaymentStatus[] = inadimplentes.map((sub) => {
-        const profile = profiles?.find((p) => p.id === sub.student_id);
-        const dataExpiracao = new Date(sub.data_expiracao);
-        const diasAtraso = Math.floor((now.getTime() - dataExpiracao.getTime()) / (1000 * 60 * 60 * 24));
+      const inadimplentesMapped: StudentPaymentStatus[] = studentsWithoutActivePayment.map((state) => {
+        const sub = state.active_subscription_id
+          ? subscriptionsById.get(state.active_subscription_id) ?? latestByStudent.get(state.student_id)
+          : latestByStudent.get(state.student_id);
+        const profile = profiles?.find((p) => p.id === state.student_id);
+        const dataExpiracao = sub?.data_expiracao ? new Date(sub.data_expiracao) : null;
+        const diasAtraso = dataExpiracao && Number.isFinite(dataExpiracao.getTime())
+          ? Math.floor((now.getTime() - dataExpiracao.getTime()) / DAY_IN_MS)
+          : 0;
         return {
-          id: sub.student_id,
+          id: state.student_id,
           nome: profile?.nome || "Desconhecido",
           email: profile?.email || "",
-          valor: sub.valor,
-          status_pagamento: sub.status_pagamento as "pago" | "pendente" | "atrasado",
-          data_expiracao: sub.data_expiracao,
+          valor: sub?.valor ?? 0,
+          status_pagamento: (sub?.status_pagamento === "atrasado" ? "atrasado" : "pendente") as
+            | "pendente"
+            | "atrasado",
+          data_expiracao: sub?.data_expiracao ?? null,
           diasAtraso: diasAtraso > 0 ? diasAtraso : 0,
+          accessAllowed: state.allowed,
+          accessSource: state.source,
+          accessReasonCode: state.reason_code,
+          manualReleaseUntil: state.manual_release_until,
         };
       });
 
@@ -448,7 +489,9 @@ export function useFinancialDashboard(personalId: string) {
           !!p.stripe_invoice_id ||
           !!p.stripe_account_id ||
           !!p.stripe_payment_method_type ||
-          normalizePaymentText(p.metodo_pagamento).includes("stripe");
+          !!sub?.stripe_subscription_id ||
+          !!sub?.stripe_checkout_session_id ||
+          !!sub?.stripe_account_id;
 
         return {
           id: p.id,
@@ -484,6 +527,7 @@ export function useFinancialDashboard(personalId: string) {
       // Add pending subscriptions as upcoming payments
       const pendingSubs = latestSubscriptions.filter(
         (s) =>
+          !accessByStudent.get(s.student_id)?.has_active_payment &&
           s.status_pagamento === "pendente" &&
           !!s.data_expiracao &&
           new Date(s.data_expiracao) >= now &&
@@ -517,8 +561,8 @@ export function useFinancialDashboard(personalId: string) {
         receitaMesAnterior,
         previsaoReceita,
         taxaInadimplencia,
-        totalAlunosAtivos: assinaturasAtivas.length,
-        totalAlunosInadimplentes: inadimplentes.length,
+        totalAlunosAtivos: paidStates.length,
+        totalAlunosInadimplentes: studentsWithoutActivePayment.length,
         comparacaoPercentual,
         receitaMesmoMesAnoAnterior,
         comparacaoAnual,
@@ -536,7 +580,7 @@ export function useFinancialDashboard(personalId: string) {
       console.error("Erro ao buscar dados financeiros:", error);
       return { success: false, error: "Não foi possível carregar os dados financeiros" };
     } finally {
-      setLoading(false);
+      if (!background) setLoading(false);
     }
   }, [personalId]);
 
@@ -548,9 +592,60 @@ export function useFinancialDashboard(personalId: string) {
         toast({ title: "Erro", description: result.error, variant: "destructive" });
       }
     };
-    loadData();
-    return () => { isMounted = false; };
-  }, [fetchFinancialData, toast]);
+    void loadData();
+
+    const refreshInBackground = () => {
+      void fetchFinancialData(true);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshInBackground();
+    };
+    const interval = window.setInterval(refreshInBackground, 60_000);
+    window.addEventListener("focus", refreshInBackground);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    const channel = supabase
+      .channel(`financial-dashboard:${personalId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "subscriptions",
+          filter: `personal_id=eq.${personalId}`,
+        },
+        refreshInBackground
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "payment_history",
+          filter: `personal_id=eq.${personalId}`,
+        },
+        refreshInBackground
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "student_access_state",
+          filter: `personal_id=eq.${personalId}`,
+        },
+        refreshInBackground
+      )
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshInBackground);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      void supabase.removeChannel(channel);
+    };
+  }, [fetchFinancialData, personalId, toast]);
 
   return {
     metrics,
@@ -558,6 +653,6 @@ export function useFinancialDashboard(personalId: string) {
     inadimplentesList,
     paymentDetails,
     loading,
-    refetch: fetchFinancialData,
+    refetch: () => fetchFinancialData(false),
   };
 }

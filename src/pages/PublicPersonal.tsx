@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, ShieldCheck, Sparkles } from "lucide-react";
 import { getNameInitials } from "@/utils/nameInitial";
+import { useToast } from "@/hooks/use-toast";
+import type { StudentAccessState } from "@/hooks/useStudentAccess";
 
 type PublicPlan = {
   id: string;
@@ -31,6 +33,12 @@ type PublicSalesPage = {
   prices: PublicPlan[];
 };
 
+type ViewerContext = {
+  userId: string;
+  role: string | null;
+  personalId: string | null;
+};
+
 const PLAN_LABELS: Record<string, string> = {
   mensal: "Mensal",
   trimestral: "Trimestral",
@@ -47,9 +55,18 @@ function formatCurrency(value: number | string) {
 
 export default function PublicPersonal() {
   const { slug } = useParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { toast } = useToast();
   const [page, setPage] = useState<PublicSalesPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [viewer, setViewer] = useState<ViewerContext | null>(null);
+  const [viewerLoading, setViewerLoading] = useState(true);
+  const [accessState, setAccessState] = useState<StudentAccessState | null>(null);
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const checkoutSucceeded = searchParams.get("checkout") === "success";
+  const selectedPlan = searchParams.get("plan");
 
   useEffect(() => {
     let mounted = true;
@@ -83,13 +100,180 @@ export default function PublicPersonal() {
     };
   }, [slug]);
 
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadViewer() {
+      setViewerLoading(true);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData.session?.user;
+      if (!mounted || !user) {
+        if (mounted) {
+          setViewer(null);
+          setViewerLoading(false);
+        }
+        return;
+      }
+
+      const [roleResult, profileResult] = await Promise.all([
+        supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+        supabase
+          .from("profiles")
+          .select("personal_id")
+          .eq("id", user.id)
+          .maybeSingle(),
+      ]);
+
+      if (!mounted) return;
+      setViewer({
+        userId: user.id,
+        role: roleResult.data?.role ?? null,
+        personalId: profileResult.data?.personal_id ?? null,
+      });
+      setViewerLoading(false);
+    }
+
+    void loadViewer();
+    return () => {
+      mounted = false;
+    };
+  }, [page?.personal.id]);
+
+  useEffect(() => {
+    if (
+      !viewer?.userId ||
+      viewer.role !== "aluno" ||
+      !page?.personal.id ||
+      viewer.personalId !== page.personal.id
+    ) {
+      setAccessState(null);
+      return;
+    }
+
+    let mounted = true;
+    const refresh = async () => {
+      const { data, error: accessError } = await (supabase as any).rpc(
+        "get_student_access_state",
+        { _student_id: viewer.userId }
+      );
+      if (!mounted || accessError || !data) return;
+
+      const nextState = data as StudentAccessState;
+      setAccessState(nextState);
+      if (nextState.allowed !== true && nextState.source === "manual") {
+        navigate("/acesso-suspenso", { replace: true });
+      } else if (nextState.allowed === true && checkoutSucceeded) {
+        navigate("/aluno?section=plano&checkout=success", { replace: true });
+      }
+    };
+
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), 3_000);
+    const channel = supabase
+      .channel(`public-plans-access:${viewer.userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "student_access_state",
+          filter: `student_id=eq.${viewer.userId}`,
+        },
+        () => void refresh()
+      )
+      .subscribe();
+
+    return () => {
+      mounted = false;
+      window.clearInterval(interval);
+      void supabase.removeChannel(channel);
+    };
+  }, [checkoutSucceeded, navigate, page?.personal.id, viewer]);
+
+  const handleCheckout = async (plan: PublicPlan) => {
+    if (!page || !slug || viewerLoading) return;
+
+    if (!viewer) {
+      navigate(`/auth?personal=${page.personal.slug}&plan=${plan.plano}`);
+      return;
+    }
+
+    if (viewer.role !== "aluno") {
+      toast({
+        title: "Use uma conta de aluno",
+        description: "Somente alunos podem contratar um plano nesta pagina.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (viewer.personalId && viewer.personalId !== page.personal.id) {
+      toast({
+        title: "Conta vinculada a outro personal",
+        description: "Entre em contato antes de trocar o personal da sua conta.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setLoadingPlan(plan.plano);
+
+      if (!viewer.personalId) {
+        const { error: linkError } = await (supabase as any).rpc(
+          "link_current_student_to_public_personal",
+          { _slug: slug }
+        );
+        if (linkError) throw linkError;
+        setViewer((current) =>
+          current ? { ...current, personalId: page.personal.id } : current
+        );
+      }
+
+      const returnPath = `${window.location.origin}/planos/${page.personal.slug}`;
+      const { data, error: checkoutError } = await supabase.functions.invoke(
+        "stripe-create-checkout",
+        {
+          body: {
+            plano: plan.plano,
+            success_url: `${returnPath}?checkout=success`,
+            cancel_url: `${returnPath}?checkout=cancel`,
+          },
+        }
+      );
+
+      if (checkoutError) throw checkoutError;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      if (!(data as any)?.url) throw new Error("URL de checkout nao recebida");
+      window.location.assign((data as any).url);
+    } catch (checkoutError: any) {
+      console.error("Erro ao iniciar checkout:", checkoutError);
+      toast({
+        title: "Erro ao iniciar pagamento",
+        description: checkoutError?.message ?? "Tente novamente.",
+        variant: "destructive",
+      });
+      setLoadingPlan(null);
+    }
+  };
+
   const displayName = page?.settings.display_name || page?.personal.nome || "Personal Trainer";
   const themeColor = page?.settings.theme_color || "#2563eb";
   const title = page?.settings.welcome_title || `Treine com ${displayName}`;
   const message =
     page?.settings.welcome_message ||
     "Escolha um plano, crie sua conta e acesse seus treinos assim que o pagamento for confirmado.";
-  const plans = useMemo(() => page?.prices ?? [], [page?.prices]);
+  const plans = useMemo(() => {
+    const prices = [...(page?.prices ?? [])];
+    if (!selectedPlan) return prices;
+    return prices.sort((a, b) =>
+      a.plano === selectedPlan ? -1 : b.plano === selectedPlan ? 1 : 0
+    );
+  }, [page?.prices, selectedPlan]);
 
   if (loading) {
     return (
@@ -169,6 +353,13 @@ export default function PublicPersonal() {
                 </div>
               )}
 
+              {checkoutSucceeded && accessState?.allowed !== true && (
+                <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  Pagamento recebido. Aguardando a confirmacao para liberar seu acesso...
+                </div>
+              )}
+
               {plans.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   Nenhum plano publico ativo no momento.
@@ -188,13 +379,19 @@ export default function PublicPersonal() {
                     </div>
                     {page.stripe_ready ? (
                       <Button
-                        asChild
                         className="mt-4 w-full"
                         style={{ backgroundColor: themeColor }}
+                        onClick={() => void handleCheckout(plan)}
+                        disabled={loadingPlan !== null || viewerLoading}
                       >
-                        <Link to={`/auth?personal=${page.personal.slug}&plan=${plan.plano}`}>
-                          Comecar agora
-                        </Link>
+                        {(loadingPlan === plan.plano || viewerLoading) && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        {plan.plano === selectedPlan
+                          ? "Assinar plano selecionado"
+                          : viewer?.role === "aluno"
+                            ? "Assinar plano"
+                            : "Comecar agora"}
                       </Button>
                     ) : (
                       <Button className="mt-4 w-full" disabled>
@@ -206,7 +403,13 @@ export default function PublicPersonal() {
               )}
 
               <p className="pt-2 text-center text-xs text-muted-foreground">
-                Ja tem conta? <Link to="/auth" className="underline">Entrar</Link>
+                {viewer ? (
+                  <Link to={viewer.role === "aluno" ? "/aluno" : "/"} className="underline">
+                    Voltar para minha conta
+                  </Link>
+                ) : (
+                  <>Ja tem conta? <Link to="/auth" className="underline">Entrar</Link></>
+                )}
               </p>
             </CardContent>
           </Card>

@@ -114,42 +114,6 @@ export const useAuth = () => {
     return () => subscription.unsubscribe();
   }, [initializeUserData]);
 
-  // Listener for the unified student access state.
-  useEffect(() => {
-    if (user && role === "aluno") {
-      const channel = supabase
-        .channel(`student-access-state:${user.id}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "student_access_state",
-            filter: `student_id=eq.${user.id}`,
-          },
-          (payload: any) => {
-            if (payload.new?.allowed === false) {
-              console.log("Aluno foi bloqueado pela fonte unica de acesso, redirecionando...");
-              if (window.location.pathname !== "/acesso-suspenso") {
-                window.location.href = "/acesso-suspenso";
-              }
-            } else if (
-              payload.new?.allowed === true &&
-              window.location.pathname === "/acesso-suspenso"
-            ) {
-              console.log("Aluno foi liberado pela fonte unica de acesso, redirecionando...");
-              window.location.replace("/aluno");
-            }
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
-  }, [user, role]);
-
   // Re-initialize on visibility change (returning from background on mobile)
   useEffect(() => {
     const handleVisibilityChange = () => {

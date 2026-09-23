@@ -6,10 +6,15 @@ import {
   CheckCircle2,
   CreditCard,
   ShieldAlert,
+  Unlock,
   WalletCards,
   XCircle,
 } from "lucide-react";
-import { AccessStatus, useStudentAccess } from "@/hooks/useStudentAccess";
+import {
+  AccessStatus,
+  StudentAccessState,
+  useStudentAccess,
+} from "@/hooks/useStudentAccess";
 import { useSubscriptions, Subscription } from "@/hooks/useSubscriptions";
 import { ManageAccessDialog } from "./ManageAccessDialog";
 import { AccessHistoryList } from "./AccessHistoryList";
@@ -30,6 +35,11 @@ const ACCESS_META: Record<
     label: "Liberado",
     icon: CheckCircle2,
     classes: "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-300",
+  },
+  carencia: {
+    label: "Carencia de 24h",
+    icon: CalendarDays,
+    classes: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
   },
   pausado: {
     label: "Suspenso",
@@ -73,13 +83,48 @@ function getLatestSubscription(subscriptions: Subscription[]) {
   return [...subscriptions].sort((a, b) => getReferenceTime(b) - getReferenceTime(a))[0];
 }
 
-function getFinanceSummary(subscriptions: Subscription[]) {
+function getFinanceSummary(
+  subscriptions: Subscription[],
+  accessState: StudentAccessState | null
+) {
   const now = new Date();
+  const canonical = accessState?.active_subscription_id
+    ? subscriptions.find((sub) => sub.id === accessState.active_subscription_id)
+    : null;
   const active = [...subscriptions]
-    .filter((sub) => sub.status_pagamento === "pago" && new Date(sub.data_expiracao) > now)
+    .filter(
+      (sub) =>
+        ["pago", "cancelado", "canceled"].includes(sub.status_pagamento) &&
+        new Date(sub.data_expiracao).getTime() + 24 * 60 * 60 * 1000 > now.getTime()
+    )
     .sort((a, b) => new Date(b.data_expiracao).getTime() - new Date(a.data_expiracao).getTime())[0];
 
-  const latest = active ?? getLatestSubscription(subscriptions);
+  const latest = canonical ?? active ?? getLatestSubscription(subscriptions);
+
+  if (accessState && !accessState.payment_required) {
+    return {
+      status: "Acesso sem cobranca",
+      tone: "ok" as const,
+      dueText: "Pagamento nao exigido",
+      planText: latest ? `Plano ${PLAN_LABELS[latest.plano] ?? latest.plano}` : "Sem plano",
+      valueText: latest ? formatCurrency(latest.valor) : "Valor nao informado",
+    };
+  }
+
+  if (
+    accessState &&
+    !accessState.has_active_payment &&
+    accessState.allowed &&
+    accessState.source === "manual"
+  ) {
+    return {
+      status: "Liberacao manual",
+      tone: "pending" as const,
+      dueText: "Sem pagamento ativo",
+      planText: latest ? `Plano ${PLAN_LABELS[latest.plano] ?? latest.plano}` : "Sem plano pago",
+      valueText: latest ? formatCurrency(latest.valor) : "Valor nao informado",
+    };
+  }
 
   if (!latest) {
     return {
@@ -93,11 +138,27 @@ function getFinanceSummary(subscriptions: Subscription[]) {
 
   const expired = new Date(latest.data_expiracao) < now;
   const isPending = latest.status_pagamento === "pendente" || latest.status_pagamento === "atrasado";
-  const status = active ? "Em dia" : expired ? "Vencido" : isPending ? "Pagamento pendente" : "Pagamento pendente";
+  const hasActivePayment = accessState?.has_active_payment ?? !!active;
+  const inGrace = accessState?.reason_code === "payment_grace";
+  const status = hasActivePayment
+    ? inGrace
+      ? "Carencia de 24h"
+      : "Em dia"
+    : expired
+      ? "Vencido"
+      : isPending
+        ? "Pagamento pendente"
+        : "Pagamento pendente";
 
   return {
     status,
-    tone: active ? ("ok" as const) : expired ? ("danger" as const) : ("pending" as const),
+    tone: hasActivePayment
+      ? inGrace
+        ? ("pending" as const)
+        : ("ok" as const)
+      : expired
+        ? ("danger" as const)
+        : ("pending" as const),
     dueText: `${expired ? "Venceu em" : "Vence em"} ${formatDisplayDateOnly(latest.data_expiracao)}`,
     planText: `Plano ${PLAN_LABELS[latest.plano] ?? latest.plano}`,
     valueText: formatCurrency(latest.valor),
@@ -124,7 +185,7 @@ function getBannerClasses(tone: "ok" | "pending" | "danger") {
 }
 
 export function AccessControlPanel({ studentId, personalId, studentName }: Props) {
-  const { status, logs, loading, mutate, isMutating, refresh, error: accessError } =
+  const { state, status, logs, loading, mutate, isMutating, refresh, error: accessError } =
     useStudentAccess(studentId);
   const { subscriptions, loading: subscriptionsLoading } = useSubscriptions(studentId, personalId);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -132,9 +193,13 @@ export function AccessControlPanel({ studentId, personalId, studentName }: Props
 
   const accessMeta = ACCESS_META[status] ?? ACCESS_META.suspenso;
   const AccessIcon = accessMeta.icon;
-  const finance = useMemo(() => getFinanceSummary(subscriptions), [subscriptions]);
+  const finance = useMemo(
+    () => getFinanceSummary(subscriptions, state),
+    [state, subscriptions]
+  );
   const bannerClasses = getBannerClasses(finance.tone);
   const FinanceIcon = finance.tone === "ok" ? CheckCircle2 : finance.tone === "danger" ? XCircle : WalletCards;
+  const canSuspend = status === "ativo" || status === "carencia";
 
   return (
     <section className="space-y-5">
@@ -196,12 +261,16 @@ export function AccessControlPanel({ studentId, personalId, studentName }: Props
         <Button
           size="lg"
           variant="outline"
-          className="gap-2 border-red-500/35 text-red-700 hover:bg-red-500/10 hover:text-red-700 dark:text-red-300"
+          className={
+            canSuspend
+              ? "gap-2 border-red-500/35 text-red-700 hover:bg-red-500/10 hover:text-red-700 dark:text-red-300"
+              : "gap-2 border-green-500/35 text-green-700 hover:bg-green-500/10 hover:text-green-700 dark:text-green-300"
+          }
           onClick={() => setDialogOpen(true)}
           disabled={loading || isMutating}
         >
-          <ShieldAlert className="h-4 w-4" />
-          Suspender acesso
+          {canSuspend ? <ShieldAlert className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+          {canSuspend ? "Suspender acesso" : "Liberar sem pagamento por 7 dias"}
         </Button>
       </div>
 
@@ -229,7 +298,9 @@ export function AccessControlPanel({ studentId, personalId, studentName }: Props
         studentName={studentName}
         status={status}
         isMutating={isMutating}
-        onConfirm={(p) => mutate(p)}
+        onConfirm={async (p) => {
+          await mutate(p);
+        }}
       />
     </section>
   );

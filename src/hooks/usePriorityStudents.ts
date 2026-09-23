@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { differenceInCalendarDays, parseISO, startOfDay } from "date-fns";
+import type { StudentAccessState } from "@/hooks/useStudentAccess";
 
 export type PriorityReason =
   | "plano_vencendo"
@@ -44,8 +45,7 @@ export function usePriorityStudents(personalId?: string) {
     const { data: alunos } = await supabase
       .from("profiles")
       .select("id, nome")
-      .eq("personal_id", personalId)
-      .eq("is_active", true);
+      .eq("personal_id", personalId);
 
     const map: Record<string, { nome: string; flags: PriorityFlag[] }> = {};
     (alunos || []).forEach((a) => {
@@ -53,11 +53,16 @@ export function usePriorityStudents(personalId?: string) {
     });
 
     // 2. Subscriptions — pegar APENAS a mais recente por aluno (ordem desc por data_expiracao)
-    const { data: subs } = await supabase
-      .from("subscriptions")
-      .select("student_id, data_expiracao, status_pagamento")
-      .eq("personal_id", personalId)
-      .order("data_expiracao", { ascending: false });
+    const [{ data: subs }, accessResult] = await Promise.all([
+      supabase
+        .from("subscriptions")
+        .select("id, student_id, data_expiracao, status_pagamento")
+        .eq("personal_id", personalId)
+        .order("data_expiracao", { ascending: false }),
+      (supabase as any).rpc("get_students_access_states", {
+        _personal_id: personalId,
+      }),
+    ]);
 
     const subPorAluno = new Map<string, any>();
     (subs || []).forEach((s: any) => {
@@ -100,6 +105,85 @@ export function usePriorityStudents(personalId?: string) {
     });
 
     // 2.b Planilhas de treino — vencendo / vencidas (status ativa)
+    // Replace the legacy financial flags above with the canonical access
+    // decision. This prevents an older overdue row from contradicting a newer
+    // paid subscription or a clearly identified manual exception.
+    if (!accessResult.error) {
+      Object.values(map).forEach((student) => {
+        student.flags = student.flags.filter(
+          (flag) =>
+            !["plano_vencendo", "plano_vencido", "pagamento_pendente"].includes(
+              flag.reason
+            )
+        );
+      });
+
+      const subscriptionsById = new Map((subs || []).map((sub: any) => [sub.id, sub]));
+      ((accessResult.data || []) as StudentAccessState[]).forEach((state) => {
+      if (!map[state.student_id] || !state.payment_required) return;
+
+      const activeSubscription = state.active_subscription_id
+        ? subscriptionsById.get(state.active_subscription_id)
+        : null;
+
+      if (state.has_active_payment && activeSubscription?.data_expiracao) {
+        const expiration = startOfDay(parseISO(activeSubscription.data_expiracao));
+        const days = differenceInCalendarDays(expiration, today);
+        if (days <= 7) {
+          map[state.student_id].flags.push({
+            reason: "plano_vencendo",
+            label:
+              state.in_grace || state.reason_code === "payment_grace"
+                ? "Carencia de pagamento"
+                : "Plano vence em breve",
+            detail: days < 0 ? "carencia de 24h" : days === 0 ? "hoje" : `${days}d`,
+            severity: days <= 3 ? "alta" : "media",
+          });
+        }
+        return;
+      }
+
+      if (state.status === "carencia") return;
+
+      if (state.allowed && state.source === "manual") {
+        map[state.student_id].flags.push({
+          reason: "pagamento_pendente",
+          label: "Sem pagamento - acesso manual",
+          detail: state.manual_release_until ? "liberacao temporaria" : "liberacao sem prazo",
+          severity: "media",
+        });
+        return;
+      }
+
+      const latestSubscription = subPorAluno.get(state.student_id);
+      const expiration = latestSubscription?.data_expiracao
+        ? startOfDay(parseISO(latestSubscription.data_expiracao))
+        : null;
+      const days = expiration
+        ? differenceInCalendarDays(expiration, today)
+        : null;
+
+      if (state.reason_code === "payment_expired") {
+        map[state.student_id].flags.push({
+          reason: "plano_vencido",
+          label: "Plano vencido",
+          detail: days !== null && days < 0 ? `ha ${Math.abs(days)}d` : undefined,
+          severity: "alta",
+        });
+        return;
+      }
+
+      map[state.student_id].flags.push({
+        reason: "pagamento_pendente",
+        label:
+          state.reason_code?.startsWith("refund") || state.reason_code === "chargeback"
+            ? "Pagamento estornado"
+            : "Pagamento pendente",
+        severity: "alta",
+      });
+      });
+    }
+
     const { data: planilhas } = await supabase
       .from("planilhas_treino")
       .select("profile_id, data_prevista_fim, status")

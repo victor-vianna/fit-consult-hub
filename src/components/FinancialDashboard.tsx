@@ -539,13 +539,13 @@ export function FinancialDashboard() {
         {/* Inadimplência */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Inadimplência</CardTitle>
+            <CardTitle className="text-sm font-medium">Sem pagamento ativo</CardTitle>
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metrics.taxaInadimplencia.toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {metrics.totalAlunosInadimplentes} inadimplente(s)
+              {metrics.totalAlunosInadimplentes} sem pagamento ativo
             </p>
           </CardContent>
         </Card>
@@ -949,7 +949,7 @@ export function FinancialDashboard() {
           <CardHeader className="p-4 md:p-6">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-yellow-500" />
-              <CardTitle className="text-lg md:text-xl">Alunos Inadimplentes</CardTitle>
+              <CardTitle className="text-lg md:text-xl">Alunos sem pagamento ativo</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="p-4 md:p-6 pt-0">
@@ -962,14 +962,23 @@ export function FinancialDashboard() {
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2 mb-1">
                       <h4 className="font-semibold text-base md:text-sm">{student.nome}</h4>
-                      <Badge variant="destructive" className="text-xs">
-                        {student.diasAtraso} dias de atraso
+                      <Badge
+                        variant={student.accessAllowed ? "outline" : "destructive"}
+                        className="text-xs"
+                      >
+                        {student.accessAllowed && student.accessSource === "manual"
+                          ? "Acesso manual - sem pagamento"
+                          : student.diasAtraso > 0
+                            ? `${student.diasAtraso} dias de atraso`
+                            : "Pagamento necessario"}
                       </Badge>
                     </div>
                     <p className="text-sm md:text-xs text-muted-foreground truncate">{student.email}</p>
                     <p className="text-sm md:text-xs text-muted-foreground">
                       Valor: {formatCurrency(student.valor)} • Vencimento:{" "}
-                      {formatDisplayDate(student.data_expiracao)}
+                      {student.data_expiracao
+                        ? formatDisplayDate(student.data_expiracao)
+                        : "Nenhum pagamento registrado"}
                     </p>
                   </div>
                   <Button variant="outline" size="sm" className="h-10 md:h-9 w-full sm:w-auto">
@@ -994,7 +1003,7 @@ export function FinancialDashboard() {
                 <Users className="h-5 w-5 text-green-600 dark:text-green-400" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Alunos Ativos</p>
+                <p className="text-sm text-muted-foreground">Com pagamento ativo</p>
                 <p className="text-2xl font-bold">{metrics.totalAlunosAtivos}</p>
               </div>
             </div>
@@ -1003,7 +1012,7 @@ export function FinancialDashboard() {
                 <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Inadimplentes</p>
+                <p className="text-sm text-muted-foreground">Sem pagamento ativo</p>
                 <p className="text-2xl font-bold">{metrics.totalAlunosInadimplentes}</p>
               </div>
             </div>

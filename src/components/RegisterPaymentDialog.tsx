@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { CreditCard, FileText, Loader2 } from "lucide-react";
+import { FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -23,11 +22,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   ManualPaymentMethod,
-  PaymentOrigin,
   useSubscriptions,
 } from "@/hooks/useSubscriptions";
 import { Plano, usePersonalPlanPrices } from "@/hooks/usePersonalPlanPrices";
-import { cn } from "@/lib/utils";
 import {
   formatDateForInput,
   formatDisplayDateOnly,
@@ -91,7 +88,6 @@ export function RegisterPaymentForm({
   const [plano, setPlano] = useState<Plano>("mensal");
   const [valor, setValor] = useState("");
   const [dataPagamento, setDataPagamento] = useState(formatDateForInput(new Date()));
-  const [origemPagamento, setOrigemPagamento] = useState<PaymentOrigin>("manual");
   const [metodoManual, setMetodoManual] = useState<ManualPaymentMethod>("pix");
   const [observacoes, setObservacoes] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -127,8 +123,7 @@ export function RegisterPaymentForm({
         plano,
         valor: numericValue,
         data_pagamento: dataPagamento,
-        origem_pagamento: origemPagamento,
-        metodo_pagamento: origemPagamento === "manual" ? metodoManual : "stripe",
+        metodo_pagamento: metodoManual,
         observacoes: observacoes || undefined,
       });
       onSuccess?.();
@@ -142,7 +137,7 @@ export function RegisterPaymentForm({
     !studentId ||
     !valor ||
     !expirationDate ||
-    (origemPagamento === "manual" && !metodoManual);
+    !metodoManual;
 
   return (
     <div className="space-y-5 pb-1">
@@ -195,56 +190,18 @@ export function RegisterPaymentForm({
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label>Origem do pagamento</Label>
-        <RadioGroup
-          value={origemPagamento}
-          onValueChange={(value) => setOrigemPagamento(value as PaymentOrigin)}
-          className="grid gap-3 md:grid-cols-2"
-        >
-          <Label
-            htmlFor="payment-origin-stripe"
-            className={cn(
-              "flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors",
-              origemPagamento === "stripe"
-                ? "border-primary bg-primary/10"
-                : "hover:bg-muted/60",
-            )}
-          >
-            <RadioGroupItem id="payment-origin-stripe" value="stripe" className="mt-1" />
-            <CreditCard className="mt-0.5 h-5 w-5 text-primary" />
-            <span className="min-w-0">
-              <span className="block font-semibold">Pago pela plataforma (Stripe)</span>
-              <span className="block text-xs font-normal text-muted-foreground">
-                PIX, cartao ou boleto processado pela Stripe.
-              </span>
-            </span>
-          </Label>
-
-          <Label
-            htmlFor="payment-origin-manual"
-            className={cn(
-              "flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors",
-              origemPagamento === "manual"
-                ? "border-primary bg-primary/10"
-                : "hover:bg-muted/60",
-            )}
-          >
-            <RadioGroupItem id="payment-origin-manual" value="manual" className="mt-1" />
-            <FileText className="mt-0.5 h-5 w-5 text-primary" />
-            <span className="min-w-0">
-              <span className="block font-semibold">Registrado manualmente</span>
-              <span className="block text-xs font-normal text-muted-foreground">
-                PIX direto, dinheiro, transferencia ou outro meio externo.
-              </span>
-            </span>
-          </Label>
-        </RadioGroup>
-      </div>
-
-      {origemPagamento === "manual" && (
+      <div className="space-y-3 rounded-md border bg-muted/20 p-4">
+        <div className="flex items-start gap-3">
+          <FileText className="mt-0.5 h-5 w-5 text-primary" />
+          <div>
+            <p className="font-semibold">Pagamento registrado manualmente</p>
+            <p className="text-xs text-muted-foreground">
+              Pagamentos feitos na plataforma sao confirmados somente pelos eventos da Stripe.
+            </p>
+          </div>
+        </div>
         <div className="space-y-2">
-          <Label>Metodo de pagamento manual</Label>
+          <Label>Metodo de pagamento</Label>
           <Select
             value={metodoManual}
             onValueChange={(value) => setMetodoManual(value as ManualPaymentMethod)}
@@ -261,7 +218,7 @@ export function RegisterPaymentForm({
             </SelectContent>
           </Select>
         </div>
-      )}
+      </div>
 
       <div className="space-y-2">
         <Label htmlFor="register-payment-notes">Observacao opcional</Label>

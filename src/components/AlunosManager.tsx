@@ -536,12 +536,6 @@ export default function AlunosManager() {
     });
     const now = new Date().toISOString();
 
-    queryClient.setQueryData<Aluno[]>(alunosKey, (current = []) =>
-      current.map((item) =>
-        item.id === aluno.id ? { ...item, is_active: shouldAllow } : item
-      )
-    );
-
     queryClient.setQueriesData<StudentAccessState[]>(
       { queryKey: ["students-access-states", user.id] },
       (current) =>
@@ -557,7 +551,9 @@ export default function AlunosManager() {
                   ? "Aluno liberado manualmente pelo personal."
                   : "Aluno bloqueado manualmente pelo personal.",
                 source: "manual",
-                manual_release_until: null,
+                manual_release_until: shouldAllow
+                  ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+                  : null,
                 calculated_at: now,
                 updated_at: now,
               }
@@ -573,7 +569,7 @@ export default function AlunosManager() {
         ? null
         : "Seu acesso foi temporariamente suspenso. Entre em contato com seu personal trainer.",
       _observation: shouldAllow
-        ? "Acesso liberado pelo menu do card do aluno."
+        ? "Acesso liberado por 7 dias pelo menu do card do aluno."
         : "Bloqueio executado pelo menu do card do aluno.",
     });
 
@@ -591,20 +587,11 @@ export default function AlunosManager() {
     }
 
     refreshStudentsAndAccess();
-    toast({ title: shouldAllow ? "Aluno desbloqueado" : "Aluno bloqueado" });
+    toast({ title: shouldAllow ? "Aluno liberado por 7 dias" : "Aluno bloqueado" });
   };
 
   const handleToggleAlunoArchive = async (aluno: Aluno, shouldArchive: boolean) => {
     if (!user?.id) return;
-
-    if (shouldArchive && resolveAccessAllowed(aluno) !== false) {
-      toast({
-        title: "Bloqueie antes de arquivar",
-        description: "O arquivamento organiza a lista, mas o bloqueio controla o acesso do aluno.",
-        variant: "destructive",
-      });
-      return;
-    }
 
     const alunosKey = ["alunos", user.id];
     const previousAlunos = queryClient.getQueryData<Aluno[]>(alunosKey);
@@ -637,7 +624,7 @@ export default function AlunosManager() {
     toast({
       title: shouldArchive ? "Aluno arquivado" : "Aluno restaurado",
       description: shouldArchive
-        ? "Ele saiu da lista principal e continua disponivel em Arquivados."
+        ? "Ele saiu da lista principal. O arquivamento nao altera o acesso nem o status financeiro."
         : "Ele voltou para a lista principal.",
     });
   };
@@ -1192,7 +1179,6 @@ export default function AlunosManager() {
     (aluno: Aluno): boolean | null => {
       const officialState = accessByStudent[aluno.id];
       if (officialState) return officialState.allowed;
-      if (aluno.is_active === false) return false;
       return null;
     },
     [accessByStudent]
@@ -1833,19 +1819,37 @@ export default function AlunosManager() {
                   };
               const StatusIcon = statusBadge.icon;
               */
-              const financeiroSummary =
-                accessState &&
-                accessState.allowed === false &&
-                (accessState.source === "payment" ||
-                  accessState.reason_code === "payment_required" ||
-                  accessState.reason_code === "payment_pending" ||
-                  accessState.reason_code === "payment_expired")
+              const financeiroSummary: StudentCardSummary["financeiro"] = !accessState
+                ? summary.financeiro
+                : !accessState.payment_required
                   ? {
-                      tone: "alert" as IndicatorTone,
-                      label: "Atrasado",
-                      detail: "acesso bloqueado",
+                      tone: "neutral",
+                      label: "Acesso sem cobranca",
+                      detail: "regra do personal",
                     }
-                  : summary.financeiro;
+                  : accessState.has_active_payment
+                    ? accessState.in_grace || accessState.reason_code === "payment_grace"
+                      ? {
+                          tone: "warn",
+                          label: "Carencia de 24h",
+                          detail: "pagamento vencendo",
+                        }
+                      : {
+                          tone: "ok",
+                          label: "Pagamento em dia",
+                          detail: "acesso por pagamento",
+                        }
+                    : accessState.allowed && accessState.source === "manual"
+                      ? {
+                          tone: "warn",
+                          label: "Liberacao manual",
+                          detail: "sem pagamento ativo",
+                        }
+                      : {
+                          tone: "alert",
+                          label: "Pagamento pendente",
+                          detail: "aluno direcionado aos planos",
+                        };
               const indicatorToneStyles: Record<IndicatorTone, string> = {
                 alert:
                   "border-red-500/35 bg-red-500/10 text-red-600 dark:text-red-300",
@@ -2116,7 +2120,11 @@ export default function AlunosManager() {
                                 ) : (
                                   <Unlock className="mr-2 h-4 w-4" />
                                 )}
-                                {isAccessAllowed ? "Bloquear" : "Desbloquear"}
+                                {isAccessAllowed
+                                  ? "Bloquear manualmente"
+                                  : accessState?.source === "manual"
+                                    ? "Liberar por 7 dias"
+                                    : "Liberar sem pagamento (7 dias)"}
                               </DropdownMenuItem>
                               <DropdownMenuItem onSelect={() => setAlunoCorDialog(aluno)}>
                                 <Palette className="mr-2 h-4 w-4" />

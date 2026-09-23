@@ -15,7 +15,6 @@ import { AppSidebarAluno } from "@/components/AppSidebarAluno";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { usePersonalSettings } from "@/hooks/usePersonalSettings";
-import { usePlanilhaAtiva } from "@/hooks/usePlanilhaAtiva";
 import {
   Dumbbell,
   LogOut,
@@ -29,7 +28,6 @@ import {
   Library,
   MessageSquare,
   Activity,
-  Lock,
 } from "lucide-react";
 import { AvaliacaoAlunoSection } from "@/components/avaliacao/AvaliacaoAlunoSection";
 import { AnamneseVisualizacao } from "@/components/AnamneseVisualizacao";
@@ -118,15 +116,6 @@ export default function AreaAluno() {
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const chatNaoLidas = useChatNaoLidas(user?.id || "");
-
-  // Verificar status da planilha para bloqueio
-  const { status: planilhaStatus, diasAposExpiracao } = usePlanilhaAtiva({
-    profileId: user?.id,
-    personalId: profile?.personal_id,
-  });
-
-  const isBloqueado = planilhaStatus === "bloqueada" as string;
-  const secoesBloqueadas = ["treinos", "historico"];
 
   // Buscar configurações do personal
   const { settings: personalSettings } = usePersonalSettings(
@@ -543,38 +532,6 @@ export default function AreaAluno() {
     );
   };
 
-  const renderBloqueio = () => (
-    <div className="space-y-6 animate-fade-in">
-      <Card className="border-destructive/50 bg-destructive/5">
-        <CardContent className="pt-6">
-          <div className="flex flex-col items-center text-center gap-4 py-8">
-            <div className="p-4 rounded-full bg-destructive/10">
-              <Lock className="h-10 w-10 text-destructive" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-destructive mb-2">
-                Acesso aos treinos bloqueado
-              </h2>
-              <p className="text-muted-foreground max-w-md">
-                Seu acesso aos treinos está temporariamente suspenso.
-                Entre em contato com seu personal trainer para regularizar
-                e voltar a treinar!
-              </p>
-            </div>
-            <Button 
-              variant="outline"
-              onClick={() => handleSectionChange("chat")}
-              className="mt-2"
-            >
-              <MessageSquare className="mr-2 h-4 w-4" />
-              Falar com meu Personal
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-
   const renderDadosAcompanhamento = () => {
     if (!profile?.personal_id || !user?.id) return null;
 
@@ -644,11 +601,6 @@ export default function AreaAluno() {
   };
 
   const renderContent = () => {
-    // Bloqueio de seções de treino se planilha expirada > 7 dias
-    if (isBloqueado && secoesBloqueadas.includes(activeSection)) {
-      return renderBloqueio();
-    }
-
     // Mobile: só renderiza home especial na seção 'inicio'
     if (isMobile && activeSection === "inicio") {
       return renderMobileHome();

@@ -17,6 +17,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -62,6 +70,11 @@ const STATUS_META = {
     icon: CheckCircle2,
     className: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
   },
+  carencia: {
+    label: "Carencia de 24h",
+    icon: Clock3,
+    className: "border-amber-500/45 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  },
   pagamento_pendente: {
     label: "Bloqueado por pagamento",
     icon: CreditCard,
@@ -84,7 +97,15 @@ const STATUS_META = {
   },
 } as const;
 
-type ReleaseOption = "24h" | "3d" | "7d" | "custom";
+type ReleaseOption = "24h" | "3d" | "7d" | "custom" | "indefinite";
+type ReleaseReason = "partnership" | "payment_arrangement" | "courtesy" | "other";
+
+const RELEASE_REASON_LABELS: Record<ReleaseReason, string> = {
+  partnership: "Parceria / cortesia permanente",
+  payment_arrangement: "Acordo de pagamento",
+  courtesy: "Cortesia temporaria",
+  other: "Outro motivo",
+};
 
 function addDuration(option: Exclude<ReleaseOption, "custom">) {
   const now = new Date();
@@ -115,8 +136,9 @@ export function QuickStudentAccessActions({
   const [releaseDialogOpen, setReleaseDialogOpen] = useState(false);
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [releaseOption, setReleaseOption] = useState<ReleaseOption>("24h");
-  const [customUntil, setCustomUntil] = useState(() => toDatetimeLocal(addDuration("24h")));
+  const [releaseOption, setReleaseOption] = useState<ReleaseOption>("7d");
+  const [releaseReason, setReleaseReason] = useState<ReleaseReason>("payment_arrangement");
+  const [customUntil, setCustomUntil] = useState(() => toDatetimeLocal(addDuration("7d")));
 
   const state = accessState;
   const status = state?.status ?? "sincronizando";
@@ -127,6 +149,10 @@ export function QuickStudentAccessActions({
     !!temporaryUntil &&
     state?.allowed === true &&
     new Date(temporaryUntil).getTime() > Date.now();
+  const hasIndefiniteRelease =
+    state?.allowed === true &&
+    state.source === "manual" &&
+    !state.manual_release_until;
   const hasFinancialPending =
     !!state?.payment_required && !state?.has_active_payment;
 
@@ -135,15 +161,15 @@ export function QuickStudentAccessActions({
       return {
         title: "Liberar manualmente?",
         description:
-          "Esta acao libera o aluno sem dar baixa financeira. A pendencia continua visivel no card e no historico.",
-        observation: "Liberacao manual emergencial sem baixa financeira.",
+          "Esta acao libera o aluno por 7 dias sem dar baixa financeira. A pendencia continua visivel no card e no historico.",
+        observation: "Liberacao manual de 7 dias sem baixa financeira.",
       };
     }
 
     return {
       title: "Liberar acesso?",
-      description: "Esta acao remove uma pausa ou suspensao manual e libera o acesso do aluno.",
-      observation: "Acesso liberado manualmente pela lista de alunos.",
+      description: "Esta acao remove a pausa ou suspensao e libera o acesso por 7 dias.",
+      observation: "Acesso liberado manualmente por 7 dias pela lista de alunos.",
     };
   }, [hasFinancialPending]);
 
@@ -192,12 +218,13 @@ export function QuickStudentAccessActions({
   });
 
   const handleTemporaryRelease = async () => {
-    const until =
-      releaseOption === "custom"
+    const until = releaseOption === "indefinite"
+      ? null
+      : releaseOption === "custom"
         ? new Date(customUntil)
         : addDuration(releaseOption);
 
-    if (!Number.isFinite(until.getTime()) || until.getTime() <= Date.now()) {
+    if (until && (!Number.isFinite(until.getTime()) || until.getTime() <= Date.now())) {
       toast({
         title: "Prazo invalido",
         description: "Escolha uma data futura para a liberacao temporaria.",
@@ -208,9 +235,13 @@ export function QuickStudentAccessActions({
 
     await accessMutation.mutateAsync({
       eventType: "manual_release",
-      reasonCode: "manual_temporary_release",
-      observation: `Liberacao temporaria ate ${formatDisplayDateTime(until)}. Pendencia financeira mantida quando existir.`,
-      manualReleaseUntil: until.toISOString(),
+      reasonCode: releaseOption === "indefinite"
+        ? `manual_indefinite_${releaseReason}`
+        : `manual_temporary_${releaseReason}`,
+      observation: releaseOption === "indefinite"
+        ? `Liberacao sem prazo. Motivo: ${RELEASE_REASON_LABELS[releaseReason]}. Pendencia financeira mantida quando existir.`
+        : `Liberacao ate ${formatDisplayDateTime(until!)}. Motivo: ${RELEASE_REASON_LABELS[releaseReason]}. Pendencia financeira mantida quando existir.`,
+      manualReleaseUntil: until?.toISOString() ?? null,
     });
     setTempDialogOpen(false);
     toast({ title: "Acesso liberado temporariamente" });
@@ -221,9 +252,10 @@ export function QuickStudentAccessActions({
       eventType: "manual_release",
       reasonCode: "manual_release",
       observation: releaseCopy.observation,
+      manualReleaseUntil: addDuration("7d").toISOString(),
     });
     setReleaseDialogOpen(false);
-    toast({ title: "Acesso liberado" });
+    toast({ title: "Acesso liberado por 7 dias" });
   };
 
   const handleBlock = async () => {
@@ -278,11 +310,13 @@ export function QuickStudentAccessActions({
         </DropdownMenu>
       </div>
 
-      {hasTemporaryRelease && (
+      {(hasTemporaryRelease || hasIndefiniteRelease) && (
         <div className="flex items-start gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-700 dark:text-amber-300">
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
-            Liberado ate {formatUntil(temporaryUntil)}. Baixa financeira ainda pendente.
+            {hasIndefiniteRelease
+              ? "Liberado manualmente sem prazo. Baixa financeira nao registrada."
+              : `Liberado ate ${formatUntil(temporaryUntil)}. Baixa financeira ainda pendente.`}
           </span>
         </div>
       )}
@@ -315,6 +349,16 @@ export function QuickStudentAccessActions({
 
           <Button
             type="button"
+            variant={releaseOption === "indefinite" ? "default" : "outline"}
+            className="justify-start gap-2"
+            onClick={() => setReleaseOption("indefinite")}
+          >
+            <Unlock className="h-4 w-4" />
+            Sem prazo definido
+          </Button>
+
+          <Button
+            type="button"
             variant={releaseOption === "custom" ? "default" : "outline"}
             className="justify-start gap-2"
             onClick={() => setReleaseOption("custom")}
@@ -331,6 +375,25 @@ export function QuickStudentAccessActions({
               onChange={(event) => setCustomUntil(event.target.value)}
             />
           )}
+
+          <div className="space-y-2">
+            <Label>Motivo da liberacao</Label>
+            <Select
+              value={releaseReason}
+              onValueChange={(value) => setReleaseReason(value as ReleaseReason)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(RELEASE_REASON_LABELS).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button variant="outline" onClick={() => setTempDialogOpen(false)} disabled={accessMutation.isPending}>

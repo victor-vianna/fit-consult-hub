@@ -81,7 +81,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import {
-  dateInputToIsoString,
   formatDateForInput,
   formatDisplayDateOnly,
   parseDateInputValue,
@@ -159,7 +158,7 @@ export function SubscriptionManager({
   const {
     subscriptions,
     loading,
-    updateSubscription,
+    correctManualPayment,
     deleteSubscription,
     getActiveSubscription,
     refetch,
@@ -186,7 +185,6 @@ export function SubscriptionManager({
   const [editValor, setEditValor] = useState<string>("");
   const [editDataExpiracao, setEditDataExpiracao] = useState<string>("");
   const [editDataPagamento, setEditDataPagamento] = useState<string>("");
-  const [editStatus, setEditStatus] = useState<string>("pendente");
   const [editObservacoes, setEditObservacoes] = useState<string>("");
 
   const platformFeePercent = stripeStatus?.billing_config.application_fee_percent ?? 0;
@@ -204,12 +202,18 @@ export function SubscriptionManager({
 
   const handleOpenEdit = (sub: Subscription) => {
     const isStripeRecord = !!sub.stripe_subscription_id || !!sub.stripe_checkout_session_id;
+    if (isStripeRecord) {
+      toast({
+        title: "Pagamento controlado pela Stripe",
+        description: "Use as acoes da Stripe para alterar essa assinatura.",
+      });
+      return;
+    }
     setSubscriptionToEdit(sub);
     setEditPlano(sub.plano);
     setEditValor(sub.valor.toString());
     setEditDataExpiracao(formatDateForInput(sub.data_expiracao));
     setEditDataPagamento(formatDateForInput(sub.data_pagamento));
-    setEditStatus(!isStripeRecord && sub.status_pagamento === "pendente" ? "pago" : sub.status_pagamento);
     setEditObservacoes(sub.observacoes || "");
     setEditDialogOpen(true);
   };
@@ -217,20 +221,20 @@ export function SubscriptionManager({
   const handleUpdateSubscription = async () => {
     if (!subscriptionToEdit || !editValor) return;
 
-    const novaDataPagamento = dateInputToIsoString(editDataPagamento);
-    const novaDataExpiracao = dateInputToIsoString(editDataExpiracao);
-    if (!novaDataExpiracao) return;
+    if (!editDataPagamento || !editDataExpiracao) {
+      toast({
+        title: "Datas obrigatorias",
+        description: "Informe as datas do pagamento e do vencimento.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    const isStripeRecord =
-      !!subscriptionToEdit.stripe_subscription_id ||
-      !!subscriptionToEdit.stripe_checkout_session_id;
-
-    await updateSubscription(subscriptionToEdit.id, {
+    await correctManualPayment(subscriptionToEdit.id, {
       plano: editPlano as any,
       valor: parseFloat(editValor),
-      data_expiracao: novaDataExpiracao,
-      data_pagamento: novaDataPagamento,
-      status_pagamento: (!isStripeRecord && editStatus === "pendente" ? "pago" : editStatus) as any,
+      data_expiracao: editDataExpiracao,
+      data_pagamento: editDataPagamento,
       observacoes: editObservacoes || null,
     });
 
@@ -676,6 +680,9 @@ export function SubscriptionManager({
                         </DropdownMenu>
                       )}
 
+                      {!isStripeSubscription && (
+                        <>
+
                       {/* Botão Editar */}
                       <Button 
                         size="icon" 
@@ -697,6 +704,8 @@ export function SubscriptionManager({
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -749,23 +758,6 @@ export function SubscriptionManager({
                 value={editValor}
                 onChange={(e) => setEditValor(e.target.value)}
               />
-            </div>
-
-            <div>
-              <Label>Status</Label>
-              <Select value={editStatus} onValueChange={setEditStatus}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(subscriptionToEdit?.stripe_subscription_id ||
-                    subscriptionToEdit?.stripe_checkout_session_id) && (
-                    <SelectItem value="pendente">Pendente</SelectItem>
-                  )}
-                  <SelectItem value="pago">Pago</SelectItem>
-                  <SelectItem value="atrasado">Atrasado</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             <div>

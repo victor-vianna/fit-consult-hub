@@ -42,8 +42,6 @@ export default function Personal() {
   const {
     settings: personalSettings
   } = usePersonalSettings(user?.id);
-  const alunosAtivos = alunos.filter(a => a.is_active).length;
-  const alunosInativos = alunos.filter(a => !a.is_active).length;
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);

@@ -36,9 +36,7 @@ export interface PaymentHistory {
   created_at: string;
 }
 
-export type PaymentOrigin = "stripe" | "manual";
 export type ManualPaymentMethod = "pix" | "dinheiro" | "transferencia" | "outro";
-export type RegisterPaymentMethod = "stripe" | ManualPaymentMethod;
 
 const roundCurrency = (value: number) => Math.round(Number(value || 0) * 100) / 100;
 
@@ -187,8 +185,7 @@ export function useSubscriptions(studentId?: string, personalId?: string) {
     plano: Subscription["plano"];
     valor: number;
     data_pagamento: string;
-    origem_pagamento: PaymentOrigin;
-    metodo_pagamento: RegisterPaymentMethod;
+    metodo_pagamento: ManualPaymentMethod;
     observacoes?: string;
   }) => {
     if (!studentId || !personalId) {
@@ -232,9 +229,7 @@ export function useSubscriptions(studentId?: string, personalId?: string) {
         title: result?.duplicate ? "Pagamento ja registrado" : "Pagamento registrado",
         description: result?.duplicate
           ? "Esta baixa ja existe no historico financeiro."
-          : paymentData.origem_pagamento === "stripe"
-            ? "Pagamento registrado como recebido pela plataforma."
-            : "Pagamento manual registrado como recebido.",
+          : "Pagamento manual registrado como recebido.",
       });
 
       if (!result?.duplicate) {
@@ -315,6 +310,77 @@ export function useSubscriptions(studentId?: string, personalId?: string) {
       toast({
         title: "Erro",
         description: "Não foi possível atualizar a assinatura",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
+  const correctManualPayment = async (
+    subscriptionId: string,
+    paymentData: {
+      plano: Subscription["plano"];
+      valor: number;
+      data_pagamento: string;
+      data_expiracao: string;
+      observacoes?: string | null;
+    }
+  ) => {
+    const subscription = subscriptions.find((item) => item.id === subscriptionId);
+    if (!subscription) throw new Error("Assinatura nao encontrada");
+    if (
+      subscription.stripe_subscription_id ||
+      subscription.stripe_checkout_session_id ||
+      subscription.stripe_account_id
+    ) {
+      throw new Error("Pagamentos Stripe devem ser corrigidos pela propria Stripe");
+    }
+
+    const normalizedValue = roundCurrency(paymentData.valor);
+    if (!Number.isFinite(normalizedValue) || normalizedValue <= 0) {
+      throw new Error("Valor do pagamento invalido");
+    }
+
+    const idempotencyKey = buildManualPaymentKey([
+      "correction",
+      subscriptionId,
+      paymentData.plano,
+      normalizedValue.toFixed(2),
+      paymentData.data_pagamento,
+      paymentData.data_expiracao,
+      paymentData.observacoes,
+    ]);
+
+    try {
+      const { data: result, error } = await (supabase as any).rpc(
+        "correct_manual_subscription_payment",
+        {
+          _subscription_id: subscriptionId,
+          _plan: paymentData.plano,
+          _value: normalizedValue,
+          _payment_date: paymentData.data_pagamento,
+          _expiration_date: paymentData.data_expiracao,
+          _notes: paymentData.observacoes || null,
+          _idempotency_key: idempotencyKey,
+        }
+      );
+
+      if (error) throw error;
+
+      toast({
+        title: result?.duplicate ? "Alteracao ja aplicada" : "Pagamento atualizado",
+        description: result?.duplicate
+          ? "Essa mesma correcao ja havia sido processada."
+          : "O pagamento e o historico financeiro foram corrigidos juntos.",
+      });
+
+      await fetchSubscriptions();
+      return result?.subscription as Subscription | undefined;
+    } catch (error: any) {
+      console.error("Erro ao corrigir pagamento manual:", error);
+      toast({
+        title: "Erro",
+        description: error?.message ?? "Nao foi possivel atualizar o pagamento",
         variant: "destructive",
       });
       throw error;
@@ -426,8 +492,8 @@ export function useSubscriptions(studentId?: string, personalId?: string) {
     return [...subscriptions]
       .filter(
         (sub) =>
-          sub.status_pagamento === "pago" &&
-          new Date(sub.data_expiracao) > new Date()
+          ["pago", "cancelado", "canceled"].includes(sub.status_pagamento) &&
+          new Date(sub.data_expiracao).getTime() + DAY_MS > Date.now()
       )
       .sort(
         (a, b) =>
@@ -442,6 +508,7 @@ export function useSubscriptions(studentId?: string, personalId?: string) {
     createSubscription,
     createPaidSubscription,
     updateSubscription,
+    correctManualPayment,
     registerPayment,
     deleteSubscription,
     getActiveSubscription,

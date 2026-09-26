@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +31,15 @@ export default function Auth() {
   const [publicPersonal, setPublicPersonal] = useState<PublicPersonalContext | null>(null);
   const publicPersonalSlug = searchParams.get('personal');
   const selectedPlan = searchParams.get('plan');
+  const studentDestination = useMemo(() => {
+    if (!publicPersonal?.slug) return '/aluno';
+
+    const params = new URLSearchParams();
+    if (selectedPlan) params.set('plan', selectedPlan);
+
+    const query = params.toString();
+    return `/planos/${encodeURIComponent(publicPersonal.slug)}${query ? `?${query}` : ''}`;
+  }, [publicPersonal?.slug, selectedPlan]);
 
   useEffect(() => {
     let mounted = true;
@@ -114,16 +123,12 @@ export default function Auth() {
                 }
               }
             }
-            navigate(
-              publicPersonal
-                ? `/planos/${publicPersonal.slug}${selectedPlan ? `?plan=${selectedPlan}` : ''}`
-                : '/aluno'
-            );
+            navigate(studentDestination);
           }
         }
       }
     });
-  }, [navigate, publicPersonal, publicPersonalSlug, selectedPlan, toast]);
+  }, [navigate, publicPersonal, publicPersonalSlug, studentDestination, toast]);
 
   const linkStudentToPublicPersonal = async () => {
     if (!publicPersonal?.id) return true;
@@ -158,11 +163,7 @@ export default function Auth() {
     else if (data?.role === 'aluno') {
       const linked = await linkStudentToPublicPersonal();
       if (linked) {
-        navigate(
-          publicPersonal
-            ? `/planos/${publicPersonal.slug}${selectedPlan ? `?plan=${selectedPlan}` : ''}`
-            : '/aluno'
-        );
+        navigate(studentDestination);
       }
     }
   };
@@ -256,7 +257,7 @@ export default function Auth() {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/aluno`,
+            emailRedirectTo: new URL(studentDestination, window.location.origin).toString(),
             data: {
               nome,
               telefone,
@@ -266,18 +267,23 @@ export default function Auth() {
         });
         if (error) throw error;
         if (data.user) {
-          toast({
-            title: 'Cadastro realizado!',
-            description: publicPersonal
-              ? `Conta vinculada a ${publicPersonal.nome}. Escolha seu plano para liberar o acesso.`
-              : 'Voce ja pode fazer login.',
-          });
           if (data.session) {
-            navigate(
-              publicPersonal
-                ? `/planos/${publicPersonal.slug}${selectedPlan ? `?plan=${selectedPlan}` : ''}`
-                : '/aluno'
-            );
+            toast({
+              title: 'Cadastro realizado!',
+              description: publicPersonal
+                ? `Conta vinculada a ${publicPersonal.nome}. Continue com o plano escolhido.`
+                : 'Voce ja pode acessar o sistema.',
+            });
+            navigate(studentDestination);
+          } else {
+            toast({
+              title: 'Confirme seu e-mail',
+              description: publicPersonal
+                ? selectedPlan
+                  ? 'Abra o link enviado para concluir o cadastro e retornar ao plano escolhido.'
+                  : `Abra o link enviado para concluir o cadastro e retornar aos planos de ${publicPersonal.nome}.`
+                : 'Abra o link enviado para concluir o cadastro e acessar o sistema.',
+            });
           }
         }
       }

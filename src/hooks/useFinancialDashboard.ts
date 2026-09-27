@@ -40,6 +40,20 @@ type FinancialPaymentRow = {
   stripe_net_amount?: number | null;
 };
 
+type FinancialAdjustmentRow = {
+  id: string;
+  subscription_id?: string | null;
+  student_id: string;
+  personal_id: string;
+  provider_event_created_at: string;
+  event_type: string;
+  financial_effect: "debit" | "credit";
+  amount: number;
+  currency?: string | null;
+  stripe_payment_method_type?: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
 export interface FinancialMetrics {
   receitaMesAtual: number;
   receitaMesAnterior: number;
@@ -53,6 +67,7 @@ export interface FinancialMetrics {
   receitaUltimos12Meses: number;
   receitaUltimos12MesesAnoAnterior: number;
   crescimentoAnual12Meses: number;
+  ajustesMesAtual: number;
 }
 
 export interface MonthlyRevenue {
@@ -106,6 +121,24 @@ export interface PaymentDetail {
   isStripePayment: boolean;
   paymentOrigin: "stripe" | "manual";
 }
+
+export interface FinancialAdjustmentDetail {
+  id: string;
+  studentName: string;
+  plano: string;
+  amount: number;
+  signedAmount: number;
+  effect: "debit" | "credit";
+  eventType: string;
+  reason: string;
+  date: string;
+  metodo: string;
+}
+
+const getSignedAdjustmentAmount = (adjustment: FinancialAdjustmentRow) =>
+  adjustment.financial_effect === "credit"
+    ? Number(adjustment.amount || 0)
+    : -Number(adjustment.amount || 0);
 
 const normalizePaymentText = (value: unknown) =>
   String(value ?? "")
@@ -292,10 +325,12 @@ export function useFinancialDashboard(personalId: string) {
     receitaUltimos12Meses: 0,
     receitaUltimos12MesesAnoAnterior: 0,
     crescimentoAnual12Meses: 0,
+    ajustesMesAtual: 0,
   });
   const [monthlyRevenue, setMonthlyRevenue] = useState<MonthlyRevenue[]>([]);
   const [inadimplentesList, setInadimplentesList] = useState<StudentPaymentStatus[]>([]);
   const [paymentDetails, setPaymentDetails] = useState<PaymentDetail[]>([]);
+  const [financialAdjustments, setFinancialAdjustments] = useState<FinancialAdjustmentDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -314,17 +349,26 @@ export function useFinancialDashboard(personalId: string) {
         .eq("personal_id", personalId);
       if (subsError) throw subsError;
 
-      const [{ data: payments, error: paymentsError }, accessResult] = await Promise.all([
+      const [
+        { data: payments, error: paymentsError },
+        accessResult,
+        { data: adjustments, error: adjustmentsError },
+      ] = await Promise.all([
         supabase
           .from("payment_history")
           .select("*")
           .eq("personal_id", personalId),
-        (supabase as any).rpc("get_students_access_states", {
+        supabase.rpc("get_students_access_states", {
           _personal_id: personalId,
         }),
+        supabase
+          .from("stripe_financial_adjustments")
+          .select("*")
+          .eq("personal_id", personalId),
       ]);
       if (paymentsError) throw paymentsError;
       if (accessResult.error) throw accessResult.error;
+      if (adjustmentsError) throw adjustmentsError;
 
       const subscriptionRows = (subscriptions || []) as unknown as FinancialSubscriptionRow[];
       const latestSubscriptions = getLatestSubscriptionsByStudent(subscriptionRows);
@@ -334,11 +378,13 @@ export function useFinancialDashboard(personalId: string) {
         (payments || []) as unknown as FinancialPaymentRow[],
         subscriptionRows
       );
+      const adjustmentRows = (adjustments || []) as FinancialAdjustmentRow[];
 
       const studentIds = Array.from(
         new Set([
           ...((subscriptions || []).map((s) => s.student_id)),
           ...revenuePayments.map((payment) => payment.student_id),
+          ...adjustmentRows.map((adjustment) => adjustment.student_id),
           ...accessStates.map((state) => state.student_id),
         ])
       );
@@ -362,15 +408,33 @@ export function useFinancialDashboard(personalId: string) {
           return d.getMonth() === month && d.getFullYear() === year;
         });
 
-      // Receita mês atual e anterior
+      const getAdjustmentsForMonth = (month: number, year: number) =>
+        adjustmentRows.filter((adjustment) => {
+          const date = new Date(adjustment.provider_event_created_at);
+          return date.getMonth() === month && date.getFullYear() === year;
+        });
+
+      const getAdjustedRevenueForMonth = (month: number, year: number) =>
+        getPaymentsForMonth(month, year).reduce((sum, payment) => sum + payment.valor, 0) +
+        getAdjustmentsForMonth(month, year).reduce(
+          (sum, adjustment) => sum + getSignedAdjustmentAmount(adjustment),
+          0
+        );
+
+      // Receita após estornos/chargebacks do mês atual e anterior.
       const currentMonthPayments = getPaymentsForMonth(currentMonth, currentYear);
-      const receitaMesAtual = currentMonthPayments.reduce((sum, p) => sum + p.valor, 0);
+      const currentMonthAdjustments = getAdjustmentsForMonth(currentMonth, currentYear);
+      const ajustesMesAtual = currentMonthAdjustments.reduce(
+        (sum, adjustment) => sum + getSignedAdjustmentAmount(adjustment),
+        0
+      );
+      const receitaMesAtual = getAdjustedRevenueForMonth(currentMonth, currentYear);
 
       const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
       const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-      const receitaMesAnterior = getPaymentsForMonth(lastMonth, lastMonthYear).reduce((sum, p) => sum + p.valor, 0);
+      const receitaMesAnterior = getAdjustedRevenueForMonth(lastMonth, lastMonthYear);
 
-      const receitaMesmoMesAnoAnterior = getPaymentsForMonth(currentMonth, currentYear - 1).reduce((sum, p) => sum + p.valor, 0);
+      const receitaMesmoMesAnoAnterior = getAdjustedRevenueForMonth(currentMonth, currentYear - 1);
 
       const comparacaoPercentual =
         receitaMesAnterior > 0
@@ -394,11 +458,10 @@ export function useFinancialDashboard(personalId: string) {
         const targetYear = targetDate.getFullYear();
 
         const monthPayments = getPaymentsForMonth(targetMonth, targetYear);
-        const receita = monthPayments.reduce((sum, p) => sum + p.valor, 0);
+        const receita = getAdjustedRevenueForMonth(targetMonth, targetYear);
         receitaUltimos12Meses += receita;
 
-        const prevYearPayments = getPaymentsForMonth(targetMonth, targetYear - 1);
-        const receitaAnoAnterior = prevYearPayments.reduce((sum, p) => sum + p.valor, 0);
+        const receitaAnoAnterior = getAdjustedRevenueForMonth(targetMonth, targetYear - 1);
         receitaUltimos12MesesAnoAnterior += receitaAnoAnterior;
 
         monthlyRevenueData.push({
@@ -524,6 +587,37 @@ export function useFinancialDashboard(personalId: string) {
         };
       });
 
+      const financialAdjustmentsMapped: FinancialAdjustmentDetail[] = adjustmentRows
+        .map((adjustment) => {
+          const subscription = adjustment.subscription_id
+            ? subscriptionsById.get(adjustment.subscription_id)
+            : undefined;
+          const profile = profiles.find((item) => item.id === adjustment.student_id);
+          const accessReason = String(adjustment.metadata?.access_reason || "");
+
+          return {
+            id: adjustment.id,
+            studentName: profile?.nome || "Desconhecido",
+            plano: subscription?.plano || "—",
+            amount: Number(adjustment.amount || 0),
+            signedAmount: getSignedAdjustmentAmount(adjustment),
+            effect: adjustment.financial_effect,
+            eventType: adjustment.event_type,
+            reason: accessReason || (
+              adjustment.financial_effect === "credit"
+                ? "Reversão de contestação"
+                : adjustment.event_type.includes("dispute")
+                ? "Chargeback/contestação"
+                : "Estorno"
+            ),
+            date: adjustment.provider_event_created_at,
+            metodo: adjustment.stripe_payment_method_type
+              ? `stripe_${adjustment.stripe_payment_method_type}`
+              : "stripe",
+          };
+        })
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
       // Add pending subscriptions as upcoming payments
       const pendingSubs = latestSubscriptions.filter(
         (s) =>
@@ -569,14 +663,16 @@ export function useFinancialDashboard(personalId: string) {
         receitaUltimos12Meses,
         receitaUltimos12MesesAnoAnterior,
         crescimentoAnual12Meses,
+        ajustesMesAtual,
       });
 
       setMonthlyRevenue(monthlyRevenueData);
       setInadimplentesList(inadimplentesMapped);
       setPaymentDetails(paymentDetailsMapped);
+      setFinancialAdjustments(financialAdjustmentsMapped);
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao buscar dados financeiros:", error);
       return { success: false, error: "Não foi possível carregar os dados financeiros" };
     } finally {
@@ -636,6 +732,16 @@ export function useFinancialDashboard(personalId: string) {
         },
         refreshInBackground
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "stripe_financial_adjustments",
+          filter: `personal_id=eq.${personalId}`,
+        },
+        refreshInBackground
+      )
       .subscribe();
 
     return () => {
@@ -652,6 +758,7 @@ export function useFinancialDashboard(personalId: string) {
     monthlyRevenue,
     inadimplentesList,
     paymentDetails,
+    financialAdjustments,
     loading,
     refetch: () => fetchFinancialData(false),
   };

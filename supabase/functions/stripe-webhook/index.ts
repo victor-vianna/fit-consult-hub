@@ -154,8 +154,25 @@ async function retrieveStripePaymentDetails(
   stripeAccountId?: string | null,
 ) {
   const options = stripeOptions(stripeAccountId);
-  const invoiceAny = invoice as any;
-  const paymentIntentId = getInvoicePaymentIntentId(invoice);
+  let resolvedInvoice: any = invoice as any;
+
+  // Webhook payloads from the newer Stripe API no longer expose payment_intent
+  // and charge at the invoice root. Fetching the invoice with the API version
+  // pinned by this function gives us those references without depending on the
+  // event payload shape.
+  if (
+    !getInvoicePaymentIntentId(resolvedInvoice) &&
+    !getObjectId(resolvedInvoice?.charge) &&
+    resolvedInvoice?.id
+  ) {
+    resolvedInvoice = await stripe.invoices.retrieve(
+      resolvedInvoice.id,
+      {},
+      options,
+    );
+  }
+
+  const paymentIntentId = getInvoicePaymentIntentId(resolvedInvoice);
   let paymentIntent: any = null;
   let charge: any = null;
 
@@ -170,7 +187,15 @@ async function retrieveStripePaymentDetails(
       : null;
   }
 
-  const chargeId = getObjectId(charge) || getObjectId(invoiceAny.charge);
+  if (!paymentIntent && typeof resolvedInvoice?.payment_intent === "object") {
+    paymentIntent = resolvedInvoice.payment_intent;
+  }
+
+  if (!charge && typeof resolvedInvoice?.charge === "object") {
+    charge = resolvedInvoice.charge;
+  }
+
+  const chargeId = getObjectId(charge) || getObjectId(resolvedInvoice?.charge);
   if (!charge && chargeId) {
     charge = await stripe.charges.retrieve(
       chargeId,
@@ -183,7 +208,7 @@ async function retrieveStripePaymentDetails(
     charge?.payment_method_details?.type ||
       paymentIntent?.payment_method?.type ||
       paymentIntent?.payment_method_types?.[0] ||
-      invoiceAny.payment_settings?.payment_method_types?.[0],
+      resolvedInvoice?.payment_settings?.payment_method_types?.[0],
   );
 
   const balanceTransaction = typeof charge?.balance_transaction === "object"
@@ -196,17 +221,38 @@ async function retrieveStripePaymentDetails(
     )
     : null;
 
+  const feeDetails = Array.isArray(balanceTransaction?.fee_details)
+    ? balanceTransaction.fee_details
+    : [];
+  const applicationFeeFromBreakdown = feeDetails
+    .filter((fee: any) => fee?.type === "application_fee")
+    .reduce((sum: number, fee: any) => sum + Number(fee?.amount || 0), 0);
+  const applicationFeeAmountCents =
+    typeof resolvedInvoice?.application_fee_amount === "number"
+      ? resolvedInvoice.application_fee_amount
+      : typeof charge?.application_fee_amount === "number"
+      ? charge.application_fee_amount
+      : applicationFeeFromBreakdown > 0
+      ? applicationFeeFromBreakdown
+      : null;
+  const totalFeeCents = typeof balanceTransaction?.fee === "number"
+    ? balanceTransaction.fee
+    : null;
+  const processingFeeCents = totalFeeCents !== null
+    ? Math.max(0, totalFeeCents - (applicationFeeAmountCents ?? 0))
+    : feeDetails
+      .filter((fee: any) => fee?.type !== "application_fee")
+      .reduce((sum: number, fee: any) => sum + Number(fee?.amount || 0), 0);
+
   return {
     stripe_payment_intent_id: paymentIntentId,
     stripe_charge_id: chargeId,
     stripe_balance_transaction_id: getObjectId(balanceTransaction),
     stripe_payment_method_type: paymentMethodType,
-    stripe_processing_fee_amount: centsToMoney(balanceTransaction?.fee),
+    stripe_processing_fee_amount: centsToMoney(processingFeeCents),
     stripe_net_amount: centsToMoney(balanceTransaction?.net),
     stripe_application_fee_id: getObjectId(charge?.application_fee),
-    stripe_application_fee_amount:
-      centsToMoney(invoiceAny.application_fee_amount) ??
-      centsToMoney(charge?.application_fee_amount),
+    stripe_application_fee_amount: centsToMoney(applicationFeeAmountCents),
     stripe_currency: balanceTransaction?.currency || invoice.currency || null,
     metodo_pagamento: paymentMethodType
       ? `stripe_${paymentMethodType}`
@@ -361,10 +407,63 @@ async function normalizeRevocation(
     status_pagamento: "atrasado",
     preserve_paid_grace: false,
     access_revoked_reason: reason,
-    revoked_amount: centsToMoney(object?.amount ?? (charge as any).amount_refunded),
+    revoked_amount: centsToMoney(
+      object?.object === "charge" ? object?.amount_refunded : object?.amount,
+    ),
     stripe_currency: object?.currency || charge.currency || null,
     stripe_charge_id: charge.id,
     stripe_invoice_id: invoice?.id || null,
+    stripe_payment_method_type: normalizePaymentMethodType(
+      (charge as any)?.payment_method_details?.type,
+    ),
+  };
+}
+
+async function normalizeFinancialRestoration(
+  stripe: Stripe,
+  event: Stripe.Event,
+  stripeAccountId: string | null,
+) {
+  const object = event.data.object as any;
+  const charge = await getChargeForFinancialObject(stripe, object, stripeAccountId);
+  if (!charge) {
+    return { kind: "ignored", priority: 0, reason: "unrelated_financial_event" };
+  }
+
+  const invoice = await getInvoiceForCharge(stripe, charge, stripeAccountId);
+  const subscriptionId = getInvoiceSubscriptionId(invoice) ||
+    charge.metadata?.stripe_subscription_id ||
+    object?.metadata?.stripe_subscription_id;
+  if (!subscriptionId) {
+    return { kind: "ignored", priority: 0, reason: "unrelated_financial_event" };
+  }
+
+  const snapshot = await getSubscriptionSnapshot(
+    stripe,
+    subscriptionId,
+    stripeAccountId,
+    {
+      studentId: charge.metadata?.student_id || object?.metadata?.student_id,
+      personalId: charge.metadata?.personal_id || object?.metadata?.personal_id,
+      plano: (charge.metadata?.plano || object?.metadata?.plano) as Plano | undefined,
+      statusPagamento: "pago",
+      preservePaidGrace: false,
+    },
+  );
+
+  return {
+    ...snapshot,
+    kind: "subscription_sync",
+    priority: 100,
+    status_pagamento: "pago",
+    clear_revocation: true,
+    preserve_paid_grace: false,
+    stripe_currency: object?.currency || charge.currency || null,
+    stripe_charge_id: charge.id,
+    stripe_invoice_id: invoice?.id || null,
+    stripe_payment_method_type: normalizePaymentMethodType(
+      (charge as any)?.payment_method_details?.type,
+    ),
   };
 }
 
@@ -528,7 +627,13 @@ async function normalizeEvent(
       const reason = (charge.amount_refunded ?? 0) < charge.amount
         ? "refund_partial"
         : "refund_full";
-      return await normalizeRevocation(stripe, event, eventAccountId, reason);
+      // This event contains the cumulative refunded amount. The corresponding
+      // refund.* event is the canonical accounting entry and prevents the same
+      // refund from being subtracted more than once.
+      return {
+        ...await normalizeRevocation(stripe, event, eventAccountId, reason),
+        accounting_effect: "neutral",
+      };
     }
 
     case "refund.created":
@@ -539,15 +644,58 @@ async function normalizeEvent(
       const reason = charge && (charge.amount_refunded ?? 0) < charge.amount
         ? "refund_partial"
         : "refund_full";
-      return await normalizeRevocation(stripe, event, eventAccountId, reason);
+      const refundStatus = String(object?.status || "").toLowerCase();
+      if (["failed", "canceled", "cancelled"].includes(refundStatus)) {
+        return {
+          ...await normalizeFinancialRestoration(stripe, event, eventAccountId),
+          accounting_effect: "neutral",
+        };
+      }
+
+      const normalized = await normalizeRevocation(
+        stripe,
+        event,
+        eventAccountId,
+        reason,
+      );
+      if (normalized.kind === "ignored") return normalized;
+
+      const refundId = getObjectId(object);
+      return {
+        ...normalized,
+        accounting_effect: refundStatus === "succeeded" ? "debit" : "neutral",
+        accounting_key: refundStatus === "succeeded" && refundId
+          ? `refund:${eventAccountId || "platform"}:${refundId}`
+          : null,
+        adjustment_amount: centsToMoney(object?.amount),
+        stripe_refund_id: refundId,
+      };
     }
 
     case "charge.dispute.created":
     case "charge.dispute.updated":
     case "charge.dispute.closed":
     case "charge.dispute.funds_withdrawn":
-    case "charge.dispute.funds_reinstated":
-      return await normalizeRevocation(stripe, event, eventAccountId, "chargeback");
+    case "charge.dispute.funds_reinstated": {
+      const dispute = event.data.object as any;
+      const disputeId = getObjectId(dispute);
+      const restored = event.type === "charge.dispute.funds_reinstated" ||
+        dispute?.status === "won";
+      const normalized = restored
+        ? await normalizeFinancialRestoration(stripe, event, eventAccountId)
+        : await normalizeRevocation(stripe, event, eventAccountId, "chargeback");
+      if (normalized.kind === "ignored") return normalized;
+
+      return {
+        ...normalized,
+        accounting_effect: restored ? "credit" : "debit",
+        accounting_key: disputeId
+          ? `dispute:${eventAccountId || "platform"}:${disputeId}:${restored ? "credit" : "debit"}`
+          : null,
+        adjustment_amount: centsToMoney(dispute?.amount),
+        stripe_dispute_id: disputeId,
+      };
+    }
 
     default:
       return { kind: "ignored", priority: 0, reason: "event_not_used_for_access" };
@@ -601,7 +749,7 @@ Deno.serve(async (req) => {
     };
   }
 
-  const { data, error } = await admin.rpc("apply_stripe_webhook_event", {
+  const { data, error } = await admin.rpc("apply_stripe_webhook_event_v2", {
     _event_id: event.id,
     _event_type: event.type,
     _event_created_at: eventCreatedAt,

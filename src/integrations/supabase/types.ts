@@ -1866,6 +1866,75 @@ export type Database = {
           },
         ]
       }
+      stripe_financial_adjustments: {
+        Row: {
+          accounting_key: string
+          amount: number
+          created_at: string
+          currency: string | null
+          event_type: string
+          financial_effect: string
+          id: string
+          metadata: Json
+          personal_id: string
+          provider: string
+          provider_event_created_at: string
+          provider_event_id: string
+          stripe_account_id: string | null
+          stripe_charge_id: string | null
+          stripe_dispute_id: string | null
+          stripe_invoice_id: string | null
+          stripe_payment_method_type: string | null
+          stripe_refund_id: string | null
+          student_id: string
+          subscription_id: string | null
+        }
+        Insert: {
+          accounting_key: string
+          amount: number
+          created_at?: string
+          currency?: string | null
+          event_type: string
+          financial_effect: string
+          id?: string
+          metadata?: Json
+          personal_id: string
+          provider?: string
+          provider_event_created_at: string
+          provider_event_id: string
+          stripe_account_id?: string | null
+          stripe_charge_id?: string | null
+          stripe_dispute_id?: string | null
+          stripe_invoice_id?: string | null
+          stripe_payment_method_type?: string | null
+          stripe_refund_id?: string | null
+          student_id: string
+          subscription_id?: string | null
+        }
+        Update: {
+          accounting_key?: string
+          amount?: number
+          created_at?: string
+          currency?: string | null
+          event_type?: string
+          financial_effect?: string
+          id?: string
+          metadata?: Json
+          personal_id?: string
+          provider?: string
+          provider_event_created_at?: string
+          provider_event_id?: string
+          stripe_account_id?: string | null
+          stripe_charge_id?: string | null
+          stripe_dispute_id?: string | null
+          stripe_invoice_id?: string | null
+          stripe_payment_method_type?: string | null
+          stripe_refund_id?: string | null
+          student_id?: string
+          subscription_id?: string | null
+        }
+        Relationships: []
+      }
       student_access_logs: {
         Row: {
           changed_by: string
@@ -2645,6 +2714,28 @@ export type Database = {
           p_treino_id: string
         }
         Returns: string
+      }
+      get_students_access_states: {
+        Args: { _personal_id?: string }
+        Returns: {
+          active_subscription_id: string | null
+          allowed: boolean
+          calculated_at: string
+          effective_event_id: string | null
+          has_active_payment: boolean
+          manual_release_until: string | null
+          message_aluno: string | null
+          payment_required: boolean
+          personal_id: string
+          priority: number
+          reason: string | null
+          reason_code: string | null
+          source: string
+          status: string
+          status_label: string
+          student_id: string
+          updated_at: string
+        }[]
       }
       deletar_grupo_exercicios: {
         Args: { p_grupo_id: string }

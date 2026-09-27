@@ -26,7 +26,10 @@ import {
   Search,
   FilterX,
 } from "lucide-react";
-import { useFinancialDashboard, type PaymentDetail } from "@/hooks/useFinancialDashboard";
+import {
+  useFinancialDashboard,
+  type PaymentDetail,
+} from "@/hooks/useFinancialDashboard";
 import { useAuth } from "@/hooks/useAuth";
 import { useStripeConnectAccount } from "@/hooks/useStripeConnectAccount";
 import { PersonalPlanPricingForm } from "@/components/PersonalPlanPricingForm";
@@ -135,6 +138,13 @@ const getPaymentOriginText = (payment: PaymentDetail) => {
     : `${method} · registrado manualmente`;
 };
 
+const formatAdjustmentReason = (reason: string) => {
+  if (reason === "refund_full") return "Estorno total";
+  if (reason === "refund_partial") return "Estorno parcial";
+  if (reason === "chargeback") return "Chargeback/contestação";
+  return reason;
+};
+
 function getPaymentFinancialAmounts(
   payment: PaymentDetail,
   platformFeePercent: number,
@@ -236,8 +246,15 @@ export function FinancialDashboard() {
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const { data: stripeStatus } = useStripeConnectAccount(userId);
 
-  const { metrics, monthlyRevenue, inadimplentesList, paymentDetails, loading, refetch } =
-    useFinancialDashboard(userId);
+  const {
+    metrics,
+    monthlyRevenue,
+    inadimplentesList,
+    paymentDetails,
+    financialAdjustments,
+    loading,
+    refetch,
+  } = useFinancialDashboard(userId);
   const { data: students = [] } = useQuery<FinanceStudent[]>({
     queryKey: ["alunos", userId],
     enabled: !!userId,
@@ -262,18 +279,24 @@ export function FinancialDashboard() {
 
   const planOptions = useMemo(
     () =>
-      Array.from(new Set(paymentDetails.map((p) => p.plano).filter(Boolean))).sort((a, b) =>
-        a.localeCompare(b)
-      ),
-    [paymentDetails]
+      Array.from(
+        new Set(
+          [...paymentDetails.map((p) => p.plano), ...financialAdjustments.map((a) => a.plano)]
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [financialAdjustments, paymentDetails]
   );
 
   const methodOptions = useMemo(
     () =>
       Array.from(
-        new Set(paymentDetails.map((p) => p.metodo).filter((method) => method && method !== "—"))
+        new Set(
+          [...paymentDetails.map((p) => p.metodo), ...financialAdjustments.map((a) => a.metodo)]
+            .filter((method) => method && method !== "—")
+        )
       ).sort((a, b) => a.localeCompare(b)),
-    [paymentDetails]
+    [financialAdjustments, paymentDetails]
   );
 
   const filteredPaymentDetails = useMemo(() => {
@@ -326,6 +349,55 @@ export function FinancialDashboard() {
     });
   }, [paymentDetails, paymentFilters]);
 
+  const filteredFinancialAdjustments = useMemo(() => {
+    const now = new Date();
+    const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const last30Days = new Date(now);
+    last30Days.setDate(now.getDate() - 30);
+    const last90Days = new Date(now);
+    last90Days.setDate(now.getDate() - 90);
+
+    const customStart = getDateTime(paymentFilters.startDate);
+    const customEnd = getDateTime(paymentFilters.endDate, true);
+    const minValue = paymentFilters.minValue ? Number(paymentFilters.minValue) : null;
+    const maxValue = paymentFilters.maxValue ? Number(paymentFilters.maxValue) : null;
+    const search = normalizeText(paymentFilters.search);
+
+    return financialAdjustments.filter((adjustment) => {
+      const adjustmentTime = new Date(adjustment.date).getTime();
+      const status = adjustment.effect === "debit" ? "estornado" : "revertido";
+      const searchableText = normalizeText(
+        [
+          adjustment.studentName,
+          adjustment.plano,
+          adjustment.metodo,
+          formatPaymentMethod(adjustment.metodo),
+          adjustment.reason,
+          adjustment.eventType,
+          status,
+          adjustment.amount,
+        ].join(" ")
+      );
+
+      if (search && !searchableText.includes(search)) return false;
+      if (paymentFilters.status !== "all" && paymentFilters.status !== status) return false;
+      if (paymentFilters.plan !== "all" && adjustment.plano !== paymentFilters.plan) return false;
+      if (paymentFilters.method !== "all" && adjustment.metodo !== paymentFilters.method) return false;
+      if (minValue !== null && Number.isFinite(minValue) && adjustment.amount < minValue) return false;
+      if (maxValue !== null && Number.isFinite(maxValue) && adjustment.amount > maxValue) return false;
+
+      if (paymentFilters.period === "current_month" && adjustmentTime < startOfCurrentMonth) return false;
+      if (paymentFilters.period === "last_30" && adjustmentTime < last30Days.getTime()) return false;
+      if (paymentFilters.period === "last_90" && adjustmentTime < last90Days.getTime()) return false;
+      if (paymentFilters.period === "custom") {
+        if (customStart !== null && adjustmentTime < customStart) return false;
+        if (customEnd !== null && adjustmentTime > customEnd) return false;
+      }
+
+      return true;
+    });
+  }, [financialAdjustments, paymentFilters]);
+
   const filteredReceivedTotal = useMemo(
     () =>
       filteredPaymentDetails
@@ -341,6 +413,13 @@ export function FinancialDashboard() {
         .reduce((sum, payment) => sum + payment.valorParcela, 0),
     [filteredPaymentDetails]
   );
+
+  const filteredAdjustmentTotal = useMemo(
+    () => filteredFinancialAdjustments.reduce((sum, adjustment) => sum + adjustment.signedAmount, 0),
+    [filteredFinancialAdjustments]
+  );
+
+  const filteredRevenueAfterAdjustments = filteredReceivedTotal + filteredAdjustmentTotal;
 
   const filteredTotalFee = useMemo(
     () =>
@@ -367,6 +446,7 @@ export function FinancialDashboard() {
         ),
     [filteredPaymentDetails, platformFeePercent, stripeProcessingFees]
   );
+  const filteredNetAfterAdjustments = filteredNetTotal + filteredAdjustmentTotal;
 
   const hasActivePaymentFilters = useMemo(
     () => JSON.stringify(paymentFilters) !== JSON.stringify(DEFAULT_PAYMENT_FILTERS),
@@ -477,12 +557,17 @@ export function FinancialDashboard() {
         {/* Receita Mês Atual */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receita do Mês</CardTitle>
+            <CardTitle className="text-sm font-medium">Receita após estornos</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(metrics.receitaMesAtual)}</div>
             <ComparisonBadge value={metrics.comparacaoPercentual} label="vs mês anterior" />
+            {metrics.ajustesMesAtual !== 0 && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Ajustes no mês: {formatCurrency(metrics.ajustesMesAtual)}
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -557,7 +642,7 @@ export function FinancialDashboard() {
           <CardHeader>
             <CardTitle className="text-lg">Receita Mensal (Fluxo de Caixa)</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Baseado nas parcelas efetivamente recebidas em cada mês
+              Pagamentos recebidos menos estornos e chargebacks de cada mês
             </p>
           </CardHeader>
           <CardContent>
@@ -625,7 +710,7 @@ export function FinancialDashboard() {
       </div>
 
       {/* Tabela de pagamentos com detalhes de parcelas */}
-      {paymentDetails.length > 0 && (
+      {(paymentDetails.length > 0 || financialAdjustments.length > 0) && (
         <Card>
           <CardHeader className="p-4 md:p-6">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -635,11 +720,12 @@ export function FinancialDashboard() {
                   <CardTitle className="text-lg md:text-xl">Histórico de Pagamentos</CardTitle>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Detalhamento de parcelas e pagamentos recebidos
+                  Pagamentos recebidos, estornos e reversões registrados pela Stripe
                 </p>
               </div>
               <Badge variant="outline" className="w-fit">
-                {filteredPaymentDetails.length} de {paymentDetails.length} registro(s)
+                {filteredPaymentDetails.length + filteredFinancialAdjustments.length} de{" "}
+                {paymentDetails.length + financialAdjustments.length} registro(s)
               </Badge>
             </div>
           </CardHeader>
@@ -694,6 +780,8 @@ export function FinancialDashboard() {
                         <SelectItem value="all">Todos</SelectItem>
                         <SelectItem value="pago">Pago</SelectItem>
                         <SelectItem value="pendente">Pendente</SelectItem>
+                        <SelectItem value="estornado">Estornado/chargeback</SelectItem>
+                        <SelectItem value="revertido">Reversão de chargeback</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -809,10 +897,12 @@ export function FinancialDashboard() {
                 </div>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
                 <div className="rounded-lg border bg-background p-3">
                   <p className="text-xs text-muted-foreground">Registros encontrados</p>
-                  <p className="text-xl font-semibold">{filteredPaymentDetails.length}</p>
+                  <p className="text-xl font-semibold">
+                    {filteredPaymentDetails.length + filteredFinancialAdjustments.length}
+                  </p>
                 </div>
                 <div className="rounded-lg border bg-background p-3">
                   <p className="text-xs text-muted-foreground">Recebido bruto</p>
@@ -821,15 +911,33 @@ export function FinancialDashboard() {
                   </p>
                 </div>
                 <div className="rounded-lg border bg-background p-3">
-                  <p className="text-xs text-muted-foreground">Taxa Stripe est.</p>
+                  <p className="text-xs text-muted-foreground">Estornos/ajustes</p>
+                  <p
+                    className={`text-xl font-semibold ${
+                      filteredAdjustmentTotal < 0
+                        ? "text-red-600 dark:text-red-400"
+                        : "text-green-600 dark:text-green-400"
+                    }`}
+                  >
+                    {formatCurrency(filteredAdjustmentTotal)}
+                  </p>
+                </div>
+                <div className="rounded-lg border bg-background p-3">
+                  <p className="text-xs text-muted-foreground">Receita após ajustes</p>
+                  <p className="text-xl font-semibold">
+                    {formatCurrency(filteredRevenueAfterAdjustments)}
+                  </p>
+                </div>
+                <div className="rounded-lg border bg-background p-3">
+                  <p className="text-xs text-muted-foreground">Taxas Stripe</p>
                   <p className="text-xl font-semibold text-amber-600 dark:text-amber-400">
                     {formatCurrency(filteredTotalFee)}
                   </p>
                 </div>
                 <div className="rounded-lg border bg-background p-3">
-                  <p className="text-xs text-muted-foreground">Liquido final est.</p>
+                  <p className="text-xs text-muted-foreground">Líquido após taxas e ajustes</p>
                   <p className="text-xl font-semibold">
-                    {formatCurrency(filteredNetTotal)}
+                    {formatCurrency(filteredNetAfterAdjustments)}
                   </p>
                 </div>
                 <div className="rounded-lg border bg-background p-3">
@@ -936,6 +1044,59 @@ export function FinancialDashboard() {
                       })}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {filteredFinancialAdjustments.length > 0 && (
+                <div className="space-y-2">
+                  <div>
+                    <h3 className="text-sm font-semibold">Estornos e contestações</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Lançamentos imutáveis descontados da receita sem apagar o pagamento original.
+                    </p>
+                  </div>
+                  <div className="overflow-x-auto rounded-lg border">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/30 text-muted-foreground">
+                          <th className="px-3 py-3 text-left font-medium">Aluno</th>
+                          <th className="px-3 py-3 text-left font-medium">Plano</th>
+                          <th className="px-3 py-3 text-left font-medium">Motivo</th>
+                          <th className="px-3 py-3 text-left font-medium">Método</th>
+                          <th className="px-3 py-3 text-center font-medium">Data</th>
+                          <th className="px-3 py-3 text-right font-medium">Ajuste</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredFinancialAdjustments.map((adjustment) => (
+                          <tr key={adjustment.id} className="border-b last:border-0">
+                            <td className="px-3 py-3 font-medium">{adjustment.studentName}</td>
+                            <td className="px-3 py-3">{adjustment.plano}</td>
+                            <td className="px-3 py-3">
+                              <Badge variant={adjustment.effect === "debit" ? "destructive" : "outline"}>
+                                {adjustment.effect === "credit"
+                                  ? "Reversão de chargeback"
+                                  : formatAdjustmentReason(adjustment.reason)}
+                              </Badge>
+                            </td>
+                            <td className="px-3 py-3">{formatPaymentMethod(adjustment.metodo)}</td>
+                            <td className="px-3 py-3 text-center text-muted-foreground">
+                              {formatDisplayDate(adjustment.date)}
+                            </td>
+                            <td
+                              className={`px-3 py-3 text-right font-semibold ${
+                                adjustment.effect === "debit"
+                                  ? "text-red-600 dark:text-red-400"
+                                  : "text-green-600 dark:text-green-400"
+                              }`}
+                            >
+                              {formatCurrency(adjustment.signedAmount)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>

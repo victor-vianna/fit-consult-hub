@@ -1821,13 +1821,7 @@ export default function AlunosManager() {
               */
               const financeiroSummary: StudentCardSummary["financeiro"] = !accessState
                 ? summary.financeiro
-                : !accessState.payment_required
-                  ? {
-                      tone: "neutral",
-                      label: "Acesso sem cobranca",
-                      detail: "regra do personal",
-                    }
-                  : accessState.has_active_payment
+                : accessState.has_active_payment
                     ? accessState.in_grace || accessState.reason_code === "payment_grace"
                       ? {
                           tone: "warn",
@@ -1838,6 +1832,12 @@ export default function AlunosManager() {
                           tone: "ok",
                           label: "Pagamento em dia",
                           detail: "acesso por pagamento",
+                        }
+                    : !accessState.payment_required
+                      ? {
+                          tone: "neutral",
+                          label: "Acesso sem cobranca",
+                          detail: "regra do personal",
                         }
                     : accessState.allowed && accessState.source === "manual"
                       ? {

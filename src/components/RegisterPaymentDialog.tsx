@@ -20,11 +20,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  ManualPaymentMethod,
-  useSubscriptions,
-} from "@/hooks/useSubscriptions";
+import { useSubscriptions, type ManualPaymentMethod } from "@/hooks/useSubscriptions";
 import { Plano, usePersonalPlanPrices } from "@/hooks/usePersonalPlanPrices";
+import { MANUAL_PAYMENT_METHOD_OPTIONS } from "@/utils/paymentMethods";
 import {
   formatDateForInput,
   formatDisplayDateOnly,
@@ -36,13 +34,6 @@ const PLANOS: Array<{ value: Plano; label: string; meses: number }> = [
   { value: "trimestral", label: "Trimestral", meses: 3 },
   { value: "semestral", label: "Semestral", meses: 6 },
   { value: "anual", label: "Anual", meses: 12 },
-];
-
-const MANUAL_METHODS: Array<{ value: ManualPaymentMethod; label: string }> = [
-  { value: "pix", label: "PIX" },
-  { value: "dinheiro", label: "Dinheiro" },
-  { value: "transferencia", label: "Transferencia" },
-  { value: "outro", label: "Outro" },
 ];
 
 function calculateExpirationDate(plano: Plano, paymentDate: string) {
@@ -196,7 +187,8 @@ export function RegisterPaymentForm({
           <div>
             <p className="font-semibold">Pagamento registrado manualmente</p>
             <p className="text-xs text-muted-foreground">
-              Pagamentos feitos na plataforma sao confirmados somente pelos eventos da Stripe.
+              Escolha como o valor foi recebido fora da plataforma. O valor sera contabilizado
+              integralmente, sem taxa da Stripe ou da plataforma.
             </p>
           </div>
         </div>
@@ -210,13 +202,17 @@ export function RegisterPaymentForm({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {MANUAL_METHODS.map((item) => (
+              {MANUAL_PAYMENT_METHOD_OPTIONS.map((item) => (
                 <SelectItem key={item.value} value={item.value}>
                   {item.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          <p className="text-xs text-muted-foreground">
+            Pagamentos realizados pela Stripe continuam sendo registrados automaticamente pelo
+            webhook, com as taxas reais descontadas.
+          </p>
         </div>
       </div>
 

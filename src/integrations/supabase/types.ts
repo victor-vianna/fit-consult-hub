@@ -1416,11 +1416,22 @@ export type Database = {
           created_at: string | null
           data_pagamento: string
           id: string
-          metodo_pagamento: string | null
+          idempotency_key: string | null
+          metodo_pagamento: string
           observacoes: string | null
+          payment_origin: string
           personal_id: string
+          stripe_account_id: string | null
+          stripe_application_fee_amount: number | null
+          stripe_application_fee_id: string | null
+          stripe_balance_transaction_id: string | null
+          stripe_charge_id: string | null
+          stripe_currency: string | null
           stripe_invoice_id: string | null
+          stripe_net_amount: number | null
+          stripe_payment_method_type: string | null
           stripe_payment_intent_id: string | null
+          stripe_processing_fee_amount: number | null
           student_id: string
           subscription_id: string
           valor: number
@@ -1429,11 +1440,22 @@ export type Database = {
           created_at?: string | null
           data_pagamento: string
           id?: string
-          metodo_pagamento?: string | null
+          idempotency_key?: string | null
+          metodo_pagamento?: string
           observacoes?: string | null
+          payment_origin?: string
           personal_id: string
+          stripe_account_id?: string | null
+          stripe_application_fee_amount?: number | null
+          stripe_application_fee_id?: string | null
+          stripe_balance_transaction_id?: string | null
+          stripe_charge_id?: string | null
+          stripe_currency?: string | null
           stripe_invoice_id?: string | null
+          stripe_net_amount?: number | null
+          stripe_payment_method_type?: string | null
           stripe_payment_intent_id?: string | null
+          stripe_processing_fee_amount?: number | null
           student_id: string
           subscription_id: string
           valor: number
@@ -1442,11 +1464,22 @@ export type Database = {
           created_at?: string | null
           data_pagamento?: string
           id?: string
-          metodo_pagamento?: string | null
+          idempotency_key?: string | null
+          metodo_pagamento?: string
           observacoes?: string | null
+          payment_origin?: string
           personal_id?: string
+          stripe_account_id?: string | null
+          stripe_application_fee_amount?: number | null
+          stripe_application_fee_id?: string | null
+          stripe_balance_transaction_id?: string | null
+          stripe_charge_id?: string | null
+          stripe_currency?: string | null
           stripe_invoice_id?: string | null
+          stripe_net_amount?: number | null
+          stripe_payment_method_type?: string | null
           stripe_payment_intent_id?: string | null
+          stripe_processing_fee_amount?: number | null
           student_id?: string
           subscription_id?: string
           valor?: number

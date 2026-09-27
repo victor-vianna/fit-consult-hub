@@ -85,6 +85,11 @@ import {
   formatDisplayDateOnly,
   parseDateInputValue,
 } from "@/utils/dateFormat";
+import {
+  MANUAL_PAYMENT_METHOD_OPTIONS,
+  normalizeManualPaymentMethod,
+  type ManualPaymentMethod,
+} from "@/utils/paymentMethods";
 
 interface SubscriptionManagerProps {
   studentId: string;
@@ -181,10 +186,12 @@ export function SubscriptionManager({
   const [copyingPortalFor, setCopyingPortalFor] = useState<string | null>(null);
 
   // Edit form states
-  const [editPlano, setEditPlano] = useState<string>("mensal");
+  const [editPlano, setEditPlano] = useState<Plano>("mensal");
   const [editValor, setEditValor] = useState<string>("");
   const [editDataExpiracao, setEditDataExpiracao] = useState<string>("");
   const [editDataPagamento, setEditDataPagamento] = useState<string>("");
+  const [editPaymentMethod, setEditPaymentMethod] = useState<ManualPaymentMethod | "">("");
+  const [loadingEditPaymentMethod, setLoadingEditPaymentMethod] = useState(false);
   const [editObservacoes, setEditObservacoes] = useState<string>("");
 
   const platformFeePercent = stripeStatus?.billing_config.application_fee_percent ?? 0;
@@ -200,7 +207,7 @@ export function SubscriptionManager({
     }
   }, [openCreateSignal]);
 
-  const handleOpenEdit = (sub: Subscription) => {
+  const handleOpenEdit = async (sub: Subscription) => {
     const isStripeRecord = !!sub.stripe_subscription_id || !!sub.stripe_checkout_session_id;
     if (isStripeRecord) {
       toast({
@@ -214,12 +221,44 @@ export function SubscriptionManager({
     setEditValor(sub.valor.toString());
     setEditDataExpiracao(formatDateForInput(sub.data_expiracao));
     setEditDataPagamento(formatDateForInput(sub.data_pagamento));
+    setEditPaymentMethod("");
+    setLoadingEditPaymentMethod(true);
     setEditObservacoes(sub.observacoes || "");
     setEditDialogOpen(true);
+    const { data: latestPayment, error } = await supabase
+      .from("payment_history")
+      .select("metodo_pagamento")
+      .eq("subscription_id", sub.id)
+      .order("data_pagamento", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      setLoadingEditPaymentMethod(false);
+      toast({
+        title: "Forma de pagamento nao carregada",
+        description: "Selecione a forma de pagamento antes de salvar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setEditPaymentMethod(normalizeManualPaymentMethod(latestPayment?.metodo_pagamento) ?? "");
+    setLoadingEditPaymentMethod(false);
   };
 
   const handleUpdateSubscription = async () => {
     if (!subscriptionToEdit || !editValor) return;
+
+    if (!editPaymentMethod) {
+      toast({
+        title: "Forma de pagamento obrigatoria",
+        description: "Selecione como o pagamento foi recebido.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     if (!editDataPagamento || !editDataExpiracao) {
       toast({
@@ -231,10 +270,11 @@ export function SubscriptionManager({
     }
 
     await correctManualPayment(subscriptionToEdit.id, {
-      plano: editPlano as any,
+      plano: editPlano,
       valor: parseFloat(editValor),
       data_expiracao: editDataExpiracao,
       data_pagamento: editDataPagamento,
+      metodo_pagamento: editPaymentMethod,
       observacoes: editObservacoes || null,
     });
 
@@ -532,14 +572,16 @@ export function SubscriptionManager({
         <CardContent className={embedded ? "px-0" : undefined}>
           <div className="space-y-3">
             {subscriptions.map((sub) => {
-              const isStripeSubscription = !!sub.stripe_subscription_id;
+              const isStripeSubscription = !!(
+                sub.stripe_subscription_id || sub.stripe_checkout_session_id
+              );
               const stripeMethod = normalizeStripePaymentMethod(
                 sub.observacoes,
                 isStripeSubscription,
               );
               const fee = calculateNetAfterFees({
                 grossValue: Number(sub.valor) || 0,
-                platformFeePercent,
+                platformFeePercent: isStripeSubscription ? platformFeePercent : 0,
                 stripeMethod,
                 stripeFeeConfig: stripeProcessingFees,
               });
@@ -596,16 +638,20 @@ export function SubscriptionManager({
                           <p className="font-semibold">{formatCurrencyBRL(fee.gross)}</p>
                         </div>
                         <div className="rounded-md border bg-background/80 px-3 py-2">
-                          <p className="text-muted-foreground">Taxa Stripe</p>
+                          <p className="text-muted-foreground">Taxas Stripe</p>
                           <p className="font-semibold">{formatCurrencyBRL(fee.totalFees)}</p>
                           <p className="text-muted-foreground">
-                            {formatTotalStripeFeeRule(platformFeePercent, fee.stripeFee)}
+                            {isStripeSubscription
+                              ? formatTotalStripeFeeRule(platformFeePercent, fee.stripeFee)
+                              : "Sem taxa Stripe"}
                           </p>
                         </div>
                         <div className="rounded-md border bg-background/80 px-3 py-2">
                           <p className="text-muted-foreground">Liquido final est.</p>
                           <p className="font-semibold">{formatCurrencyBRL(fee.netAfterFees)}</p>
-                          <p className="text-muted-foreground">Apos taxas</p>
+                          <p className="text-muted-foreground">
+                            {isStripeSubscription ? "Apos taxas" : "Valor integral recebido"}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -687,7 +733,7 @@ export function SubscriptionManager({
                       <Button 
                         size="icon" 
                         variant="outline"
-                        onClick={() => handleOpenEdit(sub)}
+                        onClick={() => void handleOpenEdit(sub)}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -736,7 +782,7 @@ export function SubscriptionManager({
           <div className="space-y-4">
             <div>
               <Label>Plano</Label>
-              <Select value={editPlano} onValueChange={setEditPlano}>
+              <Select value={editPlano} onValueChange={(value) => setEditPlano(value as Plano)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -770,6 +816,35 @@ export function SubscriptionManager({
               />
             </div>
 
+            <div className="space-y-2">
+              <Label>Forma de pagamento</Label>
+              <Select
+                value={editPaymentMethod}
+                onValueChange={(value) => setEditPaymentMethod(value as ManualPaymentMethod)}
+                disabled={loadingEditPaymentMethod}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={
+                      loadingEditPaymentMethod
+                        ? "Carregando forma de pagamento..."
+                        : "Selecione a forma de pagamento"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {MANUAL_PAYMENT_METHOD_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Recebimentos manuais permanecem sem taxas da Stripe ou da plataforma.
+              </p>
+            </div>
+
             <div>
               <Label>Data de Expiração</Label>
               <LocalizedDateInput
@@ -793,7 +868,12 @@ export function SubscriptionManager({
             <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleUpdateSubscription}>Salvar</Button>
+            <Button
+              onClick={handleUpdateSubscription}
+              disabled={loadingEditPaymentMethod || !editPaymentMethod}
+            >
+              Salvar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

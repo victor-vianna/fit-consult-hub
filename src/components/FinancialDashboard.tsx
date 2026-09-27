@@ -69,6 +69,7 @@ import {
 } from "recharts";
 import { useMemo, useState } from "react";
 import { formatDisplayDate } from "@/utils/dateFormat";
+import { formatPaymentMethodLabel } from "@/utils/paymentMethods";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -111,31 +112,13 @@ const isFiniteNumber = (value: unknown): value is number =>
 
 const roundCurrencyValue = (value: number) => Math.round(Number(value || 0) * 100) / 100;
 
-const formatPaymentMethod = (method: string) => {
-  const normalized = normalizeText(method).replace(/^stripe_/, "");
-  const original = normalizeText(method);
-
-  if (original === "stripe_pending") return "Link Stripe";
-  if (!normalized || normalized === "—" || normalized === "â€”") return "—";
-  if (normalized === "pix") return "PIX";
-  if (normalized === "dinheiro") return "Dinheiro";
-  if (normalized === "transferencia") return "Transferencia";
-  if (normalized === "outro") return "Outro";
-
-  if (!normalized || normalized === "—") return "—";
-  if (normalized === "pix") return "Pix";
-  if (normalized === "card" || normalized === "cartao") return "Cartao";
-  if (normalized === "boleto") return "Boleto";
-  if (normalized === "connect" || normalized === "stripe") return "Stripe";
-
-  return method.replace(/^stripe_/i, "");
-};
+const formatPaymentMethod = (method: string) => formatPaymentMethodLabel(method);
 
 const getPaymentOriginText = (payment: PaymentDetail) => {
   const method = formatPaymentMethod(payment.metodo);
   return payment.paymentOrigin === "stripe"
     ? `${method} · pago pela plataforma`
-    : `${method} · registrado manualmente`;
+    : `${method} · recebido fora da Stripe`;
 };
 
 const formatAdjustmentReason = (reason: string) => {
@@ -176,7 +159,7 @@ function getPaymentFinancialAmounts(
       stripeProcessingFee: 0,
       totalFee: 0,
       net: gross,
-      feeLabel: "Sem taxa Stripe",
+      feeLabel: "Sem taxa Stripe · valor integral",
     };
   }
 
@@ -965,7 +948,7 @@ export function FinancialDashboard() {
                         <th className="text-right py-3 px-2 font-medium">Valor Total</th>
                         <th className="text-center py-3 px-2 font-medium">Parcela</th>
                         <th className="text-right py-3 px-2 font-medium">Valor Parcela</th>
-                        <th className="text-right py-3 px-2 font-medium">Taxa Stripe</th>
+                        <th className="text-right py-3 px-2 font-medium">Taxas Stripe</th>
                         <th className="text-right py-3 px-2 font-medium">Liquido Final</th>
                         <th className="text-center py-3 px-2 font-medium">Data</th>
                         <th className="text-center py-3 px-2 font-medium">Origem</th>

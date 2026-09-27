@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { createStudentNotification } from "@/utils/studentNotifications";
+import type { ManualPaymentMethod } from "@/utils/paymentMethods";
+
+export type { ManualPaymentMethod } from "@/utils/paymentMethods";
 
 export interface Subscription {
   id: string;
@@ -18,6 +21,8 @@ export interface Subscription {
   stripe_customer_id?: string | null;
   stripe_account_id?: string | null;
   stripe_checkout_session_id?: string | null;
+  access_revoked_at?: string | null;
+  access_revoked_reason?: string | null;
   cancela_no_fim_do_ciclo?: boolean;
   cancelado_em?: string | null;
   created_at: string;
@@ -33,10 +38,9 @@ export interface PaymentHistory {
   data_pagamento: string;
   metodo_pagamento: string | null;
   observacoes: string | null;
+  payment_origin?: "stripe" | "manual";
   created_at: string;
 }
-
-export type ManualPaymentMethod = "pix" | "dinheiro" | "transferencia" | "outro";
 
 const roundCurrency = (value: number) => Math.round(Number(value || 0) * 100) / 100;
 
@@ -323,6 +327,7 @@ export function useSubscriptions(studentId?: string, personalId?: string) {
       valor: number;
       data_pagamento: string;
       data_expiracao: string;
+      metodo_pagamento: ManualPaymentMethod;
       observacoes?: string | null;
     }
   ) => {
@@ -348,18 +353,20 @@ export function useSubscriptions(studentId?: string, personalId?: string) {
       normalizedValue.toFixed(2),
       paymentData.data_pagamento,
       paymentData.data_expiracao,
+      paymentData.metodo_pagamento,
       paymentData.observacoes,
     ]);
 
     try {
       const { data: result, error } = await (supabase as any).rpc(
-        "correct_manual_subscription_payment",
+        "correct_manual_subscription_payment_with_method",
         {
           _subscription_id: subscriptionId,
           _plan: paymentData.plano,
           _value: normalizedValue,
           _payment_date: paymentData.data_pagamento,
           _expiration_date: paymentData.data_expiracao,
+          _payment_method: paymentData.metodo_pagamento,
           _notes: paymentData.observacoes || null,
           _idempotency_key: idempotencyKey,
         }
@@ -392,7 +399,7 @@ export function useSubscriptions(studentId?: string, personalId?: string) {
     paymentData: {
       valor: number;
       data_pagamento: string;
-      metodo_pagamento?: string;
+      metodo_pagamento: ManualPaymentMethod;
       observacoes?: string;
       parcelas?: number;
     }
@@ -424,7 +431,7 @@ export function useSubscriptions(studentId?: string, personalId?: string) {
           _plan: subscription.plano,
           _value: normalizedValue,
           _payment_date: paymentData.data_pagamento,
-          _payment_method: paymentData.metodo_pagamento || null,
+          _payment_method: paymentData.metodo_pagamento,
           _notes: paymentData.observacoes || null,
           _installments: parcelas,
           _idempotency_key: idempotencyKey,

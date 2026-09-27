@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatDisplayMonthYear } from "@/utils/dateFormat";
+import { resolvePaymentOrigin, type PaymentOrigin } from "@/utils/paymentMethods";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -34,10 +35,15 @@ type FinancialPaymentRow = {
   created_at?: string | null;
   stripe_account_id?: string | null;
   stripe_invoice_id?: string | null;
+  stripe_payment_intent_id?: string | null;
+  stripe_charge_id?: string | null;
+  stripe_balance_transaction_id?: string | null;
+  stripe_application_fee_id?: string | null;
   stripe_application_fee_amount?: number | null;
   stripe_payment_method_type?: string | null;
   stripe_processing_fee_amount?: number | null;
   stripe_net_amount?: number | null;
+  payment_origin?: PaymentOrigin | null;
 };
 
 type FinancialAdjustmentRow = {
@@ -119,7 +125,7 @@ export interface PaymentDetail {
   stripeProcessingFeeAmount: number | null;
   stripeNetAmount: number | null;
   isStripePayment: boolean;
-  paymentOrigin: "stripe" | "manual";
+  paymentOrigin: PaymentOrigin;
 }
 
 export interface FinancialAdjustmentDetail {
@@ -548,13 +554,10 @@ export function useFinancialDashboard(personalId: string) {
         // Extract parcela info from observacoes (e.g. "Parcela 1/3")
         const parcelaMatch = p.observacoes?.match(/Parcela (\d+\/\d+)/);
         const parcelaAtual = parcelaMatch ? parcelaMatch[1] : "1/1";
-        const isStripePayment =
-          !!p.stripe_invoice_id ||
-          !!p.stripe_account_id ||
-          !!p.stripe_payment_method_type ||
-          !!sub?.stripe_subscription_id ||
-          !!sub?.stripe_checkout_session_id ||
-          !!sub?.stripe_account_id;
+        // A origem pertence ao lancamento, nao a assinatura. Uma assinatura
+        // Stripe pode receber uma baixa manual sem que existam taxas Stripe.
+        const paymentOrigin = resolvePaymentOrigin(p);
+        const isStripePayment = paymentOrigin === "stripe";
 
         return {
           id: p.id,
@@ -583,7 +586,7 @@ export function useFinancialDashboard(personalId: string) {
               ? Number(p.stripe_net_amount)
               : null,
           isStripePayment,
-          paymentOrigin: isStripePayment ? "stripe" : "manual",
+          paymentOrigin,
         };
       });
 

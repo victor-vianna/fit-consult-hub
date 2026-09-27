@@ -38,6 +38,38 @@ function getObjectId(value: unknown): string | null {
   return null;
 }
 
+function getInvoiceSubscriptionId(invoice: unknown): string | null {
+  const invoiceAny = invoice as any;
+  const lineItems = Array.isArray(invoiceAny?.lines?.data)
+    ? invoiceAny.lines.data
+    : [];
+  const lineSubscriptionId = lineItems
+    .map((line: any) =>
+      getObjectId(line?.parent?.subscription_item_details?.subscription) ||
+      getObjectId(line?.parent?.invoice_item_details?.subscription)
+    )
+    .find((id: string | null): id is string => !!id);
+
+  return getObjectId(invoiceAny?.subscription) ||
+    getObjectId(invoiceAny?.parent?.subscription_details?.subscription) ||
+    lineSubscriptionId ||
+    null;
+}
+
+function getInvoicePaymentIntentId(invoice: unknown): string | null {
+  const invoiceAny = invoice as any;
+  const invoicePayments = Array.isArray(invoiceAny?.payments?.data)
+    ? invoiceAny.payments.data
+    : [];
+  const invoicePaymentIntentId = invoicePayments
+    .map((payment: any) => getObjectId(payment?.payment?.payment_intent))
+    .find((id: string | null): id is string => !!id);
+
+  return getObjectId(invoiceAny?.payment_intent) ||
+    invoicePaymentIntentId ||
+    null;
+}
+
 function centsToMoney(value?: number | null) {
   return typeof value === "number" ? value / 100 : null;
 }
@@ -123,7 +155,7 @@ async function retrieveStripePaymentDetails(
 ) {
   const options = stripeOptions(stripeAccountId);
   const invoiceAny = invoice as any;
-  const paymentIntentId = getObjectId(invoiceAny.payment_intent);
+  const paymentIntentId = getInvoicePaymentIntentId(invoice);
   let paymentIntent: any = null;
   let charge: any = null;
 
@@ -196,7 +228,14 @@ async function getSubscriptionSnapshot(
     stripeOptions(stripeAccountId),
   );
   const metadata = subscription.metadata || {};
-  const periodEnd = (subscription as any).current_period_end;
+  const subscriptionAny = subscription as any;
+  const itemPeriodEnds = Array.isArray(subscriptionAny.items?.data)
+    ? subscriptionAny.items.data
+      .map((item: any) => item?.current_period_end)
+      .filter((value: unknown): value is number => typeof value === "number")
+    : [];
+  const periodEnd = subscriptionAny.current_period_end ||
+    (itemPeriodEnds.length > 0 ? Math.max(...itemPeriodEnds) : null);
   const status = fallback.statusPagamento ??
     mapSubscriptionPaymentStatus(subscription.status) ?? "pendente";
 
@@ -211,7 +250,10 @@ async function getSubscriptionSnapshot(
     student_id: fallback.studentId || metadata.student_id || null,
     personal_id: fallback.personalId || metadata.personal_id || null,
     plano: fallback.plano || metadata.plano || null,
-    valor: fallback.valor ?? centsToMoney(subscription.items.data[0]?.price.unit_amount) ?? 0,
+    valor: fallback.valor ??
+      centsToMoney(subscriptionAny.items?.data?.[0]?.price?.unit_amount) ??
+      centsToMoney(subscriptionAny.items?.data?.[0]?.pricing?.price_details?.unit_amount) ??
+      0,
     status_pagamento: status,
     data_pagamento: fallback.dataPagamento || null,
     data_expiracao: new Date(periodEnd * 1000).toISOString(),
@@ -288,7 +330,7 @@ async function normalizeRevocation(
   }
 
   const invoice = await getInvoiceForCharge(stripe, charge, stripeAccountId);
-  const subscriptionId = getObjectId((invoice as any)?.subscription) ||
+  const subscriptionId = getInvoiceSubscriptionId(invoice) ||
     charge.metadata?.stripe_subscription_id ||
     object?.metadata?.stripe_subscription_id;
 
@@ -390,7 +432,7 @@ async function normalizeEvent(
     case "invoice.paid":
     case "invoice.payment_succeeded": {
       const invoice = event.data.object as Stripe.Invoice;
-      const subscriptionId = getObjectId((invoice as any).subscription);
+      const subscriptionId = getInvoiceSubscriptionId(invoice);
       if (!subscriptionId) return { kind: "ignored", priority: 0, reason: "invoice_without_subscription" };
 
       const paidAt = getStripePaidAt(invoice);
@@ -407,7 +449,7 @@ async function normalizeEvent(
       );
 
       let details: JsonRecord = {
-        stripe_payment_intent_id: getObjectId((invoice as any).payment_intent),
+        stripe_payment_intent_id: getInvoicePaymentIntentId(invoice),
         stripe_charge_id: getObjectId((invoice as any).charge),
         stripe_currency: invoice.currency || null,
         metodo_pagamento: eventAccountId ? "stripe_connect" : "stripe",
@@ -435,7 +477,7 @@ async function normalizeEvent(
     case "invoice.voided":
     case "invoice.marked_uncollectible": {
       const invoice = event.data.object as Stripe.Invoice;
-      const subscriptionId = getObjectId((invoice as any).subscription);
+      const subscriptionId = getInvoiceSubscriptionId(invoice);
       if (!subscriptionId) return { kind: "ignored", priority: 0, reason: "invoice_without_subscription" };
       const snapshot = await getSubscriptionSnapshot(
         stripe,

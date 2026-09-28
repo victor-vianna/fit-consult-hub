@@ -321,6 +321,7 @@ export function useStudentAccess(studentId: string | undefined) {
       queryClient.invalidateQueries({ queryKey: ["platform-access", studentId] });
       queryClient.invalidateQueries({ queryKey: ["alunos"] });
       queryClient.invalidateQueries({ queryKey: ["aluno", studentId] });
+      queryClient.invalidateQueries({ queryKey: ["priority-students"] });
 
       const titles: Record<typeof vars.acao, string> = {
         pausar: "Acesso pausado",

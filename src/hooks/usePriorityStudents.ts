@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { differenceInCalendarDays, parseISO, startOfDay } from "date-fns";
 import type { StudentAccessState } from "@/hooks/useStudentAccess";
+import { isStudentManuallyBlockedFromPriorities } from "@/utils/priorityStudentVisibility";
 
 export type PriorityReason =
   | "plano_vencendo"
@@ -45,7 +46,8 @@ export function usePriorityStudents(personalId?: string) {
     const { data: alunos } = await supabase
       .from("profiles")
       .select("id, nome")
-      .eq("personal_id", personalId);
+      .eq("personal_id", personalId)
+      .is("archived_at", null);
 
     const map: Record<string, { nome: string; flags: PriorityFlag[] }> = {};
     (alunos || []).forEach((a) => {
@@ -63,6 +65,10 @@ export function usePriorityStudents(personalId?: string) {
         _personal_id: personalId,
       }),
     ]);
+
+    if (accessResult.error) {
+      throw accessResult.error;
+    }
 
     const subPorAluno = new Map<string, any>();
     (subs || []).forEach((s: any) => {
@@ -108,18 +114,25 @@ export function usePriorityStudents(personalId?: string) {
     // Replace the legacy financial flags above with the canonical access
     // decision. This prevents an older overdue row from contradicting a newer
     // paid subscription or a clearly identified manual exception.
-    if (!accessResult.error) {
-      Object.values(map).forEach((student) => {
-        student.flags = student.flags.filter(
-          (flag) =>
-            !["plano_vencendo", "plano_vencido", "pagamento_pendente"].includes(
-              flag.reason
-            )
-        );
-      });
+    const accessStates = (accessResult.data || []) as StudentAccessState[];
 
-      const subscriptionsById = new Map((subs || []).map((sub: any) => [sub.id, sub]));
-      ((accessResult.data || []) as StudentAccessState[]).forEach((state) => {
+    accessStates.forEach((state) => {
+      if (isStudentManuallyBlockedFromPriorities(state)) {
+        delete map[state.student_id];
+      }
+    });
+
+    Object.values(map).forEach((student) => {
+      student.flags = student.flags.filter(
+        (flag) =>
+          !["plano_vencendo", "plano_vencido", "pagamento_pendente"].includes(
+            flag.reason
+          )
+      );
+    });
+
+    const subscriptionsById = new Map((subs || []).map((sub: any) => [sub.id, sub]));
+    accessStates.forEach((state) => {
       if (!map[state.student_id] || !state.payment_required) return;
 
       const activeSubscription = state.active_subscription_id
@@ -181,8 +194,7 @@ export function usePriorityStudents(personalId?: string) {
             : "Pagamento pendente",
         severity: "alta",
       });
-      });
-    }
+    });
 
     const { data: planilhas } = await supabase
       .from("planilhas_treino")

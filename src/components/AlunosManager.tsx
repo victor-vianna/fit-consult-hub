@@ -721,6 +721,7 @@ export default function AlunosManager() {
     if (!user?.id) return;
     queryClient.invalidateQueries({ queryKey: ["alunos", user.id] });
     queryClient.invalidateQueries({ queryKey: ["students-access-states", user.id] });
+    queryClient.invalidateQueries({ queryKey: ["priority-students", user.id] });
   }, [queryClient, user?.id]);
 
   const fetchAlunos = refreshStudentsAndAccess;

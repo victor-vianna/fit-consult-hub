@@ -8,20 +8,20 @@ import {
   Circle,
   Dumbbell,
   MessageSquareText,
-  Play,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { InlinePesoInput } from "@/components/InlinePesoInput";
 import { supabase } from "@/integrations/supabase/client";
 import { useWeightHistory } from "@/hooks/useWeightHistory";
 import { formatDisplayMonthDay } from "@/utils/dateFormat";
-import { getNormalizedVideoUrl, getVideoThumbnail } from "@/utils/videoLinks";
+import { DemonstrationVideoPicker } from "./DemonstrationVideoPicker";
 
 interface CompactExerciseCardProps {
   exercicio: {
     id: string;
     nome: string;
     link_video?: string | null;
+    links_demonstracao?: unknown;
     series?: number;
     series_concluidas?: number | null;
     repeticoes?: string;
@@ -118,10 +118,6 @@ export function CompactExerciseCard({
   const currentSeries = Math.min(completedSeries + 1, totalSeries);
   const weightHistory = useWeightHistory(exercicio.nome, profileId || null);
   const suggestedWeight = getSuggestedWeight(weightHistory.ultimoPeso);
-  const externalVideoUrl = getNormalizedVideoUrl(exercicio.link_video);
-  const thumbnail = externalVideoUrl
-    ? getVideoThumbnail(exercicio.link_video, exercicio.thumbnail)
-    : null;
   const personalNote = exercicio.observacoes?.trim();
 
   useEffect(() => {
@@ -289,32 +285,12 @@ export function CompactExerciseCard({
             </p>
           </div>
 
-          {externalVideoUrl && thumbnail && (
-            <a
-              href={externalVideoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(event) => event.stopPropagation()}
-              aria-label={`Abrir demonstracao de ${exercicio.nome} em nova aba`}
-              title="Abrir demonstracao"
-              className={cn(
-                "relative shrink-0 overflow-hidden rounded-lg border bg-muted shadow-sm transition-transform active:scale-[0.98]",
-                isCarousel ? "h-12 w-16" : "h-12 w-16 sm:h-14 sm:w-20"
-              )}
-            >
-              <img
-                src={thumbnail}
-                alt=""
-                loading="lazy"
-                className="h-full w-full object-cover"
-              />
-              <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55">
-                  <Play className="ml-0.5 h-3.5 w-3.5 text-white" />
-                </span>
-              </span>
-            </a>
-          )}
+          <DemonstrationVideoPicker
+            links={exercicio.links_demonstracao}
+            legacyVideoUrl={exercicio.link_video}
+            title={exercicio.nome}
+            className={isCarousel ? "sm:h-12 sm:w-16" : undefined}
+          />
 
           <ChevronDown
             className={cn(

@@ -1,6 +1,7 @@
 // hooks/useAplicarModelo.ts
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getValidVideoReferences } from "@/utils/videoLinks";
 import { toast } from "sonner";
 import type { ModeloTreino } from "./useModelosTreino";
 import { formatDisplayMonthDay } from "@/utils/dateFormat";
@@ -200,10 +201,16 @@ export function useAplicarModelo() {
               novoGrupoId = grupoIdMap.get(ex.grupo_id) || ex.grupo_id;
             }
 
+            const demonstrationVideos = getValidVideoReferences(
+              ex.links_demonstracao,
+              ex.link_video
+            );
+
             return {
               treino_semanal_id: treinoId,
               nome: ex.nome,
-              link_video: ex.links_demonstracao?.[0]?.url || ex.link_video,
+              link_video: demonstrationVideos[0]?.url || null,
+              links_demonstracao: demonstrationVideos,
               series: ex.series,
               repeticoes: ex.repeticoes,
               descanso: ex.descanso,

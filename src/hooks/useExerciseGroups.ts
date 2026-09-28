@@ -10,6 +10,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { normalizeExerciseGroups } from "@/utils/workoutNormalization";
 import { getWeekStart } from "@/utils/weekUtils";
+import {
+  getValidVideoReferences,
+  type DemonstrationVideoLink,
+} from "@/utils/videoLinks";
 
 type TipoAgrupamento =
   | "normal"
@@ -23,6 +27,7 @@ export interface ExercicioInput {
   id?: string;
   nome: string;
   link_video?: string | null;
+  links_demonstracao?: DemonstrationVideoLink[] | null;
   series: number;
   repeticoes: string;
   descanso?: number;
@@ -246,22 +251,30 @@ export function useExerciseGroups({
       }
 
       // 2. Montar inserts
-      const inserts = payload.exercicios.map((ex, idx) => ({
-        treino_semanal_id: treinoIdValido, // ✅ Usar ID validado
-        nome: ex.nome,
-        link_video: ex.link_video ?? null,
-        series: ex.series,
-        repeticoes: ex.repeticoes,
-        descanso: ex.descanso ?? 0,
-        carga: ex.carga != null ? String(ex.carga) : null,
-        observacoes: ex.observacoes ?? null,
-        ordem: proximaOrdemBase,
-        grupo_id: grupoId,
-        tipo_agrupamento: String(payload.tipo),
-        ordem_no_grupo: idx + 1,
-        descanso_entre_grupos: payload.descanso_entre_grupos ?? null,
-        concluido: false,
-      }));
+      const inserts = payload.exercicios.map((ex, idx) => {
+        const demonstrationVideos = getValidVideoReferences(
+          ex.links_demonstracao,
+          ex.link_video
+        );
+
+        return {
+          treino_semanal_id: treinoIdValido, // ✅ Usar ID validado
+          nome: ex.nome,
+          link_video: demonstrationVideos[0]?.url ?? null,
+          links_demonstracao: demonstrationVideos,
+          series: ex.series,
+          repeticoes: ex.repeticoes,
+          descanso: ex.descanso ?? 0,
+          carga: ex.carga != null ? String(ex.carga) : null,
+          observacoes: ex.observacoes ?? null,
+          ordem: proximaOrdemBase,
+          grupo_id: grupoId,
+          tipo_agrupamento: String(payload.tipo),
+          ordem_no_grupo: idx + 1,
+          descanso_entre_grupos: payload.descanso_entre_grupos ?? null,
+          concluido: false,
+        };
+      });
 
       // 3. Inserir em lote
       const { data: inserted, error: insertErr } = await supabase
@@ -336,10 +349,15 @@ export function useExerciseGroups({
         proximaOrdemNoGrupo = Number(itensDoGrupo.ordem_no_grupo) + 1;
       }
 
+      const demonstrationVideos = getValidVideoReferences(
+        exercicio.links_demonstracao,
+        exercicio.link_video
+      );
       const insertObj = {
         treino_semanal_id: treinoSemanalId,
         nome: exercicio.nome,
-        link_video: exercicio.link_video ?? null,
+        link_video: demonstrationVideos[0]?.url ?? null,
+        links_demonstracao: demonstrationVideos,
         series: exercicio.series,
         repeticoes: exercicio.repeticoes,
         descanso: exercicio.descanso ?? 0,
@@ -477,22 +495,30 @@ export function useExerciseGroups({
       if (delError) throw delError;
 
       // 3. Reinserir com mesmo grupo_id e ordem preservada
-      const inserts = payload.exercicios.map((ex, idx) => ({
-        treino_semanal_id: treinoSemanalId,
-        nome: ex.nome,
-        link_video: ex.link_video ?? null,
-        series: ex.series,
-        repeticoes: ex.repeticoes,
-        descanso: ex.descanso ?? 0,
-        carga: ex.carga != null ? String(ex.carga) : null,
-        observacoes: ex.observacoes ?? null,
-        ordem: ordemBase,
-        grupo_id: grupoId,
-        tipo_agrupamento: String(payload.tipo),
-        ordem_no_grupo: idx + 1,
-        descanso_entre_grupos: payload.descanso_entre_grupos ?? null,
-        concluido: false,
-      }));
+      const inserts = payload.exercicios.map((ex, idx) => {
+        const demonstrationVideos = getValidVideoReferences(
+          ex.links_demonstracao,
+          ex.link_video
+        );
+
+        return {
+          treino_semanal_id: treinoSemanalId,
+          nome: ex.nome,
+          link_video: demonstrationVideos[0]?.url ?? null,
+          links_demonstracao: demonstrationVideos,
+          series: ex.series,
+          repeticoes: ex.repeticoes,
+          descanso: ex.descanso ?? 0,
+          carga: ex.carga != null ? String(ex.carga) : null,
+          observacoes: ex.observacoes ?? null,
+          ordem: ordemBase,
+          grupo_id: grupoId,
+          tipo_agrupamento: String(payload.tipo),
+          ordem_no_grupo: idx + 1,
+          descanso_entre_grupos: payload.descanso_entre_grupos ?? null,
+          concluido: false,
+        };
+      });
 
       const { error: insError } = await supabase
         .from("exercicios")

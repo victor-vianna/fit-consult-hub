@@ -20,6 +20,7 @@ import {
 import { useExerciseProgress } from "@/hooks/useExerciseProgress";
 import { hidratarBlocoComTemplate } from "@/types/workoutBlocks";
 import { WORKOUT_EVENTS } from "@/constants/workoutStatus";
+import { getValidVideoReferences } from "@/utils/videoLinks";
 import {
   normalizeExerciseGroups,
   normalizeExercises,
@@ -232,6 +233,10 @@ export function useTreinos({
                       : null,
                   nome: String(ex.nome ?? ""),
                   link_video: ex.link_video ?? null,
+                  links_demonstracao: getValidVideoReferences(
+                    ex.links_demonstracao,
+                    ex.link_video
+                  ),
                   ordem:
                     typeof ex.ordem === "number"
                       ? ex.ordem
@@ -459,6 +464,10 @@ export function useTreinos({
 
       const validated = exercicioSchema.parse(exercicio);
       const cargaDb = cargaForInsert((exercicio as Partial<Exercicio>).carga);
+      const demonstrationVideos = getValidVideoReferences(
+        validated.links_demonstracao,
+        validated.link_video
+      );
 
       // ✅ Usar treinoId alvo se fornecido, senão criar/encontrar
       const treinoId = treinoIdAlvo || await criarTreinoSeNecessario(diaValido, treinoIdAlvo);
@@ -474,7 +483,8 @@ export function useTreinos({
         .insert({
           treino_semanal_id: treinoId,
           nome: validated.nome,
-          link_video: validated.link_video || null,
+          link_video: demonstrationVideos[0]?.url || null,
+          links_demonstracao: demonstrationVideos,
           ordem: proximaOrdem,
           series: validated.series ?? 3,
           repeticoes: validated.repeticoes ?? "12",
@@ -497,6 +507,10 @@ export function useTreinos({
             : null,
         nome: String((data as any).nome ?? ""),
         link_video: (data as any).link_video ?? null,
+        links_demonstracao: getValidVideoReferences(
+          (data as any).links_demonstracao,
+          (data as any).link_video
+        ),
         ordem:
           typeof (data as any).ordem === "number"
             ? (data as any).ordem
@@ -554,6 +568,18 @@ export function useTreinos({
     }) => {
       const validated = exercicioSchema.partial().parse(dados);
       const payload: Record<string, any> = { ...validated };
+
+      if (
+        (dados as Partial<Exercicio>).links_demonstracao !== undefined ||
+        (dados as Partial<Exercicio>).link_video !== undefined
+      ) {
+        const demonstrationVideos = getValidVideoReferences(
+          (dados as Partial<Exercicio>).links_demonstracao,
+          (dados as Partial<Exercicio>).link_video
+        );
+        payload.links_demonstracao = demonstrationVideos;
+        payload.link_video = demonstrationVideos[0]?.url || null;
+      }
 
       if ((dados as Partial<Exercicio>).carga !== undefined) {
         payload.carga = cargaForUpdate((dados as Partial<Exercicio>).carga);

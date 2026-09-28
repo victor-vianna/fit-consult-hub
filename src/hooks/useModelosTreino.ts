@@ -2,11 +2,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import {
+  getValidVideoReferences,
+  type DemonstrationVideoLink,
+} from "@/utils/videoLinks";
 
-export interface LinkDemonstracao {
-  label: string;
-  url: string;
-}
+export type LinkDemonstracao = DemonstrationVideoLink;
 
 export interface ModeloTreinoExercicio {
   id?: string;
@@ -177,21 +178,29 @@ export function useModelosTreino({
 
       // 2. Inserir exercícios
       if (input.exercicios.length > 0) {
-        const exerciciosInsert = input.exercicios.map((ex, index) => ({
-          modelo_id: modeloData.id,
-          nome: ex.nome,
-          link_video: ex.link_video || null,
-          series: ex.series,
-          repeticoes: ex.repeticoes,
-          descanso: ex.descanso,
-          carga: ex.carga || null,
-          observacoes: ex.observacoes || null,
-          ordem: ex.ordem ?? index,
-          grupo_id: ex.grupo_id || null,
-          tipo_agrupamento: ex.tipo_agrupamento || null,
-          ordem_no_grupo: ex.ordem_no_grupo || null,
-          descanso_entre_grupos: ex.descanso_entre_grupos || null,
-        }));
+        const exerciciosInsert = input.exercicios.map((ex, index) => {
+          const demonstrationVideos = getValidVideoReferences(
+            ex.links_demonstracao,
+            ex.link_video
+          );
+
+          return {
+            modelo_id: modeloData.id,
+            nome: ex.nome,
+            link_video: demonstrationVideos[0]?.url || null,
+            links_demonstracao: demonstrationVideos,
+            series: ex.series,
+            repeticoes: ex.repeticoes,
+            descanso: ex.descanso,
+            carga: ex.carga || null,
+            observacoes: ex.observacoes || null,
+            ordem: ex.ordem ?? index,
+            grupo_id: ex.grupo_id || null,
+            tipo_agrupamento: ex.tipo_agrupamento || null,
+            ordem_no_grupo: ex.ordem_no_grupo || null,
+            descanso_entre_grupos: ex.descanso_entre_grupos || null,
+          };
+        });
 
         const { error: exerciciosError } = await supabase
           .from("treino_modelo_exercicios")

@@ -1,5 +1,17 @@
 export const DEFAULT_VIDEO_THUMBNAIL = "/exercise-thumbnail.svg";
 
+export interface DemonstrationVideoLink {
+  label: string;
+  url: string;
+}
+
+export type DemonstrationVideoInput =
+  | string
+  | {
+      label?: unknown;
+      url?: unknown;
+    };
+
 function getSafeHttpUrl(value?: string | null) {
   const raw = value?.trim();
   if (!raw) return null;
@@ -67,11 +79,49 @@ export function getVideoThumbnail(
   return DEFAULT_VIDEO_THUMBNAIL;
 }
 
-export function getFirstValidVideoUrl(links?: Array<string | null | undefined> | null) {
-  for (const link of links ?? []) {
-    const normalizedUrl = getNormalizedVideoUrl(link);
-    if (normalizedUrl) return normalizedUrl;
+export function getValidVideoReferences(
+  links?: unknown,
+  legacyVideoUrl?: string | null
+): DemonstrationVideoLink[] {
+  const candidates: DemonstrationVideoInput[] = Array.isArray(links)
+    ? [...(links as DemonstrationVideoInput[])]
+    : [];
+
+  if (legacyVideoUrl) {
+    candidates.push({ label: "Vídeo 1", url: legacyVideoUrl });
   }
 
-  return null;
+  const seen = new Set<string>();
+  const normalized: DemonstrationVideoLink[] = [];
+
+  for (const candidate of candidates) {
+    const rawUrl =
+      typeof candidate === "string"
+        ? candidate
+        : typeof candidate?.url === "string"
+          ? candidate.url
+          : "";
+    const url = getNormalizedVideoUrl(rawUrl);
+
+    if (!url || seen.has(url)) continue;
+
+    const rawLabel =
+      typeof candidate === "object" &&
+      candidate !== null &&
+      typeof candidate.label === "string"
+        ? candidate.label.trim()
+        : "";
+
+    seen.add(url);
+    normalized.push({
+      label: rawLabel || `Vídeo ${normalized.length + 1}`,
+      url,
+    });
+  }
+
+  return normalized;
+}
+
+export function getFirstValidVideoUrl(links?: Array<string | null | undefined> | null) {
+  return getValidVideoReferences(links)[0]?.url ?? null;
 }

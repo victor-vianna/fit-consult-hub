@@ -1,6 +1,11 @@
 // exercicioSchema.ts
 import { z } from "zod";
 
+const demonstrationVideoSchema = z.object({
+  label: z.string().max(80, "Nome do video muito longo"),
+  url: z.string().url("URL de video invalida"),
+});
+
 export const exercicioSchema = z.object({
   nome: z
     .string()
@@ -8,6 +13,7 @@ export const exercicioSchema = z.object({
     .max(100, "Nome muito longo"),
   // aceita URL válida ou string vazia (campo opcional)
   link_video: z.string().url("URL inválida").optional().or(z.literal("")),
+  links_demonstracao: z.array(demonstrationVideoSchema).max(10).optional(),
   series: z
     .number()
     .int()

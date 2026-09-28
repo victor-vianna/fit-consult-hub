@@ -1,10 +1,13 @@
 // src/types/treino.ts
 
+import type { DemonstrationVideoLink } from "@/utils/videoLinks";
+
 export interface Exercicio {
   id: string;
   treino_semanal_id: string | null;
   nome: string;
   link_video: string | null;
+  links_demonstracao?: DemonstrationVideoLink[] | null;
   ordem: number;
   ordem_no_grupo: number | null;
   series: number | null;

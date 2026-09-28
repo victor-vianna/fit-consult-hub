@@ -36,11 +36,16 @@ import {
   readInterfaceMemory,
   writeInterfaceMemory,
 } from "@/utils/interfaceMemory";
+import {
+  getValidVideoReferences,
+  type DemonstrationVideoLink,
+} from "@/utils/videoLinks";
 
 interface ExercicioItem {
   id?: string;
   nome: string;
   link_video: string;
+  links_demonstracao: DemonstrationVideoLink[];
   series: number;
   repeticoes: string;
   descanso: number;
@@ -79,6 +84,7 @@ interface GrupoEditando {
   exercicios: Array<{
     nome: string;
     link_video?: string | null;
+    links_demonstracao?: unknown;
     series?: number | null;
     repeticoes?: string | null;
     descanso?: number | null;
@@ -102,6 +108,7 @@ interface ExercicioDialogProps {
 const defaultExercicio = (): Omit<ExercicioItem, "id"> => ({
   nome: "",
   link_video: "",
+  links_demonstracao: [],
   series: 3,
   repeticoes: "10-12",
   descanso: 60,
@@ -109,9 +116,24 @@ const defaultExercicio = (): Omit<ExercicioItem, "id"> => ({
   observacoes: "",
 });
 
-const EXERCISE_DIALOG_DRAFT_VERSION = 2;
+const EXERCISE_DIALOG_DRAFT_VERSION = 3;
 const EXERCISE_DIALOG_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const EXERCISE_DEFAULT_VALUES = defaultExercicio();
+
+function normalizeExerciseVideos(
+  exercise: Omit<ExercicioItem, "id">
+): Omit<ExercicioItem, "id"> {
+  const videos = getValidVideoReferences(
+    exercise.links_demonstracao,
+    exercise.link_video
+  );
+
+  return {
+    ...exercise,
+    link_video: videos[0]?.url || "",
+    links_demonstracao: videos,
+  };
+}
 
 export function getExerciseDialogDraftScope(draftKey: string) {
   return `workout:exercise-dialog:${draftKey}`;
@@ -168,23 +190,36 @@ export function ExercicioDialog({
         setTipoAgrupamento(grupoEditando.tipo_agrupamento || "bi-set");
         setDescansoEntreGrupos(grupoEditando.descanso_entre_grupos ?? 90);
         setGrupoExercicios(
-          grupoEditando.exercicios.map((ex) => ({
-            nome: ex.nome || "",
-            link_video: ex.link_video || "",
-            series: ex.series || 3,
-            repeticoes: ex.repeticoes || "10-12",
-            descanso: ex.descanso ?? 0,
-            carga: ex.carga != null ? String(ex.carga) : "",
-            observacoes: ex.observacoes || "",
-          }))
+          grupoEditando.exercicios.map((ex) => {
+            const videos = getValidVideoReferences(
+              ex.links_demonstracao,
+              ex.link_video
+            );
+
+            return {
+              nome: ex.nome || "",
+              link_video: videos[0]?.url || "",
+              links_demonstracao: videos,
+              series: ex.series || 3,
+              repeticoes: ex.repeticoes || "10-12",
+              descanso: ex.descanso ?? 0,
+              carga: ex.carga != null ? String(ex.carga) : "",
+              observacoes: ex.observacoes || "",
+            };
+          })
         );
         setFormData(defaultExercicio());
       } else if (exercicio) {
         // Modo edição: sempre simples
+        const videos = getValidVideoReferences(
+          exercicio.links_demonstracao,
+          exercicio.link_video
+        );
         setModo("simple");
         setFormData({
           nome: exercicio.nome || "",
-          link_video: exercicio.link_video || "",
+          link_video: videos[0]?.url || "",
+          links_demonstracao: videos,
           series: exercicio.series || 3,
           repeticoes: exercicio.repeticoes || "10-12",
           descanso: exercicio.descanso || 60,
@@ -240,8 +275,16 @@ export function ExercicioDialog({
     if (ex.series < 1 || ex.series > 20) erros[`${prefix}series`] = "Séries: 1-20.";
     if (!ex.repeticoes.trim()) erros[`${prefix}repeticoes`] = "Repetições é obrigatório.";
     if (ex.descanso < 0 || ex.descanso > 600) erros[`${prefix}descanso`] = "Descanso: 0-600s.";
-    if (ex.link_video && !/^https?:\/\/[\w\-]+(\.[\w\-]+)+[/#?]?.*$/.test(ex.link_video))
-      erros[`${prefix}link_video`] = "URL inválida.";
+    const videos = ex.links_demonstracao.length > 0
+      ? ex.links_demonstracao
+      : ex.link_video
+        ? [{ label: "Vídeo 1", url: ex.link_video }]
+        : [];
+    videos.forEach((video, index) => {
+      if (video.url && !/^https?:\/\/[\w-]+(\.[\w-]+)+[/#?]?.*$/.test(video.url)) {
+        erros[`${prefix}video_${index}`] = "URL inválida.";
+      }
+    });
     return erros;
   };
 
@@ -271,21 +314,21 @@ export function ExercicioDialog({
     setLoading(true);
     try {
       if (modo === "simple") {
-        await onSave(formData);
+        await onSave(normalizeExerciseVideos(formData));
       } else if (grupoEditando && onUpdateGroup) {
         // Atualizar grupo existente
         await onUpdateGroup(grupoEditando.grupo_id, {
           type: "group",
           tipoAgrupamento,
           descansoEntreGrupos,
-          exercicios: grupoExercicios,
+          exercicios: grupoExercicios.map(normalizeExerciseVideos),
         });
       } else if (onSaveGroup) {
         await onSaveGroup({
           type: "group",
           tipoAgrupamento,
           descansoEntreGrupos,
-          exercicios: grupoExercicios,
+          exercicios: grupoExercicios.map(normalizeExerciseVideos),
         });
       }
       clearDraft();
@@ -302,6 +345,9 @@ export function ExercicioDialog({
     const data = {
       nome: exercise.nome,
       link_video: exercise.link_youtube || "",
+      links_demonstracao: exercise.link_youtube
+        ? [{ label: exercise.nome, url: exercise.link_youtube }]
+        : [],
     };
 
     if (modo === "simple" || pickerTargetIndex === null) {
@@ -689,6 +735,7 @@ function hasExerciseItemContent(exercise: Partial<ExercicioItem>) {
     hasMeaningfulValues({
       nome: exercise.nome,
       link_video: exercise.link_video,
+      links_demonstracao: exercise.links_demonstracao,
       carga: exercise.carga,
       observacoes: exercise.observacoes,
     }) ||
@@ -708,6 +755,17 @@ interface ExerciseFieldsProps {
 }
 
 function ExerciseFields({ data, errors, prefix, onChange, compact = false }: ExerciseFieldsProps) {
+  const videoLinks =
+    data.links_demonstracao.length > 0
+      ? data.links_demonstracao
+      : [{ label: "Vídeo 1", url: data.link_video }];
+
+  const updateVideoLinks = (nextLinks: DemonstrationVideoLink[]) => {
+    const boundedLinks = nextLinks.slice(0, 10);
+    onChange("links_demonstracao", boundedLinks);
+    onChange("link_video", boundedLinks[0]?.url || "");
+  };
+
   return (
     <div className={cn("space-y-3", compact && "space-y-2")}>
       {/* Nome */}
@@ -730,24 +788,102 @@ function ExerciseFields({ data, errors, prefix, onChange, compact = false }: Exe
         )}
       </div>
 
-      {/* Link vídeo */}
-      <div className="space-y-1">
-        <Label htmlFor={`${prefix}link_video`} className={compact ? "text-xs" : ""}>
-          Link do Vídeo (opcional)
-        </Label>
-        <Input
-          id={`${prefix}link_video`}
-          value={data.link_video}
-          onChange={(e) => onChange("link_video", e.target.value)}
-          placeholder="https://youtube.com/watch?v=..."
-          className={cn(
-            compact ? "h-9 text-sm" : "h-10",
-            errors[`${prefix}link_video`] && "border-destructive"
-          )}
-        />
-        {errors[`${prefix}link_video`] && (
-          <p className="text-xs text-destructive">{errors[`${prefix}link_video`]}</p>
-        )}
+      {/* Vídeos de demonstração */}
+      <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <Label className={compact ? "text-xs" : ""}>
+              Vídeos de demonstração
+            </Label>
+            {!compact ? (
+              <p className="text-xs text-muted-foreground">
+                Adicione mais opções para bi-set, tri-set ou variações do exercício.
+              </p>
+            ) : null}
+          </div>
+          {videoLinks.some((video) => video.url.trim()) ? (
+            <Badge variant="secondary" className="shrink-0 text-[10px]">
+              {videoLinks.filter((video) => video.url.trim()).length} vídeo(s)
+            </Badge>
+          ) : null}
+        </div>
+
+        <div className="space-y-2">
+          {videoLinks.map((video, index) => (
+            <div
+              key={`${prefix}video-${index}`}
+              className={cn(
+                "grid gap-2",
+                compact ? "grid-cols-1" : "sm:grid-cols-[minmax(120px,0.45fr)_minmax(0,1fr)_auto]"
+              )}
+            >
+              <Input
+                value={video.label}
+                onChange={(event) => {
+                  const next = [...videoLinks];
+                  next[index] = { ...video, label: event.target.value };
+                  updateVideoLinks(next);
+                }}
+                placeholder={`Nome do vídeo ${index + 1}`}
+                maxLength={80}
+                className={compact ? "h-9 text-sm" : "h-10"}
+                aria-label={`Nome do vídeo ${index + 1}`}
+              />
+              <div className="space-y-1">
+                <Input
+                  id={`${prefix}video_${index}`}
+                  value={video.url}
+                  onChange={(event) => {
+                    const next = [...videoLinks];
+                    next[index] = { ...video, url: event.target.value };
+                    updateVideoLinks(next);
+                  }}
+                  placeholder="https://youtube.com/watch?v=..."
+                  className={cn(
+                    compact ? "h-9 text-sm" : "h-10",
+                    errors[`${prefix}video_${index}`] && "border-destructive"
+                  )}
+                  aria-label={`Link do vídeo ${index + 1}`}
+                />
+                {errors[`${prefix}video_${index}`] ? (
+                  <p className="text-xs text-destructive">
+                    {errors[`${prefix}video_${index}`]}
+                  </p>
+                ) : null}
+              </div>
+              {videoLinks.length > 1 ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0 text-destructive hover:text-destructive"
+                  onClick={() => updateVideoLinks(videoLinks.filter((_, itemIndex) => itemIndex !== index))}
+                  aria-label={`Remover vídeo ${index + 1}`}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              ) : null}
+            </div>
+          ))}
+        </div>
+
+        {videoLinks.length < 10 ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full border-dashed"
+            onClick={() =>
+              updateVideoLinks([
+                ...videoLinks,
+                { label: `Vídeo ${videoLinks.length + 1}`, url: "" },
+              ])
+            }
+          >
+            <Plus className="mr-1 h-4 w-4" />
+            Adicionar outro vídeo
+          </Button>
+        ) : null}
       </div>
 
       {/* Grid: séries, repetições, descanso */}

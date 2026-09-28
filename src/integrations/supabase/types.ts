@@ -895,6 +895,7 @@ export type Database = {
           grupo_id: string | null
           id: string
           link_video: string | null
+          links_demonstracao: Json
           nome: string
           observacoes: string | null
           ordem: number
@@ -918,6 +919,7 @@ export type Database = {
           grupo_id?: string | null
           id?: string
           link_video?: string | null
+          links_demonstracao?: Json
           nome: string
           observacoes?: string | null
           ordem?: number
@@ -941,6 +943,7 @@ export type Database = {
           grupo_id?: string | null
           id?: string
           link_video?: string | null
+          links_demonstracao?: Json
           nome?: string
           observacoes?: string | null
           ordem?: number

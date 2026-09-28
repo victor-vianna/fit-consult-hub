@@ -88,6 +88,7 @@ function getExerciseSignature(
     normalizeNumber(exercicio.descanso, 0),
     normalizeText(exercicio.carga),
     normalizeText(exercicio.link_video),
+    stableSerialize(exercicio.links_demonstracao),
     normalizeText(exercicio.observacoes),
     ignoreGroupId ? "" : normalizeText(exercicio.grupo_id),
     normalizeText(exercicio.tipo_agrupamento),

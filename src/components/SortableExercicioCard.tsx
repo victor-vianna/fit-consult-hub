@@ -7,6 +7,7 @@ interface Exercicio {
   id: string;
   nome: string;
   link_video: string | null;
+  links_demonstracao?: unknown;
   ordem: number;
   series: number;
   repeticoes: string;

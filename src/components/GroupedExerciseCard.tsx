@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { InlinePesoInput } from "@/components/InlinePesoInput";
+import { DemonstrationVideoPicker } from "./DemonstrationVideoPicker";
 import { useExerciseLibrary } from "@/hooks/useExerciseLibrary";
 
 const TIPOS_AGRUPAMENTO = {
@@ -38,6 +39,7 @@ interface ExercicioAgrupado {
   id: string;
   nome: string;
   link_video?: string | null;
+  links_demonstracao?: unknown;
   series?: number;
   repeticoes?: string;
   descanso?: number;
@@ -450,18 +452,12 @@ export function GroupedExerciseCard({
                         </div>
 
                         <div className="flex flex-wrap items-center gap-3">
-                          {exercicio.link_video && (
-                            <a
-                              href={exercicio.link_video}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline touch-target"
-                              onClick={(event) => event.stopPropagation()}
-                            >
-                              <Play className="h-3.5 w-3.5" />
-                              Ver demonstração
-                            </a>
-                          )}
+                          <DemonstrationVideoPicker
+                            links={exercicio.links_demonstracao}
+                            legacyVideoUrl={exercicio.link_video}
+                            title={exercicio.nome}
+                            variant="inline"
+                          />
 
                           {!readOnly && (
                             <button

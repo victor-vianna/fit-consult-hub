@@ -11,7 +11,6 @@ import {
   Dumbbell,
   Edit,
   GripVertical,
-  Play,
   Trash2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -21,11 +20,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { InlinePesoInput } from "@/components/InlinePesoInput";
 import { useExerciseLibrary } from "@/hooks/useExerciseLibrary";
 import { useHaptic } from "@/hooks/useHaptic";
+import { DemonstrationVideoPicker } from "./DemonstrationVideoPicker";
 
 interface Exercicio {
   id: string;
   nome: string;
   link_video: string | null;
+  links_demonstracao?: unknown;
   ordem: number;
   series: number;
   repeticoes: string;
@@ -279,18 +280,12 @@ export function ExercicioCard({
         {expanded && (
           <div className="mt-3 space-y-3 border-t pt-3">
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-              {exercicio.link_video && (
-                <a
-                  href={exercicio.link_video}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-blue-600 hover:underline touch-target"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <Play className="h-4 w-4" />
-                  Ver demonstração
-                </a>
-              )}
+              <DemonstrationVideoPicker
+                links={exercicio.links_demonstracao}
+                legacyVideoUrl={exercicio.link_video}
+                title={exercicio.nome}
+                variant="inline"
+              />
 
               {onToggleConcluido && (
                 <button

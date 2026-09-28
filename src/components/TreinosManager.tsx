@@ -122,6 +122,7 @@ import { useWorkoutBlocks } from "@/hooks/useWorkoutBlocks";
 import { GroupedExerciseCard } from "./GroupedExerciseCard";
 import { ExerciseGroupDialog } from "./ExerciseGroupDialog";
 import { toast } from "sonner";
+import type { DemonstrationVideoLink } from "@/utils/videoLinks";
 
 interface TreinosManagerProps {
   profileId: string;
@@ -134,6 +135,7 @@ type DialogExercicio = {
   id?: string;
   nome: string;
   link_video: string;
+  links_demonstracao: DemonstrationVideoLink[];
   series: number;
   repeticoes: string;
   descanso: number;
@@ -786,6 +788,7 @@ export function TreinosManager({
       id: exercicio.id,
       nome: exercicio.nome,
       link_video: exercicio.link_video ?? null,
+      links_demonstracao: exercicio.links_demonstracao ?? null,
       ordem: exercicio.ordem,
       series: exercicio.series,
       repeticoes: exercicio.repeticoes,
@@ -858,6 +861,9 @@ export function TreinosManager({
     setExercicioTemp({
       nome: exercise.nome,
       link_video: exercise.link_youtube ?? "",
+      links_demonstracao: exercise.link_youtube
+        ? [{ label: exercise.nome, url: exercise.link_youtube }]
+        : [],
       series: 3,
       repeticoes: "12",
       descanso: 60,
@@ -875,6 +881,7 @@ export function TreinosManager({
     return {
       nome: d.nome,
       link_video: d.link_video || "",
+      links_demonstracao: d.links_demonstracao,
       series: d.series,
       repeticoes: d.repeticoes,
       descanso: d.descanso,
@@ -887,6 +894,7 @@ export function TreinosManager({
     id: ex.id,
     nome: ex.nome,
     link_video: ex.link_video ?? "",
+    links_demonstracao: ex.links_demonstracao ?? [],
     series: ex.series ?? 3,
     repeticoes: ex.repeticoes ?? "12",
     descanso: ex.descanso ?? 60,
@@ -1416,6 +1424,7 @@ export function TreinosManager({
         .map((ex, index) => ({
           nome: ex.nome,
           link_video: ex.link_video ?? undefined,
+          links_demonstracao: ex.links_demonstracao ?? undefined,
           series: ex.series ?? 3,
           repeticoes: ex.repeticoes ?? "12",
           descanso: ex.descanso ?? 60,
@@ -1429,6 +1438,7 @@ export function TreinosManager({
         grupo.exercicios.map((ex: any, index: number) => ({
           nome: ex.nome,
           link_video: ex.link_video ?? undefined,
+          links_demonstracao: ex.links_demonstracao ?? undefined,
           series: ex.series ?? 3,
           repeticoes: ex.repeticoes ?? "12",
           descanso: ex.descanso ?? 60,
@@ -2238,6 +2248,7 @@ export function TreinosManager({
                 exercicios: result.exercicios.map((ex) => ({
                   nome: ex.nome,
                   link_video: ex.link_video || null,
+                  links_demonstracao: ex.links_demonstracao,
                   series: ex.series,
                   repeticoes: ex.repeticoes,
                   descanso: ex.descanso,
@@ -2265,6 +2276,7 @@ export function TreinosManager({
                 exercicios: result.exercicios.map((ex) => ({
                   nome: ex.nome,
                   link_video: ex.link_video || null,
+                  links_demonstracao: ex.links_demonstracao,
                   series: ex.series,
                   repeticoes: ex.repeticoes,
                   descanso: ex.descanso,

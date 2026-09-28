@@ -9,10 +9,10 @@ import {
   Dumbbell,
   ExternalLink,
   Layers3,
-  Play,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TIPOS_BLOCO, formatarDuracao } from "@/types/workoutBlocks";
+import { DemonstrationVideoPicker } from "./DemonstrationVideoPicker";
 
 type PreviewItemType = "exercise" | "group" | "block";
 
@@ -151,18 +151,12 @@ function PreviewExerciseCard({
                   {carga}kg
                 </span>
               )}
-              {exercicio?.link_video && (
-                <a
-                  href={exercicio.link_video}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(event) => event.stopPropagation()}
-                  className="inline-flex items-center gap-1 text-blue-500 hover:underline"
-                >
-                  <Play className="h-3.5 w-3.5" />
-                  Demonstração
-                </a>
-              )}
+              <DemonstrationVideoPicker
+                links={exercicio?.links_demonstracao}
+                legacyVideoUrl={exercicio?.link_video}
+                title={exercicio?.nome || "Exercício"}
+                variant="inline"
+              />
             </div>
             {exercicio?.observacoes && (
               <p className="italic">{exercicio.observacoes}</p>

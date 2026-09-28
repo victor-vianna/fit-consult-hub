@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { decideAuthEvent } from "@/utils/authSessionEvents";
 
 export type UserRole = "admin" | "personal" | "aluno";
 
@@ -11,7 +12,7 @@ export type Profile = {
   email: string | null;
   personal_id?: string | null;
   is_active?: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 const clearPersistedAuthSession = () => {
@@ -34,53 +35,125 @@ export const useAuth = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const initializedRef = useRef(false);
+  const loadedUserIdRef = useRef<string | null>(null);
+  const initializingUserIdRef = useRef<string | null>(null);
+  const roleRef = useRef<UserRole | null>(null);
+  const sessionRef = useRef<Session | null>(null);
 
-  const initializeUserData = useCallback(async (userId: string) => {
-    if (initializedRef.current) return;
-    initializedRef.current = true;
-    setLoading(true);
-    try {
-      const [roleResult, profileResult] = await Promise.all([
-        supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", userId)
-          .single(),
-        supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", userId)
-          .single(),
-      ]);
+  const updateAuthState = useCallback((nextSession: Session | null) => {
+    const currentSession = sessionRef.current;
+    const currentUserId = currentSession?.user.id ?? null;
+    const nextUserId = nextSession?.user.id ?? null;
+    const accessTokenChanged =
+      currentSession?.access_token !== nextSession?.access_token;
+    const userChanged = currentUserId !== nextUserId;
 
-      if (roleResult.error) {
-        console.error("Erro ao buscar role:", roleResult.error);
-        setRole(null);
-      } else {
-        setRole(roleResult.data.role as UserRole);
-      }
+    if (!accessTokenChanged && !userChanged) return;
 
-      if (profileResult.error) {
-        console.error("Erro ao buscar profile:", profileResult.error);
-        setProfile(null);
-      } else {
-        setProfile(profileResult.data);
-      }
-    } catch (error) {
-      console.error("Erro ao inicializar dados do usuário:", error);
-    } finally {
-      setLoading(false);
-    }
+    sessionRef.current = nextSession;
+    setSession(nextSession);
+    setUser(nextSession?.user ?? null);
   }, []);
+
+  const clearUserData = useCallback(() => {
+    initializedRef.current = false;
+    loadedUserIdRef.current = null;
+    initializingUserIdRef.current = null;
+    roleRef.current = null;
+    setRole(null);
+    setProfile(null);
+    setLoading(false);
+  }, []);
+
+  const initializeUserData = useCallback(
+    async (userId: string, { showLoading }: { showLoading: boolean }) => {
+      if (initializingUserIdRef.current === userId) return;
+      if (
+        initializedRef.current &&
+        loadedUserIdRef.current === userId &&
+        roleRef.current
+      ) {
+        return;
+      }
+
+      const accountChanged =
+        loadedUserIdRef.current !== null &&
+        loadedUserIdRef.current !== userId;
+
+      initializingUserIdRef.current = userId;
+      initializedRef.current = true;
+      loadedUserIdRef.current = userId;
+
+      if (accountChanged) {
+        roleRef.current = null;
+        setRole(null);
+        setProfile(null);
+      }
+      if (showLoading) setLoading(true);
+
+      try {
+        const [roleResult, profileResult] = await Promise.all([
+          supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", userId)
+            .single(),
+          supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", userId)
+            .single(),
+        ]);
+
+        if (loadedUserIdRef.current !== userId) return;
+
+        if (roleResult.error) {
+          console.error("Erro ao buscar role:", roleResult.error);
+          roleRef.current = null;
+          setRole(null);
+        } else {
+          const nextRole = roleResult.data.role as UserRole;
+          roleRef.current = nextRole;
+          setRole(nextRole);
+        }
+
+        if (profileResult.error) {
+          console.error("Erro ao buscar profile:", profileResult.error);
+          setProfile(null);
+        } else {
+          setProfile(profileResult.data);
+        }
+      } catch (error) {
+        console.error("Erro ao inicializar dados do usuário:", error);
+      } finally {
+        if (initializingUserIdRef.current === userId) {
+          initializingUserIdRef.current = null;
+        }
+        if (loadedUserIdRef.current === userId) setLoading(false);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     // Load initial session first
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+      updateAuthState(session);
 
       if (session?.user) {
-        initializeUserData(session.user.id);
+        const decision = decideAuthEvent({
+          event: "INITIAL_SESSION",
+          currentUserId: loadedUserIdRef.current,
+          nextUserId: session.user.id,
+          initialized: initializedRef.current,
+          hasRole: roleRef.current !== null,
+        });
+
+        if (decision.reinitialize) {
+          void initializeUserData(session.user.id, {
+            showLoading: decision.showLoading,
+          });
+        }
       } else {
         setLoading(false);
       }
@@ -90,29 +163,27 @@ export const useAuth = () => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("🔵 Auth event:", event);
-      setSession(session);
-      setUser(session?.user ?? null);
+      updateAuthState(session);
 
-      if (event === "SIGNED_IN" && session?.user) {
-        // Reset initialized flag on new sign-in to reload data
-        initializedRef.current = false;
-        initializeUserData(session.user.id);
-      } else if (event === "SIGNED_OUT") {
-        initializedRef.current = false;
-        setRole(null);
-        setProfile(null);
-        setLoading(false);
-      } else if (event === "TOKEN_REFRESHED" && session?.user) {
-        // Session was refreshed (e.g. returning to app), ensure data is loaded
-        if (!initializedRef.current) {
-          initializeUserData(session.user.id);
-        }
+      const decision = decideAuthEvent({
+        event,
+        currentUserId: loadedUserIdRef.current,
+        nextUserId: session?.user.id ?? null,
+        initialized: initializedRef.current,
+        hasRole: roleRef.current !== null,
+      });
+
+      if (decision.clear) {
+        clearUserData();
+      } else if (decision.reinitialize && session?.user) {
+        void initializeUserData(session.user.id, {
+          showLoading: decision.showLoading,
+        });
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [initializeUserData]);
+  }, [clearUserData, initializeUserData, updateAuthState]);
 
   // Re-initialize on visibility change (returning from background on mobile)
   useEffect(() => {
@@ -120,12 +191,22 @@ export const useAuth = () => {
       if (document.visibilityState === "visible") {
         // Check if session is still valid when returning to app
         supabase.auth.getSession().then(({ data: { session } }) => {
-          if (session?.user) {
-            setSession(session);
-            setUser(session.user);
-            if (!initializedRef.current || !role) {
-              initializeUserData(session.user.id);
-            }
+          updateAuthState(session);
+
+          const decision = decideAuthEvent({
+            event: session?.user ? "TOKEN_REFRESHED" : "SIGNED_OUT",
+            currentUserId: loadedUserIdRef.current,
+            nextUserId: session?.user.id ?? null,
+            initialized: initializedRef.current,
+            hasRole: roleRef.current !== null,
+          });
+
+          if (decision.clear) {
+            clearUserData();
+          } else if (decision.reinitialize && session?.user) {
+            void initializeUserData(session.user.id, {
+              showLoading: decision.showLoading,
+            });
           }
         });
       }
@@ -133,7 +214,7 @@ export const useAuth = () => {
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [role, initializeUserData]);
+  }, [clearUserData, initializeUserData, updateAuthState]);
 
   const signOut = async () => {
     console.log("🔵 Iniciando logout...");

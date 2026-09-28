@@ -1,14 +1,28 @@
-import { ReactNode, useCallback, useEffect, useState } from "react";
+import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { useAuth, UserRole } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import type { StudentAccessState } from "@/hooks/useStudentAccess";
 import { Button } from "@/components/ui/button";
+import {
+  backgroundErrorKeepsScreen,
+  shouldShowBlockingLoader,
+  shouldStartBackgroundCheck,
+} from "@/utils/accessRevalidation";
+
+const BACKGROUND_CHECK_MIN_INTERVAL_MS = 15_000;
 
 interface AuthGuardProps {
   children: ReactNode;
   allowedRoles?: UserRole[];
+}
+
+interface StudentAccessRpcClient {
+  rpc(
+    functionName: "get_student_access_state",
+    args: { _student_id: string }
+  ): Promise<{ data: unknown; error: unknown }>;
 }
 
 function blockedDestination(state: StudentAccessState) {
@@ -26,77 +40,113 @@ export const AuthGuard = ({ children, allowedRoles }: AuthGuardProps) => {
   const [isBlocked, setIsBlocked] = useState(true);
   const [accessState, setAccessState] = useState<StudentAccessState | null>(null);
   const [accessCheckError, setAccessCheckError] = useState<string | null>(null);
+  const [firstCheckDone, setFirstCheckDone] = useState(false);
+  const inFlightRef = useRef<Promise<void> | null>(null);
+  const lastCheckAtRef = useRef(0);
 
-  const checkAccess = useCallback(async () => {
-    setCheckingAccess(true);
-    setAccessCheckError(null);
+  const checkAccess = useCallback(
+    (options: { background?: boolean } = {}): Promise<void> => {
+      const background = options.background === true;
 
-    if (!user || !role) {
-      setAccessState(null);
-      setIsBlocked(true);
-      setCheckingAccess(false);
-      return;
-    }
+      if (inFlightRef.current) return inFlightRef.current;
 
-    if (role === "admin") {
-      setAccessState(null);
-      setIsBlocked(false);
-      setCheckingAccess(false);
-      return;
-    }
+      if (
+        background &&
+        !shouldStartBackgroundCheck({
+          now: Date.now(),
+          lastCheckAt: lastCheckAtRef.current,
+          inFlight: false,
+          minIntervalMs: BACKGROUND_CHECK_MIN_INTERVAL_MS,
+        })
+      ) {
+        return Promise.resolve();
+      }
 
-    try {
-      if (role === "aluno") {
-        const { data, error } = await (supabase as any).rpc(
-          "get_student_access_state",
-          { _student_id: user.id }
-        );
+      if (!background && !firstCheckDone) setCheckingAccess(true);
 
-        if (error) throw error;
-        if (!data || typeof data !== "object") {
-          throw new Error("Resposta de acesso invalida");
-        }
+      const request = Promise.resolve()
+        .then(async () => {
+          if (!user || !role) {
+            setAccessState(null);
+            setIsBlocked(true);
+            return;
+          }
 
-        const nextState = data as StudentAccessState;
-        setAccessState(nextState);
+          if (role === "admin") {
+            setAccessState(null);
+            if (!background) setAccessCheckError(null);
+            setIsBlocked(false);
+            return;
+          }
 
-        if (nextState.allowed !== true) {
+          if (role === "aluno") {
+            const { data, error } = await (
+              supabase as unknown as StudentAccessRpcClient
+            ).rpc("get_student_access_state", { _student_id: user.id });
+
+            if (error) throw error;
+            if (!data || typeof data !== "object") {
+              throw new Error("Resposta de acesso inválida");
+            }
+
+            const nextState = data as StudentAccessState;
+            setAccessState(nextState);
+            if (!background) setAccessCheckError(null);
+
+            if (nextState.allowed !== true) {
+              setIsBlocked(true);
+              navigate(blockedDestination(nextState), { replace: true });
+              return;
+            }
+
+            setIsBlocked(false);
+            return;
+          }
+
+          const { data, error } = await supabase.rpc("pode_acessar_plataforma", {
+            _user_id: user.id,
+          });
+
+          if (error) throw error;
+          if (data !== true) {
+            if (!background) setAccessCheckError(null);
+            setIsBlocked(true);
+            navigate("/acesso-suspenso", { replace: true });
+            return;
+          }
+
+          setAccessState(null);
+          if (!background) setAccessCheckError(null);
+          setIsBlocked(false);
+        })
+        .catch((error) => {
+          if (background && backgroundErrorKeepsScreen()) {
+            console.warn("Erro ao revalidar acesso em segundo plano:", error);
+            return;
+          }
+
+          console.error("Erro ao verificar acesso:", error);
           setIsBlocked(true);
-          navigate(blockedDestination(nextState), { replace: true });
-          return;
-        }
+          setAccessCheckError(
+            "Não foi possível verificar seu acesso. Confira sua conexão e tente novamente."
+          );
+        })
+        .finally(() => {
+          lastCheckAtRef.current = Date.now();
+          setCheckingAccess(false);
+          setFirstCheckDone(true);
+          inFlightRef.current = null;
+        });
 
-        setIsBlocked(false);
-        return;
-      }
-
-      const { data, error } = await supabase.rpc("pode_acessar_plataforma", {
-        _user_id: user.id,
-      });
-
-      if (error) throw error;
-      if (data !== true) {
-        setIsBlocked(true);
-        navigate("/acesso-suspenso", { replace: true });
-        return;
-      }
-
-      setAccessState(null);
-      setIsBlocked(false);
-    } catch (error) {
-      console.error("Erro ao verificar acesso:", error);
-      setIsBlocked(true);
-      setAccessCheckError(
-        "Nao foi possivel verificar seu acesso. Confira sua conexao e tente novamente."
-      );
-    } finally {
-      setCheckingAccess(false);
-    }
-  }, [navigate, role, user]);
+      inFlightRef.current = request;
+      return request;
+    },
+    [firstCheckDone, navigate, role, user]
+  );
 
   useEffect(() => {
-    if (!loading) void checkAccess();
-  }, [checkAccess, loading]);
+    if (!loading) void checkAccess({ background: firstCheckDone });
+  }, [checkAccess, firstCheckDone, loading]);
 
   useEffect(() => {
     if (role !== "aluno" || accessState?.allowed !== true) return;
@@ -113,21 +163,21 @@ export const AuthGuard = ({ children, allowedRoles }: AuthGuardProps) => {
     const delay = Math.min(...expirationTimes) - Date.now() + 1_000;
 
     if (delay <= 0) {
-      void checkAccess();
+      void checkAccess({ background: true });
       return;
     }
 
     const timer = window.setTimeout(
-      () => void checkAccess(),
+      () => void checkAccess({ background: true }),
       Math.min(delay, 2_147_483_647)
     );
     return () => window.clearTimeout(timer);
   }, [accessState, checkAccess, role]);
 
   useEffect(() => {
-    if (!user || role !== "aluno") return;
+    if (!firstCheckDone || !user || role !== "aluno") return;
 
-    const recheck = () => void checkAccess();
+    const recheck = () => void checkAccess({ background: true });
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") recheck();
     };
@@ -158,9 +208,15 @@ export const AuthGuard = ({ children, allowedRoles }: AuthGuardProps) => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       void supabase.removeChannel(channel);
     };
-  }, [checkAccess, role, user]);
+  }, [checkAccess, firstCheckDone, role, user]);
 
-  if (loading || checkingAccess) {
+  if (
+    shouldShowBlockingLoader({
+      firstCheckDone,
+      authLoading: loading,
+      checkingAccess,
+    })
+  ) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -181,7 +237,7 @@ export const AuthGuard = ({ children, allowedRoles }: AuthGuardProps) => {
             <AlertTriangle className="h-6 w-6 text-destructive" />
           </div>
           <h1 className="text-xl font-semibold text-foreground">
-            Verificacao de acesso indisponivel
+            Verificação de acesso indisponível
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">{accessCheckError}</p>
           <Button onClick={() => void checkAccess()} className="mt-6 w-full gap-2">

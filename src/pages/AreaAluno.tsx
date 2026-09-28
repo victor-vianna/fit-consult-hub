@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { getMaterialSignedUrl, openMaterialInNewTab } from "@/utils/materiais";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ import {
   Library,
   MessageSquare,
   Activity,
+  type LucideIcon,
 } from "lucide-react";
 import { AvaliacaoAlunoSection } from "@/components/avaliacao/AvaliacaoAlunoSection";
 import { AnamneseVisualizacao } from "@/components/AnamneseVisualizacao";
@@ -61,6 +62,11 @@ import { ptBR } from "date-fns/locale";
 import { MaterialFileExplorer } from "@/components/materials/MaterialFileExplorer";
 import { cn } from "@/lib/utils";
 import { formatDisplayDateTime } from "@/utils/dateFormat";
+import {
+  getAllowedAlunoSections,
+  resolveInitialAlunoSection,
+} from "@/utils/alunoSection";
+import type { Tables } from "@/integrations/supabase/types";
 
 interface Material {
   id: string;
@@ -72,10 +78,15 @@ interface Material {
   created_at: string;
 }
 
-const ALWAYS_ALLOWED_ALUNO_SECTIONS = ["inicio", "treinos", "chat", "dados", "plano"] as const;
+type AlunoProfile = Tables<"profiles">;
+type PersonalContactProfile = Pick<AlunoProfile, "telefone"> & {
+  nome?: string | null;
+};
 
-function getAllowedAlunoSections(cardsVisiveis: string[]) {
-  return Array.from(new Set([...ALWAYS_ALLOWED_ALUNO_SECTIONS, ...cardsVisiveis]));
+interface SelectedMaterialFile {
+  url: string;
+  name: string;
+  type: string;
 }
 
 function getAlunoActiveSectionKey(userId: string) {
@@ -101,26 +112,28 @@ function readAlunoSectionScroll(userId: string, section: string) {
 export default function AreaAluno() {
   const { user, signOut } = useAuth();
   const isMobile = useIsMobile();
-  const [searchParams] = useSearchParams();
-  const [profile, setProfile] = useState<any>(null);
-  const [personalProfile, setPersonalProfile] = useState<any>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [profile, setProfile] = useState<AlunoProfile | null>(null);
+  const [personalProfile, setPersonalProfile] =
+    useState<PersonalContactProfile | null>(null);
   const [materiais, setMateriais] = useState<Material[]>([]);
   const [activeSection, setActiveSection] = useState<string>("inicio");
   const activeSectionHydratedUserRef = useRef<string | null>(null);
   const activeSectionRef = useRef(activeSection);
   const mainScrollRef = useRef<HTMLElement | null>(null);
   const scrollSaveTimerRef = useRef<number | null>(null);
-  const skipNextSectionPersistRef = useRef(false);
   const welcomeMessageRequestRef = useRef<Set<string>>(new Set());
   const [viewerOpen, setViewerOpen] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<any>(null);
+  const [selectedFile, setSelectedFile] =
+    useState<SelectedMaterialFile | null>(null);
   const [loading, setLoading] = useState(true);
   const chatNaoLidas = useChatNaoLidas(user?.id || "");
 
   // Buscar configurações do personal
-  const { settings: personalSettings } = usePersonalSettings(
-    profile?.personal_id || undefined
-  );
+  const {
+    settings: personalSettings,
+    loading: personalSettingsLoading,
+  } = usePersonalSettings(profile?.personal_id || undefined);
 
   useEffect(() => {
     activeSectionRef.current = activeSection;
@@ -175,9 +188,20 @@ export default function AreaAluno() {
         saveSectionScroll(activeSectionRef.current);
       }
 
+      activeSectionRef.current = section;
       setActiveSection(section);
+
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          next.set("section", section);
+          next.delete("tab");
+          return next;
+        },
+        { replace: true }
+      );
     },
-    [saveSectionScroll]
+    [saveSectionScroll, setSearchParams]
   );
 
   const handleMainScroll = useCallback(() => {
@@ -194,24 +218,7 @@ export default function AreaAluno() {
   }, [saveSectionScroll, user?.id]);
 
   useEffect(() => {
-    if (!user?.id || activeSectionHydratedUserRef.current === user.id) return;
-
-    activeSectionHydratedUserRef.current = user.id;
-    skipNextSectionPersistRef.current = true;
-
-    const sectionFromUrl = searchParams.get("section") || searchParams.get("tab");
-    const nextSection = sectionFromUrl || "inicio";
-
-    setActiveSection(nextSection);
-  }, [searchParams, user?.id]);
-
-  useEffect(() => {
     if (!user?.id || activeSectionHydratedUserRef.current !== user.id) return;
-
-    if (skipNextSectionPersistRef.current) {
-      skipNextSectionPersistRef.current = false;
-      return;
-    }
 
     try {
       window.localStorage.setItem(
@@ -292,7 +299,7 @@ export default function AreaAluno() {
         if (!welcomeMessageRequestRef.current.has(welcomeMessageKey)) {
           welcomeMessageRequestRef.current.add(welcomeMessageKey);
 
-          void supabase.rpc("enviar_mensagem_boas_vindas_chat" as any).then(({ error }) => {
+          void supabase.rpc("enviar_mensagem_boas_vindas_chat").then(({ error }) => {
             if (error) {
               console.error("Erro ao enviar mensagem automatica de boas-vindas:", error);
               welcomeMessageRequestRef.current.delete(welcomeMessageKey);
@@ -326,28 +333,111 @@ export default function AreaAluno() {
     setViewerOpen(true);
   };
 
-  const cardsVisiveis = (personalSettings?.cards_visiveis?.length
-    ? personalSettings.cards_visiveis
-    : [...DEFAULT_CARDS_VISIVEIS]) as string[];
+  const cardsVisiveis = useMemo(
+    () =>
+      (personalSettings?.cards_visiveis?.length
+        ? personalSettings.cards_visiveis
+        : [...DEFAULT_CARDS_VISIVEIS]) as string[],
+    [personalSettings]
+  );
 
   const dashboardComponentes = (personalSettings?.aluno_dashboard_componentes?.length
     ? personalSettings.aluno_dashboard_componentes
     : [...DEFAULT_ALUNO_DASHBOARD_COMPONENTES]) as string[];
 
   useEffect(() => {
+    if (
+      !user?.id ||
+      !profile?.id ||
+      personalSettingsLoading ||
+      activeSectionHydratedUserRef.current === user.id
+    ) {
+      return;
+    }
+
+    let storedSection: string | null = null;
+    try {
+      const raw = window.localStorage.getItem(getAlunoActiveSectionKey(user.id));
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw) as unknown;
+          storedSection = typeof parsed === "string" ? parsed : null;
+        } catch {
+          storedSection = raw;
+        }
+      }
+    } catch {
+      // localStorage indisponivel: segue com URL ou secao inicial
+    }
+
+    const sectionFromUrl = searchParams.get("section") || searchParams.get("tab");
+    const nextSection = resolveInitialAlunoSection({
+      urlSection: sectionFromUrl,
+      storedSection,
+      allowedSections: getAllowedAlunoSections(cardsVisiveis),
+    });
+
+    activeSectionHydratedUserRef.current = user.id;
+    handleSectionChange(nextSection);
+  }, [
+    cardsVisiveis,
+    handleSectionChange,
+    personalSettingsLoading,
+    profile?.id,
+    searchParams,
+    user?.id,
+  ]);
+
+  useEffect(() => {
+    if (
+      !user?.id ||
+      !profile?.id ||
+      personalSettingsLoading ||
+      activeSectionHydratedUserRef.current !== user.id
+    ) {
+      return;
+    }
+
     const secoesPermitidas = getAllowedAlunoSections(cardsVisiveis);
     if (!secoesPermitidas.includes(activeSection)) {
       handleSectionChange("inicio");
     }
-  }, [activeSection, cardsVisiveis.join("|"), handleSectionChange]);
+  }, [
+    activeSection,
+    cardsVisiveis,
+    handleSectionChange,
+    personalSettingsLoading,
+    profile?.id,
+    user?.id,
+  ]);
 
   useEffect(() => {
+    if (
+      !user?.id ||
+      !profile?.id ||
+      personalSettingsLoading ||
+      activeSectionHydratedUserRef.current !== user.id
+    ) {
+      return;
+    }
+
     const sectionFromUrl = searchParams.get("section") || searchParams.get("tab");
     const secoesPermitidas = getAllowedAlunoSections(cardsVisiveis);
-    if (sectionFromUrl && secoesPermitidas.includes(sectionFromUrl)) {
+    if (
+      sectionFromUrl &&
+      sectionFromUrl !== activeSectionRef.current &&
+      secoesPermitidas.includes(sectionFromUrl)
+    ) {
       handleSectionChange(sectionFromUrl);
     }
-  }, [cardsVisiveis.join("|"), handleSectionChange, searchParams]);
+  }, [
+    cardsVisiveis,
+    handleSectionChange,
+    personalSettingsLoading,
+    profile?.id,
+    searchParams,
+    user?.id,
+  ]);
 
   const { ultima: ultimaMsg } = useUltimaMensagem(
     profile?.personal_id || "",
@@ -392,7 +482,10 @@ export default function AreaAluno() {
     );
   };
 
-  const cardConfig: Record<string, { title: string; icon: any; section: string; badge?: number }> = {
+  const cardConfig: Record<
+    string,
+    { title: string; icon: LucideIcon; section: string; badge?: number }
+  > = {
     treinos: { title: ALUNO_CARD_LABELS.treinos, icon: Dumbbell, section: "treinos" },
     chat: { title: ALUNO_CARD_LABELS.chat, icon: MessageSquare, section: "chat", badge: chatNaoLidas },
     avaliacao: { title: ALUNO_CARD_LABELS.avaliacao, icon: Activity, section: "dados" },

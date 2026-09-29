@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { createStudentNotification } from "@/utils/studentNotifications";
 import type { ManualPaymentMethod } from "@/utils/paymentMethods";
+import { getSubscriptionLifecycleAlert } from "@/utils/subscriptionLifecycleNotifications";
 
 export type { ManualPaymentMethod } from "@/utils/paymentMethods";
 
@@ -66,45 +67,34 @@ const notifySubscriptionLifecycleAlerts = (
 ) => {
   if (!studentId || !personalId) return;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const alert = getSubscriptionLifecycleAlert(subscriptions);
+  if (!alert) return;
 
-  subscriptions.forEach((subscription) => {
-    if (subscription.status_pagamento !== "pago" || !subscription.data_expiracao) return;
+  const { subscription, daysUntilExpiration } = alert;
+  if (alert.kind === "expired") {
+    void createStudentNotification({
+      studentId,
+      personalId,
+      tipo: "plano_expirado",
+      titulo: "Plano expirado",
+      mensagem: "Seu plano expirou. Regularize para manter o acesso.",
+      dados: { subscription_id: subscription.id, data_expiracao: subscription.data_expiracao },
+      dedupeKey: `${subscription.id}:plano_expirado`,
+    });
+    return;
+  }
 
-    const expiration = new Date(subscription.data_expiracao);
-    if (!Number.isFinite(expiration.getTime())) return;
-    expiration.setHours(0, 0, 0, 0);
-
-    const daysUntilExpiration = Math.ceil((expiration.getTime() - today.getTime()) / DAY_MS);
-
-    if (daysUntilExpiration < 0) {
-      void createStudentNotification({
-        studentId,
-        personalId,
-        tipo: "plano_expirado",
-        titulo: "Plano expirado",
-        mensagem: "Seu plano expirou. Regularize para manter o acesso.",
-        dados: { subscription_id: subscription.id, data_expiracao: subscription.data_expiracao },
-        dedupeKey: `${subscription.id}:plano_expirado`,
-      });
-      return;
-    }
-
-    if (daysUntilExpiration <= 7) {
-      void createStudentNotification({
-        studentId,
-        personalId,
-        tipo: "plano_expirando",
-        titulo: "Plano expirando",
-        mensagem:
-          daysUntilExpiration === 0
-            ? "Seu plano expira hoje."
-            : `Seu plano expira em ${daysUntilExpiration} dia${daysUntilExpiration === 1 ? "" : "s"} (${formatDatePtBr(subscription.data_expiracao)}).`,
-        dados: { subscription_id: subscription.id, data_expiracao: subscription.data_expiracao },
-        dedupeKey: `${subscription.id}:plano_expirando:${subscription.data_expiracao}`,
-      });
-    }
+  void createStudentNotification({
+    studentId,
+    personalId,
+    tipo: "plano_expirando",
+    titulo: "Plano expirando",
+    mensagem:
+      daysUntilExpiration === 0
+        ? "Seu plano expira hoje."
+        : `Seu plano expira em ${daysUntilExpiration} dia${daysUntilExpiration === 1 ? "" : "s"} (${formatDatePtBr(subscription.data_expiracao)}).`,
+    dados: { subscription_id: subscription.id, data_expiracao: subscription.data_expiracao },
+    dedupeKey: `${subscription.id}:plano_expirando:${subscription.data_expiracao}`,
   });
 };
 

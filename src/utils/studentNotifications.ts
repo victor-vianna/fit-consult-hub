@@ -25,25 +25,14 @@ export async function createStudentNotification({
 }: StudentNotificationInput) {
   if (!studentId) return null;
 
-  if (dedupeKey) {
-    const { data: existing, error: existingError } = await supabase
-      .from("notificacoes")
-      .select("id")
-      .eq("destinatario_id", studentId)
-      .eq("tipo", tipo)
-      .contains("dados", { dedupe_key: dedupeKey })
-      .maybeSingle();
-
-    if (!existingError && existing?.id) return existing.id;
-  }
-
   const id = createNotificationId();
-  const { error } = await supabase.from("notificacoes").insert({
+  const notification = {
     id,
     destinatario_id: studentId,
     tipo,
     titulo,
     mensagem: previewNotificationMessage(mensagem, 90),
+    dedupe_key: dedupeKey || null,
     dados: {
       aluno_id: studentId,
       personal_id: personalId || null,
@@ -52,20 +41,51 @@ export async function createStudentNotification({
       ...(dados || {}),
     },
     lida: false,
-  });
+  };
+
+  const query = dedupeKey
+    ? supabase
+        .from("notificacoes")
+        .upsert(notification, {
+          onConflict: "destinatario_id,tipo,dedupe_key",
+          ignoreDuplicates: true,
+        })
+    : supabase.from("notificacoes").insert(notification);
+
+  const { data: inserted, error } = await query.select("id").maybeSingle();
 
   if (error) {
     console.error("Erro ao criar notificacao para aluno:", error);
     return null;
   }
 
-  if (push) {
-    await dispatchPushNotification(id).catch((pushError) => {
+  // An ignored conflict means this event had already been persisted. Do not
+  // send another push; return the canonical id for callers that need it.
+  if (!inserted?.id && dedupeKey) {
+    const { data: existing, error: existingError } = await supabase
+      .from("notificacoes")
+      .select("id")
+      .eq("destinatario_id", studentId)
+      .eq("tipo", tipo)
+      .eq("dedupe_key", dedupeKey)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) {
+      console.error("Erro ao localizar notificacao deduplicada:", existingError);
+      return null;
+    }
+
+    return existing?.id || null;
+  }
+
+  if (push && inserted?.id) {
+    await dispatchPushNotification(inserted.id).catch((pushError) => {
       console.error("Erro ao enviar push para aluno:", pushError);
     });
   }
 
-  return id;
+  return inserted?.id || null;
 }
 
 function getStudentNotificationAction(tipo: string) {

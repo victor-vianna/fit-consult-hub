@@ -1306,6 +1306,7 @@ export type Database = {
         Row: {
           created_at: string | null
           dados: Json | null
+          dedupe_key: string | null
           destinatario_id: string | null
           id: string
           lida: boolean | null
@@ -1316,6 +1317,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           dados?: Json | null
+          dedupe_key?: string | null
           destinatario_id?: string | null
           id?: string
           lida?: boolean | null
@@ -1326,6 +1328,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           dados?: Json | null
+          dedupe_key?: string | null
           destinatario_id?: string | null
           id?: string
           lida?: boolean | null

@@ -95,6 +95,11 @@ import {
   normalizeExerciseGroups,
   normalizeWorkoutBlocks,
 } from "@/utils/workoutNormalization";
+import { shouldStartBackgroundCheck } from "@/utils/accessRevalidation";
+import {
+  shouldShowWorkoutBlockingLoader,
+  shouldShowWorkoutLoadError,
+} from "@/utils/workoutLoading";
 
 import {
   DndContext,
@@ -166,6 +171,7 @@ export function TreinosManager({
   const {
     treinos,
     loading,
+    hasData: treinosHasData,
     adicionarExercicio,
     editarExercicio,
     removerExercicio,
@@ -189,6 +195,7 @@ export function TreinosManager({
     error: treinosError,
     refetch: refetchTreinos,
     semanaAtivaData,
+    sincronizarProgressoPendente,
   } = useTreinos({
     profileId,
     personalId,
@@ -255,6 +262,7 @@ export function TreinosManager({
   const {
     gruposPorTreino,
     loading: loadingGrupos,
+    hasData: gruposHasData,
     obterGruposDoTreino,
     criarGrupo,
     editarGrupo,
@@ -275,6 +283,7 @@ export function TreinosManager({
   const {
     blocosPorTreino,
     loading: loadingBlocos,
+    hasData: blocosHasData,
     obterBlocos,
     criarBloco,
     atualizarBloco,
@@ -295,11 +304,34 @@ export function TreinosManager({
   const [isAtivandoSemanaSelecionada, setIsAtivandoSemanaSelecionada] =
     useState(false);
 
-  const workoutLoadError = treinosError || gruposError || blocosError;
+  const hasCurrentWorkoutData =
+    treinosHasData && gruposHasData && blocosHasData;
+
+  const showWorkoutBlockingLoader = shouldShowWorkoutBlockingLoader({
+    hasLoadedOnce: hasCurrentWorkoutData,
+    isInitialLoading: loading || loadingGrupos || loadingBlocos,
+  });
+
+  const workoutLoadError = shouldShowWorkoutLoadError({
+    hasData: treinosHasData,
+    hasError: Boolean(treinosError),
+  })
+    ? treinosError
+    : shouldShowWorkoutLoadError({
+          hasData: gruposHasData,
+          hasError: Boolean(gruposError),
+        })
+      ? gruposError
+      : shouldShowWorkoutLoadError({
+            hasData: blocosHasData,
+            hasError: Boolean(blocosError),
+          })
+        ? blocosError
+        : null;
   const workoutLoadErrorMessage =
     workoutLoadError instanceof Error
       ? workoutLoadError.message
-      : "Nao foi possivel carregar o treino completo.";
+      : "Não foi possível carregar o treino completo.";
 
   const handleRetryWorkoutLoad = useCallback(async () => {
     await Promise.allSettled([
@@ -365,19 +397,31 @@ export function TreinosManager({
     }
   }, [personalId, profileId, queryClient, semanaSelecionada]);
 
-  const [isResumingWorkoutData, setIsResumingWorkoutData] = useState(false);
   const resumeRefetchInFlightRef = useRef<Promise<void> | null>(null);
   const resumeRefetchTimerRef = useRef<number | null>(null);
+  const resumeLastCheckAtRef = useRef(0);
 
   const refetchStudentWorkoutData = useCallback(async () => {
     if (!isAluno || !profileId || !personalId || !workoutWeekReady) return;
-    if (resumeRefetchInFlightRef.current) return resumeRefetchInFlightRef.current;
+    if (!hasCurrentWorkoutData) return;
 
-    setIsResumingWorkoutData(true);
+    const existingCheck = resumeRefetchInFlightRef.current;
+    if (
+      !shouldStartBackgroundCheck({
+        now: Date.now(),
+        lastCheckAt: resumeLastCheckAtRef.current,
+        inFlight: existingCheck !== null,
+        minIntervalMs: 30_000,
+      })
+    ) {
+      return existingCheck ?? undefined;
+    }
 
     const activeWeekQueryKey = ["semana-ativa-inicio", profileId, personalId];
 
     const run = (async () => {
+      await sincronizarProgressoPendente();
+
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -424,15 +468,17 @@ export function TreinosManager({
     } catch (error) {
       console.error("[TreinosManager] Erro ao revalidar treinos no resume:", error);
     } finally {
+      resumeLastCheckAtRef.current = Date.now();
       resumeRefetchInFlightRef.current = null;
-      setIsResumingWorkoutData(false);
     }
   }, [
+    hasCurrentWorkoutData,
     isAluno,
     personalId,
     profileId,
     queryClient,
     semanaSelecionada,
+    sincronizarProgressoPendente,
     workoutWeekReady,
   ]);
 
@@ -1333,7 +1379,7 @@ export function TreinosManager({
     }
   };
 
-  if (loading || loadingGrupos || loadingBlocos || isResumingWorkoutData) {
+  if (showWorkoutBlockingLoader) {
     return (
       <div className="flex flex-col items-center justify-center py-16 space-y-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -1354,7 +1400,7 @@ export function TreinosManager({
               Erro ao carregar treino
             </h2>
             <p className="max-w-md text-sm text-muted-foreground">
-              Nao foi possivel confirmar os dados do treino agora. Tente novamente antes de considerar este dia como descanso.
+              Não foi possível confirmar os dados do treino agora. Tente novamente antes de considerar este dia como descanso.
             </p>
             <p className="max-w-md text-xs text-muted-foreground">
               {workoutLoadErrorMessage}

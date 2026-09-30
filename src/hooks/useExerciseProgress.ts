@@ -1,6 +1,6 @@
 // hooks/useExerciseProgress.ts
 // Hook para persistir progresso de exercícios e blocos no PWA
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 const EXERCISE_PROGRESS_KEY = "pwa_exercise_progress";
@@ -20,6 +20,7 @@ interface ProgressRecord {
 export function useExerciseProgress(profileId: string) {
   const [pendingSync, setPendingSync] = useState<string[]>([]);
   const [pendingBlockSync, setPendingBlockSync] = useState<string[]>([]);
+  const syncInFlightRef = useRef<Promise<void> | null>(null);
 
   const markExerciseSyncState = useCallback((exercicioId: string, synced: boolean) => {
     try {
@@ -182,31 +183,43 @@ export function useExerciseProgress(profileId: string) {
     }
   }, [profileId]);
 
+  const sincronizarTudo = useCallback((): Promise<void> => {
+    if (syncInFlightRef.current) return syncInFlightRef.current;
+
+    const run = Promise.all([
+      sincronizarExerciciosPendentes(),
+      sincronizarBlocosPendentes(),
+    ]).then(() => undefined);
+
+    syncInFlightRef.current = run;
+    const clearInFlight = () => {
+      if (syncInFlightRef.current === run) {
+        syncInFlightRef.current = null;
+      }
+    };
+    void run.then(clearInFlight, clearInFlight);
+
+    return run;
+  }, [sincronizarExerciciosPendentes, sincronizarBlocosPendentes]);
+
   // 🔧 Sincronizar tudo ao montar e quando voltar ao app
   useEffect(() => {
-    const sincronizarTudo = async () => {
-      await Promise.all([
-        sincronizarExerciciosPendentes(),
-        sincronizarBlocosPendentes()
-      ]);
-    };
-
     // Sincronizar ao montar
-    sincronizarTudo();
+    void sincronizarTudo();
 
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
-        sincronizarTudo();
+        void sincronizarTudo();
       }
     };
 
     // 🔧 iOS PWA: usar focus como fallback
     const handleFocus = () => {
-      sincronizarTudo();
+      void sincronizarTudo();
     };
 
     const handlePageHide = () => {
-      sincronizarTudo();
+      void sincronizarTudo();
     };
 
     document.addEventListener("visibilitychange", handleVisibility);
@@ -218,7 +231,7 @@ export function useExerciseProgress(profileId: string) {
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("pagehide", handlePageHide);
     };
-  }, [sincronizarExerciciosPendentes, sincronizarBlocosPendentes]);
+  }, [sincronizarTudo]);
 
   // 🔧 Salvar progresso de exercício localmente (síncrono para garantir)
   const salvarProgressoLocal = useCallback((exercicioId: string, concluido: boolean) => {
@@ -561,6 +574,7 @@ export function useExerciseProgress(profileId: string) {
     marcarSincronizado,
     obterProgressoLocal,
     mesclarProgressoExercicios,
+    sincronizarTudo,
     limparProgressoLocal,
     pendingSync,
     

@@ -28,6 +28,8 @@ const buildQueryKey = (
   semana: string
 ): QueryKey => ["blocos-treino", profileId, personalId, semana];
 
+const EMPTY_BLOCKS_BY_WORKOUT: Record<string, BlocoTreino[]> = {};
+
 const garantirTreinoExisteBloco = async (
   treinoSemanalId: string | null,
   profileId: string,
@@ -66,7 +68,7 @@ export function useWorkoutBlocks({
 
   // Query para buscar todos os blocos da semana
   const {
-    data: blocosPorTreino = {},
+    data: blocosPorTreinoData,
     isLoading: loading,
     error,
     refetch,
@@ -121,9 +123,11 @@ export function useWorkoutBlocks({
     },
     staleTime: 1000 * 60 * 2,
     enabled: enabled && !!profileId && !!personalId,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     refetchOnMount: true,
   });
+
+  const blocosPorTreino = blocosPorTreinoData ?? EMPTY_BLOCKS_BY_WORKOUT;
 
   // Mutation: Criar bloco
   const criarBlocoMutation = useMutation({
@@ -422,6 +426,7 @@ export function useWorkoutBlocks({
   return {
     blocosPorTreino,
     loading,
+    hasData: blocosPorTreinoData !== undefined,
     error,
     obterBlocos,
     criarBloco: (treinoSemanalId: string, bloco: Partial<BlocoTreino>) =>

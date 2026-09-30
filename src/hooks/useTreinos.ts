@@ -10,7 +10,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { exercicioSchema } from "@/lib/schemas/exercicioSchema";
 import type { Exercicio, TreinoDia } from "@/types/treino";
-import { useExerciseGroups } from "@/hooks/useExerciseGroups";
 import {
   getWeekStart,
   getPreviousWeekStart,
@@ -18,14 +17,13 @@ import {
   isCurrentWeek,
 } from "@/utils/weekUtils";
 import { useExerciseProgress } from "@/hooks/useExerciseProgress";
-import { hidratarBlocoComTemplate } from "@/types/workoutBlocks";
+import {
+  hidratarBlocoComTemplate,
+  type BlocoTreino,
+} from "@/types/workoutBlocks";
 import { WORKOUT_EVENTS } from "@/constants/workoutStatus";
 import { getValidVideoReferences } from "@/utils/videoLinks";
-import {
-  normalizeExerciseGroups,
-  normalizeExercises,
-  normalizeWorkoutBlocks,
-} from "@/utils/workoutNormalization";
+import { assembleWorkoutWeek } from "@/utils/workoutWeekAssembly";
 
 
 interface UseTreinosProps {
@@ -89,6 +87,7 @@ export function useTreinos({
     salvarProgressoLocal,
     marcarSincronizado,
     mesclarProgressoExercicios,
+    sincronizarTudo: sincronizarProgressoPendente,
   } = useExerciseProgress(profileId);
   
   // Estado para semana selecionada (navegável)
@@ -145,15 +144,8 @@ export function useTreinos({
     !activeWeekError &&
     (!waitsForActiveWeek || !loadingSemanaAtiva);
 
-  const { obterGruposDoTreino } = useExerciseGroups({
-    profileId,
-    personalId,
-    semana: semanaParaBuscar,
-    enabled: canFetchWorkoutWeek,
-  });
-
   const {
-    data: treinos = buildInitialTreinos(),
+    data: treinosData,
     isLoading: loadingTreinos,
     error,
     refetch,
@@ -161,8 +153,6 @@ export function useTreinos({
     // ✅ CORREÇÃO: queryKey usa semanaParaBuscar (a mesma que é buscada)
     queryKey: buildQueryKey(profileId, personalId, semanaParaBuscar),
     queryFn: async (): Promise<TreinoDia[]> => {
-      console.log(`[useTreinos] Buscando treinos para semana: ${semanaParaBuscar}`);
-
       const { data: treinosSemanais, error: treinosError } = await supabase
         .from("treinos_semanais")
         .select("*")
@@ -177,158 +167,64 @@ export function useTreinos({
         throw treinosError;
       }
 
-      // Agrupar treinos por dia_semana (suporta múltiplos treinos por dia)
-      const treinosPorDia = new Map<number, any[]>();
-      (treinosSemanais || []).forEach((treino: any) => {
-        const dia = treino.dia_semana;
-        if (!treinosPorDia.has(dia)) {
-          treinosPorDia.set(dia, []);
-        }
-        treinosPorDia.get(dia)!.push(treino);
-      });
-
-      // Processar todos os treinos (flatten para manter compatibilidade com a UI atual)
-      const todosTreinos: TreinoDia[] = [];
-
-      for (let i = 0; i < 7; i++) {
-        const dia = i + 1;
-        const treinosDoDia = treinosPorDia.get(dia) || [];
-
-        if (treinosDoDia.length === 0) {
-          // Dia sem treino - adicionar placeholder
-          todosTreinos.push({
-            dia,
-            treinoId: null,
-            exercicios: [],
-            grupos: [],
-            descricao: null,
-            concluido: false,
-            nome_treino: undefined,
-            ordem_no_dia: 1,
-          });
-        } else {
-          // Processar cada treino do dia
-          for (const treino of treinosDoDia) {
-            const { data: exercicios, error: exerciciosError } = await supabase
-              .from("exercicios")
-              .select("*")
-              .eq("treino_semanal_id", treino.id)
-              .is("deleted_at", null)
-              .order("ordem");
-
-            if (exerciciosError) {
-              console.error("❌ Erro ao buscar exercícios:", exerciciosError);
-              throw exerciciosError;
-            }
-
-            // Mapear cada registro do banco para o tipo Exercicio com conversões corretas
-            const exerciciosTipados: Exercicio[] = normalizeExercises(
-              mesclarProgressoExercicios((exercicios || []).map(
-              (ex: any) => {
-                const mapped: Exercicio = {
-                  id: String(ex.id),
-                  treino_semanal_id:
-                    ex.treino_semanal_id != null
-                      ? String(ex.treino_semanal_id)
-                      : null,
-                  nome: String(ex.nome ?? ""),
-                  link_video: ex.link_video ?? null,
-                  links_demonstracao: getValidVideoReferences(
-                    ex.links_demonstracao,
-                    ex.link_video
-                  ),
-                  ordem:
-                    typeof ex.ordem === "number"
-                      ? ex.ordem
-                      : Number(ex.ordem ?? 0),
-                  ordem_no_grupo:
-                    ex.ordem_no_grupo != null ? Number(ex.ordem_no_grupo) : null,
-                  series: ex.series != null ? Number(ex.series) : 3,
-                  series_concluidas:
-                    ex.series_concluidas != null
-                      ? Number(ex.series_concluidas)
-                      : 0,
-                  repeticoes: ex.repeticoes ?? "12",
-                  descanso: ex.descanso != null ? Number(ex.descanso) : 60,
-                  descanso_entre_grupos:
-                    ex.descanso_entre_grupos != null
-                      ? Number(ex.descanso_entre_grupos)
-                      : null,
-                  carga: cargaFromDb(ex.carga),
-                  peso_executado: ex.peso_executado ?? null,
-                  observacoes: ex.observacoes ?? null,
-                  concluido: Boolean(ex.concluido),
-                  grupo_id: ex.grupo_id ?? null,
-                  tipo_agrupamento: ex.tipo_agrupamento ?? null,
-                  created_at: ex.created_at ?? null,
-                  updated_at: ex.updated_at ?? null,
-                  deleted_at: ex.deleted_at ?? null,
-                };
-                return mapped;
-              }
-            ))
-            );
-
-            // Buscar grupos associados ao treino
-            const grupos = normalizeExerciseGroups(
-              await obterGruposDoTreino(treino.id)
-            );
-
-            // Buscar blocos do treino
-            const { data: blocos, error: blocosError } = await supabase
-              .from("blocos_treino")
-              .select("*")
-              .eq("treino_semanal_id", treino.id)
-              .is("deleted_at", null)
-              .order("ordem", { ascending: true });
-
-            if (blocosError) {
-              console.error("❌ Erro ao buscar blocos:", blocosError);
-              throw blocosError;
-            }
-
-            const blocosHidratados = normalizeWorkoutBlocks(
-              (blocos ?? []).map((b: any) => hidratarBlocoComTemplate(b))
-            );
-
-            todosTreinos.push({
-              dia,
-              treinoId: treino.id,
-              exercicios: exerciciosTipados,
-              grupos,
-              blocos: blocosHidratados,
-              descricao: treino.descricao ?? null,
-              concluido: Boolean(treino.concluido),
-              nome_treino: treino.nome_treino || undefined,
-              ordem_no_dia: treino.ordem_no_dia || 1,
-            });
-          }
-        }
+      if (!treinosSemanais || treinosSemanais.length === 0) {
+        return assembleWorkoutWeek({
+          treinosSemanais: [],
+          exercicios: [],
+          blocos: [],
+          hidratarBloco: (bloco) =>
+            hidratarBlocoComTemplate(bloco as unknown as BlocoTreino),
+          mesclarProgressoExercicios,
+        });
       }
 
-      return todosTreinos;
+      const treinoIds = treinosSemanais.map((treino) => treino.id);
+      const [exerciciosResult, blocosResult] = await Promise.all([
+        supabase
+          .from("exercicios")
+          .select("*")
+          .in("treino_semanal_id", treinoIds)
+          .is("deleted_at", null)
+          .order("ordem", { ascending: true }),
+        supabase
+          .from("blocos_treino")
+          .select("*")
+          .in("treino_semanal_id", treinoIds)
+          .is("deleted_at", null)
+          .order("ordem", { ascending: true }),
+      ]);
+
+      if (exerciciosResult.error) {
+        console.error("❌ Erro ao buscar exercícios:", exerciciosResult.error);
+        throw exerciciosResult.error;
+      }
+      if (blocosResult.error) {
+        console.error("❌ Erro ao buscar blocos:", blocosResult.error);
+        throw blocosResult.error;
+      }
+
+      return assembleWorkoutWeek({
+        treinosSemanais,
+        exercicios: exerciciosResult.data,
+        blocos: blocosResult.data,
+        hidratarBloco: (bloco) =>
+          hidratarBlocoComTemplate(bloco as unknown as BlocoTreino),
+        mesclarProgressoExercicios,
+      });
     },
     staleTime: 1000 * 60 * 2,
     enabled: canFetchWorkoutWeek,
-    // 🔧 CORREÇÃO: Desabilitar refetchOnWindowFocus para evitar race condition
-    // A sincronização é feita manualmente via visibilitychange com ordem controlada
+    // O TreinosManager coordena a sincronização e a revalidação ao voltar ao app.
     refetchOnWindowFocus: false,
     refetchOnMount: true,
     // 🔧 PWA: Manter dados mais atualizados
     refetchOnReconnect: true,
   });
 
-  // 🔧 FIX: Improved sync ordering - wait for localStorage sync THEN refetch
+  const treinos = treinosData ?? buildInitialTreinos();
+
   useEffect(() => {
     let progressRefetchTimer: number | null = null;
-
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === "visible" && profileId && personalId) {
-        // Wait for useExerciseProgress sync to complete
-        await new Promise(r => setTimeout(r, 500));
-        refetch();
-      }
-    };
 
     // 🔧 FIX: Listen to centralized event
     const handleWorkoutCompleted = () => {
@@ -351,11 +247,9 @@ export function useTreinos({
       }, 300);
     };
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener(WORKOUT_EVENTS.COMPLETED, handleWorkoutCompleted);
     window.addEventListener(WORKOUT_EVENTS.PROGRESS_CHANGED, handleProgressChanged);
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener(WORKOUT_EVENTS.COMPLETED, handleWorkoutCompleted);
       window.removeEventListener(WORKOUT_EVENTS.PROGRESS_CHANGED, handleProgressChanged);
 
@@ -966,6 +860,7 @@ export function useTreinos({
   return {
     treinos,
     loading: loadingTreinos || (waitsForActiveWeek && loadingSemanaAtiva),
+    hasData: treinosData !== undefined,
     error: activeWeekError || error,
     activeWeekError,
     workoutWeekReady: canFetchWorkoutWeek,
@@ -977,6 +872,7 @@ export function useTreinos({
     irParaSemanaAtual,
     isSemanaAtual,
     semanaAtivaData,
+    sincronizarProgressoPendente,
     // Mutations
     adicionarExercicio: (dia: number, exercicio: Partial<Exercicio>, treinoIdAlvo?: string | null) =>
       adicionarExercicioMutation.mutateAsync({ dia, exercicio, treinoIdAlvo }),

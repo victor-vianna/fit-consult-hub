@@ -14,14 +14,16 @@ import {
   getValidVideoReferences,
   type DemonstrationVideoLink,
 } from "@/utils/videoLinks";
+import {
+  buildGroupsFromExercises,
+  type GrupoExercicio,
+  type TipoAgrupamento,
+} from "@/utils/workoutWeekAssembly";
 
-type TipoAgrupamento =
-  | "normal"
-  | "bi-set"
-  | "tri-set"
-  | "drop-set"
-  | "superset"
-  | "circuito";
+export type {
+  GrupoExercicio,
+  TipoAgrupamento,
+} from "@/utils/workoutWeekAssembly";
 
 export interface ExercicioInput {
   id?: string;
@@ -43,14 +45,6 @@ export interface GrupoExerciciosInput {
   exercicios: ExercicioInput[];
 }
 
-export interface GrupoExercicio {
-  grupo_id: string;
-  tipo_agrupamento: TipoAgrupamento;
-  descanso_entre_grupos?: number | null;
-  ordem: number;
-  exercicios: any[];
-}
-
 interface UseExerciseGroupsProps {
   profileId: string;
   personalId: string;
@@ -64,6 +58,8 @@ const buildQueryKey = (
   personalId: string,
   semana: string
 ): QueryKey => ["grupos-exercicios", profileId, personalId, semana];
+
+const EMPTY_GROUPS_BY_WORKOUT: Record<string, GrupoExercicio[]> = {};
 
 /**
  * Valida que o treino semanal de destino existe na semana carregada.
@@ -124,7 +120,7 @@ export function useExerciseGroups({
 
   // Query para buscar todos os grupos da semana
   const {
-    data: gruposPorTreino = {},
+    data: gruposPorTreinoData,
     isLoading: loading,
     error,
     refetch,
@@ -156,45 +152,7 @@ export function useExerciseGroups({
 
         if (exerciciosError) throw exerciciosError;
 
-        // 3. Agrupar por treino_semanal_id e grupo_id
-        const resultado: Record<string, GrupoExercicio[]> = {};
-
-        (exercicios || []).forEach((ex) => {
-          const tid = ex.treino_semanal_id;
-          const gid = ex.grupo_id;
-          if (!gid) return;
-
-          if (!resultado[tid]) resultado[tid] = [];
-
-          let grupo = resultado[tid].find((g) => g.grupo_id === gid);
-          if (!grupo) {
-            grupo = {
-              grupo_id: gid,
-              tipo_agrupamento:
-                (ex.tipo_agrupamento as TipoAgrupamento) || "normal",
-              descanso_entre_grupos: ex.descanso_entre_grupos ?? null,
-              ordem: ex.ordem ?? Number.MAX_SAFE_INTEGER,
-              exercicios: [],
-            };
-            resultado[tid].push(grupo);
-          }
-
-          grupo.exercicios.push(ex);
-          const ordemAtual = ex.ordem ?? Number.MAX_SAFE_INTEGER;
-          if (ordemAtual < grupo.ordem) grupo.ordem = ordemAtual;
-        });
-
-        // Ordenar grupos por ordem
-        Object.keys(resultado).forEach((tid) => {
-          resultado[tid] = normalizeExerciseGroups(resultado[tid]);
-        });
-
-        console.log(
-          "[useExerciseGroups] Grupos carregados:",
-          Object.keys(resultado).length,
-          "treinos"
-        );
-        return resultado;
+        return buildGroupsFromExercises(exercicios);
       } catch (err) {
         console.error("[useExerciseGroups] Erro na query:", err);
         throw err;
@@ -202,9 +160,12 @@ export function useExerciseGroups({
     },
     staleTime: 1000 * 60 * 2,
     enabled: enabled && !!profileId && !!personalId,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     refetchOnMount: true,
   });
+
+  const gruposPorTreino =
+    gruposPorTreinoData ?? EMPTY_GROUPS_BY_WORKOUT;
 
   // Mutation: Criar grupo
   const criarGrupoMutation = useMutation({
@@ -586,6 +547,7 @@ export function useExerciseGroups({
   return {
     gruposPorTreino,
     loading,
+    hasData: gruposPorTreinoData !== undefined,
     error,
     obterGruposDoTreino,
     criarGrupo: (treinoSemanalId: string, payload: GrupoExerciciosInput) =>

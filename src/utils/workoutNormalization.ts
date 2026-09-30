@@ -115,8 +115,9 @@ export function normalizeExercises<T extends ExerciseLike>(
 
     const id = exercicio.id ? String(exercicio.id) : "";
     const signature = getExerciseSignature(exercicio);
+    const existingById = id ? byId.get(id) : undefined;
     const existingIndex =
-      (id && byId.get(id)) ?? bySignature.get(signature) ?? -1;
+      existingById ?? bySignature.get(signature) ?? -1;
 
     if (existingIndex >= 0) {
       result[existingIndex] = mergeProgress(result[existingIndex], exercicio);
@@ -191,8 +192,9 @@ export function normalizeExerciseGroups<T extends ExerciseGroupLike>(
 
     const id = normalizedGroup.grupo_id ? String(normalizedGroup.grupo_id) : "";
     const signature = getGroupSignature(normalizedGroup, index);
+    const existingById = id ? byId.get(id) : undefined;
     const existingIndex =
-      (id && byId.get(id)) ?? bySignature.get(signature) ?? -1;
+      existingById ?? bySignature.get(signature) ?? -1;
 
     if (existingIndex >= 0) {
       result[existingIndex] = mergeGroups(result[existingIndex], normalizedGroup);
@@ -262,8 +264,9 @@ export function normalizeWorkoutBlocks<T extends BlockLike>(
 
     const id = bloco.id ? String(bloco.id) : "";
     const signature = getBlockSignature(bloco);
+    const existingById = id ? byId.get(id) : undefined;
     const existingIndex =
-      (id && byId.get(id)) ?? bySignature.get(signature) ?? -1;
+      existingById ?? bySignature.get(signature) ?? -1;
 
     if (existingIndex >= 0) {
       result[existingIndex] = mergeProgress(result[existingIndex], bloco);
